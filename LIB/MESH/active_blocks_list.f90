@@ -30,7 +30,7 @@ subroutine active_blocks_list()
     ! create new list
     j = 1
     do i = 1, blocks_params%number_max_blocks
-        if (blocks(i)%active == .true.) then
+        if (blocks(i)%active .eqv. .true.) then
             blocks_list(j) = i
             j = j + 1
         end if

@@ -1,17 +1,17 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! main program, time loop
 !
 ! name: main.f90
 ! date: 01.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
-program main
+program mains
 
     use module_params
     use module_blocks
@@ -37,7 +37,7 @@ program main
 
     ! check workdir
     call check_workdir()
-   
+
     ! cpu time start
     call cpu_time(t0)
 
@@ -84,4 +84,4 @@ program main
     call cpu_time(t1)
     write(*,'(a,f10.6)') "cpu-time = ", t1-t0
 
-end program main
+end program mains

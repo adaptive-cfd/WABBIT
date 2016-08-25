@@ -1,37 +1,97 @@
-#----------------------------------------
+# Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
+# Non-module Fortran files to be compiled:
+FFILES = check_timedir.f90 check_workdir.f90 save_data.f90 write_field.f90 giveCertainOrder.f90 \
+Dper.f90 D26p.f90 Dnonper.f90 D18j.f90  time_step.f90 calc_dt.f90 local_refinement_status.f90 \
+synchronize_ghosts.f90 delete_block.f90 get_sister_id.f90 matrix_to_block_tree.f90 active_blocks_list.f90 \
+new_block.f90 does_block_exist.f90 ensure_completeness.f90 adjacent_block.f90 adapt_mesh.f90 blocks_sum.f90 \
+encoding.f90 respect_min_max_treelevel.f90 restriction_2D.f90 interpolate_mesh.f90 treecode_size.f90 \
+find_block_id.f90 ensure_gradedness.f90 block_check.f90 get_free_block.f90 update_neighbors.f90 \
+prediction_2D.f90 matrix_mult.f90 int_to_binary.f90 factorial.f90 \
+print_data.f90 array_compare.f90 fliplr.f90 grad_test.f90 matrix_sum.f90 \
+neighbor_search.f90 RHS_2D_block.f90
 
-OBJ = $(shell find ./LIB -name "*.f90" -printf %f\ | sed 's/\.f90/.o/g')
-SRC = $(shell find ./LIB -name "*.f90")
+FFILES += init_data.f90
 
-LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
-CFLAGS = -FR -warn all -O3 -traceback -check bounds -check all #-heap-arrays
-
-CASE = USER/msr/test004/
-FILE = init_data.f90
+# Object and module directory:
 OBJDIR = OBJ
+OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
-OBJNEW = $(addprefix $(OBJDIR)/, $OBJ \)
+# Files that create modules:
+MFILES = module_params.f90 module_blocks.f90
+MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
-#----------------------------------------
-all: main
+# Source code directories (colon-separated):
+VPATH = LIB
+VPATH += :LIB/DERIVATIVES:LIB/EQUATION:LIB/HELPER:LIB/IO:LIB/MAIN:LIB/MESH:LIB/MODULE:LIB/TIME
+VPATH += :USER/msr/test004/
 
-main: $(OBJ) init_data.o move
-	ifort $(LDFLAGS) -o main $(OBJDIR)/*.o
+# Set the default compiler if it's not already set
+ifndef FC
+FC = gfortran
+endif
 
-$(OBJ): $(SRC)
-	ifort $(CFLAGS) -c $(SRC)
+#-------------------------------------------------------------------------------
+# COMPILER-DEPENDEND PART
+#-------------------------------------------------------------------------------
+# GNU compiler
+ifeq ($(shell $(FC) --version 2>&1 | head -n 1 | head -c 3),GNU)
+# Specify directory for compiled modules:
+FFLAGS += -J$(OBJDIR) # specify directory for modules.
+FFLAGS += -O3 -ffree-line-length-none
+PPFLAG= -cpp #preprocessor flag
+LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
+# Debug flags for gfortran:
+#FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
+endif
 
-init_data.o: $(CASE)$(FILE) 
-	ifort $(CFLAGS) -c $(CASE)$(FILE)
-	
-$(OBJDIR):
-	mkdir $(OBJDIR)
-	
-move:
-	cp -p *.o *.mod *.f90 $(OBJDIR)/
-	rm *.o *.mod *.f90
+# Intel compiler
+ifort:=$(shell $(FC) --version | head -c 5)
+ifeq ($(ifort),ifort)
+PPFLAG= -fpp #preprocessor flag
+FFLAGS = -FR -warn all -O3 -traceback -check bounds -check all #-heap-arrays
+FFLAGS += -module $(OBJDIR) # specify directory for modules.
+LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
+endif
+
+#IBM compiler
+ifeq ($(shell $(FC) -qversion 2>&1 | head -c 3),IBM)
+FFLAGS += -qmoddir=$(OBJDIR)
+FFLAGS += -I$(OBJDIR)
+PPFLAG=-qsuffix=cpp=f90  #preprocessor flag
+endif
+
+PROGRAMS = main
+
+
+
+
+# Both programs are compiled by default.
+all: directories $(PROGRAMS)
+
+# Compile main programs, with dependencies.
+main: main.f90 $(MOBJS) $(OBJS)
+	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Compile modules (module dependency must be specified by hand in
+# Fortran). Objects are specified in MOBJS (module objects).
+$(OBJDIR)/module_blocks.o: module_blocks.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+# Compile remaining objects from Fortran files.
+$(OBJDIR)/%.o: %.f90 $(MOBJS)
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 clean:
-	rm -r $(OBJDIR) 
+	rm -rf $(PROGRAMS) $(OBJDIR)/*.o $(OBJDIR)/*.mod a.out
 
-$(shell   mkdir -p $(OBJDIR))
+tidy:
+	rm -rf $(OBJDIR)/*.o $(OBJDIR)/*.mod a.out
+
+# If the object directory doesn't exist, create it.
+.PHONY: directories
+
+directories: ${OBJDIR}
+
+${OBJDIR}:
+	mkdir -p ${OBJDIR}

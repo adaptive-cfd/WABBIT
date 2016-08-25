@@ -29,7 +29,7 @@ subroutine does_block_exist(treecode, exists)
 
     do k = 1, N
 
-        block_num   = blocks_params%active_list(k)
+        block_num = blocks_params%active_list(k)
 
         if (array_compare(blocks(block_num)%treecode, treecode, 10)) exists = .true.
 

@@ -27,7 +27,7 @@ subroutine get_free_block(id)
     ! loop over all blocks
     do k = 1, N
 
-        if (blocks(k)%active == .false.) then
+        if (blocks(k)%active .eqv. .false.) then
             id = k
             exit
         end if

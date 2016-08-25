@@ -28,17 +28,23 @@ subroutine active_blocks_list()
     deallocate( blocks_params%active_list, stat=allocate_error )
 
     ! create new list
+    ! 1st step: we count how many active blocks we find
     j = 1
     do i = 1, blocks_params%number_max_blocks
+        ! is this block actrive?
         if (blocks(i)%active .eqv. .true.) then
+            ! yes, count it
             blocks_list(j) = i
             j = j + 1
         end if
     end do
+    ! we counted one too far
+    j=j-1
+
 
     ! allocate memory, saving new list
-    allocate( blocks_params%active_list(j-1), stat=allocate_error )
-    blocks_params%active_list = blocks_list
+    allocate( blocks_params%active_list(j), stat=allocate_error )
+    blocks_params%active_list = blocks_list(1:j)
 
     ! local variable
     deallocate( blocks_list, stat=allocate_error)

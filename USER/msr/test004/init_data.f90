@@ -1,14 +1,14 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! initialize all data (params, fields, blocks, ...)
 !
 ! name: init_data.f90
 ! date: 02.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 subroutine init_data()
@@ -44,19 +44,20 @@ subroutine init_data()
 
     !------------------------------
     ! allocate memory for local variables
-    allocate( phi(nx, nx), stat=allocate_error )
+    allocate( phi(1:nx, 1:nx), stat=allocate_error )
     allocate( D1(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
     allocate( D2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
 
     !------------------------------
     ! initial data field, memory allocation for module variables
-    mux     = 0.5_rk * ( real(nx,8) - 1.0_rk )
-    muy     = 0.5_rk * ( real(nx,8) - 1.0_rk )
+    mux     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
+    muy     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
     sigma   = 100.0_rk
+    phi     = 0.0_rk
 
     do i = 1, nx
         do j = 1, nx
-            phi(i,j) = exp( -( (real(i,8)-mux)*(real(i,8)-mux) + (real(j,8)-muy)*(real(j,8)-muy) )/sigma )
+            phi(i,j) = dexp( -((real(i,kind=rk)-mux)**2 + (real(j,kind=rk)-muy)**2) / sigma)
         end do
     end do
 
@@ -81,7 +82,7 @@ subroutine init_data()
 
     blocks_params%size_domain		    = nx
     blocks_params%size_block		    = blocksize
-    blocks_params%number_max_blocks     = max_blocks
+    blocks_params%number_max_blocks = max_blocks
     blocks_params%number_ghost_nodes	= ghosts
 
     !------------------------------
@@ -138,7 +139,7 @@ subroutine init_data()
 
     !------------------------------
     ! workdir, case name, write frequency
-    params%name_workdir 	    = "/work/sroka/2D_AMR_Proto/"
+    params%name_workdir 	    = "./data/"
     params%name_case 	        = "004Test"
     params%write_freq	        =  20
 

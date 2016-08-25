@@ -27,10 +27,10 @@ subroutine local_refinement_status()
     Bs = blocks_params%size_block
     g  = blocks_params%number_ghost_nodes
 
-    allocate( u1(Bs+2*g,Bs+2*g), stat=allocate_error )
-    allocate( u2(Bs+2*g,Bs+2*g), stat=allocate_error )
+    allocate( u1(1:Bs+2*g,1:Bs+2*g), stat=allocate_error )
+    allocate( u2(1:Bs+2*g,1:Bs+2*g), stat=allocate_error )
     ! coarsen field are half block size + 1/2
-    allocate( u3( (Bs+1)/2 + g , (Bs+1)/2 + g), stat=allocate_error )
+    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g), stat=allocate_error )
 
     ! synchronize ghostnodes
     call synchronize_ghosts()

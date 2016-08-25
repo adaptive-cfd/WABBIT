@@ -21,8 +21,10 @@ subroutine active_blocks_list()
     integer(kind=ik)                            :: i, j, allocate_error
     integer(kind=ik), dimension(:), allocatable :: blocks_list
 
-    ! local variable
-    allocate( blocks_list(blocks_params%number_max_blocks), stat=allocate_error)
+    ! allocate a list to temporarily hold the active blocks. as we do not
+    ! know the number of active blocks (that's why we're here), we allocate alonger list
+    ! with the maximum number of blocks allowed
+    allocate( blocks_list(1:blocks_params%number_max_blocks), stat=allocate_error)
 
     ! deallocate old list
     deallocate( blocks_params%active_list, stat=allocate_error )
@@ -33,18 +35,20 @@ subroutine active_blocks_list()
     do i = 1, blocks_params%number_max_blocks
         ! is this block actrive?
         if (blocks(i)%active .eqv. .true.) then
-            ! yes, count it
+            ! and add it to the list of active blocks
             blocks_list(j) = i
+            ! yes, count it
             j = j + 1
         end if
     end do
     ! we counted one too far
-    j=j-1
+    j = j-1
 
 
     ! allocate memory, saving new list
-    allocate( blocks_params%active_list(j), stat=allocate_error )
-    blocks_params%active_list = blocks_list(1:j)
+    allocate( blocks_params%active_list(1:j), stat=allocate_error )
+    ! copy the list of active blocks, but only the first part (1:j)
+    blocks_params%active_list(1:j) = blocks_list(1:j)
 
     ! local variable
     deallocate( blocks_list, stat=allocate_error)

@@ -65,15 +65,16 @@ program mains
         call time_step(time)
 
         ! write data to disk
-        if (modulo(iteration, params%write_freq) == 0) call save_data(iteration, time)
+        if (modulo(iteration, params%write_freq) == 0) then
+          call save_data(iteration, time)
+        endif
 
         ! error calculation
         !call blocks_sum(s)
         !num_error   = abs(s0 - s)
 
         ! output on screen
-        !write(*,'(a,i5,3x,a,f10.6,3x,a,es16.8)') "iteration = ", iteration, "time = ", time, "error = ", num_error
-        write(*,'(a,i5,3x,a,f10.6,3x)') "iteration = ", iteration, "time = ", time
+        write(*,'("iteration=",i5,3x," time=",f10.6,3x)') iteration, time
 
     end do
 

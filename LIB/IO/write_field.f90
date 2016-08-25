@@ -1,15 +1,15 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
-! write data of a single 2D field phi 
+!
+! write data of a single 2D field phi
 ! at timestep n and time t
 !
 ! name: write_field.f90
 ! date: 03.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 subroutine write_field(iteration, time)
@@ -28,6 +28,8 @@ subroutine write_field(iteration, time)
     integer(kind=ik)		        :: io_error, i, j, nx, k, N, block_num
 
     N = size(blocks_params%active_list, dim=1)
+
+    write(*,'("Writing data... time=",f15.8," iteration",i8, " N_active=",i8)') time, iteration, N
 
     ! save block data
     do k = 1, N
@@ -51,29 +53,29 @@ subroutine write_field(iteration, time)
         nx = blocks_params%size_block
 
         ! write coords
-        open(unit=k,file=name_file_xy,status='new',action='write', iostat=io_error)
+        open(unit=99,file=name_file_xy,status='new',action='write', iostat=io_error)
 
         if (io_error == 0) then
             do i = 1, nx
-                write(k, '(f10.4,1x)', advance='no') blocks(block_num)%coord_x(i)
-                write(k, '(f10.4,1x)', advance='no') blocks(block_num)%coord_y(i)
-                write(k, *)
+                write(99, '(f10.4,1x)', advance='no') blocks(block_num)%coord_x(i)
+                write(99, '(f10.4,1x)', advance='no') blocks(block_num)%coord_y(i)
+                write(99, *)
             end do
         end if
-        close(unit=k)
+        close(unit=99)
 
         ! write data
-        open(unit=k,file=name_file,status='new',action='write', iostat=io_error)
+        open(unit=99,file=name_file,status='new',action='write', iostat=io_error)
 
         if (io_error == 0) then
             do i = 1, nx
                 do j = 1, nx
-                    write(k, '(f10.4,1x)', advance='no') blocks(block_num)%data1(i,j)
+                    write(99, '(f10.4,1x)', advance='no') blocks(block_num)%data1(i,j)
                 end do
-                write(k, *)
+                write(99, *)
             end do
         end if
-        close(unit=k)
+        close(unit=99)
 
     end do
 

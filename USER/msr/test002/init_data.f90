@@ -1,0 +1,164 @@
+! ********************************
+! 2D AMR prototype
+! --------------------------------
+! 
+! initialize all data (params, fields, blocks, ...)
+!
+! name: init_data.f90
+! date: 02.08.2016
+! author: msr
+! version: 0.1
+! 
+! ********************************
+
+subroutine init_data()
+
+    use module_params
+    use module_blocks
+
+    implicit none
+
+    integer 								        :: allocate_error
+
+    ! grid size
+    integer(kind=ik)             					:: nx
+    integer(kind=ik)							    :: i, j
+    real(kind=rk) 							        :: mux, muy
+    ! block size,
+    integer(kind=ik)        						:: blocksize
+    integer(kind=ik)                                :: max_blocks
+    integer(kind=ik)        						:: ghosts
+    ! derivatives
+    real(kind=rk), dimension(:,:), allocatable      :: D1, D2
+    ! gauss parameter
+    real(kind=rk) 							        :: sigma
+    ! 2D grid
+    real(kind=rk), dimension(:,:), allocatable  	:: phi
+
+    !------------------------------
+    ! grid and block parameter
+    nx          = 512
+    blocksize   = 32 !64 !128 !256
+    max_blocks  = 300 !100 !16 !4
+    ghosts      = 4
+
+    !------------------------------
+    ! allocate memory for local variables
+    allocate( phi(nx, nx), stat=allocate_error )
+    allocate( D1(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+    allocate( D2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+
+    !------------------------------
+    ! initial data field, memory allocation for module variables
+    mux     = 0.5_rk * ( real(nx,8) - 1.0_rk )
+    muy     = 0.5_rk * ( real(nx,8) - 1.0_rk )
+    sigma   = 300.0_rk
+
+    do i = 1, nx
+        do j = 1, nx
+            phi(i,j) = exp( -( (real(i,8)-mux)*(real(i,8)-mux) + (real(j,8)-muy)*(real(j,8)-muy) )/sigma )
+        end do
+    end do
+
+    allocate( blocks_params%phi(nx, nx), stat=allocate_error )
+
+    allocate( blocks(max_blocks), stat=allocate_error )
+    ! dummy allocation
+    allocate( blocks_params%active_list(1), stat=allocate_error )
+
+    do i = 1, max_blocks
+        allocate( blocks(i)%data1(blocksize, blocksize), stat=allocate_error )
+        allocate( blocks(i)%data2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+        allocate( blocks(i)%data_old(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+        allocate( blocks(i)%k1(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+        allocate( blocks(i)%k2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+        allocate( blocks(i)%k3(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+        allocate( blocks(i)%k4(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
+        allocate( blocks(i)%treecode(10), stat=allocate_error )
+        allocate( blocks(i)%neighbor_treecode(14,10), stat=allocate_error )
+    end do
+
+    blocks_params%size_domain		    = nx
+    blocks_params%size_block		    = blocksize
+    blocks_params%number_max_blocks     = max_blocks
+    blocks_params%number_ghost_nodes	= ghosts
+
+    !------------------------------
+    ! start field, blocks
+    blocks_params%phi 			        = phi
+
+    do i = 1, max_blocks
+        blocks(i)%data1(:,:)            = 0.0_rk
+        blocks(i)%data2(:,:)            = 0.0_rk
+        blocks(i)%data_old(:,:)         = 0.0_rk
+        blocks(i)%k1(:,:)               = 0.0_rk
+        blocks(i)%k2(:,:)               = 0.0_rk
+        blocks(i)%k3(:,:)               = 0.0_rk
+        blocks(i)%k4(:,:)               = 0.0_rk
+        blocks(i)%active                = .false.
+        blocks(i)%treecode(:)           = -1
+        blocks(i)%neighbor_treecode(:,:)= -1
+    end do
+
+    !------------------------------
+    ! derivatives
+    allocate( blocks_params%D1(blocksize+2*ghosts,blocksize+2*ghosts), stat=allocate_error )
+    allocate( blocks_params%D2(blocksize+2*ghosts,blocksize+2*ghosts), stat=allocate_error )
+
+    call D18j(D1, blocksize+2*ghosts, 1.0_rk)
+    call D26p(D2, blocksize+2*ghosts, 1.0_rk)
+
+    blocks_params%D1 			        = D1
+    blocks_params%D2			        = D2
+
+    !------------------------------
+    ! time loop parameter
+    params%time_max             = 250.0_rk
+    params%CFL 		            = 0.5_rk
+
+    !------------------------------
+    ! convective velocity
+    params%u0 		            = (/1.0_rk, 0.5_rk/)
+
+    !------------------------------
+    ! diffusion coeffcient
+    params%nu 		            = 1e-2_rk
+
+    !------------------------------
+    ! domain size in [m]
+    params%Lx 		            = 256.0_rk
+    params%Ly                   = params%Lx
+
+    !------------------------------
+    ! workdir, case name, write frequency
+    params%name_workdir 	    = "/work/sroka/2D_AMR_Proto/"
+    params%name_case 	        = "002Test"
+    params%write_freq	        =  20
+
+    !------------------------------
+    ! spacing
+
+    do i = 1, max_blocks
+        blocks(i)%dx    	    = params%Lx / real(nx,8)
+        blocks(i)%dy		    = params%Lx / real(nx,8)
+    end do
+
+    !------------------------------
+    ! coordinates
+    do i = 1, max_blocks
+        allocate( blocks(i)%coord_x(blocksize) )
+        allocate( blocks(i)%coord_y(blocksize) )
+    end do
+
+    do i = 1, max_blocks
+        blocks(i)%coord_x(:)    = 0.0_rk
+        blocks(i)%coord_y(:)    = 0.0_rk
+    end do
+
+    !------------------------------
+    ! deallocate memory for local variables
+    deallocate( phi, stat=allocate_error )
+    deallocate( D1, stat=allocate_error )
+    deallocate( D2, stat=allocate_error )
+
+end subroutine init_data

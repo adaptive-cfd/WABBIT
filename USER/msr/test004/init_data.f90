@@ -40,8 +40,9 @@ subroutine init_data()
     nx          = 513 !512
     blocksize   = 17 !33 !65 !129 !257
     ! allocate twice as many blocks as required
+    ! TODO: allocate max level full
     max_blocks = 2*((nx-1)/(blocksize-1))**2
-    ghosts      = 4
+    ghosts     = 4
 
     write(*,'(80("-"))')
     write(*,*) "INITIALIZATION PHASE"
@@ -55,7 +56,7 @@ subroutine init_data()
     allocate( D1(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
     allocate( D2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
 
-    !------------------------------
+    !---------------------------------------------------------------------------
     ! initial data field, memory allocation for module variables
     mux     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
     muy     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
@@ -67,6 +68,7 @@ subroutine init_data()
             phi(i,j) = dexp( -((real(i,kind=rk)-mux)**2 + (real(j,kind=rk)-muy)**2) / sigma)
         end do
     end do
+    !---------------------------------------------------------------------------
 
     allocate( blocks_params%phi(nx, nx), stat=allocate_error )
 
@@ -85,18 +87,7 @@ subroutine init_data()
         allocate( blocks(i)%treecode(10), stat=allocate_error )
         allocate( blocks(i)%neighbor_treecode(8,10), stat=allocate_error )
         allocate( blocks(i)%neighbor2_treecode(4,10), stat=allocate_error )
-    end do
 
-    blocks_params%size_domain		    = nx
-    blocks_params%size_block		    = blocksize
-    blocks_params%number_max_blocks = max_blocks
-    blocks_params%number_ghost_nodes	= ghosts
-
-    !------------------------------
-    ! start field, blocks
-    blocks_params%phi 			            = phi
-
-    do i = 1, max_blocks
         blocks(i)%data1(:,:)                = 0.0_rk
         blocks(i)%data2(:,:)                = 0.0_rk
         blocks(i)%data_old(:,:)             = 0.0_rk
@@ -115,6 +106,13 @@ subroutine init_data()
         blocks(i)%neighbor_number(:)        = 1
     end do
 
+    blocks_params%size_domain		    = nx
+    blocks_params%size_block		    = blocksize
+    blocks_params%number_max_blocks = max_blocks
+    blocks_params%number_ghost_nodes	= ghosts
+    !------------------------------
+    ! start field, blocks
+    blocks_params%phi 			            = phi
     !------------------------------
     ! derivatives
     allocate( blocks_params%D1(blocksize+2*ghosts,blocksize+2*ghosts), stat=allocate_error )

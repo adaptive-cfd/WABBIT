@@ -6,7 +6,7 @@
 !
 ! name: RHS_2D_block.f90
 ! date: 05.08.2016
-! author: msr
+! author: msr, engels
 ! version: 0.1
 !
 ! ********************************
@@ -72,7 +72,7 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
         !          +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
 
         ! compute (assemble) final right hand side
-        rhs(ix,iy) = -params%u0(1)*phi_dx -params%u0(2)*phi_dy &
+        rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &
                    + params%nu * ( phi_dxdx + phi_dydy )
       end do
     end do

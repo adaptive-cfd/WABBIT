@@ -38,9 +38,16 @@ subroutine init_data()
     !------------------------------
     ! grid and block parameter
     nx          = 513 !512
-    blocksize   = 33 !32 !64 !128 !256
-    max_blocks  = 300 !100 !16 !4
-    ghosts      = 2 !4
+    blocksize   = 17 !33 !65 !129 !257
+    ! allocate twice as many blocks as required
+    max_blocks = 2*((nx-1)/(blocksize-1))**2
+    ghosts      = 4
+
+    write(*,'(80("-"))')
+    write(*,*) "INITIALIZATION PHASE"
+    write(*,*) "we use a maximum number of blocks of",max_blocks
+    write(*,*) "nghosts=", ghosts
+    write(*,'(80("-"))')
 
     !------------------------------
     ! allocate memory for local variables
@@ -121,7 +128,7 @@ subroutine init_data()
 
     !------------------------------
     ! time loop parameter
-    params%time_max             = 250.0_rk
+    params%time_max             = 100.0_rk
     params%CFL 		            = 0.5_rk
 
     !------------------------------
@@ -140,7 +147,7 @@ subroutine init_data()
     !------------------------------
     ! workdir, case name, write frequency
     params%name_workdir 	    = "./data/"
-    params%name_case 	        = "004Test"
+    params%name_case 	        = "nghosts4"
     params%write_freq	        =  20
 
     !------------------------------

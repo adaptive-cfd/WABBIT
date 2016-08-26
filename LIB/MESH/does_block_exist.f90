@@ -6,7 +6,7 @@
 !
 ! name: update_neighbors.f90
 ! date: 16.08.2016
-! author: msr
+! author: msr, engels
 ! version: 0.1
 !
 ! ********************************

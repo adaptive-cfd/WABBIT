@@ -6,7 +6,7 @@
 !
 ! name: new_block.f90
 ! date: 15.08.2016
-! author: msr
+! author: msr, engels
 ! version: 0.1
 !
 ! ********************************

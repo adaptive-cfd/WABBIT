@@ -51,8 +51,8 @@ subroutine matrix_to_block_tree()
     num_blocks_y        = (Ds-1) / (Bs-1)
     num_blocks          = num_blocks_x * num_blocks_y
 
-    write(*,'(a,i5,a,i5,a,i5,a,i5,a,i5,a,i5)') "Field with res: ", (Ds-1), " x", (Ds-1), " gives: ", &
-    num_blocks_x, " x", num_blocks_y, " (", num_blocks, ") blocks of size: ", (Bs-1)
+    write(*,'(a,i5,a,i5,a,i5,a,i5,a,i5,a,i5)') "Field with res: ", (Ds), " x", (Ds), " gives: ", &
+    num_blocks_x, " x", num_blocks_y, " (", num_blocks, ") blocks of size: ", (Bs)
 
     ! domain coordinate vectors
     do i = 1, Ds

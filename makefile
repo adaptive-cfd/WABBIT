@@ -42,7 +42,7 @@ PPFLAG= -cpp #preprocessor flag
 LDFLAGS = -llapack
 # Debug flags for gfortran:
 #FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-#FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
 
 endif
 

@@ -1,14 +1,14 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! time step main function, RK4
 !
 ! name: time_step.f90
 ! date: 02.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 subroutine time_step(time)
@@ -34,7 +34,7 @@ subroutine time_step(time)
     if (time > params%time_max) time = params%time_max
 
     ! output on screen
-    write(*,'(a,i5)') "number of active blocks = ", block_N
+!    write(*,'(a,i5)') "number of active blocks = ", block_N
 
     !------------------------------
     ! first stage

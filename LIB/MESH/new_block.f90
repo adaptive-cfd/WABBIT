@@ -26,6 +26,12 @@ subroutine new_block(k, treecode, treeN, data, ix, iy, N)
 
     integer(kind=ik)                                :: treecode_size
 
+    if ( k<=0 .or. k>blocks_params%number_max_blocks) then
+      write(*,*) "ERROR! You try to create a block outside of the list"
+      write(*,'("your id: ",i8," N_max_blocks=",i8)') k, blocks_params%number_max_blocks
+      stop
+    endif
+
     ! save data
     blocks(k)%data1                 = data
     blocks(k)%data2                 = 0.0_rk

@@ -26,7 +26,7 @@ subroutine prediction_2D(coarse, fine, Bs)
     integer(kind=ik) :: order, nc
 
     ! temporarily choose the order here:
-    order = 4
+    order = 2
     ! we need the number of points in the coarse array (as fortran lacks Matlab's handy
     ! 'end' keyword)
     nc = (Bs-1)/2+1

@@ -7,8 +7,8 @@
 !
 ! name: ensure_gradedness.f90
 ! date: 18.08.2016
-! author: msr
-! version: 0.1
+! author: msr, engels
+! version: 0.2
 !
 ! ********************************
 
@@ -19,158 +19,192 @@ subroutine ensure_gradedness()
 
     implicit none
 
-    integer(kind=ik) :: k, N, block_num, l, neighbor_id, level, neighbor_level, neighbor2_id
+    integer(kind=ik) :: myid, l, neighbor_id, mylevel, neighbor_level, neighbor2_id
+    logical :: indirect_refinement
 
-    N  = size(blocks_params%active_list, dim=1)
+    ! we repeat the ensure_gradedness procedure until this flag is .false.
+    ! why? see below in the code.
+    indirect_refinement = .true. ! true statement for loop triggering
 
-    ! loop over all active blocks
-    do k = 1, N
+    do while ( indirect_refinement )
+      ! we hope not to set the flag to .true. again in this iteration
+      indirect_refinement = .false.
 
-        block_num = blocks_params%active_list(k)
+      !-------------------------------------------------------------------------
+      ! loop over all active blocks
+      !-------------------------------------------------------------------------
+      do myid = 1, blocks_params%number_max_blocks
+          ! is this block in use?
+          if (blocks(myid)%active) then
 
-        ! block want to refine
-        if (blocks(block_num)%refinement == 1) then
+          !-----------------------------------------------------------------------
+          ! block wants to refine
+          !-----------------------------------------------------------------------
+          if (blocks(myid)%refinement == 1) then
 
-            ! loop over all directions
-            do l = 1, 8
+              ! loop over all directions
+              do l = 1, 8
 
-                ! check number of neighbors, first case: exact 1 neighbor
-                if (blocks(block_num)%neighbor_number(l) == 1) then
+                  ! check number of neighbors, first case: exactly 1 neighbor
+                  if (blocks(myid)%neighbor_number(l) == 1) then
 
-                    ! check neighbor treelevel
-                    neighbor_id     = blocks(block_num)%neighbor_id(l)
-                    level           = blocks(block_num)%level
+                      mylevel     = blocks(myid)%level
+                      ! check neighbor treelevel
+                      neighbor_id = blocks(myid)%neighbor_id(l)
 
-                    if (neighbor_id == -1) then
-                        print*, 'error: gradedness error, can not refine - neighbor does not exists'
-                        stop
-                    end if
+                      if (neighbor_id == -1) then
+                          print*, 'error: gradedness error, can not refine - neighbor does not exists'
+                          stop
+                      end if
 
-                    neighbor_level  = blocks(neighbor_id)%level
+                      neighbor_level = blocks(neighbor_id)%level
 
-                    if (level == neighbor_level) then
-                        ! neighbor on same level
-                        ! neighbor can not coarsen, because block want to refine
-                        if (blocks(neighbor_id)%refinement == -1) blocks(neighbor_id)%refinement = 0
+                      if (mylevel == neighbor_level) then
+                          ! neighbor on same level
+                          ! neighbor can not coarsen, because I want to refine
+                          if (blocks(neighbor_id)%refinement == -1) blocks(neighbor_id)%refinement = 0
+                          ! if the neighbor wants to stay or refine, that is fine with us
 
-                    elseif (level - neighbor_level == 1) then
-                        ! neighbor one level lower
-                        ! neighbor has to refine, because block want to refine
+                      elseif (mylevel - neighbor_level == 1) then
+                          ! neighbor one level lower (=coarser)
+                          ! neighbor has to refine, because I want to refine
+                          if (blocks(neighbor_id)%refinement /= 1) then
+                            ! note this branch takes only place if the neighbor does not want
+                            ! to refine anyways already
+                            blocks(neighbor_id)%refinement = 1
 
-                        blocks(neighbor_id)%refinement = 1
+                            ! this imposed (involuntary) refinement has important consequences: we
+                            ! have to be sure that this block also respects gradedness
+                            ! after its refinement. therefore, we have to repeat the entire process
+                            indirect_refinement = .true.
+                          endif
 
-                    elseif (neighbor_level - level == 1) then
-                        ! neighbor one level higher
-                        ! nothing to do
+                      elseif (mylevel - neighbor_level == -1) then
+                          ! neighbor one level higher (=finer), and I want to refine
+                          ! myself. My neighbor can
+                          ! a) refine, b) stay, c) coarsen but in any of these cases
+                          ! the level difference will be at most 1, so we have nothing
+                          ! to do
 
-                    else
-                        ! error
-                        print*, 'error: neighbor more than one level up/down in tree'
-                        stop
+                          ! NOTE this case cannot happen here, since we'd have two neighbors
+                          ! in this case NOTE
 
-                    end if
+                      else
+                          ! error
+                          print*, 'error: neighbor more than one level up/down in tree'
+                          stop
 
-                ! second case: 2 neighbors
-                elseif (blocks(block_num)%neighbor_number(l) == 2) then
-                    ! nothing to do, block can refine
+                      end if
 
-                ! error case
-                else
-                    print*, "error: block has wrong number of neighbors!"
-                    stop
+                  ! second case: 2 neighbors
+                  elseif (blocks(myid)%neighbor_number(l) == 2) then
+                      ! two neighbors imply that they are one level finer than I am
+                      ! neighbor one level higher (=finer), and I want to refine
+                      ! myself. My neighbor can
+                      ! a) refine, b) stay, c) coarsen but in any of these cases
+                      ! the level difference will be at most 1, so we have nothing
+                      ! to do
 
-                end if
-            end do
+                  ! error case
+                  else
+                      print*, "error: block has wrong number of neighbors!"
+                      stop
 
-        ! block want to coarsen
-        elseif (blocks(block_num)%refinement == -1) then
+                  end if
+              end do
+          !-----------------------------------------------------------------------
+          ! block wants to coarsen
+          !-----------------------------------------------------------------------
+          elseif (blocks(myid)%refinement == -1) then
 
-            ! loop over all directions
-            do l = 1, 8
+              ! loop over all directions
+              do l = 1, 8
 
-                ! check number of neighbors, first case: exact 1 neighbor
-                if (blocks(block_num)%neighbor_number(l) == 1) then
+                  ! check number of neighbors, first case: exact 1 neighbor
+                  if (blocks(myid)%neighbor_number(l) == 1) then
 
-                    ! check neighbor treelevel
-                    neighbor_id     = blocks(block_num)%neighbor_id(l)
-                    level           = blocks(block_num)%level
+                      ! check neighbor treelevel
+                      neighbor_id = blocks(myid)%neighbor_id(l)
+                      mylevel     = blocks(myid)%level
 
-                    if (neighbor_id == -1) then
-                        print*, 'error: gradedness error, can not coarsen - neighbor does not exists'
-                        stop
-                    end if
+                      if (neighbor_id == -1) then
+                          print*, 'error: gradedness error, can not coarsen - neighbor does not exists'
+                          stop
+                      end if
 
-                    neighbor_level  = blocks(neighbor_id)%level
+                      neighbor_level  = blocks(neighbor_id)%level
 
-                    if (level == neighbor_level) then
-                        ! neighbor on same level
-                        ! block can not coarsen, because neighbor want to refine
-                        if (blocks(neighbor_id)%refinement == 1) blocks(block_num)%refinement = 0
+                      if (mylevel == neighbor_level) then
+                          ! neighbor on same level
+                          ! block can not coarsen, because neighbor want to refine
+                          if (blocks(neighbor_id)%refinement == 1) blocks(myid)%refinement = 0
 
-                    elseif (level - neighbor_level == 1) then
-                        ! neighbor on lower level
-                        ! nothing to do
+                      elseif (mylevel - neighbor_level == 1) then
+                          ! neighbor on lower level
+                          ! nothing to do
 
-                    elseif (neighbor_level - level == 1) then
-                        ! neighbor on higher level
-                        ! neighbor want to refine, ...
-                        if (blocks(neighbor_id)%refinement == 1) then
-                            ! ... so block have also refine
-                            blocks(block_num)%refinement = 1
-                        else
-                            ! neighbor stays on his level or want to coarsen,
-                            ! so block can not coarsen
-                            ! TODO: block can coarsen, if neighbor also want to coarsen
-                            blocks(block_num)%refinement = 0
-                        end if
+                      elseif (neighbor_level - mylevel == 1) then
+                          ! neighbor on higher level
+                          ! neighbor want to refine, ...
+                          if (blocks(neighbor_id)%refinement == 1) then
+                              ! ... so block have also refine
+                              blocks(myid)%refinement = 1
+                          else
+                              ! neighbor stays on his level or want to coarsen,
+                              ! so block can not coarsen
+                              ! TODO: block can coarsen, if neighbor also want to coarsen
+                              blocks(myid)%refinement = 0
+                          end if
 
-                    else
-                        ! error case
-                        print*, "error: block has wrong number of neighbors!"
-                        stop
+                      else
+                          ! error case
+                          print*, "error: block has wrong number of neighbors!"
+                          stop
 
-                    end if
+                      end if
 
-                ! second case: 2 neighbors
-                elseif (blocks(block_num)%neighbor_number(l) == 2) then
-                    ! two neighbor, both are one level higher in tree
-                    neighbor_id     = blocks(block_num)%neighbor_id(l)
+                  ! second case: 2 neighbors
+                  elseif (blocks(myid)%neighbor_number(l) == 2) then
+                      ! two neighbor, both are one level higher in tree
+                      neighbor_id     = blocks(myid)%neighbor_id(l)
 
-                    if (neighbor_id == -1) then
-                        print*, 'error: gradedness error, can not coarsen - neighbor 1 does not exists'
-                        stop
-                    end if
+                      if (neighbor_id == -1) then
+                          print*, 'error: gradedness error, can not coarsen - neighbor 1 does not exists'
+                          stop
+                      end if
 
-                    ! look for second neighbor
-                    neighbor2_id    = blocks(block_num)%neighbor2_id(l)
+                      ! look for second neighbor
+                      neighbor2_id    = blocks(myid)%neighbor2_id(l)
 
-                    if (neighbor_id == -1) then
-                        print*, 'error: gradedness error, can not coarsen - neighbor 2 does not exists'
-                        stop
-                    end if
+                      if (neighbor_id == -1) then
+                          print*, 'error: gradedness error, can not coarsen - neighbor 2 does not exists'
+                          stop
+                      end if
 
-                    if ( (blocks(neighbor_id)%refinement == 1) .or. (blocks(neighbor2_id)%refinement == 1) ) then
-                        ! one of the neighbors want to refine,
-                        ! so block have also refine
-                        blocks(block_num)%refinement = 1
-                    else
-                        ! neighbors stay on tree level or want to coarsen,
-                        ! so block can not coarsen
-                        ! TODO: block can coarsen, if both neighbors also want to coarsen
-                        blocks(block_num)%refinement = 0
+                      if ( (blocks(neighbor_id)%refinement == 1) .or. (blocks(neighbor2_id)%refinement == 1) ) then
+                          ! one of the neighbors want to refine,
+                          ! so block have also refine
+                          blocks(myid)%refinement = 1
+                      else
+                          ! neighbors stay on tree level or want to coarsen,
+                          ! so block can not coarsen
+                          ! TODO: block can coarsen, if both neighbors also want to coarsen
+                          blocks(myid)%refinement = 0
 
-                    end if
+                      end if
 
-                ! error case
-                else
-                    print*, "error: block has wrong number of neighbors!"
-                    stop
-                end if
+                  ! error case
+                  else
+                      print*, "error: block has wrong number of neighbors!"
+                      stop
+                  end if
 
-            end do
+              end do
 
-        end if
-
+          end if
+          end if
+      end do
+    ! end do of repeat procedure until indirect_refinement==.false.
     end do
 
 end subroutine ensure_gradedness

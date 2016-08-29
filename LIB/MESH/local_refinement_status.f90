@@ -35,12 +35,6 @@ subroutine local_refinement_status()
     ! synchronize ghostnodes
     call synchronize_ghosts()
 
-    ! clear old status
-    do k = 1, N
-        block_num                    = blocks_params%active_list(k)
-        blocks(block_num)%refinement = 0
-    end do
-
     ! loop over all active blocks
     do k = 1, N
 
@@ -49,14 +43,17 @@ subroutine local_refinement_status()
         u2        = 0.0_rk
         u3        = 0.0_rk
 
+        ! clear old status
+        blocks(block_num)%refinement = 0
+
         ! wavelet indicator
-        call restriction_2D(u1, u3, Bs)
-        call prediction_2D(u3, u2, Bs)
+        call restriction_2D(u1, u3, size(u1,1) )  ! fine, coarse
+        call prediction_2D (u3, u2, size(u2,1) )  ! coarse, fine
 
         ! error
         error = 0.0_rk
-        do i = 1, Bs+2*g
-            do j = 1, Bs+2*g
+        do i = 1, size(u1,1)
+            do j = 1, size(u1,1)
                 error = max( error, sqrt( (u1(i,j)-u2(i,j)) * ( u1(i,j)-u2(i,j)) ) )
             end do
         end do
@@ -68,14 +65,12 @@ subroutine local_refinement_status()
             ! refine block, +1
             blocks(block_num)%refinement = 1
         end if
-
+        !!!!!!! HACK
+!blocks(block_num)%refinement = 1
     end do
 
     ! check if block has reached maximal level
     call respect_min_max_treelevel()
 
-    deallocate( u1, stat=allocate_error )
-    deallocate( u2, stat=allocate_error )
-    deallocate( u3, stat=allocate_error )
-
+    deallocate( u1, u2, u3 )
 end subroutine local_refinement_status

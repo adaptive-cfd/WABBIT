@@ -1,14 +1,14 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! blocks data structure
 !
 ! name: module_blocks.f90
 ! date: 02.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 module module_blocks
@@ -36,7 +36,9 @@ module module_blocks
 
     end type type_blocks_params
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type (type_blocks_params), save                     :: blocks_params
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     ! datatype for block data
     type type_blocks
@@ -61,6 +63,8 @@ module module_blocks
 
     end type type_blocks
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type (type_blocks), save, dimension(:), allocatable :: blocks
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 end module module_blocks

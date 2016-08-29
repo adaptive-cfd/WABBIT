@@ -57,8 +57,8 @@ subroutine write_field(iteration, time)
 
         if (io_error == 0) then
             do i = 1, nx
-                write(99, '(f10.4,1x)', advance='no') blocks(block_num)%coord_x(i)
-                write(99, '(f10.4,1x)', advance='no') blocks(block_num)%coord_y(i)
+                write(99, '(es15.8,1x)', advance='no') blocks(block_num)%coord_x(i)
+                write(99, '(es15.8,1x)', advance='no') blocks(block_num)%coord_y(i)
                 write(99, *)
             end do
         end if
@@ -70,7 +70,7 @@ subroutine write_field(iteration, time)
         if (io_error == 0) then
             do i = 1, nx
                 do j = 1, nx
-                    write(99, '(f10.4,1x)', advance='no') blocks(block_num)%data1(i,j)
+                    write(99, '(es15.8,1x)', advance='no') blocks(block_num)%data1(i,j)
                 end do
                 write(99, *)
             end do

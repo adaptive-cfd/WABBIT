@@ -23,7 +23,6 @@ subroutine adapt_mesh()
 
     ! unmark blocks that cannot be coarsened due to gradedness
     call ensure_gradedness()
-    call ensure_gradedness()
 
     ! ensure completeness
     call ensure_completeness()

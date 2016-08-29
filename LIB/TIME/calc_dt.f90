@@ -1,14 +1,14 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! calculate timestep
 !
 ! name: calc_dt.f90
 ! date: 04.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 subroutine calc_dt(dt)
@@ -34,5 +34,4 @@ subroutine calc_dt(dt)
 
     ! time step
     dt = params%CFL * dx / norm2(params%u0)
-
 end subroutine calc_dt

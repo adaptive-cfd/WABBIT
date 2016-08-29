@@ -1,14 +1,14 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! params data structure
 !
 ! name: module_params.f90
 ! date: 02.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 module module_params

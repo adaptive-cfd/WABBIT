@@ -32,6 +32,7 @@ subroutine init_data()
     real(kind=rk), dimension(:,:), allocatable      :: D1, D2
     ! gauss parameter
     real(kind=rk) 							        :: sigma
+    reaL(kind=rk) :: x,y
     ! 2D grid
     real(kind=rk), dimension(:,:), allocatable  	:: phi
 
@@ -41,7 +42,7 @@ subroutine init_data()
     blocksize   = 17 !33 !65 !129 !257
     ! allocate twice as many blocks as required
     ! TODO: allocate max level full
-    max_blocks = 2*((nx-1)/(blocksize-1))**2
+    max_blocks = 4*((nx-1)/(blocksize-1))**2
     ghosts     = 4
 
     write(*,'(80("-"))')
@@ -63,11 +64,22 @@ subroutine init_data()
     sigma   = 100.0_rk
     phi     = 0.0_rk
 
+    write(*,*) mux,muy,sigma
+
     do i = 1, nx
         do j = 1, nx
-            phi(i,j) = dexp( -((real(i,kind=rk)-mux)**2 + (real(j,kind=rk)-muy)**2) / sigma)
+          x = real(i,kind=rk)
+          y = real(j,kind=rk)
+            phi(i,j) = exp( -((x-mux)**2 + (y-muy)**2) / sigma )
+            ! phi(i,j) = dsin(real(i,kind=rk)/mux) * dcos(real(j,kind=rk)/muy)
         end do
     end do
+
+    ! it sometimes causes bizarre effects not to delete extremely small numbers:
+    ! so we do that now.
+    where( phi<1.0e-13_rk)
+      phi = 0.0_rk
+    end where
     !---------------------------------------------------------------------------
 
     allocate( blocks_params%phi(nx, nx), stat=allocate_error )
@@ -126,16 +138,16 @@ subroutine init_data()
 
     !------------------------------
     ! time loop parameter
-    params%time_max             = 100.0_rk
+    params%time_max             = 60.0_rk
     params%CFL 		            = 0.5_rk
 
     !------------------------------
     ! convective velocity
-    params%u0 		            = (/1.0_rk, 0.5_rk/)
+    params%u0 		            = (/1.0_rk, 0.5_rk/) !(/0.0_rk, 0.0_rk/)
 
     !------------------------------
     ! diffusion coeffcient
-    params%nu 		            = 1e-2_rk
+    params%nu 		            = 0.0e-3_rk
 
     !------------------------------
     ! domain size in [m]
@@ -145,8 +157,8 @@ subroutine init_data()
     !------------------------------
     ! workdir, case name, write frequency
     params%name_workdir 	    = "./data/"
-    params%name_case 	        = "nghosts4"
-    params%write_freq	        =  20
+    params%name_case 	        = "eps1e-3_level7"
+    params%write_freq	        =  25
 
     !------------------------------
     ! spacing
@@ -177,11 +189,11 @@ subroutine init_data()
     !------------------------------
     ! eps for coarsen and refine the block
     params%eps_coarsen          = 1e-3_rk
-    params%eps_refine           = 1e-2_rk
+    params%eps_refine           = 5.0_rk * params%eps_coarsen
 
     !------------------------------
     ! set treelevel
-    params%max_treelevel        = 5
+    params%max_treelevel        = 7
     params%min_treelevel        = 1
 
 end subroutine init_data

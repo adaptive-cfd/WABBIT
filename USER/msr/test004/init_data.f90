@@ -63,7 +63,7 @@ subroutine init_data()
     ! workdir, case name, write frequency
     params%name_workdir 	    = "./data/"
     params%name_case 	        = "eps1e-3_level6"
-    params%write_freq	        =  1
+    params%write_freq	        =  25
     ! eps for coarsen and refine the block
     params%eps_coarsen          = 1e-3_rk
     params%eps_refine           = 5.0_rk * params%eps_coarsen

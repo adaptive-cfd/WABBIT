@@ -10,20 +10,29 @@
 ! version: 0.1
 !
 ! ********************************
+! COMPILED IN THE MODULE "MODULE_INTERPOLATION.F90"
+! ********************************
 
-subroutine restriction_2D(fine, coarse, Bs)
+subroutine restriction_2D(fine, coarse)
 
     use module_params
     use module_blocks
 
     implicit none
 
-    integer(kind=ik), intent(in)                                    :: Bs
-    real(kind=rk), dimension(Bs,Bs), intent(in)                     :: fine
-    real(kind=rk), dimension((Bs+1)/2, (Bs+1)/2), intent(out)       :: coarse
+    real(kind=rk), dimension(1:,1:), intent(in) :: fine
+    real(kind=rk), dimension(1:,1:), intent(out) :: coarse
+    integer(kind=ik) :: nfine, ncoarse
+
+    ncoarse = size(coarse,1)
+    nfine = size(fine,1)
+
+    if ( 2*ncoarse-1 /= nfine ) then
+      write(*,*) "restriction_2D: arrays wrongly sized.."
+      stop
+    endif
 
     coarse = 0.0_rk
-
-    coarse(:, :) = fine(1:Bs:2, 1:Bs:2)
+    coarse(:, :) = fine(1:nfine:2,1:nfine:2)
 
 end subroutine restriction_2D

@@ -25,15 +25,12 @@ module module_blocks
 
     ! datatype for block parameter
     type type_blocks_params
-
-        real(kind=rk), dimension(:,:), allocatable      :: phi, D1, D2
-
+        real(kind=rk), dimension(:,:), allocatable      :: phi
         integer(kind=ik), dimension(:), allocatable     :: active_list
         integer(kind=ik)                                :: size_domain
         integer(kind=ik)                                :: size_block
         integer(kind=ik)                                :: number_max_blocks
         integer(kind=ik)                                :: number_ghost_nodes
-
     end type type_blocks_params
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

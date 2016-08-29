@@ -54,22 +54,22 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        ! phi_dx = (phi(ix+1,iy)-phi(ix-1,iy))/(2.0_rk*dx)
-        ! phi_dy = (phi(ix,iy+1)-phi(ix,iy-1))/(2.0_rk*dy)
-        ! phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
-        ! phi_dydy = (phi(ix,iy-1)-2.d0*phi(ix,iy)+phi(ix,iy+1))*dy2_inv
+        phi_dx = (phi(ix+1,iy)-phi(ix-1,iy))/(2.0_rk*dx)
+        phi_dy = (phi(ix,iy+1)-phi(ix,iy-1))/(2.0_rk*dy)
+        phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
+        phi_dydy = (phi(ix,iy-1)-2.d0*phi(ix,iy)+phi(ix,iy+1))*dy2_inv
 
         !-----------------------------------------------------------------------
         ! 4th order
         !-----------------------------------------------------------------------
-        phi_dx = (a(-3)*phi(ix-3,iy) + a(-2)*phi(ix-2,iy) + a(-1)*phi(ix-1,iy) + a(0)*phi(ix,iy)&
-               +  a(+3)*phi(ix+3,iy) + a(+2)*phi(ix+2,iy) + a(+1)*phi(ix+1,iy))*dx_inv
-        phi_dy = (a(-3)*phi(ix,iy-3) + a(-2)*phi(ix,iy-2) + a(-1)*phi(ix,iy-1) + a(0)*phi(ix,iy)&
-               +  a(+3)*phi(ix,iy+3) + a(+2)*phi(ix,iy+2) + a(+1)*phi(ix,iy+1))*dy_inv
-        phi_dxdx = (b1*phi(ix-2,iy) + b2*phi(ix-1,iy) + b3*phi(ix,iy)&
-                 +  b4*phi(ix+1,iy) + b5*phi(ix+2,iy))*dx2_inv
-        phi_dydy = (b1*phi(ix,iy-2) + b2*phi(ix,iy-1) + b3*phi(ix,iy)&
-                 +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
+        ! phi_dx = (a(-3)*phi(ix-3,iy) + a(-2)*phi(ix-2,iy) + a(-1)*phi(ix-1,iy) + a(0)*phi(ix,iy)&
+        !        +  a(+3)*phi(ix+3,iy) + a(+2)*phi(ix+2,iy) + a(+1)*phi(ix+1,iy))*dx_inv
+        ! phi_dy = (a(-3)*phi(ix,iy-3) + a(-2)*phi(ix,iy-2) + a(-1)*phi(ix,iy-1) + a(0)*phi(ix,iy)&
+        !        +  a(+3)*phi(ix,iy+3) + a(+2)*phi(ix,iy+2) + a(+1)*phi(ix,iy+1))*dy_inv
+        ! phi_dxdx = (b1*phi(ix-2,iy) + b2*phi(ix-1,iy) + b3*phi(ix,iy)&
+        !          +  b4*phi(ix+1,iy) + b5*phi(ix+2,iy))*dx2_inv
+        ! phi_dydy = (b1*phi(ix,iy-2) + b2*phi(ix,iy-1) + b3*phi(ix,iy)&
+        !          +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
 
         ! compute (assemble) final right hand side
         rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &

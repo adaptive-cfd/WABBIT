@@ -1,20 +1,21 @@
 ! ********************************
 ! 2D AMR prototype
 ! --------------------------------
-! 
+!
 ! synchronize ghosts nodes
 !
 ! name: synchronize_ghosts.f90
 ! date: 05.08.2016
 ! author: msr
 ! version: 0.1
-! 
+!
 ! ********************************
 
 subroutine synchronize_ghosts()
 
     use module_params
     use module_blocks
+    use module_interpolation
 
     implicit none
     integer(kind=ik)	                            :: k, N, block_num, i, neighbor_num, neighbor2_num, g, Bs, allocate_error
@@ -34,7 +35,7 @@ subroutine synchronize_ghosts()
          block_num = blocks_params%active_list(k)
 
          ! copy block data in ghost nodes data field
-         blocks(block_num)%data2                        = 0.0_rk
+         blocks(block_num)%data2                        = 9.0e9_rk
          blocks(block_num)%data2(g+1:Bs+g, g+1:Bs+g)    = blocks(block_num)%data1
 
          ! loop over all possible neighbors (max=8)
@@ -45,11 +46,11 @@ subroutine synchronize_ghosts()
 
                  neighbor_num = blocks(block_num)%neighbor_id(i)
 
+                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                  ! neighbor is on the same level
+                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                  if ( blocks(block_num)%level == blocks(neighbor_num)%level ) then
-
                      select case(blocks(block_num)%neighbor_dir(i))
-
                          ! first line/row overlap, so do not copy!
                          !north
                          case('NO')
@@ -82,15 +83,16 @@ subroutine synchronize_ghosts()
                          !southwest
                          case('SW')
                          blocks(block_num)%data2(Bs+g+1:Bs+g+g, 1:g)           = blocks(neighbor_num)%data1(2:g+1, Bs-g:Bs-1)
-
                      end select
 
                  elseif ( blocks(block_num)%level > blocks(neighbor_num)%level) then
+                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                      ! neighbor is one level coarser
+                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                      ! predict finer data
-                     data_predict_fine                                         = 0.0_rk
-                     data_predict_coarse                                       = blocks(neighbor_num)%data1
-                     call prediction_2D(data_predict_coarse, data_predict_fine, 2*Bs-1)
+                     data_predict_fine   = 0.0_rk
+                     data_predict_coarse = blocks(neighbor_num)%data1
+                     call prediction_2D(data_predict_coarse, data_predict_fine)
 
                      select case(blocks(block_num)%neighbor_dir(i))
 
@@ -281,5 +283,12 @@ subroutine synchronize_ghosts()
 
      deallocate( data_predict_fine, stat=allocate_error )
      deallocate( data_predict_coarse, stat=allocate_error )
+
+
+      ! do block_num = 1, blocks_params%number_max_blocks
+      !   if (blocks(block_num)%active) then
+      !
+      !   end if
+      ! end do
 
 end subroutine synchronize_ghosts

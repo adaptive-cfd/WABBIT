@@ -6,7 +6,7 @@
 !
 ! name: init_data.f90
 ! date: 02.08.2016
-! author: msr
+! author: msr, engels
 ! version: 0.1
 !
 ! ********************************
@@ -18,182 +18,62 @@ subroutine init_data()
 
     implicit none
 
-    integer 								        :: allocate_error
+    integer :: allocate_error
 
     ! grid size
-    integer(kind=ik)             					:: nx
-    integer(kind=ik)							    :: i, j
-    real(kind=rk) 							        :: mux, muy
+    integer(kind=ik) :: nx
     ! block size,
-    integer(kind=ik)        						:: blocksize
-    integer(kind=ik)                                :: max_blocks
-    integer(kind=ik)        						:: ghosts
-    ! derivatives
-    real(kind=rk), dimension(:,:), allocatable      :: D1, D2
-    ! gauss parameter
-    real(kind=rk) 							        :: sigma
-    reaL(kind=rk) :: x,y
-    ! 2D grid
-    real(kind=rk), dimension(:,:), allocatable  	:: phi
+    integer(kind=ik) :: blocksize
+    integer(kind=ik) :: max_blocks
+    integer(kind=ik) :: ghosts
 
     !------------------------------
     ! grid and block parameter
     nx          = 513 !512
     blocksize   = 17 !33 !65 !129 !257
-    ! allocate twice as many blocks as required
+    ! allocate 4x as many blocks as required
     ! TODO: allocate max level full
     max_blocks = 4*((nx-1)/(blocksize-1))**2
     ghosts     = 4
-
-    write(*,'(80("-"))')
-    write(*,*) "INITIALIZATION PHASE"
-    write(*,*) "we use a maximum number of blocks of",max_blocks
-    write(*,*) "nghosts=", ghosts
-    write(*,'(80("-"))')
-
-    !------------------------------
-    ! allocate memory for local variables
-    allocate( phi(1:nx, 1:nx), stat=allocate_error )
-    allocate( D1(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-    allocate( D2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-
-    !---------------------------------------------------------------------------
-    ! initial data field, memory allocation for module variables
-    mux     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
-    muy     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
-    sigma   = 100.0_rk
-    phi     = 0.0_rk
-
-    write(*,*) mux,muy,sigma
-
-    do i = 1, nx
-        do j = 1, nx
-          x = real(i,kind=rk)
-          y = real(j,kind=rk)
-            phi(i,j) = exp( -((x-mux)**2 + (y-muy)**2) / sigma )
-            ! phi(i,j) = dsin(real(i,kind=rk)/mux) * dcos(real(j,kind=rk)/muy)
-        end do
-    end do
-
-    ! it sometimes causes bizarre effects not to delete extremely small numbers:
-    ! so we do that now.
-    where( phi<1.0e-13_rk)
-      phi = 0.0_rk
-    end where
-    !---------------------------------------------------------------------------
-
-    allocate( blocks_params%phi(nx, nx), stat=allocate_error )
-
-    allocate( blocks(max_blocks), stat=allocate_error )
-    ! dummy allocation
-    allocate( blocks_params%active_list(1), stat=allocate_error )
-
-    do i = 1, max_blocks
-        allocate( blocks(i)%data1(blocksize, blocksize), stat=allocate_error )
-        allocate( blocks(i)%data2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-        allocate( blocks(i)%data_old(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-        allocate( blocks(i)%k1(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-        allocate( blocks(i)%k2(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-        allocate( blocks(i)%k3(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-        allocate( blocks(i)%k4(blocksize+2*ghosts, blocksize+2*ghosts), stat=allocate_error )
-        allocate( blocks(i)%treecode(10), stat=allocate_error )
-        allocate( blocks(i)%neighbor_treecode(8,10), stat=allocate_error )
-        allocate( blocks(i)%neighbor2_treecode(4,10), stat=allocate_error )
-
-        blocks(i)%data1(:,:)                = 0.0_rk
-        blocks(i)%data2(:,:)                = 0.0_rk
-        blocks(i)%data_old(:,:)             = 0.0_rk
-        blocks(i)%k1(:,:)                   = 0.0_rk
-        blocks(i)%k2(:,:)                   = 0.0_rk
-        blocks(i)%k3(:,:)                   = 0.0_rk
-        blocks(i)%k4(:,:)                   = 0.0_rk
-        blocks(i)%active                    = .false.
-        blocks(i)%treecode(:)               = -1
-        blocks(i)%neighbor_treecode(:,:)    = -1
-        blocks(i)%neighbor2_treecode(:,:)   = -1
-        blocks(i)%neighbor_id(:)            = -1
-        blocks(i)%neighbor2_id(:)           = -1
-        blocks(i)%refinement                = 0
-        blocks(i)%level                     = -1
-        blocks(i)%neighbor_number(:)        = 1
-    end do
 
     blocks_params%size_domain		    = nx
     blocks_params%size_block		    = blocksize
     blocks_params%number_max_blocks = max_blocks
     blocks_params%number_ghost_nodes	= ghosts
-    !------------------------------
-    ! start field, blocks
-    blocks_params%phi 			            = phi
-    !------------------------------
-    ! derivatives
-    allocate( blocks_params%D1(blocksize+2*ghosts,blocksize+2*ghosts), stat=allocate_error )
-    allocate( blocks_params%D2(blocksize+2*ghosts,blocksize+2*ghosts), stat=allocate_error )
 
-    call D18j(D1, blocksize+2*ghosts, 1.0_rk)
-    call D26p(D2, blocksize+2*ghosts, 1.0_rk)
+    write(*,'(80("-"))')
+    write(*,*) "INITIALIZATION PHASE"
+    write(*,*) "we use a maximum number of blocks of", max_blocks
+    write(*,*) "nghosts=", ghosts
+    write(*,'(80("-"))')
 
-    blocks_params%D1 			        = D1
-    blocks_params%D2			        = D2
-
-    !------------------------------
+    !***************************************************************************
+    ! GENERAL PARAMETERS (STRUCT "PARAMS")
+    !***************************************************************************
     ! time loop parameter
-    params%time_max             = 60.0_rk
-    params%CFL 		            = 0.5_rk
-
-    !------------------------------
+    params%time_max = 160.0_rk
+    params%CFL 		  = 0.5_rk
     ! convective velocity
-    params%u0 		            = (/1.0_rk, 0.5_rk/) !(/0.0_rk, 0.0_rk/)
-
-    !------------------------------
+    params%u0 		  = (/1.0_rk, 0.5_rk/) !(/0.0_rk, 0.0_rk/)
     ! diffusion coeffcient
     params%nu 		            = 0.0e-3_rk
-
-    !------------------------------
-    ! domain size in [m]
+    ! domain size
     params%Lx 		            = 256.0_rk
     params%Ly                   = params%Lx
-
-    !------------------------------
     ! workdir, case name, write frequency
     params%name_workdir 	    = "./data/"
-    params%name_case 	        = "eps1e-3_level7"
-    params%write_freq	        =  25
-
-    !------------------------------
-    ! spacing
-
-    do i = 1, max_blocks
-        blocks(i)%dx    	    = params%Lx / real(nx,8)
-        blocks(i)%dy		    = params%Lx / real(nx,8)
-    end do
-
-    !------------------------------
-    ! coordinates
-    do i = 1, max_blocks
-        allocate( blocks(i)%coord_x(blocksize) )
-        allocate( blocks(i)%coord_y(blocksize) )
-    end do
-
-    do i = 1, max_blocks
-        blocks(i)%coord_x(:)    = 0.0_rk
-        blocks(i)%coord_y(:)    = 0.0_rk
-    end do
-
-    !------------------------------
-    ! deallocate memory for local variables
-    deallocate( phi, stat=allocate_error )
-    deallocate( D1, stat=allocate_error )
-    deallocate( D2, stat=allocate_error )
-
-    !------------------------------
+    params%name_case 	        = "eps1e-3_level6"
+    params%write_freq	        =  1
     ! eps for coarsen and refine the block
     params%eps_coarsen          = 1e-3_rk
     params%eps_refine           = 5.0_rk * params%eps_coarsen
-
-    !------------------------------
     ! set treelevel
-    params%max_treelevel        = 7
+    params%max_treelevel        = 6
     params%min_treelevel        = 1
 
+    allocate( blocks_params%active_list(1), stat=allocate_error )
+    ! allocate the individual block's memory
+    call allocate_block_memory()
+    ! initial data field
+    call initial_condition_dense_field()
 end subroutine init_data

@@ -4,11 +4,11 @@ FFILES = check_timedir.f90 check_workdir.f90 save_data.f90 write_field.f90 giveC
 Dper.f90 D26p.f90 Dnonper.f90 D18j.f90  time_step.f90 calc_dt.f90 local_refinement_status.f90 \
 synchronize_ghosts.f90 delete_block.f90 get_sister_id.f90 matrix_to_block_tree.f90 active_blocks_list.f90 \
 new_block.f90 does_block_exist.f90 ensure_completeness.f90 adjacent_block.f90 adapt_mesh.f90 blocks_sum.f90 \
-encoding.f90 respect_min_max_treelevel.f90 restriction_2D.f90 interpolate_mesh.f90 treecode_size.f90 \
+encoding.f90 respect_min_max_treelevel.f90 interpolate_mesh.f90 treecode_size.f90 \
 find_block_id.f90 ensure_gradedness.f90 block_check.f90 get_free_block.f90 update_neighbors.f90 \
-prediction_2D.f90 matrix_mult.f90 int_to_binary.f90 factorial.f90 \
+matrix_mult.f90 int_to_binary.f90 factorial.f90 \
 print_data.f90 array_compare.f90 fliplr.f90 grad_test.f90 matrix_sum.f90 \
-neighbor_search.f90 RHS_2D_block.f90
+neighbor_search.f90 RHS_2D_block.f90 allocate_block_memory.f90 inicond_dense_field.f90
 
 FFILES += init_data.f90
 
@@ -17,13 +17,13 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90
+MFILES = module_params.f90 module_blocks.f90 module_interpolation.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/DERIVATIVES:LIB/EQUATION:LIB/HELPER:LIB/IO:LIB/MAIN:LIB/MESH:LIB/MODULE:LIB/TIME
-VPATH += :USER/msr/test004/
+VPATH += :USER/msr/test004/:LIB/INICOND
 
 # Set the default compiler if it's not already set
 ifndef FC
@@ -79,6 +79,8 @@ main: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_blocks.o: module_blocks.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o prediction_2D.f90 restriction_2D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)

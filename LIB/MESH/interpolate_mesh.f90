@@ -15,6 +15,7 @@ subroutine interpolate_mesh()
 
     use module_params
     use module_blocks
+    use module_interpolation
 
     implicit none
 
@@ -97,7 +98,7 @@ subroutine interpolate_mesh()
             data_predict_coarse                             = 0.0_rk
 
             data_predict_coarse                             = blocks(block_num)%data1
-            call prediction_2D(data_predict_coarse, data_predict_fine, 2*Bs-1)
+            call prediction_2D(data_predict_coarse, data_predict_fine)
 
             !--------------------------
             ! first new block

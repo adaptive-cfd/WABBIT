@@ -15,6 +15,7 @@ subroutine local_refinement_status()
 
     use module_params
     use module_blocks
+    use module_interpolation
 
     implicit none
 
@@ -47,8 +48,8 @@ subroutine local_refinement_status()
         blocks(block_num)%refinement = 0
 
         ! wavelet indicator
-        call restriction_2D(u1, u3, size(u1,1) )  ! fine, coarse
-        call prediction_2D (u3, u2, size(u2,1) )  ! coarse, fine
+        call restriction_2D(u1, u3)  ! fine, coarse
+        call prediction_2D (u3, u2)  ! coarse, fine
 
         ! error
         error = 0.0_rk

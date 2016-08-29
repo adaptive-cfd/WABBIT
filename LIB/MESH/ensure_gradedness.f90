@@ -33,7 +33,7 @@ subroutine ensure_gradedness()
       grid_changed = .false.
 
       !-------------------------------------------------------------------------
-      ! loop over all active blocks
+      ! loop over all blocks, use only active ones
       !-------------------------------------------------------------------------
       do myid = 1, blocks_params%number_max_blocks
           ! is this block in use?

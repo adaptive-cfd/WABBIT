@@ -20,15 +20,17 @@ subroutine ensure_gradedness()
     implicit none
 
     integer(kind=ik) :: myid, l, neighbor_id, mylevel, neighbor_level, neighbor2_id
-    logical :: indirect_refinement
+    logical :: grid_changed
+    integer :: counter
 
-    ! we repeat the ensure_gradedness procedure until this flag is .false.
-    ! why? see below in the code.
-    indirect_refinement = .true. ! true statement for loop triggering
+    ! we repeat the ensure_gradedness procedure until this flag is .false. since as long
+    ! as the grid changes due to gradedness requirements, we have to check it again
+    grid_changed = .true. ! set true to tigger the loop
+    counter = 0
 
-    do while ( indirect_refinement )
+    do while ( grid_changed )
       ! we hope not to set the flag to .true. again in this iteration
-      indirect_refinement = .false.
+      grid_changed = .false.
 
       !-------------------------------------------------------------------------
       ! loop over all active blocks
@@ -62,8 +64,11 @@ subroutine ensure_gradedness()
                       if (mylevel == neighbor_level) then
                           ! neighbor on same level
                           ! neighbor can not coarsen, because I want to refine
-                          if (blocks(neighbor_id)%refinement == -1) blocks(neighbor_id)%refinement = 0
-                          ! if the neighbor wants to stay or refine, that is fine with us
+                          if (blocks(neighbor_id)%refinement == -1) then
+                            blocks(neighbor_id)%refinement = 0
+                            ! if the neighbor wants to stay or refine, that is fine with us
+                            grid_changed = .true. ! we changed something in the grid
+                          end if
 
                       elseif (mylevel - neighbor_level == 1) then
                           ! neighbor one level lower (=coarser)
@@ -73,10 +78,10 @@ subroutine ensure_gradedness()
                             ! to refine anyways already
                             blocks(neighbor_id)%refinement = 1
 
-                            ! this imposed (involuntary) refinement has important consequences: we
+                            ! this inherited (involuntary) refinement has important consequences: we
                             ! have to be sure that this block also respects gradedness
                             ! after its refinement. therefore, we have to repeat the entire process
-                            indirect_refinement = .true.
+                            grid_changed = .true.
                           endif
 
                       elseif (mylevel - neighbor_level == -1) then
@@ -84,11 +89,7 @@ subroutine ensure_gradedness()
                           ! myself. My neighbor can
                           ! a) refine, b) stay, c) coarsen but in any of these cases
                           ! the level difference will be at most 1, so we have nothing
-                          ! to do
-
-                          ! NOTE this case cannot happen here, since we'd have two neighbors
-                          ! in this case NOTE
-
+                          ! to do (this case is active for edges)
                       else
                           ! error
                           print*, 'error: neighbor more than one level up/down in tree'
@@ -120,7 +121,7 @@ subroutine ensure_gradedness()
               ! loop over all directions
               do l = 1, 8
 
-                  ! check number of neighbors, first case: exact 1 neighbor
+                  ! check number of neighbors, first case: exactly 1 neighbor
                   if (blocks(myid)%neighbor_number(l) == 1) then
 
                       ! check neighbor treelevel
@@ -128,16 +129,24 @@ subroutine ensure_gradedness()
                       mylevel     = blocks(myid)%level
 
                       if (neighbor_id == -1) then
-                          print*, 'error: gradedness error, can not coarsen - neighbor does not exists'
-                          stop
+                        ! error case
+                        write(*,*) myid, "myid"
+                        blocks(myid)%data2 = 9e9_rk
+                        blocks(myid)%data1 = 9e9_rk
+                        call save_data(9999, 9.999_rk)
+                        print*, 'error: gradedness error, can not coarsen - neighbor does not exists'
+                        stop
                       end if
 
                       neighbor_level  = blocks(neighbor_id)%level
 
                       if (mylevel == neighbor_level) then
                           ! neighbor on same level
-                          ! block can not coarsen, because neighbor want to refine
-                          if (blocks(neighbor_id)%refinement == 1) blocks(myid)%refinement = 0
+                          ! block can not coarsen, because neighbor wants to refine
+                          if (blocks(neighbor_id)%refinement == 1) then
+                            blocks(myid)%refinement = max(0, blocks(myid)%refinement)
+                            grid_changed = .true. ! we changed something in the grid
+                          end if
 
                       elseif (mylevel - neighbor_level == 1) then
                           ! neighbor on lower level
@@ -147,13 +156,15 @@ subroutine ensure_gradedness()
                           ! neighbor on higher level
                           ! neighbor want to refine, ...
                           if (blocks(neighbor_id)%refinement == 1) then
-                              ! ... so block have also refine
+                              ! ... so I also have to refine
                               blocks(myid)%refinement = 1
+                              grid_changed = .true. ! we changed something in the grid
                           else
                               ! neighbor stays on his level or want to coarsen,
                               ! so block can not coarsen
                               ! TODO: block can coarsen, if neighbor also want to coarsen
-                              blocks(myid)%refinement = 0
+                              blocks(myid)%refinement = max(0, blocks(myid)%refinement)
+                              grid_changed = .true. ! we changed something in the grid
                           end if
 
                       else
@@ -183,14 +194,15 @@ subroutine ensure_gradedness()
 
                       if ( (blocks(neighbor_id)%refinement == 1) .or. (blocks(neighbor2_id)%refinement == 1) ) then
                           ! one of the neighbors want to refine,
-                          ! so block have also refine
-                          blocks(myid)%refinement = 1
+                          ! so block have also refine (and this is sure, so definetly set +1)
+                          blocks(myid)%refinement = +1
+                          grid_changed = .true. ! we changed something in the grid
                       else
                           ! neighbors stay on tree level or want to coarsen,
                           ! so block can not coarsen
                           ! TODO: block can coarsen, if both neighbors also want to coarsen
-                          blocks(myid)%refinement = 0
-
+                          blocks(myid)%refinement = max( 0,blocks(myid)%refinement )
+                          grid_changed = .true. ! we changed something in the grid
                       end if
 
                   ! error case
@@ -204,7 +216,7 @@ subroutine ensure_gradedness()
           end if
           end if
       end do
-    ! end do of repeat procedure until indirect_refinement==.false.
+      counter = counter + 1
+    ! end do of repeat procedure until grid_changed==.false.
     end do
-
 end subroutine ensure_gradedness

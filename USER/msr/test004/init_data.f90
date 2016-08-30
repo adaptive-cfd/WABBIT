@@ -20,32 +20,14 @@ subroutine init_data()
 
     integer :: allocate_error
 
-    ! grid size
-    integer(kind=ik) :: nx
-    ! block size,
-    integer(kind=ik) :: blocksize
-    integer(kind=ik) :: max_blocks
-    integer(kind=ik) :: ghosts
-
-    !------------------------------
-    ! grid and block parameter
-    nx          = 513 !512
-    blocksize   = 17 !33 !65 !129 !257
+    !***************************************************************************
+    ! BLOCK STRUCTURE PARAMETERS
+    !***************************************************************************
+    blocks_params%size_domain		    = 513 !512
+    blocks_params%size_block		    = 17 !33 !65 !129 !257
     ! allocate 4x as many blocks as required
-    ! TODO: allocate max level full
-    max_blocks = 4*((nx-1)/(blocksize-1))**2
-    ghosts     = 4
-
-    blocks_params%size_domain		    = nx
-    blocks_params%size_block		    = blocksize
-    blocks_params%number_max_blocks = max_blocks
-    blocks_params%number_ghost_nodes	= ghosts
-
-    write(*,'(80("-"))')
-    write(*,*) "INITIALIZATION PHASE"
-    write(*,*) "we use a maximum number of blocks of", max_blocks
-    write(*,*) "nghosts=", ghosts
-    write(*,'(80("-"))')
+    blocks_params%number_max_blocks = 4*((blocks_params%size_domain-1)/(blocks_params%size_block-1))**2
+    blocks_params%number_ghost_nodes	= 4
 
     !***************************************************************************
     ! GENERAL PARAMETERS (STRUCT "PARAMS")
@@ -72,8 +54,13 @@ subroutine init_data()
     params%min_treelevel        = 1
     params%order_predictor      = "multiresolution_4th" !"multiresolution_2nd"  ! "multiresolution_4th"
     params%order_discretization = "FD_4th_central_optimized"!"FD_2nd_central" ! "FD_4th_central_optimized"
-    params%inicond              = "sinus" ! gauss_blob
+    params%inicond              = "gauss_blob"!"sinus" ! gauss_blob
 
+    write(*,'(80("-"))')
+    write(*,*) "INITIALIZATION PHASE"
+    write(*,*) "we use a maximum number of blocks of", blocks_params%number_max_blocks
+    write(*,*) "nghosts=", blocks_params%number_ghost_nodes
+    write(*,'(80("-"))')
 
     ! allocate the individual block's memory
     call allocate_block_memory()

@@ -1,6 +1,6 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = check_timedir.f90 check_workdir.f90 save_data.f90 write_field.f90 giveCertainOrder.f90 \
+FFILES = save_data.f90 write_field.f90 giveCertainOrder.f90 \
 Dper.f90 D26p.f90 Dnonper.f90 D18j.f90  time_step.f90 calc_dt.f90 local_refinement_status.f90 \
 synchronize_ghosts.f90 delete_block.f90 get_sister_id.f90 matrix_to_block_tree.f90 active_blocks_list.f90 \
 new_block.f90 does_block_exist.f90 ensure_completeness.f90 adjacent_block.f90 adapt_mesh.f90 blocks_sum.f90 \
@@ -9,7 +9,7 @@ find_block_id.f90 ensure_gradedness.f90 block_check.f90 get_free_block.f90 updat
 matrix_mult.f90 int_to_binary.f90 factorial.f90 \
 print_data.f90 array_compare.f90 fliplr.f90 grad_test.f90 matrix_sum.f90 \
 neighbor_search.f90 RHS_2D_block.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 \
-inicond_sinus.f90 inicond_gauss_blob.f90
+inicond_sinus.f90 inicond_gauss_blob.f90 init_empty_file.f90
 
 FFILES += init_data.f90
 
@@ -18,7 +18,7 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90 module_interpolation.f90
+MFILES = module_params.f90 module_blocks.f90 module_interpolation.f90 hdf5_wrapper.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -44,7 +44,11 @@ LDFLAGS = -llapack
 # Debug flags for gfortran:
 #FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
 FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
-
+# HDF_ROOT is set in environment.
+HDF_LIB = $(HDF_ROOT)/lib
+HDF_INC = $(HDF_ROOT)/include
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+FFLAGS += -I$(HDF_INC)
 endif
 
 # Intel compiler
@@ -68,6 +72,8 @@ PROGRAMS = main
 
 
 
+
+
 # Both programs are compiled by default.
 all: directories $(PROGRAMS)
 
@@ -78,6 +84,8 @@ main: main.f90 $(MOBJS) $(OBJS)
 # Compile modules (module dependency must be specified by hand in
 # Fortran). Objects are specified in MOBJS (module objects).
 $(OBJDIR)/module_blocks.o: module_blocks.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

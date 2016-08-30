@@ -19,8 +19,6 @@ module module_params
 
     type type_params
 
-        character(len=128) 		    :: name_workdir
-        character(len=32)  		    :: name_case
         real(kind=rk) 			    :: time_max
         real(kind=rk) 			    :: CFL
         real(kind=rk), dimension(2)	:: u0

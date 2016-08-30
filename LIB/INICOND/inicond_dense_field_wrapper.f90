@@ -10,8 +10,10 @@ subroutine initial_condition_dense_field()
       select case( params%inicond )
       case ("gauss-blob","gauss_blob")
         call inicond_gauss_blob()
+
       case ("sinus")
         call inicond_sinus()
+
       case default
         write(*,*) "params%inicond is unkown"
         write(*,*) params%inicond

@@ -6,9 +6,9 @@
 ! at timestep n and time t
 !
 ! name: write_field.f90
-! date: 03.08.2016
-! author: msr
-! version: 0.1
+! date: 30.08.2016
+! author: engels
+! version: 0.2
 !
 ! ********************************
 
@@ -16,95 +16,38 @@ subroutine write_field(iteration, time)
 
     use module_params
     use module_blocks
+    use hdf5_wrapper
 
     implicit none
 
     real(kind=rk), intent(in) 	    :: time
     integer(kind=ik), intent(in)    :: iteration
 
-    character(len=20)		        :: str_helper
-    character(len=265) 		        :: name_file, name_file_xy
+    character(len=80) :: fname, dsetname
+    integer(kind=ik)  :: k
 
-    integer(kind=ik)		        :: io_error, i, j, nx, k, N, block_num
+    ! create the filename
+    write( fname,'("data_",i8.8,".h5")') nint(time * 1.0e4_rk)
 
-    N = size(blocks_params%active_list, dim=1)
+    write(*,'("Writing data... time=",f15.8," fname=",A)') time, trim(adjustl(fname))
 
-    write(*,'("Writing data... time=",f15.8," iteration",i8, " N_active=",i8)') time, iteration, N
+    ! overwrite the file, if it already exists
+    call init_empty_file( fname )
 
     ! save block data
-    do k = 1, N
-
-        block_num = blocks_params%active_list(k)
-
-        ! create file name
-        write(str_helper, '(i5.5)') iteration
-        name_file = trim(params%name_workdir) // trim(params%name_case) // '/' // trim(adjustl(trim(str_helper)))
-        write(str_helper, '(f6.2)') time
-        name_file = trim(name_file) // '_' // adjustl(trim(str_helper))
-        write(str_helper, '(i4.4)') block_num
-        name_file = trim(name_file) // '/block_' // adjustl(trim(str_helper))
-        write(str_helper, '(i5.5)') iteration
-        name_file = trim(name_file) // '_iteration_' // trim(str_helper)
-        write(str_helper, '(f6.2)') time
-
-        name_file_xy = trim(name_file) // '_time_' // trim(adjustl(trim(str_helper))) // '.xy'
-        name_file = trim(name_file) // '_time_' // trim(adjustl(trim(str_helper))) // '.dat'
-
-        nx = blocks_params%size_block
-
-        ! write coords
-        open(unit=99,file=name_file_xy,status='new',action='write', iostat=io_error)
-
-        if (io_error == 0) then
-            do i = 1, nx
-                write(99, '(es15.8,1x)', advance='no') blocks(block_num)%coord_x(i)
-                write(99, '(es15.8,1x)', advance='no') blocks(block_num)%coord_y(i)
-                write(99, *)
-            end do
-        end if
-        close(unit=99)
-
-        ! write data
-        open(unit=99,file=name_file,status='new',action='write', iostat=io_error)
-
-        if (io_error == 0) then
-            do i = 1, nx
-                do j = 1, nx
-                    write(99, '(es15.8,1x)', advance='no') blocks(block_num)%data1(i,j)
-                end do
-                write(99, *)
-            end do
-        end if
-        close(unit=99)
-
+    do k = 1, blocks_params%number_max_blocks
+        if (blocks(k)%active) then
+          ! the name of the block within th hdf5 file
+          write(dsetname,'("block_",i8.8)') k
+          ! actual writing of block data to file:
+          call write_field_hdf5( fname, dsetname, blocks(k)%data1, .false.)
+          ! add useful attributes to the block:
+          call write_attribute( fname, dsetname, "treecode", blocks(k)%treecode)
+          call write_attribute( fname, dsetname, "time", (/time/))
+          call write_attribute( fname, dsetname, "iteration", (/iteration/))
+          call write_attribute( fname, dsetname, "coord_x", blocks(k)%coord_x)
+          call write_attribute( fname, dsetname, "coord_y", blocks(k)%coord_y)
+        endif
     end do
-
-    ! save treecode
-
-    ! create file name
-    write(str_helper, '(i5.5)') iteration
-    name_file = trim(params%name_workdir) // trim(params%name_case) // '/' // trim(adjustl(trim(str_helper)))
-    write(str_helper, '(f6.2)') time
-    name_file = trim(name_file) // '_' // adjustl(trim(str_helper))
-
-    name_file = trim(name_file) // '/treecode.dat'
-
-    open(unit=1000,file=name_file,status='new',action='write', iostat=io_error)
-
-    do k = 1, N
-
-        block_num = blocks_params%active_list(k)
-        ! write treecode
-        if (io_error == 0) then
-            write(1000, '(i6,5x)', advance='no') block_num
-            do i = 1, blocks(block_num)%level
-                write(1000, '(i2,1x)', advance='no') blocks(block_num)%treecode(i)
-            end do
-            write(1000, *)
-        end if
-
-    end do
-
-    close(unit=1000)
 
 end subroutine write_field

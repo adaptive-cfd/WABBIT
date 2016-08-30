@@ -34,10 +34,6 @@ program mains
 
     ! initializing data
     call init_data()
-
-    ! check workdir
-    call check_workdir()
-
     ! cpu time start
     call cpu_time(t0)
 

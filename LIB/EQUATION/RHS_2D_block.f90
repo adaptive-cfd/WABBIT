@@ -47,7 +47,7 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
     b4 = 4.0_rk/3.0_rk
     b5 = -1.0_rk/12.0_rk
 
-    if (params%order_discretization == "FD_2nd_central" ) then! "FD_4th_central_optimized")
+    if (params%order_discretization == "FD_2nd_central" ) then
       !-----------------------------------------------------------------------
       ! 2nd order
       !-----------------------------------------------------------------------

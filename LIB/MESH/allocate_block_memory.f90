@@ -12,6 +12,8 @@ subroutine  allocate_block_memory()
     write(*,'("System is allocating",i7," blocks" )') blocks_params%number_max_blocks
 
     allocate( blocks(1:blocks_params%number_max_blocks), stat=allocate_error )
+    ! dummy allocation
+    allocate( blocks_params%active_list(1), stat=allocate_error )
 
     do i = 1, blocks_params%number_max_blocks
         allocate( blocks(i)%data1(blocksize, blocksize), stat=allocate_error )

@@ -8,7 +8,8 @@ encoding.f90 respect_min_max_treelevel.f90 interpolate_mesh.f90 treecode_size.f9
 find_block_id.f90 ensure_gradedness.f90 block_check.f90 get_free_block.f90 update_neighbors.f90 \
 matrix_mult.f90 int_to_binary.f90 factorial.f90 \
 print_data.f90 array_compare.f90 fliplr.f90 grad_test.f90 matrix_sum.f90 \
-neighbor_search.f90 RHS_2D_block.f90 allocate_block_memory.f90 inicond_dense_field.f90
+neighbor_search.f90 RHS_2D_block.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 \
+inicond_sinus.f90 inicond_gauss_blob.f90
 
 FFILES += init_data.f90
 

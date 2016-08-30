@@ -59,7 +59,7 @@ subroutine init_data()
     params%nu 		            = 0.0e-3_rk
     ! domain size
     params%Lx 		            = 256.0_rk
-    params%Ly                   = params%Lx
+    params%Ly                 = params%Lx
     ! workdir, case name, write frequency
     params%name_workdir 	    = "./data/"
     params%name_case 	        = "eps1e-3_level6"
@@ -72,8 +72,9 @@ subroutine init_data()
     params%min_treelevel        = 1
     params%order_predictor      = "multiresolution_4th" !"multiresolution_2nd"  ! "multiresolution_4th"
     params%order_discretization = "FD_4th_central_optimized"!"FD_2nd_central" ! "FD_4th_central_optimized"
+    params%inicond              = "sinus" ! gauss_blob
 
-    allocate( blocks_params%active_list(1), stat=allocate_error )
+
     ! allocate the individual block's memory
     call allocate_block_memory()
     ! initial data field

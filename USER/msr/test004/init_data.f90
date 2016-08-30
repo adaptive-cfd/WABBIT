@@ -70,6 +70,8 @@ subroutine init_data()
     ! set treelevel
     params%max_treelevel        = 6
     params%min_treelevel        = 1
+    params%order_predictor      = "multiresolution_4th" !"multiresolution_2nd"  ! "multiresolution_4th"
+    params%order_discretization = "FD_4th_central_optimized"!"FD_2nd_central" ! "FD_4th_central_optimized"
 
     allocate( blocks_params%active_list(1), stat=allocate_error )
     ! allocate the individual block's memory

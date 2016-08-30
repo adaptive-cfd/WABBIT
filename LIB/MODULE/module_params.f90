@@ -31,6 +31,7 @@ module module_params
         real(kind=rk)               :: eps_refine
         integer(kind=ik)            :: max_treelevel
         integer(kind=ik)            :: min_treelevel
+        character(len=80) :: order_discretization, order_predictor
 
     end type type_params
 

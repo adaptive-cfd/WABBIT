@@ -11,9 +11,9 @@ subroutine initial_condition_dense_field()
 
       nx = blocks_params%size_domain
       lx = real(nx, kind=rk)
-      mux     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
-      muy     = 0.5_rk * ( real(nx,kind=rk) - 1.0_rk )
-      sigma   = 1.0_rk
+      mux     = 0.5_rk !* ( real(nx,kind=rk) - 1.0_rk )
+      muy     = 0.5_rk !* ( real(nx,kind=rk) - 1.0_rk )
+      sigma   = 2.0e-3_rk
       allocate( blocks_params%phi(1:nx, 1:nx) )
       blocks_params%phi = 0.0_rk
 
@@ -21,10 +21,11 @@ subroutine initial_condition_dense_field()
 
       do i = 1, nx
           do j = 1, nx
+            ! x and y are normalized to the domain length
             x = real(i-1,kind=rk) / (lx-1.0_rk)
             y = real(j-1,kind=rk) / (lx-1.0_rk)
-            blocks_params%phi(i,j) = exp( -((x-mux)**2 + (y-muy)**2) / sigma )
-            blocks_params%phi(i,j) = dsin(6.283185307179586e+00_rk*x) * dsin(6.283185307179586e+00_rk*y)
+            ! blocks_params%phi(i,j) = exp( -((x-mux)**2 + (y-muy)**2) / sigma )
+            blocks_params%phi(i,j) = dsin(2.0_rk*6.283185307179586e+00_rk*x) * dsin(2.0_rk*6.283185307179586e+00_rk*y)
           end do
       end do
 

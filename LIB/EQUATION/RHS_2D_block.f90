@@ -28,7 +28,7 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
     real(kind=rk) :: a(-3:+3),b1,b2,b3,b4,b5
 
     grad_phi 		= 0.0_rk
-    laplace_phi		= 0.0_rk
+    laplace_phi	= 0.0_rk
 
     ! division is expensive, multiplication is cheap, so here we save some time
     dx_inv = 1.0_rk / (dx)
@@ -47,35 +47,51 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
     b4 = 4.0_rk/3.0_rk
     b5 = -1.0_rk/12.0_rk
 
-    ! loop over interior points only (EXCLUDE ghost nodes)
-    do ix = g+1, N+g
-      do iy = g+1, N+g
-        ! locally compute derivatives (i.e. not a matrix multiplication)
-        !-----------------------------------------------------------------------
-        ! 2nd order
-        !-----------------------------------------------------------------------
-        phi_dx = (phi(ix+1,iy)-phi(ix-1,iy))/(2.0_rk*dx)
-        phi_dy = (phi(ix,iy+1)-phi(ix,iy-1))/(2.0_rk*dy)
-        phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
-        phi_dydy = (phi(ix,iy-1)-2.d0*phi(ix,iy)+phi(ix,iy+1))*dy2_inv
-
-        !-----------------------------------------------------------------------
-        ! 4th order
-        !-----------------------------------------------------------------------
-        ! phi_dx = (a(-3)*phi(ix-3,iy) + a(-2)*phi(ix-2,iy) + a(-1)*phi(ix-1,iy) + a(0)*phi(ix,iy)&
-        !        +  a(+3)*phi(ix+3,iy) + a(+2)*phi(ix+2,iy) + a(+1)*phi(ix+1,iy))*dx_inv
-        ! phi_dy = (a(-3)*phi(ix,iy-3) + a(-2)*phi(ix,iy-2) + a(-1)*phi(ix,iy-1) + a(0)*phi(ix,iy)&
-        !        +  a(+3)*phi(ix,iy+3) + a(+2)*phi(ix,iy+2) + a(+1)*phi(ix,iy+1))*dy_inv
-        ! phi_dxdx = (b1*phi(ix-2,iy) + b2*phi(ix-1,iy) + b3*phi(ix,iy)&
-        !          +  b4*phi(ix+1,iy) + b5*phi(ix+2,iy))*dx2_inv
-        ! phi_dydy = (b1*phi(ix,iy-2) + b2*phi(ix,iy-1) + b3*phi(ix,iy)&
-        !          +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
-
-        ! compute (assemble) final right hand side
-        rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &
-                   + params%nu * ( phi_dxdx + phi_dydy )
+    if (params%order_discretization == "FD_2nd_central" ) then! "FD_4th_central_optimized")
+      !-----------------------------------------------------------------------
+      ! 2nd order
+      !-----------------------------------------------------------------------
+      ! loop over interior points only (EXCLUDE ghost nodes)
+      do ix = g+1, N+g
+        do iy = g+1, N+g
+          phi_dx = (phi(ix+1,iy)-phi(ix-1,iy))/(2.0_rk*dx)
+          phi_dy = (phi(ix,iy+1)-phi(ix,iy-1))/(2.0_rk*dy)
+          phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
+          phi_dydy = (phi(ix,iy-1)-2.d0*phi(ix,iy)+phi(ix,iy+1))*dy2_inv
+          ! compute (assemble) final right hand side
+          rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &
+                     + params%nu * ( phi_dxdx + phi_dydy )
+        end do
       end do
-    end do
+
+    elseif (params%order_discretization == "FD_4th_central_optimized") then
+      !-----------------------------------------------------------------------
+      ! 4th order
+      !-----------------------------------------------------------------------
+      ! loop over interior points only (EXCLUDE ghost nodes)
+      do ix = g+1, N+g
+        do iy = g+1, N+g
+          phi_dx = (a(-3)*phi(ix-3,iy) + a(-2)*phi(ix-2,iy) + a(-1)*phi(ix-1,iy) + a(0)*phi(ix,iy)&
+                 +  a(+3)*phi(ix+3,iy) + a(+2)*phi(ix+2,iy) + a(+1)*phi(ix+1,iy))*dx_inv
+          phi_dy = (a(-3)*phi(ix,iy-3) + a(-2)*phi(ix,iy-2) + a(-1)*phi(ix,iy-1) + a(0)*phi(ix,iy)&
+                 +  a(+3)*phi(ix,iy+3) + a(+2)*phi(ix,iy+2) + a(+1)*phi(ix,iy+1))*dy_inv
+          phi_dxdx = (b1*phi(ix-2,iy) + b2*phi(ix-1,iy) + b3*phi(ix,iy)&
+                   +  b4*phi(ix+1,iy) + b5*phi(ix+2,iy))*dx2_inv
+          phi_dydy = (b1*phi(ix,iy-2) + b2*phi(ix,iy-1) + b3*phi(ix,iy)&
+                   +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
+
+          ! compute (assemble) final right hand side
+          rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &
+                     + params%nu * ( phi_dxdx + phi_dydy )
+        end do
+      end do
+
+    else
+      write(*,*) "discretization method in params%order_discretization is unknown"
+      write(*,*) params%order_discretization
+      stop
+    end if
+
 
     ! return (TODO: DO NOT OVERWRITE?)
     phi = rhs

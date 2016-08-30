@@ -24,7 +24,7 @@ subroutine prediction_2D(coarse, fine)
     real(kind=rk), dimension(1:,1:), intent(in)  :: coarse
 
     integer(kind=ik) :: i, j, Bs, g
-    integer(kind=ik) :: order, ncoarse, nfine
+    integer(kind=ik) :: ncoarse, nfine
     integer(kind=ik) :: icoarse, ifine
 
     ncoarse = size(coarse, 1)
@@ -35,8 +35,6 @@ subroutine prediction_2D(coarse, fine)
       stop
     endif
 
-    ! temporarily choose the order here:
-    order = 2
     ! inititalize fine field with zeros (actually not necessary)
     fine = 9.0e9_rk
     ! fill matching points: the coarse and fine grid share a lot of points (as the
@@ -44,7 +42,7 @@ subroutine prediction_2D(coarse, fine)
     fine(1:nfine:2, 1:nfine:2) = coarse(:,:)
 
 
-    if ( order == 2 ) then
+    if ( params%order_predictor == "multiresolution_2nd" ) then
         !-----------------------------------------------------------------------
         ! second order interpolation
         !-----------------------------------------------------------------------
@@ -61,7 +59,7 @@ subroutine prediction_2D(coarse, fine)
             fine(i,j) = ( fine(i, j-1) + fine(i, j+1) ) / 2.0_rk
           end do
         end do
-    elseif ( order == 4 ) then
+    elseif ( params%order_predictor == "multiresolution_4th"  ) then
         !-----------------------------------------------------------------------
         ! fourth order interpolation
         !-----------------------------------------------------------------------

@@ -18,13 +18,14 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90 module_interpolation.f90 hdf5_wrapper.f90
+MFILES = module_params.f90 module_blocks.f90 module_interpolation.f90 hdf5_wrapper.f90 \
+ini_files_parser.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/DERIVATIVES:LIB/EQUATION:LIB/HELPER:LIB/IO:LIB/MAIN:LIB/MESH:LIB/MODULE:LIB/TIME
-VPATH += :USER/msr/test004/:LIB/INICOND
+VPATH += :LIB/INICOND
 
 # Set the default compiler if it's not already set
 ifndef FC
@@ -87,6 +88,8 @@ main: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_blocks.o: module_blocks.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

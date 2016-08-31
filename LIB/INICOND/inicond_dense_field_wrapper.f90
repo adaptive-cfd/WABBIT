@@ -2,6 +2,7 @@
 ! this is a wrapper for different initial conditions
 !-------------------------------------------------------------------------------
 subroutine initial_condition_dense_field()
+
       use module_params
       use module_blocks
 
@@ -19,4 +20,5 @@ subroutine initial_condition_dense_field()
         write(*,*) params%inicond
         stop
       end select
+
 end subroutine

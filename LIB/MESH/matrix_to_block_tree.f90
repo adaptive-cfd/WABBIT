@@ -53,6 +53,7 @@ subroutine matrix_to_block_tree()
 
     write(*,'(a,i5,a,i5,a,i5,a,i5,a,i5,a,i5)') "Field with res: ", (Ds), " x", (Ds), " gives: ", &
     num_blocks_x, " x", num_blocks_y, " (", num_blocks, ") blocks of size: ", (Bs)
+    write(*,'(80("-"))')
 
     ! domain coordinate vectors
     do i = 1, Ds

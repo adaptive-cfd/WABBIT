@@ -33,7 +33,7 @@ subroutine init_data()
     ! GENERAL PARAMETERS (STRUCT "PARAMS")
     !***************************************************************************
     ! time loop parameter
-    params%time_max = 160.0_rk
+    params%time_max = 200.0_rk
     params%CFL 		  = 0.5_rk
     ! convective velocity
     params%u0 		  = (/1.0_rk, 0.5_rk/) !(/0.0_rk, 0.0_rk/)
@@ -56,12 +56,13 @@ subroutine init_data()
 
     write(*,'(80("-"))')
     write(*,*) "INITIALIZATION PHASE"
-    write(*,*) "we use a maximum number of blocks of", blocks_params%number_max_blocks
-    write(*,*) "nghosts=", blocks_params%number_ghost_nodes
+    write(*,*) "we use a maximum number of blocks of:", blocks_params%number_max_blocks
+    write(*,*) "nghosts:", blocks_params%number_ghost_nodes
     write(*,'(80("-"))')
 
     ! allocate the individual block's memory
     call allocate_block_memory()
     ! initial data field
     call initial_condition_dense_field()
+
 end subroutine init_data

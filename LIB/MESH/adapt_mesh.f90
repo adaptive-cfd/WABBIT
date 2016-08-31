@@ -32,7 +32,7 @@ subroutine adapt_mesh()
     call active_blocks_list()
     call update_neighbors()
 
-!    call block_check()
+    call block_check()
 
     ! update the neighbor relations
     call update_neighbors()

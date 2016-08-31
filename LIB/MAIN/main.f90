@@ -72,6 +72,7 @@ program mains
         ! output on screen
         write(*,'("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, &
         time, size(blocks_params%active_list, dim=1)
+        write(*,'(80("-"))')
 
     end do
 

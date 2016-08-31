@@ -23,4 +23,5 @@ subroutine inicond_sinus()
             blocks_params%phi(i,j) = dsin(2.0_rk*6.283185307179586e+00_rk*x) * dsin(2.0_rk*6.283185307179586e+00_rk*y)
           end do
       end do
+
 end subroutine

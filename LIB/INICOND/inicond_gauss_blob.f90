@@ -17,7 +17,9 @@ subroutine inicond_gauss_blob()
       allocate( blocks_params%phi(1:nx, 1:nx) )
       blocks_params%phi = 0.0_rk
 
-      write(*,*) mux,muy,sigma
+      write(*,'(a,f4.2,a,f4.2)') "initialize gauss pulse at x=", mux, " y=", muy
+      write(*,'(a,e10.4)') "gauss sigma=", sigma
+      write(*,'(80("-"))')
 
       do i = 1, nx
           do j = 1, nx
@@ -33,4 +35,5 @@ subroutine inicond_gauss_blob()
       where ( blocks_params%phi<1.0e-13_rk )
         blocks_params%phi = 0.0_rk
       end where
+
 end subroutine

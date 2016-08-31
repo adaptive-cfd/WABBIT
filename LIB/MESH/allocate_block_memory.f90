@@ -10,6 +10,7 @@ subroutine  allocate_block_memory()
     blocksize = blocks_params%size_block
     ghosts = blocks_params%number_ghost_nodes
     write(*,'("System is allocating",i7," blocks" )') blocks_params%number_max_blocks
+    write(*,'(80("-"))')
 
     allocate( blocks(1:blocks_params%number_max_blocks), stat=allocate_error )
     ! dummy allocation
@@ -54,4 +55,5 @@ subroutine  allocate_block_memory()
         blocks(i)%coord_x(:)    = 0.0_rk
         blocks(i)%coord_y(:)    = 0.0_rk
     end do
+
 end subroutine

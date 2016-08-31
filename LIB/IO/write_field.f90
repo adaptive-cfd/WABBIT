@@ -29,7 +29,9 @@ subroutine write_field(iteration, time)
     ! create the filename
     write( fname,'("data_",i8.8,".h5")') nint(time * 1.0e4_rk)
 
+    write(*,'(80("*"))')
     write(*,'("Writing data... time=",f15.8," fname=",A)') time, trim(adjustl(fname))
+    write(*,'(80("*"))')
 
     ! overwrite the file, if it already exists
     call init_empty_file( fname )

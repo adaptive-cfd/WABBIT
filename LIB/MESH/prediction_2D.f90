@@ -23,7 +23,7 @@ subroutine prediction_2D(coarse, fine)
     real(kind=rk), dimension(1:,1:), intent(out) :: fine
     real(kind=rk), dimension(1:,1:), intent(in)  :: coarse
 
-    integer(kind=ik) :: i, j, Bs, g
+    integer(kind=ik) :: i, j
     integer(kind=ik) :: ncoarse, nfine
     integer(kind=ik) :: icoarse, ifine
 
@@ -96,7 +96,6 @@ subroutine prediction1D(coarse, fine)
     real(kind=rk), dimension(1:), intent(in) :: coarse
 
     integer(kind=ik) :: k, nfine, ncoarse
-    integer(kind=ik) :: order
     real(kind=rk) :: a, b
 
     ncoarse = size(coarse,1)

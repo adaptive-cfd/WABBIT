@@ -24,7 +24,6 @@ subroutine matrix_to_block_tree()
 
     real(kind=rk), dimension(:,:), allocatable      :: data
     real(kind=rk), dimension(:), allocatable        :: coord_x, coord_y, domain_coord_x, domain_coord_y
-    real(kind=rk)                                   :: dx, dy
 
     Bs                  = blocks_params%size_block
     g                   = blocks_params%number_ghost_nodes

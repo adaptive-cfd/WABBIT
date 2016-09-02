@@ -19,7 +19,6 @@ subroutine init_data()
 
     implicit none
 
-    integer             :: allocate_error
     type(inifile)       :: FILE
     character(len=80)   :: infile
 

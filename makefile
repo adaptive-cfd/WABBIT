@@ -25,7 +25,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/DERIVATIVES:LIB/EQUATION:LIB/HELPER:LIB/IO:LIB/MAIN:LIB/MESH:LIB/MODULE:LIB/TIME
-VPATH += :LIB/INICOND
+VPATH += :LIB/INI
 
 # Set the default compiler if it's not already set
 ifndef FC
@@ -60,6 +60,11 @@ PPFLAG= -fpp #preprocessor flag
 FFLAGS = -FR -warn all -O3 -traceback -check bounds -check all #-heap-arrays
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
+# HDF_ROOT is set in environment.
+HDF_LIB = $(HDF_ROOT)/lib
+HDF_INC = $(HDF_ROOT)/include
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+FFLAGS += -I$(HDF_INC)
 endif
 
 #IBM compiler

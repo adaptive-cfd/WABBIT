@@ -13,7 +13,7 @@ subroutine neighbor_search()
 
     implicit none
 
-    integer(kind=ik)                    :: k, N, block_num, l
+!    integer(kind=ik)                    :: k, N, block_num, l
 
 !    N               = size(blocks_params%active_list, dim=1)
 !

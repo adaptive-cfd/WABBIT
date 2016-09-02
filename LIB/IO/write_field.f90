@@ -24,7 +24,7 @@ subroutine write_field(iteration, time, dF)
     integer(kind=ik), intent(in)    :: iteration
 
     character(len=80)               :: fname, dsetname
-    integer(kind=ik)                :: k, i
+    integer(kind=ik)                :: k
 
     integer(kind=ik), intent(in)    :: dF
 

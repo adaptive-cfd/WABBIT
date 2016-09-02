@@ -99,7 +99,6 @@ subroutine update_neighbors()
                         else
                            ! error case
                             print*, 'error: neighbor is missing (1 of 2 neighbors)'
-                            call save_data(9999, 99.99)
                             stop
                         end if
 

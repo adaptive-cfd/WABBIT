@@ -20,8 +20,9 @@ subroutine blocks_sum(s)
     implicit none
 
     real(kind=rk), intent(inout)    :: s
-
-    integer                         :: i, j, k, N, block_num
+    s = 0.0_rk
+!
+!    integer                         :: i, j, k, N, block_num
 
 !    N = size(blocks_params%active_list, dim=1)
 !    s = 0.0_rk

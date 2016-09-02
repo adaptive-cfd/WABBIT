@@ -324,8 +324,8 @@ contains
     real(kind=pr),dimension(:),allocatable :: defaultvalue
     integer :: n
 
-    character(len=maxcolumns) :: value
-    character(len=14)::formatstring
+    !character(len=maxcolumns) :: value
+    !character(len=14)::formatstring
 
     n = size(params_vector,1)
 
@@ -361,7 +361,7 @@ contains
     character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
     character(len=maxcolumns) ::  value    ! returns the value
     integer :: params_int, defaultvalue
-    integer :: mpicode
+    !integer :: mpicode
 
     call GetValue(PARAMS, section, keyword, value)
 

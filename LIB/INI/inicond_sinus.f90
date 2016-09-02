@@ -4,8 +4,8 @@ subroutine inicond_sinus()
 
       implicit none
 
-      integer(kind=ik) :: i, j, nx
-      real(kind=rk) :: mux, muy, x ,y, lx
+ !     integer(kind=ik) :: i, j, nx
+ !     real(kind=rk) :: mux, muy, x ,y, lx
 
 !      nx = blocks_params%size_domain
 !      allocate( blocks_params%phi(1:nx, 1:nx) )

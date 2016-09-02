@@ -13,7 +13,7 @@ subroutine grad_test()
 
     implicit none
 
-    integer(kind=ik) :: k, N, block_num, l, neighbor_id, level, neighbor_level
+    !integer(kind=ik) :: k, N, block_num, l, neighbor_id, level, neighbor_level
 
 !    N  = size(blocks_params%active_list, dim=1)
 !

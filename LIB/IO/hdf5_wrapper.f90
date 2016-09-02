@@ -217,9 +217,9 @@ subroutine write_field_hdf5( filename, dsetname, field, overwrite)
 
   ! HDF attribute variables
   integer, parameter :: arank = 1
-  integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+  !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
-  integer :: i, mindim, maxdim, mpicode
+  !integer :: i, mindim, maxdim, mpicode
   logical :: exist1, ovrwrte
 
   if (present(overwrite)) then

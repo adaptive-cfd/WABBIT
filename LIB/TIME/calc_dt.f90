@@ -34,4 +34,5 @@ subroutine calc_dt(dt)
 
     ! time step
     dt = params%CFL * dx / norm2(params%u0)
+
 end subroutine calc_dt

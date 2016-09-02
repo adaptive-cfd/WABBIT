@@ -15,6 +15,7 @@ module module_blocks
 
     implicit none
 
+    ! data precision parameters
     integer, parameter, public   :: sngl_prec=selected_real_kind(4)
     integer, parameter, public	 :: dble_prec=selected_real_kind(8)
 
@@ -25,25 +26,48 @@ module module_blocks
 
     ! datatype for block parameter
     type type_blocks_params
+
+        ! start data fields
         real(kind=rk), dimension(:,:), allocatable      :: phi
+
+        ! list of active blocks
         integer(kind=ik), dimension(:), allocatable     :: active_list
+
+        ! grid parameter
         integer(kind=ik)                                :: size_domain
         integer(kind=ik)                                :: size_block
-        integer(kind=ik)                                :: number_max_blocks
         integer(kind=ik)                                :: number_ghost_nodes
+
+        ! number of allocated blocks and data fields
+        integer(kind=ik)                                :: number_max_blocks
+        integer(kind=ik)                                :: number_data_fields
+
     end type type_blocks_params
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type (type_blocks_params), save                     :: blocks_params
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+    type type_data_fields
+
+        ! data fields
+        real(kind=rk), dimension(:,:), allocatable      :: data_, data_old
+
+        ! data fields for runge kutta stages
+        real(kind=rk), dimension(:,:), allocatable      :: k1, k2, k3, k4
+
+    end type type_data_fields
+
     ! datatype for block data
     type type_blocks
 
-        real(kind=rk), dimension(:,:), allocatable      :: data1, data2, data_old, k1, k2, k3, k4
+        type(type_data_fields), dimension(:), allocatable    :: data_fields
+
+        ! coordinates, spacing
         real(kind=rk), dimension(:), allocatable        :: coord_x, coord_y
         real(kind=rk)                                   :: dx, dy
 
+        ! treecode, level and neighbor information
         integer(kind=ik), dimension(:), allocatable     :: treecode
         integer(kind=ik)                                :: level
         integer(kind=ik), dimension(:,:), allocatable   :: neighbor_treecode
@@ -54,8 +78,10 @@ module module_blocks
         integer(kind=ik), dimension(4)                  :: neighbor2_id
         integer(kind=ik), dimension(8)                  :: neighbor_number
 
+        ! refinement flag
         integer(kind=ik)                                :: refinement
 
+        ! active flag
         logical                                         :: active
 
     end type type_blocks

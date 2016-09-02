@@ -21,7 +21,19 @@ subroutine save_data(iteration, time)
     real(kind=rk), intent(in) 		:: time
     integer(kind=ik), intent(in) 	:: iteration
 
-    ! save data for all blocks
-    call write_field(iteration, time)
+    integer(kind=ik)                :: dF
+
+    dF = blocks_params%number_data_fields
+
+    if ( dF == 1 ) then
+        ! exactly one field
+        ! save data for all blocks
+        call write_field(iteration, time, dF)
+
+    else
+        ! more than one field
+        ! to do
+
+    end if
 
 end subroutine save_data

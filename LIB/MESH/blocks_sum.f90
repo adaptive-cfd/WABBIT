@@ -23,19 +23,19 @@ subroutine blocks_sum(s)
 
     integer                         :: i, j, k, N, block_num
 
-    N = size(blocks_params%active_list, dim=1)
-    s = 0.0_rk
-
-    do k = 1, N
-
-        block_num = blocks_params%active_list(k)
-
-        do i = 1, blocks_params%size_block
-            do j = 1, blocks_params%size_block
-                s = s + abs(blocks(block_num)%data1(i,j))
-            end do
-        end do
-
-    end do
+!    N = size(blocks_params%active_list, dim=1)
+!    s = 0.0_rk
+!
+!    do k = 1, N
+!
+!        block_num = blocks_params%active_list(k)
+!
+!        do i = 1, blocks_params%size_block
+!            do j = 1, blocks_params%size_block
+!                s = s + abs(blocks(block_num)%data1(i,j))
+!            end do
+!        end do
+!
+!    end do
 
 end subroutine blocks_sum

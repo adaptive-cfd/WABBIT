@@ -11,7 +11,7 @@
 !
 ! ********************************
 
-program mains
+program main
 
     use module_params
     use module_blocks
@@ -23,33 +23,28 @@ program mains
     integer(kind=ik)	:: iteration
     ! cpu time variables
     real(kind=rk)       :: t0, t1
-    ! numerical error calculation
-    !real(kind=rk)       :: num_error, s0, s
 
     time        = 0.0_rk
     iteration   = 0
-    !s0          = 0.0_rk
-    !s           = 0.0_rk
-    !num_error   = abs(s0 - s)
 
     ! initializing data
     call init_data()
+
     ! cpu time start
     call cpu_time(t0)
 
     ! create block tree
     call matrix_to_block_tree()
     call active_blocks_list()
-    call update_neighbors()
+    call block_check()
 
-    call neighbor_search()
+    ! update neighbor relations
+    call update_neighbors()
 
     ! save start field to disk
     call save_data(iteration, time)
 
-    ! numerical error calculation
-    !call blocks_sum(s0)
-
+    ! main time loop
     do while ( time < params%time_max )
 
         iteration = iteration + 1
@@ -65,10 +60,6 @@ program mains
           call save_data(iteration, time)
         endif
 
-        ! error calculation
-        !call blocks_sum(s)
-        !num_error   = abs(s0 - s)
-
         ! output on screen
         write(*,'("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, &
         time, size(blocks_params%active_list, dim=1)
@@ -83,4 +74,4 @@ program mains
     call cpu_time(t1)
     write(*,'(a,f10.6)') "cpu-time = ", t1-t0
 
-end program mains
+end program main

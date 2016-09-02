@@ -11,30 +11,32 @@
 !
 ! ********************************
 
-subroutine new_block(k, treecode, treeN, data, ix, iy, N)
+subroutine new_block(k, treecode, treeN, data_, ix, iy, Bs, g, dF)
 
     use module_params
     use module_blocks
 
     implicit none
 
-    integer(kind=ik), intent(in)                    :: k, N, treeN
-    integer(kind=ik), dimension(treeN), intent(in)  :: treecode
+    integer(kind=ik), intent(in)                                :: k, Bs, g, treeN, dF
+    integer(kind=ik), dimension(treeN), intent(in)              :: treecode
 
-    real(kind=rk), dimension(N, N), intent(in)      :: data
-    real(kind=rk), dimension(N), intent(in)         :: ix, iy
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g), intent(in)        :: data_
+    real(kind=rk), dimension(Bs), intent(in)                    :: ix, iy
 
-    integer(kind=ik)                                :: treecode_size
+    integer(kind=ik)                                            :: treecode_size
 
-    if ( k<=0 .or. k>blocks_params%number_max_blocks) then
+    ! error handling
+    if ( (k <= 0) .or. (k > blocks_params%number_max_blocks) ) then
+
       write(*,*) "ERROR! You try to create a block outside of the list"
       write(*,'("your id: ",i8," N_max_blocks=",i8)') k, blocks_params%number_max_blocks
       stop
+
     endif
 
     ! save data
-    blocks(k)%data1                 = data
-    blocks(k)%data2                 = 0.0_rk
+    blocks(k)%data_fields(dF)%data_ = data_
 
     ! set block status
     blocks(k)%active                = .true.

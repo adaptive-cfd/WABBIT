@@ -20,109 +20,113 @@ subroutine time_step(time)
 
     real(kind=rk), intent(inout)  			    :: time
 
-    integer(kind=ik)				            :: g, N, block_N, k, block_num
+    integer(kind=ik)				            :: dF, g, Bs, N, k, block_num
     real(kind=rk)				                :: dt
 
     g 					    = blocks_params%number_ghost_nodes
-    N 					    = blocks_params%size_block
+    Bs 					    = blocks_params%size_block
 
-    block_N                 = size(blocks_params%active_list, dim=1)
+    N                       = size(blocks_params%active_list, dim=1)
 
     call calc_dt(dt)
     time 				    = time + dt
     ! last timestep fits in maximal time
     if (time > params%time_max) time = params%time_max
 
-    ! output on screen
-!    write(*,'(a,i5)') "number of active blocks = ", block_N
+    ! check number of data fields
+    if ( blocks_params%number_data_fields == 1 ) then
+        ! single data field
+        dF = blocks_params%number_data_fields
 
-    !------------------------------
-    ! first stage
-    ! synchronize ghostnodes
-    call synchronize_ghosts()
+        !------------------------------
+        ! first stage
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
 
-    do k = 1, block_N
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%data_old  = blocks(block_num)%data2
-        blocks(block_num)%k1        = blocks(block_num)%data_old
-        ! RHS
-        call RHS_2D_block(blocks(block_num)%k1, blocks(block_num)%dx, blocks(block_num)%dy, g, N)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%data_old  = blocks(block_num)%data_fields(dF)%data_
+            blocks(block_num)%data_fields(dF)%k1        = blocks(block_num)%data_fields(dF)%data_old
+            ! RHS
+            call RHS_2D_block(blocks(block_num)%data_fields(dF)%k1(:,:), blocks(block_num)%dx, blocks(block_num)%dy, g, Bs)
 
-    end do
+        end do
 
-    !------------------------------
-    ! second stage
-    do k = 1, block_N
+        !------------------------------
+        ! second stage
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%data2     = blocks(block_num)%data_old + 0.5_rk * dt * blocks(block_num)%k1
-        blocks(block_num)%data1     = blocks(block_num)%data2(g+1:N+g, g+1:N+g)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%data_     = blocks(block_num)%data_fields(dF)%data_old + 0.5_rk * dt * blocks(block_num)%data_fields(dF)%k1
 
-    end do
-    ! synchronize ghostnodes
-    call synchronize_ghosts()
-    do k = 1, block_N
+        end do
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%k2        = blocks(block_num)%data2
-        ! RHS
-        call RHS_2D_block(blocks(block_num)%k2, blocks(block_num)%dx, blocks(block_num)%dy, g, N)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%k2        = blocks(block_num)%data_fields(dF)%data_
+            ! RHS
+            call RHS_2D_block(blocks(block_num)%data_fields(dF)%k2(:,:), blocks(block_num)%dx, blocks(block_num)%dy, g, Bs)
 
-    end do
+        end do
 
-    !------------------------------
-    ! third stage
-    do k = 1, block_N
+        !------------------------------
+        ! third stage
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%data2     = blocks(block_num)%data_old + 0.5_rk * dt * blocks(block_num)%k2
-        blocks(block_num)%data1     = blocks(block_num)%data2(g+1:N+g, g+1:N+g)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%data_     = blocks(block_num)%data_fields(dF)%data_old + 0.5_rk * dt * blocks(block_num)%data_fields(dF)%k2
 
-    end do
-    ! synchronize ghostnodes
-    call synchronize_ghosts()
-    do k = 1, block_N
+        end do
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%k3        = blocks(block_num)%data2
-        ! RHS
-        call RHS_2D_block(blocks(block_num)%k3, blocks(block_num)%dx, blocks(block_num)%dy, g, N)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%k3        = blocks(block_num)%data_fields(dF)%data_
+            ! RHS
+            call RHS_2D_block(blocks(block_num)%data_fields(dF)%k3(:,:), blocks(block_num)%dx, blocks(block_num)%dy, g, Bs)
 
-    end do
+        end do
 
-    !------------------------------
-    ! fourth stage
-    do k = 1, block_N
+        !------------------------------
+        ! fourth stage
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%data2     = blocks(block_num)%data_old + dt * blocks(block_num)%k3
-        blocks(block_num)%data1     = blocks(block_num)%data2(g+1:N+g, g+1:N+g)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%data_     = blocks(block_num)%data_fields(dF)%data_old + dt * blocks(block_num)%data_fields(dF)%k3
 
-    end do
-    ! synchronize ghostnodes
-    call synchronize_ghosts()
-    do k = 1, block_N
+        end do
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
-        blocks(block_num)%k4        = blocks(block_num)%data2
-        ! RHS
-        call RHS_2D_block(blocks(block_num)%k4, blocks(block_num)%dx, blocks(block_num)%dy, g, N)
+            block_num                                   = blocks_params%active_list(k)
+            blocks(block_num)%data_fields(dF)%k4        = blocks(block_num)%data_fields(dF)%data_
+            ! RHS
+            call RHS_2D_block(blocks(block_num)%data_fields(dF)%k4(:,:), blocks(block_num)%dx, blocks(block_num)%dy, g, Bs)
 
-    end do
+        end do
 
-    !------------------------------
-    ! final stage
-    do k = 1, block_N
+        !------------------------------
+        ! final stage
+        do k = 1, N
 
-        block_num                   = blocks_params%active_list(k)
+            block_num                                   = blocks_params%active_list(k)
 
-        blocks(block_num)%data2     = blocks(block_num)%data_old + dt/6.0_rk * ( blocks(block_num)%k1 &
-                                                                        + 2.0_rk*blocks(block_num)%k2 &
-                                                                        + 2.0_rk*blocks(block_num)%k3 &
-                                                                        + blocks(block_num)%k4 )
-        blocks(block_num)%data1     = blocks(block_num)%data2(g+1:N+g, g+1:N+g)
+            blocks(block_num)%data_fields(dF)%data_     = blocks(block_num)%data_fields(dF)%data_old + dt/6.0_rk * ( blocks(block_num)%data_fields(dF)%k1 &
+                                                                            + 2.0_rk*blocks(block_num)%data_fields(dF)%k2 &
+                                                                            + 2.0_rk*blocks(block_num)%data_fields(dF)%k3 &
+                                                                            + blocks(block_num)%data_fields(dF)%k4 )
 
-    end do
+        end do
+
+    else
+        ! more than one data field
+        ! to do
+
+    end if
 
 end subroutine time_step

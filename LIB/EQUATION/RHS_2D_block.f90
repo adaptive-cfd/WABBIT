@@ -18,14 +18,14 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
 
     implicit none
 
-    integer(kind=ik), intent(in)					        :: g, N
-    real(kind=rk), intent(in)                               :: dx, dy
-    real(kind=rk), dimension(N+2*g, N+2*g), intent(inout)	:: phi
+    integer(kind=ik), intent(in)					            :: g, N
+    real(kind=rk), intent(in)                                   :: dx, dy
 
-    real(kind=rk), dimension(N+2*g, N+2*g)			        :: grad_phi, laplace_phi, rhs
-    integer :: ix,iy
-    real(kind=rk) :: phi_dx, phi_dy, phi_dxdx, phi_dydy, dx_inv, dy_inv, dx2_inv, dy2_inv
-    real(kind=rk) :: a(-3:+3),b1,b2,b3,b4,b5
+    real(kind=rk), dimension(N+2*g, N+2*g)			            :: phi, grad_phi, laplace_phi, rhs
+    real(kind=rk)                                               :: phi_dx, phi_dy, phi_dxdx, phi_dydy, dx_inv, dy_inv, dx2_inv, dy2_inv
+    real(kind=rk)                                               :: a(-3:+3),b1,b2,b3,b4,b5
+
+    integer                                                     :: ix,iy
 
     grad_phi 		= 0.0_rk
     laplace_phi	= 0.0_rk
@@ -59,8 +59,8 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
           phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
           phi_dydy = (phi(ix,iy-1)-2.d0*phi(ix,iy)+phi(ix,iy+1))*dy2_inv
           ! compute (assemble) final right hand side
-          rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &
-                     + params%nu * ( phi_dxdx + phi_dydy )
+          rhs(ix,iy) = - params%u0(1) * phi_dx - params%u0(2) * phi_dy &
+                       + params%nu * ( phi_dxdx + phi_dydy )
         end do
       end do
 
@@ -81,8 +81,8 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
                    +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
 
           ! compute (assemble) final right hand side
-          rhs(ix,iy) = -params%u0(1) * phi_dx -params%u0(2) * phi_dy &
-                     + params%nu * ( phi_dxdx + phi_dydy )
+          rhs(ix,iy) = - params%u0(1) * phi_dx - params%u0(2) * phi_dy &
+                       + params%nu * ( phi_dxdx + phi_dydy )
         end do
       end do
 
@@ -95,4 +95,5 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
 
     ! return (TODO: DO NOT OVERWRITE?)
     phi = rhs
+
 end subroutine RHS_2D_block

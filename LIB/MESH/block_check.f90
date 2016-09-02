@@ -33,7 +33,7 @@ subroutine block_check()
 
     do k = 1, 10
         if (block_count(k) > 0) then
-            write(*, '(i3,a,i2,2x)', advance='no') block_count(k), " blocks on level ", k
+            write(*, '(i4,a,i4,2x)', advance='no') block_count(k), " blocks on level ", k
         end if
     end do
 
@@ -51,5 +51,6 @@ subroutine block_check()
     end do
 
     write(*,*)
+    write(*,'(80("-"))')
 
 end subroutine block_check

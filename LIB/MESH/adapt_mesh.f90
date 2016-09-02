@@ -30,11 +30,10 @@ subroutine adapt_mesh()
     ! adapt the mesh
     call interpolate_mesh()
     call active_blocks_list()
-    call update_neighbors()
-
-    call block_check()
 
     ! update the neighbor relations
     call update_neighbors()
+
+    call block_check()
 
 end subroutine adapt_mesh

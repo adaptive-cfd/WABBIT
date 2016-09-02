@@ -22,9 +22,11 @@ subroutine print_data(data, Bs)
 
     do i = 1, Bs
         do j = 1, Bs
-            write(*,'(f8.2,3x)',advance='no') data(i,j)
+            write(*,'(f5.2,1x)',advance='no') data(i,j)
         end do
         write(*,*) ""
     end do
+
+    write(*,*)
 
 end subroutine print_data

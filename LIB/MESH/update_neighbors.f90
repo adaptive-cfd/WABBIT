@@ -98,10 +98,8 @@ subroutine update_neighbors()
                             call find_block_id(neighbor, block_id)
                         else
                            ! error case
-                            blocks(block_num)%data2 = 9e9_rk
-                            blocks(block_num)%data1 = 9e9_rk
-                            call save_data(9999, 9.999_rk)
                             print*, 'error: neighbor is missing (1 of 2 neighbors)'
+                            call save_data(9999, 99.99)
                             stop
                         end if
 
@@ -109,14 +107,11 @@ subroutine update_neighbors()
                         blocks(block_num)%neighbor_dir(l)           = dirs(l)
                         blocks(block_num)%neighbor_id(l)            = block_id
 
-                        call does_block_exist(neighbor, exists)
+                        call does_block_exist(neighbor2, exists)
                         if (exists) then
                             call find_block_id(neighbor2, block_id)
                         else
                           ! error case
-                           blocks(block_num)%data2 = 9e9_rk
-                           blocks(block_num)%data1 = 9e9_rk
-                           call save_data(9999, 9.999_rk)
                             print*, 'error: neighbor is missing (2 of 2 neighbors)'
                             stop
                         end if

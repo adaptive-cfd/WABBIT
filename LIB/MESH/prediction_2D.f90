@@ -35,7 +35,7 @@ subroutine prediction_2D(coarse, fine)
       stop
     endif
 
-    ! inititalize fine field with zeros (actually not necessary)
+    ! inititalize fine field (actually not necessary)
     fine = 9.0e9_rk
     ! fill matching points: the coarse and fine grid share a lot of points (as the
     ! fine grid results from insertion of one point between each coarse point)

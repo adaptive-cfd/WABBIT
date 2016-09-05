@@ -298,4 +298,7 @@ subroutine synchronize_ghosts()
      deallocate( neighbor_data, stat=allocate_error )
      deallocate( neighbor2_data, stat=allocate_error )
 
+     ! set boundary conditions
+     call set_boundary()
+
 end subroutine synchronize_ghosts

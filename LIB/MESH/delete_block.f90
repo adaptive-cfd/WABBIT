@@ -35,6 +35,8 @@ subroutine delete_block(block_num)
     blocks(block_num)%neighbor2_id                  = -1
     blocks(block_num)%neighbor_treecode             = -1
     blocks(block_num)%neighbor2_treecode            = -1
+    blocks(block_num)%boundary                      = .false.
+    blocks(block_num)%boundary2                     = .false.
 
     ! update active blocks list
     blocks(block_num)%active        = .false.

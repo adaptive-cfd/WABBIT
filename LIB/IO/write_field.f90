@@ -12,7 +12,7 @@
 !
 ! ********************************
 
-subroutine write_field(iteration, time, dF)
+subroutine write_field(iteration, time, error, dF)
 
     use module_params
     use module_blocks
@@ -20,7 +20,7 @@ subroutine write_field(iteration, time, dF)
 
     implicit none
 
-    real(kind=rk), intent(in) 	    :: time
+    real(kind=rk), intent(in) 	    :: time, error
     integer(kind=ik), intent(in)    :: iteration
 
     character(len=80)               :: fname, dsetname
@@ -79,6 +79,8 @@ subroutine write_field(iteration, time, dF)
 
           call write_attribute( fname, dsetname, "neighbor-id8", (/blocks(k)%neighbor_id(8)/) )
           call write_attribute( fname, dsetname, "neighbor-treecode8", blocks(k)%neighbor_treecode(8,:))
+
+          call write_attribute( fname, dsetname, "errors", (/error/))
 
         endif
 

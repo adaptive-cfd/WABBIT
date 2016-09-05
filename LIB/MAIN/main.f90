@@ -50,7 +50,7 @@ program main
     call update_neighbors()
 
     ! save start field to disk
-    call save_data(iteration, time)
+    call save_data(iteration, time, 0.0_rk)
 
     ! main time loop
     do while ( time < params%time_max )
@@ -66,13 +66,13 @@ program main
         ! advance in time
         call time_step(time)
 
-        ! write data to disk
-        if (modulo(iteration, params%write_freq) == 0) then
-          call save_data(iteration, time)
-        endif
-
         ! error calculation
         call blocks_sum(s1, 1)
+
+        ! write data to disk
+        if (modulo(iteration, params%write_freq) == 0) then
+          call save_data(iteration, time, abs(s0-s1))
+        endif
 
         ! output on screen
         write(*, '("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, time, size(blocks_params%active_list, dim=1)
@@ -82,7 +82,7 @@ program main
     end do
 
     ! save end field to disk
-    call save_data(iteration, time)
+    call save_data(iteration, time, abs(s0-s1))
 
     ! cpu time calculation and writing
     call cpu_time(t1)

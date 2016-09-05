@@ -11,14 +11,14 @@
 !
 ! ********************************
 
-subroutine save_data(iteration, time)
+subroutine save_data(iteration, time, error)
 
     use module_params
     use module_blocks
 
     implicit none
 
-    real(kind=rk), intent(in) 		:: time
+    real(kind=rk), intent(in) 		:: time, error
     integer(kind=ik), intent(in) 	:: iteration
 
     integer(kind=ik)                :: dF
@@ -28,7 +28,7 @@ subroutine save_data(iteration, time)
     if ( dF == 1 ) then
         ! exactly one field
         ! save data for all blocks
-        call write_field(iteration, time, dF)
+        call write_field(iteration, time, error, dF)
 
     else
         ! more than one field

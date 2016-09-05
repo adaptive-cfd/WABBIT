@@ -55,6 +55,9 @@ subroutine init_data()
     call read_param(FILE,'Physics','Ly',params%Ly, 256.0_rk )
     ! initial condition
     call read_param(FILE,'Physics','inicond',params%inicond, "gauss_blob" )
+
+    call read_param(FILE,'Physics','boundary',params%boundary, "---" )
+
     ! eps for coarsen and refine the block
     call read_param(FILE,'Blocks','eps_coarsen',params%eps_coarsen, 1e-3_rk )
     call read_param(FILE,'Blocks','eps_refine',params%eps_refine, 5.0_rk*params%eps_coarsen )

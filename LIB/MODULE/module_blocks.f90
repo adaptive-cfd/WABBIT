@@ -76,9 +76,12 @@ module module_blocks
         integer(kind=ik), dimension(:,:), allocatable   :: neighbor_treecode
         character(len=2), dimension(8)                  :: neighbor_dir
         integer(kind=ik), dimension(8)                  :: neighbor_id
+        logical, dimension(8)                           :: boundary
         integer(kind=ik), dimension(:,:), allocatable   :: neighbor2_treecode
         character(len=2), dimension(4)                  :: neighbor2_dir
         integer(kind=ik), dimension(4)                  :: neighbor2_id
+        logical, dimension(8)                           :: boundary2
+
         integer(kind=ik), dimension(8)                  :: neighbor_number
 
         ! refinement flag

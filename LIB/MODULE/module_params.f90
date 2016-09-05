@@ -19,17 +19,17 @@ module module_params
 
     type type_params
 
-        real(kind=rk) 			    :: time_max
-        real(kind=rk) 			    :: CFL
-        real(kind=rk), dimension(2)	:: u0
-        real(kind=rk)			    :: nu
-        real(kind=rk)			    :: Lx, Ly
-        integer(kind=ik)			:: write_freq
-        real(kind=rk)               :: eps_coarsen
-        real(kind=rk)               :: eps_refine
-        integer(kind=ik)            :: max_treelevel
-        integer(kind=ik)            :: min_treelevel
-        character(len=80)           :: order_discretization, order_predictor, inicond
+        real(kind=rk) 			        :: time_max
+        real(kind=rk) 			        :: CFL
+        real(kind=rk), dimension(2)	    :: u0
+        real(kind=rk)			        :: nu
+        real(kind=rk)			        :: Lx, Ly
+        integer(kind=ik)			    :: write_freq
+        real(kind=rk)                   :: eps_coarsen
+        real(kind=rk)                   :: eps_refine
+        integer(kind=ik)                :: max_treelevel
+        integer(kind=ik)                :: min_treelevel
+        character(len=80)               :: order_discretization, order_predictor, inicond, boundary
 
     end type type_params
 

@@ -78,6 +78,8 @@ subroutine  allocate_block_memory()
         blocks(i)%refinement                = 0
         blocks(i)%level                     = -1
         blocks(i)%neighbor_number(:)        = 1
+        blocks(i)%boundary(:)               = .false.
+        blocks(i)%boundary2(:)              = .false.
 
         blocks(i)%dx = params%Lx / real(blocks_params%size_domain,8)
         blocks(i)%dy = params%Lx / real(blocks_params%size_domain,8)

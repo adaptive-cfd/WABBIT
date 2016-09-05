@@ -26,7 +26,13 @@ subroutine block_check()
 
     do k = 1, N
         block_num                               = blocks_params%active_list(k)
-        block_count( blocks(block_num)%level )  = block_count( blocks(block_num)%level ) + 1
+        if (blocks(block_num)%level==0) then
+            ! only one block, he has actually no treecode, therefore level 0
+            ! set block count to 1
+            block_count(1) = 1
+        else
+            block_count( blocks(block_num)%level )  = block_count( blocks(block_num)%level ) + 1
+        end if
     end do
 
     write(*, '(a)', advance='no') "block check: "
@@ -44,8 +50,13 @@ subroutine block_check()
                     block_count(k-1) = block_count(k-1) + block_count(k)/4
                 end if
             else
-                print*, "error: block inconsistency"
-                stop
+                if (block_count(1)==1) then
+                    ! only one block, nothing to do
+                else
+                    ! more than one block, error case
+                    print*, "error: block inconsistency"
+                    stop
+                end if
             end if
         end if
     end do

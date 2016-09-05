@@ -44,32 +44,27 @@ subroutine update_neighbors()
         blocks(block_num)%neighbor2_dir(:)       = ""
         blocks(block_num)%neighbor2_id(:)        = -1
 
-        ! loop over all directions
-        do l = 1, 8
-
-            neighbor_number = 1
-
-            ! calculate treecode for neighbor block on same level
-            call adjacent_block(blocks(block_num)%treecode, neighbor, dirs(l))
-
-            call does_block_exist(neighbor, exists)
-
-            if (exists) then
-                ! one neighbor block on same level exists
-                call find_block_id(neighbor, block_id)
-
-                blocks(block_num)%neighbor_treecode(l,:)    = neighbor
+        if (N==1) then
+            ! only one block, so all neighbors are this block
+            do l = 1, 8
+                blocks(block_num)%neighbor_treecode(l,:)    = blocks(block_num)%treecode
                 blocks(block_num)%neighbor_dir(l)           = dirs(l)
-                blocks(block_num)%neighbor_id(l)            = block_id
+                blocks(block_num)%neighbor_id(l)            = block_num
+            end do
+        else
+            ! more than one block
+            ! loop over all directions
+            do l = 1, 8
 
-            else
-                ! neighbor block has different level, 1 or 2 neighbors
-                ! check if neighbor is on lower level
-                neighbor(blocks(block_num)%level) = -1
+                neighbor_number = 1
+
+                ! calculate treecode for neighbor block on same level
+                call adjacent_block(blocks(block_num)%treecode, neighbor, dirs(l))
+
                 call does_block_exist(neighbor, exists)
 
                 if (exists) then
-                    ! on neighbor on lower level exists
+                    ! one neighbor block on same level exists
                     call find_block_id(neighbor, block_id)
 
                     blocks(block_num)%neighbor_treecode(l,:)    = neighbor
@@ -77,73 +72,89 @@ subroutine update_neighbors()
                     blocks(block_num)%neighbor_id(l)            = block_id
 
                 else
-                    ! two neighbors on higher level
-                    ! diagonal: only one neighbor on higher level
-                    if (l <= 4) then
-                        ! neighbors on edge
-                        neighbor_number                             = 2
+                    ! neighbor block has different level, 1 or 2 neighbors
+                    ! check if neighbor is on lower level
+                    neighbor(blocks(block_num)%level) = -1
+                    call does_block_exist(neighbor, exists)
 
-                        ! create virtual treecodes and look for their neighbors
-                        virt1                                       = blocks(block_num)%treecode
-                        virt1(blocks(block_num)%level+1)            = dirsi(l,1)
-                        virt2                                       = blocks(block_num)%treecode
-                        virt2(blocks(block_num)%level+1)            = dirsi(l,2)
-
-                        ! find neighbors
-                        call adjacent_block(virt1, neighbor, dirs(l))
-                        call adjacent_block(virt2, neighbor2, dirs(l))
-
-                        call does_block_exist(neighbor, exists)
-                        if (exists) then
-                            call find_block_id(neighbor, block_id)
-                        else
-                           ! error case
-                            print*, 'error: neighbor is missing (1 of 2 neighbors)'
-                            stop
-                        end if
-
-                        blocks(block_num)%neighbor_treecode(l,:)    = neighbor
-                        blocks(block_num)%neighbor_dir(l)           = dirs(l)
-                        blocks(block_num)%neighbor_id(l)            = block_id
-
-                        call does_block_exist(neighbor2, exists)
-                        if (exists) then
-                            call find_block_id(neighbor2, block_id)
-                        else
-                          ! error case
-                            print*, 'error: neighbor is missing (2 of 2 neighbors)'
-                            stop
-                        end if
-
-                        blocks(block_num)%neighbor2_treecode(l,:)   = neighbor2
-                        blocks(block_num)%neighbor2_dir(l)          = dirs(l)
-                        blocks(block_num)%neighbor2_id(l)           = block_id
-
-                    else
-                        ! diagonal neighbor
-                        neighbor_number                             = 1
-
-                        ! create virtual treecode and look for the neighbor
-                        virt1                                       = blocks(block_num)%treecode
-                        virt1(blocks(block_num)%level+1)            = dirsi2(l-4)
-
-                        call adjacent_block(virt1, neighbor, dirs(l))
+                    if (exists) then
+                        ! on neighbor on lower level exists
                         call find_block_id(neighbor, block_id)
 
                         blocks(block_num)%neighbor_treecode(l,:)    = neighbor
                         blocks(block_num)%neighbor_dir(l)           = dirs(l)
                         blocks(block_num)%neighbor_id(l)            = block_id
 
+                    else
+                        ! two neighbors on higher level
+                        ! diagonal: only one neighbor on higher level
+                        if (l <= 4) then
+                            ! neighbors on edge
+                            neighbor_number                             = 2
+
+                            ! create virtual treecodes and look for their neighbors
+                            virt1                                       = blocks(block_num)%treecode
+                            virt1(blocks(block_num)%level+1)            = dirsi(l,1)
+                            virt2                                       = blocks(block_num)%treecode
+                            virt2(blocks(block_num)%level+1)            = dirsi(l,2)
+
+                            ! find neighbors
+                            call adjacent_block(virt1, neighbor, dirs(l))
+                            call adjacent_block(virt2, neighbor2, dirs(l))
+
+                            call does_block_exist(neighbor, exists)
+                            if (exists) then
+                                call find_block_id(neighbor, block_id)
+                            else
+                               ! error case
+                                print*, 'error: neighbor is missing (1 of 2 neighbors)'
+                                stop
+                            end if
+
+                            blocks(block_num)%neighbor_treecode(l,:)    = neighbor
+                            blocks(block_num)%neighbor_dir(l)           = dirs(l)
+                            blocks(block_num)%neighbor_id(l)            = block_id
+
+                            call does_block_exist(neighbor2, exists)
+                            if (exists) then
+                                call find_block_id(neighbor2, block_id)
+                            else
+                              ! error case
+                                print*, 'error: neighbor is missing (2 of 2 neighbors)'
+                                stop
+                            end if
+
+                            blocks(block_num)%neighbor2_treecode(l,:)   = neighbor2
+                            blocks(block_num)%neighbor2_dir(l)          = dirs(l)
+                            blocks(block_num)%neighbor2_id(l)           = block_id
+
+                        else
+                            ! diagonal neighbor
+                            neighbor_number                             = 1
+
+                            ! create virtual treecode and look for the neighbor
+                            virt1                                       = blocks(block_num)%treecode
+                            virt1(blocks(block_num)%level+1)            = dirsi2(l-4)
+
+                            call adjacent_block(virt1, neighbor, dirs(l))
+                            call find_block_id(neighbor, block_id)
+
+                            blocks(block_num)%neighbor_treecode(l,:)    = neighbor
+                            blocks(block_num)%neighbor_dir(l)           = dirs(l)
+                            blocks(block_num)%neighbor_id(l)            = block_id
+
+                        end if
+
                     end if
 
                 end if
 
-            end if
+                ! save number of neighbors in direction l
+                blocks(block_num)%neighbor_number(l)            = neighbor_number
 
-            ! save number of neighbors in direction l
-            blocks(block_num)%neighbor_number(l)            = neighbor_number
+            end do
 
-        end do
+        end if
 
     end do
 

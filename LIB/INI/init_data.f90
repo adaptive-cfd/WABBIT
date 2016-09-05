@@ -21,6 +21,7 @@ subroutine init_data()
 
     type(inifile)       :: FILE
     character(len=80)   :: infile
+    integer             :: read_logical
 
     ! get the first command line argument
     call get_command_argument(1,infile)
@@ -63,6 +64,14 @@ subroutine init_data()
     call read_param(FILE,'Blocks','order_predictor',params%order_predictor, "multiresolution_4th" )
 
     call read_param(FILE,'Discretization','order_discretization',params%order_discretization, "FD_4th_central_optimized" )
+
+    call read_param(FILE,'Blocks','adapt_mesh',read_logical, 1 )
+    if (read_logical==1) then
+        blocks_params%adapt_mesh = .true.
+    else
+        blocks_params%adapt_mesh = .false.
+    end if
+
 
     write(*,'(80("-"))')
     write(*,*) "INITIALIZATION PHASE"

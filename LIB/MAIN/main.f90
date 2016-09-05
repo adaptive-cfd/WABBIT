@@ -23,12 +23,20 @@ program main
     integer(kind=ik)	:: iteration
     ! cpu time variables
     real(kind=rk)       :: t0, t1
+    ! error calculation
+    real(kind=rk)       :: s0, s1
 
     time        = 0.0_rk
     iteration   = 0
+    s0          = 0.0_rk
+    s1          = 0.0_rk
 
     ! initializing data
     call init_data()
+
+    ! calculate sum over start field for error calculation
+    call matrix_sum(s0, blocks_params%phi, blocks_params%size_domain)
+    s0 = s0 / ( blocks_params%size_domain * blocks_params%size_domain ) * ( params%Lx * params%Ly )
 
     ! cpu time start
     call cpu_time(t0)
@@ -50,7 +58,10 @@ program main
         iteration = iteration + 1
 
         ! adapt the mesh
-        call adapt_mesh()
+        if (blocks_params%adapt_mesh) call adapt_mesh()
+
+        ! update the neighbor relations
+        call update_neighbors()
 
         ! advance in time
         call time_step(time)
@@ -60,9 +71,12 @@ program main
           call save_data(iteration, time)
         endif
 
+        ! error calculation
+        call blocks_sum(s1, 1)
+
         ! output on screen
-        write(*,'("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, &
-        time, size(blocks_params%active_list, dim=1)
+        write(*, '("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, time, size(blocks_params%active_list, dim=1)
+        write(*, '("error=", es16.8)') abs(s0-s1)
         write(*,'(80("-"))')
 
     end do

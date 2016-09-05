@@ -42,6 +42,9 @@ module module_blocks
         integer(kind=ik)                                :: number_max_blocks
         integer(kind=ik)                                :: number_data_fields
 
+        ! switch for mesh adaption
+        logical                                         :: adapt_mesh
+
     end type type_blocks_params
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

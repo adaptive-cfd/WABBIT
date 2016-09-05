@@ -7,7 +7,7 @@ function main
 
     files = dir('../data_*.h5');
     
-    Bs = 33; %129;%17;
+    Bs = 513; %33; %129;%17;
     g = 4;
 
     % loop over files

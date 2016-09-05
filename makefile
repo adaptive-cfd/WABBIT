@@ -57,7 +57,8 @@ endif
 ifort:=$(shell $(FC) --version | head -c 5)
 ifeq ($(ifort),ifort)
 PPFLAG= -fpp #preprocessor flag
-FFLAGS = -FR -warn all -O3 -traceback -check bounds -check all #-heap-arrays
+FFLAGS = -FR -O3 -warn all -traceback -check bounds -check all #-heap-arrays
+FFLAGS = -FR -O3 -warn all -traceback -check bounds
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment.

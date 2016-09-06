@@ -21,36 +21,110 @@ subroutine blocks_sum(s, dF)
 
     implicit none
 
-    real(kind=rk), intent(inout)    :: s
-    integer(kind=ik), intent(in)    :: dF
+    real(kind=rk), intent(inout)                :: s
+    integer(kind=ik), intent(in)                :: dF
 
-    real(kind=rk)                   :: block_s, block_area
-    integer                         :: i, j, k, N, block_num, Bs, g
+    real(kind=rk)                               :: block_s
+    real(kind=rk), dimension(:,:), allocatable  :: coeff, coeff_temp
+    integer                                     :: i, j, k, N, block_num, Bs, g, allocate_error
 
     N           = size(blocks_params%active_list, dim=1)
     Bs          = blocks_params%size_block
     g           = blocks_params%number_ghost_nodes
 
+    allocate( coeff(Bs, Bs), stat=allocate_error )
+    allocate( coeff_temp(Bs, Bs), stat=allocate_error )
+
     s           = 0.0_rk
     block_s     = 0.0_rk
-    block_area  = 0.0_rk
+
+    ! build common coefficent matrix
+    coeff(:,:) = 1.0_rk
+    coeff(1,:) = 0.5_rk
+    coeff(Bs,:) = 0.5_rk
+    coeff(:,1) = 0.5_rk
+    coeff(:,Bs) = 0.5_rk
+    coeff(1,1) = 0.25_rk
+    coeff(Bs,Bs) = 0.25_rk
+    coeff(1,Bs) = 0.25_rk
+    coeff(Bs,1) = 0.25_rk
 
     do k = 1, N
 
         block_num = blocks_params%active_list(k)
 
-        block_area = abs( blocks(block_num)%coord_x(1) - blocks(block_num)%coord_x(Bs) ) * &
-                     abs( blocks(block_num)%coord_y(1) - blocks(block_num)%coord_y(Bs) )
-
         block_s = 0.0_rk
-        do i = g+1, Bs+g
-            do j = g+1, Bs+g
-                block_s = block_s + abs(blocks(block_num)%data_fields(dF)%data_(i,j))
+        coeff_temp = coeff
+
+        ! check boundary
+        if ( blocks(block_num)%boundary(1) == .true. ) then
+            ! northern boundary
+            coeff_temp(1,:) = 1.0_rk
+            ! check corner points
+            if ( blocks(block_num)%boundary(4) == .false. ) then
+                ! no western boundary
+                coeff_temp(1,1) = 0.5_rk
+            end if
+            if ( blocks(block_num)%boundary(2) == .false. ) then
+                ! no eastern boundary
+                coeff_temp(1,Bs) = 0.5_rk
+            end if
+        end if
+
+        if ( blocks(block_num)%boundary(2) == .true. ) then
+            ! eastern boundary
+            coeff_temp(:,Bs) = 1.0_rk
+            ! check corner points
+            if ( blocks(block_num)%boundary(1) == .false. ) then
+                ! no northern boundary
+                coeff_temp(1,Bs) = 0.5_rk
+            end if
+            if ( blocks(block_num)%boundary(3) == .false. ) then
+                ! no southern boundary
+                coeff_temp(Bs,Bs) = 0.5_rk
+            end if
+        end if
+
+        if ( blocks(block_num)%boundary(3) == .true. ) then
+            ! southern boundary
+            coeff_temp(Bs,:) = 1.0_rk
+            ! check corner points
+            if ( blocks(block_num)%boundary(4) == .false. ) then
+                ! no western boundary
+                coeff_temp(Bs,1) = 0.5_rk
+            end if
+            if ( blocks(block_num)%boundary(2) == .false. ) then
+                ! no eastern boundary
+                coeff_temp(Bs,Bs) = 0.5_rk
+            end if
+        end if
+
+        if ( blocks(block_num)%boundary(4) == .true. ) then
+            ! western boundary
+            coeff_temp(:,1) = 1.0_rk
+            ! check corner points
+            if ( blocks(block_num)%boundary(1) == .false. ) then
+                ! no northern boundary
+                coeff_temp(1,1) = 0.5_rk
+            end if
+            if ( blocks(block_num)%boundary(3) == .false. ) then
+                ! no southern boundary
+                coeff_temp(Bs,1) = 0.5_rk
+            end if
+        end if
+
+        ! block sum
+        do i = 1, Bs
+            do j = 1, Bs
+                block_s = block_s + abs( blocks(block_num)%data_fields(dF)%data_(i+g, j+g) ) * coeff_temp(i, j)
             end do
         end do
 
-        s = s + block_s / real(Bs*Bs, kind=rk) * real(block_area, kind=rk)
+        s = s + block_s * blocks(block_num)%dx * blocks(block_num)%dy
 
     end do
+
+    deallocate( coeff, stat=allocate_error )
+    deallocate( coeff_temp, stat=allocate_error )
 
 end subroutine blocks_sum

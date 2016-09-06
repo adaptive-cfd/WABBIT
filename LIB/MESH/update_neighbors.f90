@@ -51,8 +51,6 @@ subroutine update_neighbors()
                 blocks(block_num)%neighbor_treecode(l,:)    = blocks(block_num)%treecode
                 blocks(block_num)%neighbor_dir(l)           = dirs(l)
                 blocks(block_num)%neighbor_id(l)            = block_num
-                ! if only one block, all neighbors are across the  boundary
-                blocks(block_num)%boundary(l)               = .true.
             end do
         else
             ! more than one block
@@ -74,16 +72,6 @@ subroutine update_neighbors()
                     blocks(block_num)%neighbor_dir(l)           = dirs(l)
                     blocks(block_num)%neighbor_id(l)            = block_id
 
-                    ! check, if neighbor across boundary
-                    ! east
-                    if ( blocks(block_num)%coord_x(Bs) == params%Lx ) blocks(block_num)%boundary(l) = .true.
-                    ! west
-                    if ( blocks(block_num)%coord_x(1) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                    ! south
-                    if ( blocks(block_num)%coord_x(Bs) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                    ! north
-                    if ( blocks(block_num)%coord_x(1) == params%Lx ) blocks(block_num)%boundary(l) = .true.
-
                 else
                     ! neighbor block has different level, 1 or 2 neighbors
                     ! check if neighbor is on lower level
@@ -97,16 +85,6 @@ subroutine update_neighbors()
                         blocks(block_num)%neighbor_treecode(l,:)    = neighbor
                         blocks(block_num)%neighbor_dir(l)           = dirs(l)
                         blocks(block_num)%neighbor_id(l)            = block_id
-
-                        ! check, if neighbor across boundary
-                        ! east
-                        if ( blocks(block_num)%coord_x(Bs) == params%Lx ) blocks(block_num)%boundary(l) = .true.
-                        ! west
-                        if ( blocks(block_num)%coord_x(1) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                        ! south
-                        if ( blocks(block_num)%coord_x(Bs) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                        ! north
-                        if ( blocks(block_num)%coord_x(1) == params%Lx ) blocks(block_num)%boundary(l) = .true.
 
                     else
                         ! two neighbors on higher level
@@ -138,16 +116,6 @@ subroutine update_neighbors()
                             blocks(block_num)%neighbor_dir(l)           = dirs(l)
                             blocks(block_num)%neighbor_id(l)            = block_id
 
-                            ! check, if neighbor across boundary
-                            ! east
-                            if ( blocks(block_num)%coord_x(Bs) == params%Lx ) blocks(block_num)%boundary(l) = .true.
-                            ! west
-                            if ( blocks(block_num)%coord_x(1) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                            ! south
-                            if ( blocks(block_num)%coord_x(Bs) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                            ! north
-                            if ( blocks(block_num)%coord_x(1) == params%Lx ) blocks(block_num)%boundary(l) = .true.
-
                             call does_block_exist(neighbor2, exists)
                             if (exists) then
                                 call find_block_id(neighbor2, block_id)
@@ -160,16 +128,6 @@ subroutine update_neighbors()
                             blocks(block_num)%neighbor2_treecode(l,:)   = neighbor2
                             blocks(block_num)%neighbor2_dir(l)          = dirs(l)
                             blocks(block_num)%neighbor2_id(l)           = block_id
-
-                            ! check, if neighbor across boundary
-                            ! east
-                            if ( blocks(block_num)%coord_x(Bs) == params%Lx ) blocks(block_num)%boundary2(l) = .true.
-                            ! west
-                            if ( blocks(block_num)%coord_x(1) == 0.0_rk ) blocks(block_num)%boundary2(l) = .true.
-                            ! south
-                            if ( blocks(block_num)%coord_x(Bs) == 0.0_rk ) blocks(block_num)%boundary2(l) = .true.
-                            ! north
-                            if ( blocks(block_num)%coord_x(1) == params%Lx ) blocks(block_num)%boundary2(l) = .true.
 
                         else
                             ! diagonal neighbor
@@ -185,16 +143,6 @@ subroutine update_neighbors()
                             blocks(block_num)%neighbor_treecode(l,:)    = neighbor
                             blocks(block_num)%neighbor_dir(l)           = dirs(l)
                             blocks(block_num)%neighbor_id(l)            = block_id
-
-                            ! check, if neighbor across boundary
-                            ! east
-                            if ( blocks(block_num)%coord_x(Bs) == params%Lx ) blocks(block_num)%boundary(l) = .true.
-                            ! west
-                            if ( blocks(block_num)%coord_x(1) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                            ! south
-                            if ( blocks(block_num)%coord_x(Bs) == 0.0_rk ) blocks(block_num)%boundary(l) = .true.
-                            ! north
-                            if ( blocks(block_num)%coord_x(1) == params%Lx ) blocks(block_num)%boundary(l) = .true.
 
                         end if
 

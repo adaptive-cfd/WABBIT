@@ -4,16 +4,32 @@ function main
     close all
     clc
     figure
-
-    files = dir('../data_*.h5');
     
-    Bs = 513; %33; %129;%17;
-    g = 4;
-
+    case_name = '../';
+    %case_name = 'gauss_one_block_correct';
+    %case_name = 'gauss_4_blocks';
+    
+    switch case_name
+        case '../'
+            dirname = '../';
+            Bs = 128;
+            g = 4;
+        case 'gauss_one_block_correct'
+            dirname = '../data/gauss_one_block_correct/';
+            Bs = 513;
+            g = 4;  
+        case 'gauss_4_blocks'
+            dirname = '../data/gauss_4_blocks/';
+            Bs = 257;
+            g = 4; 
+    end  
+  
+    files = dir([dirname 'data_*.h5']);
+    
     % loop over files
     for k = 1:length(files)
         % get filename
-        filename = ['../' files(k).name];
+        filename = [dirname files(k).name];
         % read the file
         [data, time, error] = read_wabbit_hdf( filename );
         

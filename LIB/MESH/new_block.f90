@@ -46,8 +46,8 @@ subroutine new_block(k, treecode, treeN, data_, ix, iy, Bs, g, dF)
     blocks(k)%coord_y               = iy
 
     ! update spacing
-    blocks(k)%dx                    = ix(2) - ix(1)
-    blocks(k)%dy                    = iy(2) - iy(1)
+    blocks(k)%dx                    = abs(ix(2) - ix(1))
+    blocks(k)%dy                    = abs(iy(2) - iy(1))
 
     ! save treecode
     blocks(k)%treecode(1:treeN)     = treecode

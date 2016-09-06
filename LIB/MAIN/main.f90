@@ -36,7 +36,7 @@ program main
 
     ! calculate sum over start field for error calculation
     call matrix_sum(s0, blocks_params%phi, blocks_params%size_domain)
-    s0 = s0 / ( blocks_params%size_domain * blocks_params%size_domain ) * ( params%Lx * params%Ly )
+    s0 = s0 * ( params%Lx / ( blocks_params%size_domain - 1 ) )  * ( params%Ly / ( blocks_params%size_domain - 1 ) )
 
     ! cpu time start
     call cpu_time(t0)
@@ -62,6 +62,7 @@ program main
 
         ! update the neighbor relations
         call update_neighbors()
+        call set_boundary_status()
 
         ! advance in time
         call time_step(time)

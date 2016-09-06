@@ -58,7 +58,6 @@ subroutine periodic_2D()
                          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                          if ( blocks(block_num)%level == blocks(neighbor_num)%level ) then
                              select case(blocks(block_num)%neighbor_dir(i))
-                                 ! first line/row overlap, so do not copy!
                                  !north
                                  case('NO')
                                  blocks(block_num)%data_fields(dF)%data_(1:g, g+1:Bs+g)                 = neighbor_data(Bs-g+1:Bs, :)
@@ -103,7 +102,7 @@ subroutine periodic_2D()
 
                              select case(blocks(block_num)%neighbor_dir(i))
 
-                                 ! first line/row overlap, so do not copy!
+                                 !
                                  ! north
                                  case('NO')
                                  if ( blocks(block_num)%treecode(blocks(block_num)%level) == 0 ) then
@@ -149,7 +148,7 @@ subroutine periodic_2D()
                                  select case(blocks(block_num)%treecode(blocks(block_num)%level))
                                  ! check on which side of coarser neighbor current block is located
                                      case(0)
-                                     blocks(block_num)%data_fields(dF)%data_(1:g, Bs+g+1:Bs+g+g)           = data_predict_fine(2*Bs-g:2*Bs-1, Bs+1:Bs+g)
+                                     blocks(block_num)%data_fields(dF)%data_(1:g, Bs+g+1:Bs+g+g)           = data_predict_fine(2*Bs-g:2*Bs-1, Bs:Bs+g-1)
                                      case(1)
                                      blocks(block_num)%data_fields(dF)%data_(1:g, Bs+g+1:Bs+g+g)           = data_predict_fine(2*Bs-g:2*Bs-1, 1:g)
                                      case(3)
@@ -173,9 +172,9 @@ subroutine periodic_2D()
                                  select case(blocks(block_num)%treecode(blocks(block_num)%level))
                                  ! check on which side of coarser neighbor current block is located
                                      case(1)
-                                     blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g) = data_predict_fine(Bs+1:Bs+g, 1:g)
+                                     blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g) = data_predict_fine(Bs:Bs+g-1, 1:g)
                                      case(2)
-                                     blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g) = data_predict_fine(1:g, Bs+1:Bs+g)
+                                     blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g) = data_predict_fine(1:g, Bs:Bs+g-1)
                                      case(3)
                                      blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g) = data_predict_fine(1:g, 1:g)
                                  end select
@@ -185,7 +184,7 @@ subroutine periodic_2D()
                                  select case(blocks(block_num)%treecode(blocks(block_num)%level))
                                  ! check on which side of coarser neighbor current block is located
                                      case(0)
-                                     blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, 1:g)           = data_predict_fine(Bs+1:Bs+g, 2*Bs-g:2*Bs-1)
+                                     blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, 1:g)           = data_predict_fine(Bs:Bs+g-1, 2*Bs-g:2*Bs-1)
                                      case(2)
                                      blocks(block_num)%data_fields(dF)%data_(Bs+g+1:Bs+g+g, 1:g)           = data_predict_fine(1:g, 2*Bs-g:2*Bs-1)
                                      case(3)

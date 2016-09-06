@@ -12,7 +12,7 @@ function main
     switch case_name
         case '../'
             dirname = '../';
-            Bs = 128;
+            Bs = 33;
             g = 4;
         case 'gauss_one_block_correct'
             dirname = '../data/gauss_one_block_correct/';
@@ -35,6 +35,7 @@ function main
         
         % errors
         errors(k) = error;
+        t(k) = time;
 
         %------------
         % plotting
@@ -68,7 +69,7 @@ function main
     
     % error plot
     figure
-    semilogy(errors)
+    semilogy(t, errors)
     title('error')
     
 end

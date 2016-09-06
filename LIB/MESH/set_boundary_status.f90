@@ -36,14 +36,46 @@ subroutine set_boundary_status()
             blocks(block_num)%boundary(:)               = .true.
         else
             ! more than one block
+
             ! east
-            if ( blocks(block_num)%coord_x(Bs) == params%Lx ) blocks(block_num)%boundary(2) = .true.
+            if ( blocks(block_num)%coord_x(Bs) == params%Lx ) then
+
+                blocks(block_num)%boundary(2) = .true.
+                ! diagonal boundary
+                blocks(block_num)%boundary(5) = .true.
+                blocks(block_num)%boundary(7) = .true.
+
+            end if
+
             ! west
-            if ( blocks(block_num)%coord_x(1) == 0.0_rk ) blocks(block_num)%boundary(4) = .true.
+            if ( blocks(block_num)%coord_x(1) == 0.0_rk ) then
+
+                blocks(block_num)%boundary(4) = .true.
+                ! diagonal boundary
+                blocks(block_num)%boundary(6) = .true.
+                blocks(block_num)%boundary(8) = .true.
+
+            end if
+
             ! south
-            if ( blocks(block_num)%coord_y(Bs) == 0.0_rk ) blocks(block_num)%boundary(3) = .true.
+            if ( blocks(block_num)%coord_y(Bs) == 0.0_rk ) then
+
+                blocks(block_num)%boundary(3) = .true.
+                ! diagonal boundary
+                blocks(block_num)%boundary(7) = .true.
+                blocks(block_num)%boundary(8) = .true.
+
+            end if
+
             ! north
-            if ( blocks(block_num)%coord_y(1) == params%Lx ) blocks(block_num)%boundary(1) = .true.
+            if ( blocks(block_num)%coord_y(1) == params%Lx ) then
+
+                blocks(block_num)%boundary(1) = .true.
+                ! diagonal boundary
+                blocks(block_num)%boundary(5) = .true.
+                blocks(block_num)%boundary(6) = .true.
+
+            end if
 
         end if
 

@@ -48,6 +48,12 @@ subroutine matrix_to_block_tree()
     num_blocks_y        = (Ds-1) / (Bs-1)
     num_blocks          = num_blocks_x * num_blocks_y
 
+    ! check given domain and block size
+    if ( Ds /= (num_blocks_x-1)*(Bs-1) + Bs ) then
+        print*, "error: blocksize do not fit into domain size"
+        stop
+    end if
+
     write(*,'(a,i5,a,i5,a,i5,a,i5,a,i5,a,i5)') "Field with res: ", (Ds), " x", (Ds), " gives: ", &
     num_blocks_x, " x", num_blocks_y, " (", num_blocks, ") blocks of size: ", (Bs)
     write(*,'(80("-"))')

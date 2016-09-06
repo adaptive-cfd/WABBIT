@@ -48,6 +48,7 @@ program main
 
     ! update neighbor relations
     call update_neighbors()
+    call set_boundary_status()
 
     ! save start field to disk
     call save_data(iteration, time, 0.0_rk)

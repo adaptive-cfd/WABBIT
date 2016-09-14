@@ -59,6 +59,9 @@ module module_blocks
         ! data fields for runge kutta stages
         real(kind=rk), dimension(:,:), allocatable      :: k1, k2, k3, k4
 
+        ! wavelet coefficent for datafield dF
+        real(kind=rk)                                   :: detail
+
     end type type_data_fields
 
     ! datatype for block data

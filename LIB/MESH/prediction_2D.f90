@@ -80,6 +80,10 @@ subroutine prediction_2D(coarse, fine)
          do i = 2, nfine, 2
             call prediction1D( fine(1:nfine:2,i ), fine( :, i) )
          end do
+    else
+         ! error case
+         write(*,*) "prediction_2D: wrong method.."
+         stop
     endif
 
 end subroutine prediction_2D
@@ -123,4 +127,4 @@ subroutine prediction1D(coarse, fine)
         fine(2*k) = a*coarse(k)+a*coarse(k+1)+b*coarse(k-1)+b*coarse(k+2)
     end do
 
-end subroutine
+end subroutine prediction1D

@@ -82,6 +82,8 @@ subroutine write_field(iteration, time, error, dF)
 
           call write_attribute( fname, dsetname, "errors", (/error/))
 
+          call write_attribute( fname, dsetname, "detail", (/blocks(k)%data_fields(dF)%detail/))
+
         endif
 
     end do

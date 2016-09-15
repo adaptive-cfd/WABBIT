@@ -10,6 +10,7 @@ function main
     %case_name = 'gauss_4_blocks';
     %case_name = 'gauss_64_blocks';
     %case_name = 'gauss_bs17_maxlevel6';
+    %case_name = 'wavelet_opt';
     
     switch case_name
         case '../'
@@ -36,12 +37,21 @@ function main
             dirname = '../data/wavelet_test_IV/';
             Bs = 17;
             g = 4;
+        case 'wavelet_opt'
+            dirname = '../data/gauss_bs17_maxlevel6_wavelet_opt/';
+            Bs = 17;
+            g = 4;
     end  
   
     files = dir([dirname 'data_*.h5']);
     
     % loop over files
     for k = 1:length(files)
+        
+        if (k==300)
+            k = k;
+        end
+        
         % get filename
         filename = [dirname files(k).name];
         % read the file
@@ -65,7 +75,7 @@ function main
 
             % no plotting for block points in positive axis direction (overlap with neigbor block)
             [X,Y] = meshgrid( coord_x, coord_y );
-            %pcolor(X,Y,datafield)
+            pcolor(X,Y,datafield)
 
             line([ coord_x(1) coord_x(1) ],[ coord_y(1) coord_y(end)],'color','w')
             line([ coord_x(end) coord_x(end) ],[ coord_y(1) coord_y(end)],'color','w')
@@ -98,16 +108,19 @@ function main
 %             line([ coord_x(1) coord_x(end) ],[ coord_y(end) coord_y(end)],'color','w')
 % 
 %         end
-% 
-%         shading flat
-%         
-%         colorbar
-%         
-%         axis equal
-%         %title(filename)
-%         title(['step ' num2str(k-1)])
-%         drawnow
-%         %saveas(h,sprintf('FIG%d.png',k));
+
+        shading flat
+        
+        colorbar
+        
+        axis equal
+        %title(filename)
+        title(['step ' num2str(k-1)])
+        caxis([0 1e-3])
+        
+        drawnow
+        %saveas(h,sprintf('FIG%d.png',k));
+    
 
     end
     

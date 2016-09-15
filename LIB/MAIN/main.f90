@@ -50,11 +50,6 @@ program main
     call update_neighbors()
     call set_boundary_status()
 
-! test, save refinement status for next iteration
-call local_refinement_status()
-call ensure_gradedness()
-call ensure_completeness()
-
     ! save start field to disk
     call save_data(iteration, time, 0.0_rk)
 
@@ -75,11 +70,6 @@ call ensure_completeness()
 
         ! error calculation
         call blocks_sum(s1, 1)
-
-! test, save refinement status for next iteration
-call local_refinement_status()
-call ensure_gradedness()
-call ensure_completeness()
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then

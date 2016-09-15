@@ -30,6 +30,7 @@ subroutine inicond_gauss_blob()
       ! place pulse in the center of the domain
       mux       = 0.5_rk * real(Ds+1, kind=rk)
       muy       = 0.5_rk * real(Ds+1, kind=rk)
+      !muy       = 0.9_rk * real(Ds+1, kind=rk)
       sigma     = 1.0e2_rk
 
       allocate( blocks_params%phi(1:Ds, 1:Ds) )

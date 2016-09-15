@@ -56,63 +56,6 @@ subroutine blocks_sum(s, dF)
         block_s = 0.0_rk
         coeff_temp = coeff
 
-        ! check boundary
-        if ( blocks(block_num)%boundary(1) == .true. ) then
-            ! northern boundary
-            coeff_temp(1,:) = 1.0_rk
-            ! check corner points
-            if ( blocks(block_num)%boundary(4) == .false. ) then
-                ! no western boundary
-                coeff_temp(1,1) = 0.5_rk
-            end if
-            if ( blocks(block_num)%boundary(2) == .false. ) then
-                ! no eastern boundary
-                coeff_temp(1,Bs) = 0.5_rk
-            end if
-        end if
-
-        if ( blocks(block_num)%boundary(2) == .true. ) then
-            ! eastern boundary
-            coeff_temp(:,Bs) = 1.0_rk
-            ! check corner points
-            if ( blocks(block_num)%boundary(1) == .false. ) then
-                ! no northern boundary
-                coeff_temp(1,Bs) = 0.5_rk
-            end if
-            if ( blocks(block_num)%boundary(3) == .false. ) then
-                ! no southern boundary
-                coeff_temp(Bs,Bs) = 0.5_rk
-            end if
-        end if
-
-        if ( blocks(block_num)%boundary(3) == .true. ) then
-            ! southern boundary
-            coeff_temp(Bs,:) = 1.0_rk
-            ! check corner points
-            if ( blocks(block_num)%boundary(4) == .false. ) then
-                ! no western boundary
-                coeff_temp(Bs,1) = 0.5_rk
-            end if
-            if ( blocks(block_num)%boundary(2) == .false. ) then
-                ! no eastern boundary
-                coeff_temp(Bs,Bs) = 0.5_rk
-            end if
-        end if
-
-        if ( blocks(block_num)%boundary(4) == .true. ) then
-            ! western boundary
-            coeff_temp(:,1) = 1.0_rk
-            ! check corner points
-            if ( blocks(block_num)%boundary(1) == .false. ) then
-                ! no northern boundary
-                coeff_temp(1,1) = 0.5_rk
-            end if
-            if ( blocks(block_num)%boundary(3) == .false. ) then
-                ! no southern boundary
-                coeff_temp(Bs,1) = 0.5_rk
-            end if
-        end if
-
         ! block sum
         do i = 1, Bs
             do j = 1, Bs

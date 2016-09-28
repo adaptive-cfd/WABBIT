@@ -6,39 +6,10 @@ function main
     h=figure
     
     case_name = '../'; %'test'
-    %case_name = 'gauss_one_block_correct';
-    %case_name = 'gauss_4_blocks';
-    %case_name = 'gauss_64_blocks';
-    %case_name = 'gauss_bs17_maxlevel6';
-    %case_name = 'wavelet_opt';
     
     switch case_name
         case '../'
             dirname = '../';
-            Bs = 17;
-            g = 4;
-        case 'gauss_one_block_correct'
-            dirname = '../data/gauss_one_block_correct/';
-            Bs = 513;
-            g = 4;  
-        case 'gauss_4_blocks'
-            dirname = '../data/gauss_4_blocks/';
-            Bs = 257;
-            g = 4; 
-        case 'gauss_64_blocks'
-            dirname = '../data/gauss_64_blocks/';
-            Bs = 257;
-            g = 4; 
-        case 'gauss_bs17_maxlevel6'
-            dirname = '../data/gauss_bs17_maxlevel6/';
-            Bs = 17;
-            g = 4;
-        case 'test'
-            dirname = '../data/wavelet_test_IV/';
-            Bs = 17;
-            g = 4;
-        case 'wavelet_opt'
-            dirname = '../data/gauss_bs17_maxlevel6_wavelet_opt/';
             Bs = 17;
             g = 4;
     end  
@@ -109,17 +80,20 @@ function main
 % 
 %         end
 
-        shading flat
+%         shading flat
+%         
+%         %colorbar
+%         
+%         axis equal
+%         %title(filename)
+%         title(['step ' num2str(k-1)])
+%         %caxis([0 1e-3])
+%         
+%         drawnow
         
-        colorbar
-        
-        axis equal
-        %title(filename)
-        title(['step ' num2str(k-1)])
-        caxis([0 1e-3])
-        
-        drawnow
-        %saveas(h,sprintf('FIG%d.png',k));
+%         if ( (k==1) || (mod(k,20)==0) )
+%             saveas(h,sprintf('FIG%d.png',k));
+%         end
     
 
     end

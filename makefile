@@ -1,7 +1,7 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
 FFILES = save_data.f90 write_field.f90 giveCertainOrder.f90 \
-Dper.f90 D26p.f90 Dnonper.f90 D18j.f90  time_step.f90 calc_dt.f90 local_refinement_status.f90 \
+Dper.f90 D26p.f90 D22p.f90 Dnonper.f90 D18j.f90  time_step_RK4.f90 calc_dt.f90 local_refinement_status.f90 \
 synchronize_ghosts.f90 delete_block.f90 get_sister_id.f90 matrix_to_block_tree.f90 active_blocks_list.f90 \
 new_block.f90 does_block_exist.f90 ensure_completeness.f90 adjacent_block.f90 adapt_mesh.f90 blocks_sum.f90 \
 encoding.f90 respect_min_max_treelevel.f90 interpolate_mesh.f90 treecode_size.f90 \
@@ -10,7 +10,7 @@ matrix_mult.f90 int_to_binary.f90 factorial.f90 \
 print_data.f90 array_compare.f90 fliplr.f90 grad_test.f90 matrix_sum.f90 \
 neighbor_search.f90 RHS_2D_block.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 \
 inicond_sinus.f90 inicond_gauss_blob.f90 init_empty_file.f90 set_boundary.f90 periodic_2D.f90 set_boundary_status.f90 \
-calculate_detail.f90
+calculate_detail.f90 time_step_RK1.f90
 
 FFILES += init_data.f90
 
@@ -58,8 +58,8 @@ endif
 ifort:=$(shell $(FC) --version | head -c 5)
 ifeq ($(ifort),ifort)
 PPFLAG= -fpp #preprocessor flag
-FFLAGS = -FR -O3 -warn all -traceback -check bounds -check all #-heap-arrays
-FFLAGS = -FR -O3 -warn all -traceback -check bounds
+FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
+#FFLAGS = -FR -O3 -warn all -traceback -check bounds
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment.

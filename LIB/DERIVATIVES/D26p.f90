@@ -2,8 +2,8 @@
 ! 2D AMR prototype
 ! --------------------------------
 ! 
-! eigth order first derivative 
-! nonperiodic
+! sixth order second derivative
+! periodic
 !
 ! name: D26p.f90
 ! date: 04.08.2016

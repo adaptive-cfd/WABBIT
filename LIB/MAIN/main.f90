@@ -66,7 +66,8 @@ program main
         call set_boundary_status()
 
         ! advance in time
-        call time_step(time)
+        call time_step_RK4(time)
+        !call time_step_RK1(time)
 
         ! error calculation
         call blocks_sum(s1, 1)

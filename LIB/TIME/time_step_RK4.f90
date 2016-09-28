@@ -4,14 +4,14 @@
 !
 ! time step main function, RK4
 !
-! name: time_step.f90
+! name: time_step_RK4.f90
 ! date: 02.08.2016
 ! author: msr
 ! version: 0.1
 !
 ! ********************************
 
-subroutine time_step(time)
+subroutine time_step_RK4(time)
 
     use module_params
     use module_blocks
@@ -29,9 +29,17 @@ subroutine time_step(time)
     N                       = size(blocks_params%active_list, dim=1)
 
     call calc_dt(dt)
+
+    ! test
+    !dt = 0.17_rk
+
     time 				    = time + dt
     ! last timestep fits in maximal time
-    if (time > params%time_max) time = params%time_max
+    if (time >= params%time_max) then
+        time = time - dt
+        dt = params%time_max - time
+        time = params%time_max
+    end if
 
     ! check number of data fields
     if ( blocks_params%number_data_fields == 1 ) then
@@ -129,4 +137,4 @@ subroutine time_step(time)
 
     end if
 
-end subroutine time_step
+end subroutine time_step_RK4

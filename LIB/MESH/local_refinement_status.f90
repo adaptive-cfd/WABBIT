@@ -79,6 +79,17 @@ subroutine local_refinement_status()
             call calculate_detail(detail2, u3, u5, (Bs+1)/2 + g)
 
             ! error
+!            ! method A: two threshold values
+!            if (detail1 < params%eps_coarsen) then
+!                ! coarsen block, -1
+!                dF_status(k, dF) = -1
+!            elseif (detail1 > params%eps_refine) then
+!                ! refine block, +1
+!                dF_status(k, dF) = 1
+!            end if
+!            blocks(block_num)%data_fields(dF)%detail = detail1
+
+            ! method B: one threshold value, use two wavelet coefficients
             ! case 1: detail1 = coarsen, detail2 = coarsen => coarse block, status -1
             if ( (detail1 < params%eps_coarsen) .and. (detail2 < params%eps_coarsen) ) then
                 dF_status(k, dF) = -1

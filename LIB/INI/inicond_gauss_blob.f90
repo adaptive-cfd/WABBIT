@@ -31,7 +31,12 @@ subroutine inicond_gauss_blob()
       mux       = 0.5_rk * real(Ds+1, kind=rk)
       muy       = 0.5_rk * real(Ds+1, kind=rk)
       !muy       = 0.9_rk * real(Ds+1, kind=rk)
-      sigma     = 1.0e2_rk
+
+      !sigma     = 1.0e2_rk
+      sigma     = 0.1e2_rk
+
+      mux = 0.5_rk * Lx;
+      muy = 0.5_rk * Ly;
 
       allocate( blocks_params%phi(1:Ds, 1:Ds) )
       blocks_params%phi = 0.0_rk
@@ -42,8 +47,12 @@ subroutine inicond_gauss_blob()
 
       do i = 1, Ds
           do j = 1, Ds
-            x = real(i, kind=rk)
-            y = real(j, kind=rk)
+            x = real(i-1, kind=rk)
+            y = real(j-1, kind=rk)
+
+            x = Lx / real(Ds-1, kind=rk) * x
+            y = Ly / real(Ds-1, kind=rk) * y
+
             blocks_params%phi(i,j) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
           end do
       end do

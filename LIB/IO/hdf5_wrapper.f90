@@ -5,7 +5,7 @@ module hdf5_wrapper
 
   ! Precision of doubles
   integer,parameter :: pr = 8
-  character(len=80) :: field_precision = "single"
+  character(len=80) :: field_precision = "double" !"single"
 
   ! ! maximum size of data chunks. HDF always writes chunks of data to the disk,
   ! ! these are different from the domain decomposition and important for i/o performance

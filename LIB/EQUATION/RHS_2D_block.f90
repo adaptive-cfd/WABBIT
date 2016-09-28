@@ -20,15 +20,17 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
 
     integer(kind=ik), intent(in)					            :: g, N
     real(kind=rk), intent(in)                                   :: dx, dy
+    real(kind=rk), dimension(N+2*g, N+2*g), intent(inout)       :: phi
 
-    real(kind=rk), dimension(N+2*g, N+2*g)			            :: phi, grad_phi, laplace_phi, rhs
+    real(kind=rk), dimension(N+2*g, N+2*g)			            :: grad_phi, laplace_phi, rhs, D_test
     real(kind=rk)                                               :: phi_dx, phi_dy, phi_dxdx, phi_dydy, dx_inv, dy_inv, dx2_inv, dy2_inv
     real(kind=rk)                                               :: a(-3:+3),b1,b2,b3,b4,b5
 
     integer                                                     :: ix,iy
 
     grad_phi 		= 0.0_rk
-    laplace_phi	= 0.0_rk
+    laplace_phi	    = 0.0_rk
+    rhs             = 0.0_rk
 
     ! division is expensive, multiplication is cheap, so here we save some time
     dx_inv = 1.0_rk / (dx)
@@ -86,12 +88,36 @@ subroutine RHS_2D_block(phi, dx, dy, g, N)
         end do
       end do
 
+    elseif (params%order_discretization == "test") then
+      !-----------------------------------------------------------------------
+      ! test
+      !-----------------------------------------------------------------------
+      call D22p(D_test, N+2*g, 1.0_rk)
+
+      do ix = g+1, N+g
+        do iy = g+1, N+g
+          phi_dx = (phi(ix+1,iy)-phi(ix-1,iy))/(2.0_rk*dx)
+          phi_dy = (phi(ix,iy+1)-phi(ix,iy-1))/(2.0_rk*dy)
+
+          phi_dxdx = ( phi(ix-1,iy) - 2.0_rk*phi(ix,iy) + phi(ix+1,iy) ) * dx2_inv
+          phi_dydy = ( phi(ix,iy-1) - 2.0_rk*phi(ix,iy) + phi(ix,iy+1) ) * dy2_inv
+
+          ! compute (assemble) final right hand side
+          rhs(ix,iy) = - params%u0(1) * phi_dx - params%u0(2) * phi_dy &
+                       + params%nu * ( phi_dxdx + phi_dydy )
+        end do
+      end do
+
+!      laplace_phi = matmul(D_test, phi) / (dx*dx) &
+!                    + matmul(phi, transpose(D_test)) / (dy*dy)
+!
+!      rhs = params%nu * laplace_phi
+
     else
       write(*,*) "discretization method in params%order_discretization is unknown"
       write(*,*) params%order_discretization
       stop
     end if
-
 
     ! return (TODO: DO NOT OVERWRITE?)
     phi = rhs

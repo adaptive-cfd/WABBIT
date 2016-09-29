@@ -67,6 +67,7 @@ program main
 
         ! advance in time
         call time_step_RK4(time)
+        !call time_step_RK2(time)
         !call time_step_RK1(time)
 
         ! error calculation

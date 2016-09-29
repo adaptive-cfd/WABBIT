@@ -10,7 +10,7 @@ matrix_mult.f90 int_to_binary.f90 factorial.f90 \
 print_data.f90 array_compare.f90 fliplr.f90 grad_test.f90 matrix_sum.f90 \
 neighbor_search.f90 RHS_2D_block.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 \
 inicond_sinus.f90 inicond_gauss_blob.f90 init_empty_file.f90 set_boundary.f90 periodic_2D.f90 set_boundary_status.f90 \
-calculate_detail.f90 time_step_RK1.f90
+calculate_detail.f90 time_step_RK1.f90 time_step_RK2.f90
 
 FFILES += init_data.f90
 

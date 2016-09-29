@@ -2,19 +2,19 @@
 # Non-module Fortran files to be compiled:
 FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 inicond_gauss_blob.f90 matrix_sum.f90 matrix_to_block_tree.f90 \
 new_block.f90 treecode_size.f90 encoding.f90 int_to_binary.f90 update_neighbors.f90 adjacent_block.f90 does_block_exist.f90 array_compare.f90 \
-find_block_id.f90
+find_block_id.f90 save_data.f90 write_field.f90
 
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 #module_interpolation.f90 hdf5_wrapper.f90 
+MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 hdf5_wrapper.f90 #module_interpolation.f90  
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
-VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH
+VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO
 
 # Set the default compiler if it's not already set
 ifndef FC
@@ -77,8 +77,8 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 # Fortran). Objects are specified in MOBJS (module objects).
 $(OBJDIR)/module_blocks.o: module_blocks.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-#$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o

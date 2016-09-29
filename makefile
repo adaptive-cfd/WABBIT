@@ -1,7 +1,7 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 inicond_gauss_blob.f90
-
+FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 inicond_gauss_blob.f90 matrix_sum.f90 matrix_to_block_tree.f90 \
+new_block.f90 treecode_size.f90 encoding.f90 int_to_binary.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -13,7 +13,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
-VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI
+VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH
 
 # Set the default compiler if it's not already set
 ifndef FC

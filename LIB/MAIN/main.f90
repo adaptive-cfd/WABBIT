@@ -34,16 +34,16 @@ program main
 
     ! initializing data
     call init_data()
-!
-!    ! calculate sum over start field for error calculation
-!    call matrix_sum(s0, blocks_params%phi, blocks_params%size_domain)
-!    s0 = s0 * ( params%Lx / ( blocks_params%size_domain - 1 ) )  * ( params%Ly / ( blocks_params%size_domain - 1 ) )
-!
+
+    ! calculate sum over start field for error calculation
+    call matrix_sum(s0, blocks_params%phi, blocks_params%size_domain)
+    s0 = s0 * ( params%Lx / ( blocks_params%size_domain - 1 ) )  * ( params%Ly / ( blocks_params%size_domain - 1 ) )
+
     ! cpu time start
     call cpu_time(t0)
-!
-!    ! create block tree
-!    call matrix_to_block_tree()
+
+    ! create block tree
+    call matrix_to_block_tree()
 !    call active_blocks_list()
 !    call block_check()
 !

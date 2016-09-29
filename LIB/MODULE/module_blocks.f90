@@ -1,13 +1,13 @@
 ! ********************************
-! 2D AMR prototype
+! WABBIT
 ! --------------------------------
 !
 ! blocks data structure
 !
 ! name: module_blocks.f90
-! date: 02.08.2016
+! date: 29.09.2016
 ! author: msr
-! version: 0.1
+! version: 0.2
 !
 ! ********************************
 

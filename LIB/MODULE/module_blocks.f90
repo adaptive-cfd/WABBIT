@@ -30,17 +30,15 @@ module module_blocks
         ! start data fields
         real(kind=rk), dimension(:,:), allocatable      :: phi
 
-        ! list of active blocks
-        integer(kind=ik), dimension(:), allocatable     :: active_list
-
         ! grid parameter
         integer(kind=ik)                                :: size_domain
         integer(kind=ik)                                :: size_block
         integer(kind=ik)                                :: number_ghost_nodes
 
-        ! number of allocated blocks and data fields
+        ! number of allocated blocks, data fields and active blocks
         integer(kind=ik)                                :: number_max_blocks
         integer(kind=ik)                                :: number_data_fields
+        integer(kind=ik)                                :: number_active_blocks
 
         ! switch for mesh adaption
         logical                                         :: adapt_mesh

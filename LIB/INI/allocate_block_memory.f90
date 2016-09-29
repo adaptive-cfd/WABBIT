@@ -32,9 +32,6 @@ subroutine  allocate_block_memory()
 
     allocate( blocks(1:blocks_params%number_max_blocks), stat=allocate_error )
 
-    ! dummy allocation
-    allocate( blocks_params%active_list(1), stat=allocate_error )
-
     do i = 1, blocks_params%number_max_blocks
 
         allocate( blocks(i)%data_fields(1:dF), stat=allocate_error )

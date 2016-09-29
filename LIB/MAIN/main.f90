@@ -44,11 +44,9 @@ program main
 
     ! create block tree
     call matrix_to_block_tree()
-!    call active_blocks_list()
-!    call block_check()
-!
-!    ! update neighbor relations
-!    call update_neighbors()
+
+    ! update neighbor relations
+    call update_neighbors()
 !    call set_boundary_status()
 !
 !    ! save start field to disk

@@ -91,6 +91,14 @@ subroutine matrix_to_block_tree()
         ! to do
     end if
 
+    ! count active blocks
+    blocks_params%number_active_blocks = 0
+    do i = 1, blocks_params%number_max_blocks
+        if (blocks(i)%active .eqv. .true.) then
+            blocks_params%number_active_blocks = blocks_params%number_active_blocks + 1
+        end if
+    end do
+
     ! deallocate memory for local variables
     deallocate( data, stat=allocate_error )
     deallocate( coord_x, stat=allocate_error )

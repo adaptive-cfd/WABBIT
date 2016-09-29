@@ -1,6 +1,6 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = 
+FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 inicond_gauss_blob.f90
 
 
 # Object and module directory:
@@ -8,12 +8,12 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90 #module_interpolation.f90 hdf5_wrapper.f90 \ini_files_parser.f90
+MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 #module_interpolation.f90 hdf5_wrapper.f90 
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
-VPATH += :LIB/MAIN:LIB/MODULE
+VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI
 
 # Set the default compiler if it's not already set
 ifndef FC
@@ -78,8 +78,8 @@ $(OBJDIR)/module_blocks.o: module_blocks.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-#$(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o prediction_2D.f90 restriction_2D.f90

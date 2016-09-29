@@ -13,7 +13,7 @@ git clone https://github.com/mario-sroka/WABBIT
 
 ### run make
 
-choose the compiler with FC option 
+choose compiler with FC option 
 
 ```
 make FC=[gfortran|ifort]

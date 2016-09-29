@@ -18,28 +18,29 @@ program main
 
     implicit none
 
-!    ! time loop variables
-!    real(kind=rk) 	    :: time
-!    integer(kind=ik)	:: iteration
-!    ! cpu time variables
-!    real(kind=rk)       :: t0, t1
-!    ! error calculation
-!    real(kind=rk)       :: s0, s1
-!
-!    time        = 0.0_rk
-!    iteration   = 0
-!    s0          = 0.0_rk
-!    s1          = 0.0_rk
-!
-!    ! initializing data
-!    call init_data()
+    ! time loop variables
+    real(kind=rk) 	    :: time
+    integer(kind=ik)	:: iteration
+    ! cpu time variables
+    real(kind=rk)       :: t0, t1
+    ! run time error calculation
+    real(kind=rk)       :: s0, s1
+
+    ! initialize local variables
+    time        = 0.0_rk
+    iteration   = 0
+    s0          = 0.0_rk
+    s1          = 0.0_rk
+
+    ! initializing data
+    call init_data()
 !
 !    ! calculate sum over start field for error calculation
 !    call matrix_sum(s0, blocks_params%phi, blocks_params%size_domain)
 !    s0 = s0 * ( params%Lx / ( blocks_params%size_domain - 1 ) )  * ( params%Ly / ( blocks_params%size_domain - 1 ) )
 !
-!    ! cpu time start
-!    call cpu_time(t0)
+    ! cpu time start
+    call cpu_time(t0)
 !
 !    ! create block tree
 !    call matrix_to_block_tree()
@@ -88,8 +89,8 @@ program main
 !    ! save end field to disk
 !    call save_data(iteration, time, abs(s0-s1))
 !
-!    ! cpu time calculation and writing
-!    call cpu_time(t1)
-!    write(*,'(a,f10.6)') "cpu-time = ", t1-t0
+    ! cpu time calculation and writing
+    call cpu_time(t1)
+    write(*,'(a,f10.6)') "cpu-time = ", t1-t0
 
 end program main

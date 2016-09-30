@@ -56,6 +56,8 @@ subroutine threshold_block()
 
             if (blocks(k)%active) then
 
+                dF_status = 0
+
                 u1        = blocks(k)%data_fields(dF)%data_(:,:)
                 u2        = 0.0_rk
                 u3        = 0.0_rk

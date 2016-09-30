@@ -35,6 +35,9 @@ subroutine adapt_mesh()
         ! adapt the mesh
         call interpolate_mesh()
 
+        ! update the neighbor relations
+        call update_neighbors()
+
     end do
 
 end subroutine adapt_mesh

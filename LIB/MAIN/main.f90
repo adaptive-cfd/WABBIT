@@ -69,28 +69,24 @@ program main
         ! adapt the mesh
         if (blocks_params%adapt_mesh) call adapt_mesh()
 
+        ! error calculation
+        call blocks_sum(s1, 1)
+
+        ! write data to disk
+        if (modulo(iteration, params%write_freq) == 0) then
+          call save_data(iteration, time, abs(s0-s1))
+        endif
+
+        ! output on screen
         call block_count(active_blocks)
-        print*, active_blocks
-        call save_data(iteration, time, 0.0_rk)
-        stop
-!
-!        ! error calculation
-!        call blocks_sum(s1, 1)
-!
-!        ! write data to disk
-!        if (modulo(iteration, params%write_freq) == 0) then
-!          call save_data(iteration, time, abs(s0-s1))
-!        endif
-!
-!        ! output on screen
-!        write(*, '("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, time, size(blocks_params%active_list, dim=1)
-!        write(*, '("error=", es16.8)') abs(s0-s1)
-!        write(*,'(80("-"))')
-!
+        write(*, '("iteration=",i5,3x," time=",f10.6,3x," N_active=",i7)') iteration, time, active_blocks
+        write(*, '("error=", es16.8)') abs(s0-s1)
+        write(*,'(80("-"))')
+
     end do
 
     ! save end field to disk
-    !call save_data(iteration, time, abs(s0-s1))
+    call save_data(iteration, time, abs(s0-s1))
 
     ! cpu time calculation and writing
     call cpu_time(t1)

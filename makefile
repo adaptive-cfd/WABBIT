@@ -4,7 +4,7 @@ FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90
 new_block.f90 treecode_size.f90 encoding.f90 int_to_binary.f90 update_neighbors.f90 adjacent_block.f90 does_block_exist.f90 array_compare.f90 \
 find_block_id.f90 save_data.f90 write_field.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 interpolate_mesh.f90 get_sister_id.f90 \
 delete_block.f90 get_free_block.f90 time_step_RK4.f90 calc_dt.f90 synchronize_ghosts.f90 RHS_2D_convection_diffusion.f90 adapt_mesh.f90 \
-threshold_block.f90 calculate_detail.f90 ensure_gradedness.f90 ensure_completeness.f90 block_count.f90
+threshold_block.f90 calculate_detail.f90 ensure_gradedness.f90 ensure_completeness.f90 block_count.f90 blocks_sum.f90
 
 # Object and module directory:
 OBJDIR = OBJ

@@ -20,17 +20,18 @@ program main
 
     ! time loop variables
     real(kind=rk) 	    :: time
-    integer(kind=ik)	:: iteration
+    integer(kind=ik)	:: iteration, active_blocks
     ! cpu time variables
     real(kind=rk)       :: t0, t1
     ! run time error calculation
     real(kind=rk)       :: s0, s1
 
     ! initialize local variables
-    time        = 0.0_rk
-    iteration   = 0
-    s0          = 0.0_rk
-    s1          = 0.0_rk
+    time          = 0.0_rk
+    iteration     = 0
+    active_blocks = 0
+    s0            = 0.0_rk
+    s1            = 0.0_rk
 
     ! initializing data
     call init_data()
@@ -57,7 +58,7 @@ program main
         iteration = iteration + 1
 
         ! refine every block to create the safety zone
-        call refine_everywhere()
+        if (blocks_params%adapt_mesh) call refine_everywhere()
 
         ! update the neighbor relations
         call update_neighbors()
@@ -65,6 +66,13 @@ program main
         ! advance in time
         call time_step_RK4(time)
 
+        ! adapt the mesh
+        if (blocks_params%adapt_mesh) call adapt_mesh()
+
+        call block_count(active_blocks)
+        print*, active_blocks
+        call save_data(iteration, time, 0.0_rk)
+        stop
 !
 !        ! error calculation
 !        call blocks_sum(s1, 1)

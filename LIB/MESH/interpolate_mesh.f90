@@ -101,7 +101,6 @@ subroutine interpolate_mesh()
 
             elseif (blocks(block_num)%refinement == 1) then
                 ! refinement
-
                 ! new block data, assume synchronized ghost nodes
                 new_data                                        = 0.0_rk
                 new_data_w_ghost                                = 0.0_rk

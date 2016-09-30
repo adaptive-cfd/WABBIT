@@ -25,8 +25,7 @@ module module_params
         real(kind=rk)			        :: nu
         real(kind=rk)			        :: Lx, Ly
         integer(kind=ik)			    :: write_freq
-        real(kind=rk)                   :: eps_coarsen
-        real(kind=rk)                   :: eps_refine
+        real(kind=rk)                   :: eps
         integer(kind=ik)                :: max_treelevel
         integer(kind=ik)                :: min_treelevel
         character(len=80)               :: order_discretization, order_predictor, inicond, boundary

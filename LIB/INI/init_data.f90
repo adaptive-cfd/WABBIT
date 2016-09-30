@@ -58,14 +58,14 @@ subroutine init_data()
     call read_param(FILE,'Physics','boundary',params%boundary, "---" )
 
     ! eps for coarsen and refine the block
-    call read_param(FILE,'Blocks','eps',params%eps_coarsen, 1e-3_rk )
+    call read_param(FILE,'Blocks','eps',params%eps, 1e-3_rk )
     ! set treelevel
     call read_param(FILE,'Blocks','max_treelevel',params%max_treelevel, 6 )
     call read_param(FILE,'Blocks','min_treelevel',params%min_treelevel, 1 )
     ! order of predictor for refinement
     call read_param(FILE,'Blocks','order_predictor',params%order_predictor, "multiresolution_4th" )
     ! discretization order
-    !call read_param(FILE,'Discretization','order_discretization',params%order_discretization, "FD_4th_central_optimized" )
+    call read_param(FILE,'Discretization','order_discretization',params%order_discretization, "FD_4th_central_optimized" )
     ! switch to turn on|off mesh refinement
     call read_param(FILE,'Blocks','adapt_mesh',read_logical, 1 )
     if (read_logical==1) then
@@ -75,8 +75,8 @@ subroutine init_data()
     end if
 
     ! read number of maximal blocks for memory allocation
-    ! default value for number of max_blocks is: 4^(maxlevel-1)
-    call read_param(FILE,'Blocks','number_max_blocks',blocks_params%number_max_blocks, 4**(params%max_treelevel-1) )
+    ! default value for number of max_blocks is: 4^(maxlevel-1) + 1, +1 needed for coarsening if all blocks at start on max_treelevel
+    call read_param(FILE,'Blocks','number_max_blocks',blocks_params%number_max_blocks, 4**(params%max_treelevel)+1 )
 
     ! output on screen
     write(*,'(80("-"))')

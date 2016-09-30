@@ -3,7 +3,7 @@
 FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 inicond_gauss_blob.f90 matrix_sum.f90 matrix_to_block_tree.f90 \
 new_block.f90 treecode_size.f90 encoding.f90 int_to_binary.f90 update_neighbors.f90 adjacent_block.f90 does_block_exist.f90 array_compare.f90 \
 find_block_id.f90 save_data.f90 write_field.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 interpolate_mesh.f90 get_sister_id.f90 \
-delete_block.f90 get_free_block.f90
+delete_block.f90 get_free_block.f90 time_step_RK4.f90 calc_dt.f90 synchronize_ghosts.f90 RHS_2D_convection_diffusion.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -15,7 +15,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
-VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO
+VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION
 
 # Set the default compiler if it's not already set
 ifndef FC

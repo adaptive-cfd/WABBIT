@@ -59,18 +59,12 @@ program main
         ! refine every block to create the safety zone
         call refine_everywhere()
 
-!
-!        ! adapt the mesh
-!        if (blocks_params%adapt_mesh) call adapt_mesh()
-!
-!        ! update the neighbor relations
-!        call update_neighbors()
-!        call set_boundary_status()
-!
-!        ! advance in time
-!        call time_step_RK4(time)
-!        !call time_step_RK2(time)
-!        !call time_step_RK1(time)
+        ! update the neighbor relations
+        call update_neighbors()
+
+        ! advance in time
+        call time_step_RK4(time)
+
 !
 !        ! error calculation
 !        call blocks_sum(s1, 1)

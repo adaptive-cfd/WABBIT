@@ -30,7 +30,7 @@ subroutine does_block_exist(treecode, exists)
     ! loop over all blocks
     do k = 1, N
 
-        if (blocks(k)%active .eqv. .true.) then
+        if (blocks(k)%active) then
 
             if (array_compare(blocks(k)%treecode, treecode, 10)) exists = .true.
 

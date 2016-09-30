@@ -2,14 +2,15 @@
 # Non-module Fortran files to be compiled:
 FFILES = init_data.f90 allocate_block_memory.f90 inicond_dense_field_wrapper.f90 inicond_gauss_blob.f90 matrix_sum.f90 matrix_to_block_tree.f90 \
 new_block.f90 treecode_size.f90 encoding.f90 int_to_binary.f90 update_neighbors.f90 adjacent_block.f90 does_block_exist.f90 array_compare.f90 \
-find_block_id.f90 save_data.f90 write_field.f90
+find_block_id.f90 save_data.f90 write_field.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 interpolate_mesh.f90 get_sister_id.f90 \
+delete_block.f90 get_free_block.f90
 
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 hdf5_wrapper.f90 #module_interpolation.f90  
+MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 hdf5_wrapper.f90 module_interpolation.f90  
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -83,8 +84,8 @@ $(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-#$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o prediction_2D.f90 restriction_2D.f90
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_blocks.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

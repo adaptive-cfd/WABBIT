@@ -50,11 +50,15 @@ program main
 
     ! save start field to disk
     call save_data(iteration, time, 0.0_rk)
-!
-!    ! main time loop
-!    do while ( time < params%time_max )
-!
-!        iteration = iteration + 1
+
+    ! main time loop
+    do while ( time < params%time_max )
+
+        iteration = iteration + 1
+
+        ! refine every block to create the safety zone
+        call refine_everywhere()
+
 !
 !        ! adapt the mesh
 !        if (blocks_params%adapt_mesh) call adapt_mesh()
@@ -81,11 +85,11 @@ program main
 !        write(*, '("error=", es16.8)') abs(s0-s1)
 !        write(*,'(80("-"))')
 !
-!    end do
-!
-!    ! save end field to disk
-!    call save_data(iteration, time, abs(s0-s1))
-!
+    end do
+
+    ! save end field to disk
+    !call save_data(iteration, time, abs(s0-s1))
+
     ! cpu time calculation and writing
     call cpu_time(t1)
     write(*,'(a,f10.6)') "cpu-time = ", t1-t0

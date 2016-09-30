@@ -36,7 +36,7 @@ subroutine update_neighbors()
     ! loop over all blocks
     do k = 1, N
 
-        if (blocks(k)%active .eqv. .true.) then
+        if (blocks(k)%active) then
 
             block_num = k
             ! reset neighbor lists

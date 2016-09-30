@@ -30,7 +30,7 @@ subroutine find_block_id(treecode, block_id)
     ! loop over all blocks
     do k = 1, N
 
-        if (blocks(k)%active .eqv. .true.) then
+        if (blocks(k)%active) then
 
             if (array_compare(blocks(k)%treecode, treecode, 10)) block_id = k
 

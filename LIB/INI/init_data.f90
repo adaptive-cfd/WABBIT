@@ -34,7 +34,6 @@ subroutine init_data()
     !***************************************************************************
     call read_param(FILE,'Blocks','size_domain',blocks_params%size_domain, 513 )
     call read_param(FILE,'Blocks','blocksize',blocks_params%size_block, 17 )
-    call read_param(FILE,'Blocks','number_max_blocks',blocks_params%number_max_blocks, 4*((blocks_params%size_domain-1)/(blocks_params%size_block-1))**2 )
     call read_param(FILE,'Blocks','number_data_fields',blocks_params%number_data_fields, 1)
     call read_param(FILE,'Blocks','ghosts',blocks_params%number_ghost_nodes, 4 )
 
@@ -74,6 +73,10 @@ subroutine init_data()
     else
         blocks_params%adapt_mesh = .false.
     end if
+
+    ! read number of maximal blocks for memory allocation
+    ! default value for number of max_blocks is: 4^(maxlevel-1)
+    call read_param(FILE,'Blocks','number_max_blocks',blocks_params%number_max_blocks, 4**(params%max_treelevel-1) )
 
     ! output on screen
     write(*,'(80("-"))')

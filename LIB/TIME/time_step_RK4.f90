@@ -61,11 +61,12 @@ subroutine time_step_RK4(time)
         ! second stage
         do k = 1, N
             if (blocks(k)%active) then
-                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + 0.5_rk * dt * blocks(k)%data_fields(dF)%k1
+                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + (0.5_rk * dt) * ( blocks(k)%data_fields(dF)%k1 )
             end if
         end do
         ! synchronize ghostnodes
         call synchronize_ghosts()
+
         do k = 1, N
             if (blocks(k)%active) then
                 blocks(k)%data_fields(dF)%k2        = blocks(k)%data_fields(dF)%data_
@@ -78,11 +79,12 @@ subroutine time_step_RK4(time)
         ! third stage
         do k = 1, N
             if (blocks(k)%active) then
-                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + 0.5_rk * dt * blocks(k)%data_fields(dF)%k2
+                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + (0.5_rk * dt) * ( blocks(k)%data_fields(dF)%k2 )
             end if
         end do
         ! synchronize ghostnodes
         call synchronize_ghosts()
+
         do k = 1, N
             if (blocks(k)%active) then
                 blocks(k)%data_fields(dF)%k3        = blocks(k)%data_fields(dF)%data_
@@ -95,11 +97,12 @@ subroutine time_step_RK4(time)
         ! fourth stage
         do k = 1, N
             if (blocks(k)%active) then
-                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + dt * blocks(k)%data_fields(dF)%k3
+                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + dt * ( blocks(k)%data_fields(dF)%k3 )
             end if
         end do
         ! synchronize ghostnodes
         call synchronize_ghosts()
+
         do k = 1, N
             if (blocks(k)%active) then
                 blocks(k)%data_fields(dF)%k4        = blocks(k)%data_fields(dF)%data_
@@ -112,7 +115,7 @@ subroutine time_step_RK4(time)
         ! final stage
         do k = 1, N
             if (blocks(k)%active) then
-                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + dt/6.0_rk * ( blocks(k)%data_fields(dF)%k1 &
+                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + (dt/6.0_rk) * ( blocks(k)%data_fields(dF)%k1 &
                                                     + 2.0_rk*blocks(k)%data_fields(dF)%k2 &
                                                     + 2.0_rk*blocks(k)%data_fields(dF)%k3 &
                                                     + blocks(k)%data_fields(dF)%k4 )

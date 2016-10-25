@@ -153,7 +153,7 @@ contains
         b =-1.0_rk/16.0_rk
 
         fine(2)     = (5.0_rk/16.0_rk)*coarse(1)+(15.0_rk/16.0_rk)*coarse(2)-(5.0_rk/16.0_rk)*coarse(3)+(1.0_rk/16.0_rk)*coarse(4)
-        fine(nfine-1) = (1.0_rk/16.0_rk)*coarse(ncoarse-3) -(5.0_rk/16.0_rk)*coarse(ncoarse-2) +(15.0_rk/16)*coarse(ncoarse-1) +(5.0_rk/16.0_rk)*coarse(ncoarse)
+        fine(nfine-1) = (1.0_rk/16.0_rk)*coarse(ncoarse-3) -(5.0_rk/16.0_rk)*coarse(ncoarse-2) +(15.0_rk/16.0_rk)*coarse(ncoarse-1) +(5.0_rk/16.0_rk)*coarse(ncoarse)
 
         do k = 2, ncoarse-2
             fine(2*k) = a*coarse(k)+a*coarse(k+1)+b*coarse(k-1)+b*coarse(k+2)

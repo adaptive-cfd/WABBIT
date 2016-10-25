@@ -20,7 +20,7 @@ subroutine adapt_mesh()
 
     integer(kind=ik)    :: i
 
-    ! maximal number of loops to coarsen the mesh == block go down from max_treelevel to min_treelevel
+    ! maximal number of loops to coarsen the mesh == one block go down from max_treelevel to min_treelevel
     do i = 1, (params%max_treelevel - params%min_treelevel)
 
         ! check where to coarsen (refinement done with safety zone)

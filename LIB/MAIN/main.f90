@@ -14,12 +14,12 @@
 program main
 
     use mpi
-    !use module_params
-    !use module_blocks
+    use module_params
+    use module_blocks
 
     implicit none
 
-    integer                        :: ierr
+    integer(kind=ik)    :: ierr
 
     ! init mpi
     call MPI_Init(ierr)

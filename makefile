@@ -7,7 +7,7 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = #module_params.f90 module_blocks.f90 ini_files_parser.f90 hdf5_wrapper.f90 module_interpolation.f90  
+MFILES = module_params.f90 module_blocks.f90 #ini_files_parser.f90 hdf5_wrapper.f90 module_interpolation.f90  
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -81,14 +81,14 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 
 # Compile modules (module dependency must be specified by hand in
 # Fortran). Objects are specified in MOBJS (module objects).
-#$(OBJDIR)/module_blocks.o: module_blocks.f90
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/module_blocks.o: module_blocks.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-#$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_blocks.o
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 # Compile remaining objects from Fortran files.

@@ -46,9 +46,9 @@ program main
     ! create block tree
     call matrix_to_block_tree()
 
-!    ! update neighbor relations
-!    call update_neighbors()
-!
+    ! update neighbor relations
+    call update_neighbors()
+
 !    ! save start field to disk
 !    call save_data(iteration, time, 0.0_rk)
 !

@@ -13,10 +13,16 @@ git clone https://github.com/mario-sroka/WABBIT
 
 ### run make
 
-choose compiler with FC option 
+choose compiler with FC option (to v0.2) 
 
 ```
 make FC=[gfortran|ifort]
+```
+
+choose compiler with FC option (up v0.3) 
+
+```
+make FC=[mpif90]
 ```
 ### run WABBIT
 

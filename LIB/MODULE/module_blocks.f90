@@ -38,7 +38,6 @@ module module_blocks
         ! number of allocated blocks, data fields and active blocks
         integer(kind=ik)                                :: number_max_blocks
         integer(kind=ik)                                :: number_data_fields
-        integer(kind=ik)                                :: number_active_blocks
 
         ! switch for mesh adaption
         logical                                         :: adapt_mesh

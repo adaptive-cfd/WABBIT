@@ -1,6 +1,7 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = init_data.f90 allocate_block_memory.f90 initial_condition_dense_field.f90 inicond_gauss_blob.f90
+FFILES = init_data.f90 allocate_block_memory.f90 initial_condition_dense_field.f90 inicond_gauss_blob.f90 matrix_to_block_tree.f90 \
+encoding.f90 int_to_binary.f90 initial_block_distribution.f90 new_block_light.f90 treecode_size.f90 new_block_heavy.f90
 
 # Object and module directory:
 OBJDIR = OBJ

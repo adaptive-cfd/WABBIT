@@ -105,6 +105,9 @@ subroutine  allocate_block_memory()
         blocks_data(i)%coord_x(:)    = 0.0_rk
         blocks_data(i)%coord_y(:)    = 0.0_rk
 
+        ! light data id
+        blocks_data(i)%block_id      = -1
+
     end do
 
 

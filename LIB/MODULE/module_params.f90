@@ -5,9 +5,9 @@
 ! params data structure
 !
 ! name: module_params.f90
-! date: 29.09.2016
+! date: 25.10.2016
 ! author: msr
-! version: 0.2
+! version: 0.3
 !
 ! ********************************
 

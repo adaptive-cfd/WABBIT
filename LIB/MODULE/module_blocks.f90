@@ -5,9 +5,9 @@
 ! blocks data structure
 !
 ! name: module_blocks.f90
-! date: 29.09.2016
+! date: 25.10.2016
 ! author: msr
-! version: 0.2
+! version: 0.3
 !
 ! ********************************
 
@@ -44,7 +44,7 @@ module module_blocks
         logical                                         :: adapt_mesh
 
         ! number of heavy data fields per process
-        integer(kind=ik)                                :: number_proc_data
+        integer(kind=ik)                                :: number_max_blocks_data
 
     end type type_blocks_params
 

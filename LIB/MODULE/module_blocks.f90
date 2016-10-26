@@ -67,27 +67,34 @@ module module_blocks
     ! datatype for light block data
     type type_blocks_light
 
+        ! integer data
+        ! ------------
         ! treecode, level and neighbor information
         integer(kind=ik), dimension(:), allocatable     :: treecode
         integer(kind=ik)                                :: level
         integer(kind=ik), dimension(:,:), allocatable   :: neighbor_treecode
-        character(len=2), dimension(8)                  :: neighbor_dir
         integer(kind=ik), dimension(8)                  :: neighbor_id
         integer(kind=ik), dimension(:,:), allocatable   :: neighbor2_treecode
-        character(len=2), dimension(4)                  :: neighbor2_dir
         integer(kind=ik), dimension(4)                  :: neighbor2_id
-
         integer(kind=ik), dimension(8)                  :: neighbor_number
 
         ! refinement flag
         integer(kind=ik)                                :: refinement
 
-        ! active flag
-        logical                                         :: active
-
         ! block is assigned to one process at one specific data-id
         integer(kind=ik)                                :: proc_rank
         integer(kind=ik)                                :: proc_data_id
+
+        ! character data
+        ! --------------
+        ! neighbor dirs
+        character(len=2), dimension(8)                  :: neighbor_dir
+        character(len=2), dimension(4)                  :: neighbor2_dir
+
+        ! logical data
+        ! ------------
+        ! active flag
+        logical                                         :: active
 
     end type type_blocks_light
 

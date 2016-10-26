@@ -48,10 +48,11 @@ program main
 
     ! update neighbor relations
     call update_neighbors()
+    call broadcast_light_data()
 
-!    ! save start field to disk
-!    call save_data(iteration, time, 0.0_rk)
-!
+    ! save start field to disk
+    call save_data(iteration, time)
+
 !    ! main time loop
 !    do while ( time < params%time_max )
 !

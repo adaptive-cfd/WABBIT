@@ -55,6 +55,11 @@ subroutine initial_block_distribution(distribution)
                     ! increase proc-id
                     proc_id                         = proc_id + 1
 
+                else
+                    ! block is not active, so reset id's to heavy data
+                    blocks(light_id).proc_data_id   = -1
+                    blocks(light_id).proc_rank      = -1
+
                 end if
                 ! reset proc counter
                 if ( proc_id==n_procs ) proc_id = 0

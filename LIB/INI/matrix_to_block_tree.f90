@@ -86,10 +86,8 @@ subroutine matrix_to_block_tree()
     end do
 
     ! distribute blocks to procs
-    if (rank==0) then
-        distribution = "equal"
-        call initial_block_distribution(distribution)
-    end if
+    distribution = "equal"
+    call initial_block_distribution(distribution)
 
     ! create new blocks, second: heavy data
     if (dF == 1) then

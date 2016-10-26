@@ -2,19 +2,19 @@
 # Non-module Fortran files to be compiled:
 FFILES = init_data.f90 allocate_block_memory.f90 initial_condition_dense_field.f90 inicond_gauss_blob.f90 matrix_to_block_tree.f90 \
 encoding.f90 int_to_binary.f90 initial_block_distribution.f90 new_block_light.f90 treecode_size.f90 new_block_heavy.f90 update_neighbors.f90 \
-adjacent_block.f90 does_block_exist.f90 find_block_id.f90 array_compare.f90
+adjacent_block.f90 does_block_exist.f90 find_block_id.f90 array_compare.f90 save_data.f90 write_field.f90 broadcast_light_data.f90
 
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 #hdf5_wrapper.f90 module_interpolation.f90  
+MFILES = module_params.f90 module_blocks.f90 ini_files_parser.f90 hdf5_wrapper.f90 #module_interpolation.f90  
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
-VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION
+VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI
 
 # Set the default compiler if it's not already set
 FC = mpif90
@@ -70,6 +70,11 @@ FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
 
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
+# HDF_ROOT is set in environment.
+HDF_LIB = $(HDF_ROOT)/lib
+HDF_INC = $(HDF_ROOT)/include
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+FFLAGS += -I$(HDF_INC)
 endif
 
 PROGRAMS = wabbit
@@ -85,8 +90,8 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 # Fortran). Objects are specified in MOBJS (module objects).
 $(OBJDIR)/module_blocks.o: module_blocks.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-#$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_blocks.o

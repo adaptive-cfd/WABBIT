@@ -25,7 +25,7 @@ program main
     ! cpu time variables
     real(kind=rk)                       :: t0, t1
     ! MPI variables
-    integer(kind=ik)                    :: ierr, rank
+    integer(kind=ik)                    :: ierr, rank, n_proc
 
     ! initialize local variables
     time          = 0.0_rk
@@ -36,6 +36,7 @@ program main
     call MPI_Init(ierr)
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    call MPI_Comm_size(MPI_COMM_WORLD, n_proc, ierr)
 
     ! cpu time start
     call cpu_time(t0)
@@ -48,6 +49,12 @@ program main
 
     ! update neighbor relations
     call update_neighbors()
+
+    ! output MPI status
+    if (rank==0) then
+        write(*, '("MPI: using ", i7, " processes")') n_proc
+        write(*,'(80("-"))')
+    end if
 
     ! save start field to disk
     call save_data(iteration, time)

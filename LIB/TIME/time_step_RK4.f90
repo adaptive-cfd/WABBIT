@@ -26,11 +26,10 @@ subroutine time_step_RK4(time)
     g 					    = blocks_params%number_ghost_nodes
     Bs 					    = blocks_params%size_block
 
-    N                       = blocks_params%number_max_blocks
+    N                       = blocks_params%number_max_blocks_data
 
     call calc_dt(dt)
 
-    dt = 2.0_rk
     time 				    = time + dt
     ! last timestep should fit in maximal time
     if (time >= params%time_max) then
@@ -48,81 +47,83 @@ subroutine time_step_RK4(time)
         ! first stage
         ! synchronize ghostnodes
         call synchronize_ghosts()
-!
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%data_old  = blocks(k)%data_fields(dF)%data_
-!                blocks(k)%data_fields(dF)%k1        = blocks(k)%data_fields(dF)%data_old
-!                ! RHS
-!                call RHS_2D_convection_diffusion(blocks(k)%data_fields(dF)%k1(:,:), blocks(k)%dx, blocks(k)%dy, g, Bs)
-!            end if
-!        end do
-!
-!        !------------------------------
-!        ! second stage
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + (0.5_rk * dt) * ( blocks(k)%data_fields(dF)%k1 )
-!            end if
-!        end do
-!        ! synchronize ghostnodes
-!        call synchronize_ghosts()
-!
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%k2        = blocks(k)%data_fields(dF)%data_
-!                ! RHS
-!                call RHS_2D_convection_diffusion(blocks(k)%data_fields(dF)%k2(:,:), blocks(k)%dx, blocks(k)%dy, g, Bs)
-!            end if
-!        end do
-!
-!        !------------------------------
-!        ! third stage
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + (0.5_rk * dt) * ( blocks(k)%data_fields(dF)%k2 )
-!            end if
-!        end do
-!        ! synchronize ghostnodes
-!        call synchronize_ghosts()
-!
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%k3        = blocks(k)%data_fields(dF)%data_
-!                ! RHS
-!                call RHS_2D_convection_diffusion(blocks(k)%data_fields(dF)%k3(:,:), blocks(k)%dx, blocks(k)%dy, g, Bs)
-!            end if
-!        end do
-!
-!        !------------------------------
-!        ! fourth stage
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + dt * ( blocks(k)%data_fields(dF)%k3 )
-!            end if
-!        end do
-!        ! synchronize ghostnodes
-!        call synchronize_ghosts()
-!
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%k4        = blocks(k)%data_fields(dF)%data_
-!                ! RHS
-!                call RHS_2D_convection_diffusion(blocks(k)%data_fields(dF)%k4(:,:), blocks(k)%dx, blocks(k)%dy, g, Bs)
-!            end if
-!        end do
-!
-!        !------------------------------
-!        ! final stage
-!        do k = 1, N
-!            if (blocks(k)%active) then
-!                blocks(k)%data_fields(dF)%data_     = blocks(k)%data_fields(dF)%data_old + (dt/6.0_rk) * ( blocks(k)%data_fields(dF)%k1 &
-!                                                    + 2.0_rk*blocks(k)%data_fields(dF)%k2 &
-!                                                    + 2.0_rk*blocks(k)%data_fields(dF)%k3 &
-!                                                    + blocks(k)%data_fields(dF)%k4 )
-!            end if
-!        end do
-!
+
+        ! loop over all internal blocks
+        do k = 1, N
+            ! if block is active
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%data_old  = blocks_data(k)%data_fields(dF)%data_
+                blocks_data(k)%data_fields(dF)%k1        = blocks_data(k)%data_fields(dF)%data_old
+                ! RHS
+                call RHS_2D_convection_diffusion(blocks_data(k)%data_fields(dF)%k1(:,:), blocks_data(k)%dx, blocks_data(k)%dy, g, Bs)
+            end if
+        end do
+
+        !------------------------------
+        ! second stage
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%data_     = blocks_data(k)%data_fields(dF)%data_old + (0.5_rk * dt) * ( blocks_data(k)%data_fields(dF)%k1 )
+            end if
+        end do
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
+
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%k2        = blocks_data(k)%data_fields(dF)%data_
+                ! RHS
+                call RHS_2D_convection_diffusion(blocks_data(k)%data_fields(dF)%k2(:,:), blocks_data(k)%dx, blocks_data(k)%dy, g, Bs)
+            end if
+        end do
+
+        !------------------------------
+        ! third stage
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%data_     = blocks_data(k)%data_fields(dF)%data_old + (0.5_rk * dt) * ( blocks_data(k)%data_fields(dF)%k2 )
+            end if
+        end do
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
+
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%k3        = blocks_data(k)%data_fields(dF)%data_
+                ! RHS
+                call RHS_2D_convection_diffusion(blocks_data(k)%data_fields(dF)%k3(:,:), blocks_data(k)%dx, blocks_data(k)%dy, g, Bs)
+            end if
+        end do
+
+        !------------------------------
+        ! fourth stage
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%data_     = blocks_data(k)%data_fields(dF)%data_old + dt * ( blocks_data(k)%data_fields(dF)%k3 )
+            end if
+        end do
+        ! synchronize ghostnodes
+        call synchronize_ghosts()
+
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%k4        = blocks_data(k)%data_fields(dF)%data_
+                ! RHS
+                call RHS_2D_convection_diffusion(blocks_data(k)%data_fields(dF)%k4(:,:), blocks_data(k)%dx, blocks_data(k)%dy, g, Bs)
+            end if
+        end do
+
+        !------------------------------
+        ! final stage
+        do k = 1, N
+            if ( blocks_data(k)%block_id /= -1 ) then
+                blocks_data(k)%data_fields(dF)%data_     = blocks_data(k)%data_fields(dF)%data_old + (dt/6.0_rk) * ( blocks_data(k)%data_fields(dF)%k1 &
+                                                        + 2.0_rk*blocks_data(k)%data_fields(dF)%k2 &
+                                                        + 2.0_rk*blocks_data(k)%data_fields(dF)%k3 &
+                                                        + blocks_data(k)%data_fields(dF)%k4 )
+            end if
+        end do
+
     else
         ! more than one data field
         ! to do

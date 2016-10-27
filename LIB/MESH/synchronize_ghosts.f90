@@ -48,7 +48,7 @@ subroutine synchronize_ghosts()
         if ( (com_list(k, 2) == rank) .or. (com_list(k, 3) == rank) ) then
 
             ! proc has to send/receive data
-            !call send_receive_data( k, com_plan(i, 1), com_plan(i, 2), com_list )
+            call send_receive_data( k, com_plan(i, 1), com_plan(i, 2), com_list )
             ! next step in com_plan
             if (com_plan(i, 1) == 1) then
                 ! internal com

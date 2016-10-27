@@ -4,6 +4,7 @@ FFILES = init_data.f90 allocate_block_memory.f90 initial_condition_dense_field.f
 encoding.f90 int_to_binary.f90 initial_block_distribution.f90 new_block_light.f90 treecode_size.f90 new_block_heavy.f90 update_neighbors.f90 \
 adjacent_block.f90 does_block_exist.f90 find_block_id.f90 array_compare.f90 save_data.f90 write_field.f90 calc_dt.f90 time_step_RK4.f90 \
 block_count.f90 synchronize_ghosts.f90 find_neighborhood.f90 create_com_list.f90 sort_com_list.f90 com_allowed.f90 send_receive_data.f90 \
+RHS_2D_convection_diffusion.f90
 
 # Object and module directory:
 OBJDIR = OBJ

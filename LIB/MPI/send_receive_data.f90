@@ -18,11 +18,11 @@ subroutine send_receive_data(com_id, plan_type, com_number, com_list)
 
     implicit none
 
-    real(kind=rk) , dimension(10000)        :: send_buff, recv_buff
+    real(kind=rk) , dimension(100000)        :: send_buff, recv_buff
 
     integer, intent(in)                     :: com_id, com_number, plan_type
     integer, dimension(200, 7), intent(in)  :: com_list
-    integer                                 :: Bs, g, k, l, buffer_i, dF
+    integer                                 :: Bs, g, k, k_start, k_end, l, buffer_i, dF
     integer                                 :: my_block, my_dir, tag, ierr, rank, k_shift, my_dest
     integer                                 :: status(MPI_status_size)
 
@@ -105,16 +105,21 @@ subroutine send_receive_data(com_id, plan_type, com_number, com_list)
 
     if (plan_type==1) then
         ! internal communication
-        recv_buff = send_buff
+        recv_buff   = send_buff
+        k_start     = 1
+        k_end       = com_number
     else
         ! external communication
         ! send/receive data
-        call MPI_Sendrecv( send_buff, 10000, MPI_REAL4, my_dest, tag, recv_buff, 10000, MPI_REAL4, my_dest, tag, MPI_COMM_WORLD, status, ierr)
+        call MPI_Sendrecv( send_buff, 100000, MPI_REAL4, my_dest, tag, recv_buff, 100000, MPI_REAL4, my_dest, tag, MPI_COMM_WORLD, status, ierr)
+        k_start = 1+com_number-k_shift
+        k_end   = com_number+com_number-k_shift
     end if
 
     buffer_i  = 1
+
     ! write received data in block data
-    do k = 1+com_number-k_shift, com_number+com_number-k_shift
+    do k = k_start, k_end
 
         my_block        = com_list( com_id+k-1, 5 )
         my_dir          = com_list( com_id+k-1, 7 )

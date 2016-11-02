@@ -43,18 +43,14 @@ subroutine  allocate_block_memory()
     do i = 1, blocks_params%number_max_blocks
 
         allocate( blocks(i)%treecode(10), stat=allocate_error )
-        allocate( blocks(i)%neighbor_treecode(8,10), stat=allocate_error )
-        allocate( blocks(i)%neighbor2_treecode(4,10), stat=allocate_error )
+        allocate( blocks(i)%neighbor_treecode(16,10), stat=allocate_error )
 
         blocks(i)%active                    = .false.
         blocks(i)%treecode(:)               = -1
         blocks(i)%neighbor_treecode(:,:)    = -1
-        blocks(i)%neighbor2_treecode(:,:)   = -1
         blocks(i)%neighbor_id(:)            = -1
-        blocks(i)%neighbor2_id(:)           = -1
         blocks(i)%refinement                = 0
         blocks(i)%level                     = -1
-        blocks(i)%neighbor_number(:)        = 1
 
         blocks(i)%proc_rank                 = -1
         blocks(i)%proc_data_id              = -1
@@ -84,13 +80,13 @@ subroutine  allocate_block_memory()
         ! loop over all data fields
         do j = 1, dF
 
-            blocks_data(i)%data_fields(j)%data_(:,:)              = 0.0_rk
-            blocks_data(i)%data_fields(j)%data_old(:,:)           = 0.0_rk
+            blocks_data(i)%data_fields(j)%data_(:,:)              = 9.0e9_rk
+            blocks_data(i)%data_fields(j)%data_old(:,:)           = 9.0e9_rk
 
-            blocks_data(i)%data_fields(j)%k1(:,:)                 = 0.0_rk
-            blocks_data(i)%data_fields(j)%k2(:,:)                 = 0.0_rk
-            blocks_data(i)%data_fields(j)%k3(:,:)                 = 0.0_rk
-            blocks_data(i)%data_fields(j)%k4(:,:)                 = 0.0_rk
+            blocks_data(i)%data_fields(j)%k1(:,:)                 = 9.0e9_rk
+            blocks_data(i)%data_fields(j)%k2(:,:)                 = 9.0e9_rk
+            blocks_data(i)%data_fields(j)%k3(:,:)                 = 9.0e9_rk
+            blocks_data(i)%data_fields(j)%k4(:,:)                 = 9.0e9_rk
 
         end do
 

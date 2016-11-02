@@ -73,10 +73,7 @@ module module_blocks
         integer(kind=ik), dimension(:), allocatable     :: treecode
         integer(kind=ik)                                :: level
         integer(kind=ik), dimension(:,:), allocatable   :: neighbor_treecode
-        integer(kind=ik), dimension(8)                  :: neighbor_id
-        integer(kind=ik), dimension(:,:), allocatable   :: neighbor2_treecode
-        integer(kind=ik), dimension(4)                  :: neighbor2_id
-        integer(kind=ik), dimension(8)                  :: neighbor_number
+        integer(kind=ik), dimension(16)                 :: neighbor_id
 
         ! refinement flag
         integer(kind=ik)                                :: refinement
@@ -88,13 +85,12 @@ module module_blocks
         ! character data
         ! --------------
         ! neighbor dirs
-        character(len=2), dimension(8)                  :: neighbor_dir
-        character(len=2), dimension(4)                  :: neighbor2_dir
+        character(len=3), dimension(16)                  :: neighbor_dir
 
         ! logical data
         ! ------------
         ! active flag
-        logical                                         :: active
+        logical                                          :: active
 
     end type type_blocks_light
 

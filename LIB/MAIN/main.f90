@@ -34,7 +34,6 @@ program main
 
     ! init mpi
     call MPI_Init(ierr)
-
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     call MPI_Comm_size(MPI_COMM_WORLD, n_proc, ierr)
 
@@ -65,7 +64,7 @@ program main
         iteration = iteration + 1
 
         ! refine every block to create the safety zone
-!        if (blocks_params%adapt_mesh) call refine_everywhere()
+        if (blocks_params%adapt_mesh) call refine_everywhere()
 
         ! update the neighbor relations
         call update_neighbors()
@@ -74,7 +73,7 @@ program main
         call time_step_RK4(time)
 
         ! adapt the mesh
-!        if (blocks_params%adapt_mesh) call adapt_mesh()
+        if (blocks_params%adapt_mesh) call adapt_mesh()
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
@@ -88,7 +87,7 @@ program main
             write(*,'(80("-"))')
         end if
 
-   end do
+    end do
 
     ! save end field to disk
     call save_data(iteration, time)

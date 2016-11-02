@@ -11,22 +11,24 @@
 !
 ! ********************************
 
-subroutine sort_com_list(com_list, com_plan, n_proc, n_com)
+subroutine sort_com_list(com_list, com_plan, n_proc, n_com, com_list_N)
 
     use module_params
     use module_blocks
 
     implicit none
 
-    integer(kind=ik), dimension(200, 7), intent(inout)  :: com_list
-    integer, dimension(200, 2), intent(out)             :: com_plan
-    integer(kind=ik), intent(in)                        :: n_proc, n_com
+    integer(kind=ik), intent(in)                                :: com_list_N
 
-    integer                                             :: i, j, k, allocate_error, com_count, plan_type
-    integer, dimension(7)                               :: com_list_elem
+    integer(kind=ik), dimension(com_list_N, 7), intent(inout)   :: com_list
+    integer, dimension(2000, 2), intent(out)                    :: com_plan
+    integer(kind=ik), intent(in)                                :: n_proc, n_com
 
-    logical, dimension(:), allocatable                  :: proc_status
-    logical                                             :: com_allowed
+    integer                                                     :: i, j, k, allocate_error, com_count, plan_type
+    integer, dimension(7)                                       :: com_list_elem
+
+    logical, dimension(:), allocatable                          :: proc_status
+    logical                                                     :: com_allowed
 
     ! reset com_plan
     com_plan    = -99

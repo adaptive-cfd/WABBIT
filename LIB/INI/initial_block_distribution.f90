@@ -36,18 +36,15 @@ subroutine initial_block_distribution(distribution)
                 ! block is active
                 if ( blocks(light_id).active == .true. ) then
 
-                    ! test if proc has data space left
+                    ! find free heavy id
                     if ( rank == proc_id ) then
-                        ! loop over all blocks on proc
-                        do heavy_id = 1, blocks_params%number_max_blocks_data
-                            if ( blocks_data(heavy_id)%block_id == -1 ) then
-                                ! block data on proc is not used
-                                ! save light data id in heavy data on specific proc
-                                blocks_data(heavy_id)%block_id = light_id
-                                exit
-                            end if
-                        end do
+                        ! find free id
+                        call get_heavy_free_block(heavy_id)
+                        ! save light data id in heavy data on specific proc
+                        blocks_data(heavy_id)%block_id = light_id
                     end if
+                    ! sychronize free id
+                    call MPI_Bcast(heavy_id, 1, MPI_INTEGER4, proc_id, MPI_COMM_WORLD, ierr)
 
                     ! save heavy-id and proc-id in light data
                     blocks(light_id).proc_data_id   = heavy_id

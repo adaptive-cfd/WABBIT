@@ -30,6 +30,7 @@ subroutine write_field(iteration, time, dF)
 
     real(kind=rk), dimension(:,:), allocatable  :: data_
     real(kind=rk), dimension(:), allocatable    :: coord_
+    real(kind=rk)                               :: detail_
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
@@ -118,8 +119,40 @@ subroutine write_field(iteration, time, dF)
                 call write_attribute( fname, dsetname, "neighbor-id8", (/blocks(k)%neighbor_id(8)/) )
                 call write_attribute( fname, dsetname, "neighbor-treecode8", blocks(k)%neighbor_treecode(8,:))
 
-                !call write_attribute( fname, dsetname, "detail", (/blocks(k)%data_fields(dF)%detail/))
+                call write_attribute( fname, dsetname, "neighbor-id9", (/blocks(k)%neighbor_id(9)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode9", blocks(k)%neighbor_treecode(9,:))
 
+                call write_attribute( fname, dsetname, "neighbor-id10", (/blocks(k)%neighbor_id(10)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode10", blocks(k)%neighbor_treecode(10,:))
+
+                call write_attribute( fname, dsetname, "neighbor-id11", (/blocks(k)%neighbor_id(11)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode11", blocks(k)%neighbor_treecode(11,:))
+
+                call write_attribute( fname, dsetname, "neighbor-id12", (/blocks(k)%neighbor_id(12)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode12", blocks(k)%neighbor_treecode(12,:))
+
+                call write_attribute( fname, dsetname, "neighbor-id13", (/blocks(k)%neighbor_id(13)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode13", blocks(k)%neighbor_treecode(13,:))
+
+                call write_attribute( fname, dsetname, "neighbor-id14", (/blocks(k)%neighbor_id(14)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode14", blocks(k)%neighbor_treecode(14,:))
+
+                call write_attribute( fname, dsetname, "neighbor-id15", (/blocks(k)%neighbor_id(15)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode15", blocks(k)%neighbor_treecode(15,:))
+
+                call write_attribute( fname, dsetname, "neighbor-id16", (/blocks(k)%neighbor_id(16)/) )
+                call write_attribute( fname, dsetname, "neighbor-treecode16", blocks(k)%neighbor_treecode(16,:))
+
+                ! heavy data exchange
+                ! if data on proc 0: write data
+                ! else: receive data from proc with block data
+                if ( blocks(k)%proc_rank == 0 ) then
+                    heavy_id = blocks(k)%proc_data_id
+                    call write_attribute( fname, dsetname, "detail", (/blocks_data(heavy_id)%data_fields(dF)%detail/))
+                else
+                    call MPI_Recv(detail_, 1, MPI_REAL8, blocks(k)%proc_rank, tag, MPI_COMM_WORLD, status, ierr)
+                    call write_attribute( fname, dsetname, "detail", (/blocks_data(heavy_id)%data_fields(dF)%detail/))
+                end if
 
             else
                 ! send data to proc 0
@@ -135,6 +168,9 @@ subroutine write_field(iteration, time, dF)
                     call MPI_Send( coord_, Bs, MPI_REAL8, 0, tag, MPI_COMM_WORLD, ierr)
                     coord_ = blocks_data(heavy_id)%coord_y
                     call MPI_Send( coord_, Bs, MPI_REAL8, 0, tag, MPI_COMM_WORLD, ierr)
+                    ! send detail
+                    detail_ = blocks_data(heavy_id)%data_fields(dF)%detail
+                    call MPI_Send( detail_, 1, MPI_REAL8, 0, tag, MPI_COMM_WORLD, ierr)
 
                 end if
 
@@ -143,6 +179,8 @@ subroutine write_field(iteration, time, dF)
         end if
 
     end do
+
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
     ! deallocate data fields
     deallocate( data_, stat=allocate_error )

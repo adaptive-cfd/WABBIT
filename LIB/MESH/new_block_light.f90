@@ -44,8 +44,6 @@ subroutine new_block_light(k, treecode, treeN)
 
     ! reset neighbor status
     blocks(k)%neighbor_id           = -1
-    blocks(k)%neighbor2_id          = -1
     blocks(k)%neighbor_treecode     = -1
-    blocks(k)%neighbor2_treecode    = -1
 
 end subroutine new_block_light

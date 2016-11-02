@@ -68,7 +68,7 @@ contains
         endif
 
         ! inititalize fine field (actually not necessary)
-        fine = 9.0e9_rk
+        fine = 7.0e7_rk
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point)
         fine(1:nfine:2, 1:nfine:2) = coarse(:,:)

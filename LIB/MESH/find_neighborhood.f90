@@ -2,7 +2,8 @@
 ! WABBIT
 ! --------------------------------
 !
-! find neighborhood id
+! find neighborhood id for neighbor relation
+! between block1 -> block2
 !
 ! name: find_neighborhood.f90
 ! date: 26.10.2016
@@ -11,41 +12,52 @@
 !
 ! ********************************
 
-integer function find_neighborhood(block_num, neighbor_dir)
+integer function find_neighborhood(dir)
 
     use module_blocks
 
     implicit none
 
-    integer, intent(in)             :: block_num
-    character(len=2), intent(in)    :: neighbor_dir
+    character(len=3), intent(in)    :: dir
 
-    integer                         :: k
-    character(len=2)                :: my_dir
+    ! -------------------------------------------------------------------------------------------------------------------------
+    ! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+    ! -------------------------------------------------------------------------------------------------------------------------
 
-    select case(neighbor_dir)
-        case('NO')
-            my_dir = 'SO'
-        case('SO')
-            my_dir = 'NO'
-        case('WE')
-            my_dir = 'EA'
-        case('EA')
-            my_dir = 'WE'
-        case('NE')
-            my_dir = 'SW'
-        case('NW')
-            my_dir = 'SE'
-        case('SE')
-            my_dir = 'NW'
-        case('SW')
-            my_dir = 'NE'
+    ! list id for corresponding neighborhood
+    select case(dir)
+        case('__N')
+            find_neighborhood = 3
+        case('__S')
+            find_neighborhood = 1
+        case('__W')
+            find_neighborhood = 2
+        case('__E')
+            find_neighborhood = 4
+        case('_NE')
+            find_neighborhood = 8
+        case('_NW')
+            find_neighborhood = 7
+        case('_SE')
+            find_neighborhood = 6
+        case('_SW')
+            find_neighborhood = 5
+        case('NNE')
+            find_neighborhood = 11
+        case('NNW')
+            find_neighborhood = 12
+        case('SSE')
+            find_neighborhood = 9
+        case('SSW')
+            find_neighborhood = 10
+        case('ENE')
+            find_neighborhood = 15
+        case('ESE')
+            find_neighborhood = 16
+        case('WNW')
+            find_neighborhood = 13
+        case('WSW')
+            find_neighborhood = 14
     end select
-
-    do k = 1, 8
-        if ( blocks(block_num)%neighbor_dir(k) == my_dir ) then
-            find_neighborhood = k
-        end if
-    enddo
 
 end function find_neighborhood

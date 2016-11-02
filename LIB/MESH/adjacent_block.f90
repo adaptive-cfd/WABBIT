@@ -20,7 +20,7 @@ recursive subroutine adjacent_block(me, neighbor, direction)
 
     integer(kind=ik), dimension(10), intent(in)        :: me
     integer(kind=ik), dimension(10), intent(out)       :: neighbor
-    character(len=2), intent(in)                       :: direction
+    character(len=3), intent(in)                       :: direction
 
     integer(kind=ik)                                   :: i, n, treecode_size
     integer(kind=ik), dimension(10)                    :: neighbor2
@@ -33,7 +33,7 @@ recursive subroutine adjacent_block(me, neighbor, direction)
 
     select case(direction)
 
-        case('NO')
+        case('__N')
         ! north
             neighbor(n) = modulo(me(n)+2, 4)
             i = n - 1
@@ -48,7 +48,7 @@ recursive subroutine adjacent_block(me, neighbor, direction)
                 end if
             end do
 
-        case('SO')
+        case('__S')
         ! south
             neighbor(n) = modulo(me(n)+2, 4)
             i = n - 1
@@ -63,7 +63,7 @@ recursive subroutine adjacent_block(me, neighbor, direction)
                 end if
             end do
 
-        case('EA')
+        case('__E')
         ! east
             if ( (me(n)==0) .or. (me(n)==2) ) then
                 neighbor(n) = modulo(me(n)+1, 4)
@@ -87,7 +87,7 @@ recursive subroutine adjacent_block(me, neighbor, direction)
                 end if
             end do
 
-        case('WE')
+        case('__W')
         ! west
             if ( (me(n)==0) .or. (me(n)==2) ) then
                 neighbor(n) = modulo(me(n)+1, 4)
@@ -111,25 +111,25 @@ recursive subroutine adjacent_block(me, neighbor, direction)
                 end if
             end do
 
-        case('NE')
+        case('_NE')
         ! northeast
-            call adjacent_block(me, neighbor2, 'NO')
-            call adjacent_block(neighbor2, neighbor, 'EA')
+            call adjacent_block(me, neighbor2, '__N')
+            call adjacent_block(neighbor2, neighbor, '__E')
 
-        case('NW')
+        case('_NW')
         ! northwest
-            call adjacent_block(me, neighbor2, 'NO')
-            call adjacent_block(neighbor2, neighbor, 'WE')
+            call adjacent_block(me, neighbor2, '__N')
+            call adjacent_block(neighbor2, neighbor, '__W')
 
-        case('SE')
+        case('_SE')
         ! southeast
-            call adjacent_block(me, neighbor2, 'SO')
-            call adjacent_block(neighbor2, neighbor, 'EA')
+            call adjacent_block(me, neighbor2, '__S')
+            call adjacent_block(neighbor2, neighbor, '__E')
 
-        case('SW')
+        case('_SW')
         ! southwest
-            call adjacent_block(me, neighbor2, 'SO')
-            call adjacent_block(neighbor2, neighbor, 'WE')
+            call adjacent_block(me, neighbor2, '__S')
+            call adjacent_block(neighbor2, neighbor, '__W')
 
     end select
 

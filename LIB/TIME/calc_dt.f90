@@ -21,8 +21,8 @@ subroutine calc_dt(dt)
 
     real(kind=rk), intent(inout) 	:: dt
 
-    real(kind=rk)                   :: dx, dt_loc
-    integer                         :: k, N, rank, ierr, n_procs, tag
+    real(kind=rk)                   :: dx, dt_loc, dt_loc_dF
+    integer                         :: k, N, rank, ierr, n_procs, tag, dF
     integer                         :: status(MPI_status_size)
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -43,8 +43,12 @@ subroutine calc_dt(dt)
         end if
     end do
 
-    ! time step
-    dt_loc = params%CFL * dx / norm2(params%u0)
+    ! time step, loop over all data fields
+    dt_loc = 9.0e9_rk
+    do dF = 1, blocks_params%number_data_fields
+        dt_loc_dF = params%CFL * dx / norm2(params%u0(:,dF))
+        dt_loc = min(dt_loc, dt_loc_dF)
+    end do
 
     ! second: calculate minimum over all local time steps
     ! proc 0 collect all steps and broadcast them after min operation

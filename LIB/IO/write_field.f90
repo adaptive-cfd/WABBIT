@@ -12,7 +12,7 @@
 !
 ! ********************************
 
-subroutine write_field(iteration, time, dF)
+subroutine write_field(iteration, time, dF, fname)
 
     use mpi
     use module_params
@@ -24,7 +24,9 @@ subroutine write_field(iteration, time, dF)
     real(kind=rk), intent(in) 	                :: time
     integer(kind=ik), intent(in)                :: iteration, dF
 
-    character(len=80)                           :: fname, dsetname
+    character(len=80), intent(inout)            :: fname
+
+    character(len=80)                           :: dsetname
     integer(kind=ik)                            :: k, g, Bs, rank, ierr, allocate_error, heavy_id, tag
     integer                                     :: status(MPI_status_size)
 
@@ -44,7 +46,7 @@ subroutine write_field(iteration, time, dF)
     allocate( coord_(1:Bs), stat=allocate_error )
 
     ! create the filename
-    if (rank == 0) then
+    if ( (rank == 0) .and. (dF == 1) ) then
         write( fname,'("data_",i8.8,".h5")') nint(time * 1.0e4_rk)
 
         write(*,'(80("*"))')
@@ -63,7 +65,7 @@ subroutine write_field(iteration, time, dF)
             if (rank == 0) then
 
                 ! the name of the block within th hdf5 file
-                write(dsetname,'("block_",i8.8)') k
+                write(dsetname,'("block_",i8.8, "_field_",i2.2)') k, dF
 
                 ! heavy data exchange
                 ! if data on proc 0: write data
@@ -75,6 +77,9 @@ subroutine write_field(iteration, time, dF)
                     call MPI_Recv(data_, Bs*Bs, MPI_REAL8, blocks(k)%proc_rank, tag, MPI_COMM_WORLD, status, ierr)
                     call write_field_hdf5( fname, dsetname, data_, .false.)
                 end if
+
+                ! save data field number
+                call write_attribute( fname, dsetname, "data field", (/dF/))
 
                 ! add useful attributes to the block:
                 call write_attribute( fname, dsetname, "treecode", blocks(k)%treecode)

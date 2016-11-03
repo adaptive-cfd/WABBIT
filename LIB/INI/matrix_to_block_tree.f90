@@ -115,7 +115,42 @@ subroutine matrix_to_block_tree()
 
     else
         ! more than one field
-        ! to do
+        ! write block data, write start field (phi) data to datafield 1, set all other datafields to zero
+        dF = 1
+        ib = 1
+        do i = 1, num_blocks_x
+            do j = 1, num_blocks_y
+                ! coordinates
+                coord_x                     = domain_coord_x( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 )
+                coord_y                     = domain_coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 )
+                ! data
+                data_(:,:)                  = 0.0_rk
+                data_(g+1:Bs+g,g+1:Bs+g)    = blocks_params%phi( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 , (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 )
+
+                ! write heavy data
+                if ( rank == blocks(ib)%proc_rank ) then
+                    call new_block_heavy(blocks(ib)%proc_data_id, ib, data_, coord_x, coord_y, Bs, g, dF)
+                end if
+
+                ! block counter
+                ib                          = ib + 1
+            end do
+        end do
+
+        ! set all other datafields to zero
+        data_(:,:)                  = 0.0_rk
+        do dF = 2, blocks_params%number_data_fields
+            ! loop over all heavy data
+            do i = 1, blocks_params%number_max_blocks_data
+                if ( blocks_data(i)%block_id /= -1 ) then
+
+                    ! block is active
+                    call set_heavy_data(i, data_, Bs, g, dF)
+
+                end if
+            end do
+        end do
+
     end if
 
     ! deallocate memory for local variables

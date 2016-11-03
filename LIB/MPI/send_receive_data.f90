@@ -11,7 +11,7 @@
 !
 ! ********************************
 
-subroutine send_receive_data(com_id, plan_type, com_number, com_list, com_list_N)
+subroutine send_receive_data(com_id, plan_type, com_number, com_list, com_list_N, dF)
 
     use mpi
     use module_blocks
@@ -19,13 +19,13 @@ subroutine send_receive_data(com_id, plan_type, com_number, com_list, com_list_N
 
     implicit none
 
-    integer(kind=ik), intent(in)                    :: com_list_N
+    integer(kind=ik), intent(in)                    :: com_list_N, dF
 
     real(kind=rk) , dimension(1000000)              :: send_buff, recv_buff
 
     integer, intent(in)                             :: com_id, com_number, plan_type
     integer, dimension(com_list_N, 7), intent(in)   :: com_list
-    integer                                         :: Bs, g, k, k_start, k_end, l, buffer_i, dF
+    integer                                         :: Bs, g, k, k_start, k_end, l, buffer_i
     integer                                         :: my_block, neighbor_block, my_dir, tag, ierr, rank, k_shift, my_dest, allocate_error
     integer                                         :: status(MPI_status_size)
 
@@ -39,7 +39,6 @@ subroutine send_receive_data(com_id, plan_type, com_number, com_list, com_list_N
 
     g  = blocks_params%number_ghost_nodes
     Bs = blocks_params%size_block
-    dF = 1
 
     allocate( data_corner( g, g), stat=allocate_error )
     allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )

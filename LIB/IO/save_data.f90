@@ -21,16 +21,11 @@ subroutine save_data(iteration, time)
     real(kind=rk), intent(in) 		:: time
     integer(kind=ik), intent(in) 	:: iteration
 
+    character(len=80)               :: fname
     integer(kind=ik)                :: dF
 
-    dF = blocks_params%number_data_fields
-
-    if ( dF == 1 ) then
-        call write_field(iteration, time, dF)
-    else
-        ! more than one field
-        ! to do
-
-    end if
+    do dF = 1, blocks_params%number_data_fields
+        call write_field(iteration, time, dF, fname)
+    end do
 
 end subroutine save_data

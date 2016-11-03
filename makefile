@@ -6,7 +6,7 @@ save_data.f90 write_field.f90 update_neighbors.f90 adjacent_block.f90 does_block
 get_sister_id.f90 delete_block_heavy.f90 delete_block_light.f90 get_light_free_block.f90 find_neighbor_corner.f90 find_neighbor_edge.f90 \
 synchronize_ghosts.f90 create_com_list.f90 find_neighborhood.f90 sort_com_list.f90 com_allowed.f90 send_receive_data.f90 calc_dt.f90 \
 time_step_RK4.f90 block_count.f90 RHS_2D_convection_diffusion.f90 refine_everywhere.f90 respect_min_max_treelevel.f90  get_light_free_block.f90 \
-adapt_mesh.f90 threshold_block.f90 calculate_detail.f90 ensure_gradedness.f90 ensure_completeness.f90 
+adapt_mesh.f90 threshold_block.f90 calculate_detail.f90 ensure_gradedness.f90 ensure_completeness.f90 set_heavy_data.f90
 
 # Object and module directory:
 OBJDIR = OBJ

@@ -57,17 +57,17 @@ subroutine threshold_block()
     ! loop over all blocks to calculate the detail, work on heavy data
     do k = 1, N_heavy
 
+        ! reset dF status
+        dF_status = 0
+
+        ! reset old detail
+        blocks_data(k)%data_fields(:)%detail = 0.0_rk
+
         ! loop over all fields
         do dF = 1, blocks_params%number_data_fields
 
             if ( blocks_data(k)%block_id /= -1 ) then
                 ! block is active
-
-                ! reset old detail
-                blocks_data(k)%data_fields(:)%detail = 0.0_rk
-
-                ! reset dF status
-                dF_status = 0
 
                 ! reset interpolation fields
                 u1        = blocks_data(k)%data_fields(dF)%data_(:,:)
@@ -101,7 +101,6 @@ subroutine threshold_block()
                 ! block refinement status is the maximal status
                 max_status = max( max_status, dF_status(dF) )
             end do
-
             ! save new refinement status in light data, note: light data need to synchronize later!
             blocks( blocks_data(k)%block_id )%refinement = max_status
 
@@ -121,6 +120,7 @@ subroutine threshold_block()
             buff_i = 0
             do l = 1, N_light
                 if ( blocks(l)%proc_rank == (k-1) ) then
+                    ! proc corresponding to block
                     buff_i              = buff_i + 1
                     send_buff(buff_i)   = blocks(l)%refinement
                 end if
@@ -137,6 +137,7 @@ subroutine threshold_block()
             buff_i = 0
             do l = 1, N_light
                 if ( blocks(l)%proc_rank == (k-1) ) then
+                    ! proc corresponding to block
                     buff_i               = buff_i + 1
                     blocks(l)%refinement = recv_buff(buff_i)
                 end if

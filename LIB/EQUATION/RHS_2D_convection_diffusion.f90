@@ -11,7 +11,7 @@
 !
 ! ********************************
 
-subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N)
+subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N, u01, u02, nu)
 
     use module_params
     use module_blocks
@@ -19,7 +19,7 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N)
     implicit none
 
     integer(kind=ik), intent(in)					            :: g, N
-    real(kind=rk), intent(in)                                   :: dx, dy
+    real(kind=rk), intent(in)                                   :: dx, dy, u01, u02, nu
     real(kind=rk), dimension(N+2*g, N+2*g), intent(inout)       :: phi
 
     real(kind=rk), dimension(N+2*g, N+2*g)			            :: grad_phi, laplace_phi, rhs
@@ -61,8 +61,8 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N)
           phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
           phi_dydy = (phi(ix,iy-1)-2.d0*phi(ix,iy)+phi(ix,iy+1))*dy2_inv
           ! compute (assemble) final right hand side
-          rhs(ix,iy) = - params%u0(1) * phi_dx - params%u0(2) * phi_dy &
-                       + params%nu * ( phi_dxdx + phi_dydy )
+          rhs(ix,iy) = - u01 * phi_dx - u02 * phi_dy &
+                       + nu * ( phi_dxdx + phi_dydy )
         end do
       end do
 
@@ -83,8 +83,8 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N)
                    +  b4*phi(ix,iy+1) + b5*phi(ix,iy+2))*dy2_inv
 
           ! compute (assemble) final right hand side
-          rhs(ix,iy) = - params%u0(1) * phi_dx - params%u0(2) * phi_dy &
-                       + params%nu * ( phi_dxdx + phi_dydy )
+          rhs(ix,iy) = - u01 * phi_dx - u02 * phi_dy &
+                       + nu * ( phi_dxdx + phi_dydy )
         end do
       end do
 

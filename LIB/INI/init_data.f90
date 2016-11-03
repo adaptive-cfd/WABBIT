@@ -20,9 +20,11 @@ subroutine init_data()
 
     implicit none
 
-    type(inifile)       :: FILE
-    character(len=80)   :: infile
-    integer             :: read_logical, rank, ierr
+    type(inifile)                               :: FILE
+    character(len=80)                           :: infile
+    integer                                     :: read_logical, rank, ierr, dF, allocate_error, k
+
+    real(kind=rk), dimension(:), allocatable    :: u_ini, nu_ini
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
@@ -52,10 +54,29 @@ subroutine init_data()
     call read_param(FILE,'Time','CFL',params%CFL, 0.5_rk )
     ! output write frequency
     call read_param(FILE,'Time','write_freq',params%write_freq, 25 )
-    ! convective velocity
-    call read_param(FILE,'Physics','u0',params%u0, (/1.0_rk, 0.5_rk/) )
-    ! diffusion coeffcient
-    call read_param(FILE,'Physics','nu',params%nu, 0.0_rk )
+
+    ! read separat velocity and diffusion coefficient for each data field
+    ! first: allocate memory, in params structure and local variables for reading
+    allocate( params%u0(2, blocks_params%number_data_fields), stat=allocate_error )
+    allocate( params%nu(blocks_params%number_data_fields), stat=allocate_error )
+    allocate( u_ini(blocks_params%number_data_fields*2), stat=allocate_error )
+    allocate( nu_ini(blocks_params%number_data_fields), stat=allocate_error )
+    ! set local variables
+    u_ini  = 0.0_rk
+    nu_ini = 0.0_rk
+    ! second: read from ini file
+    call read_param(FILE,'Physics','u0', u_ini, u_ini )
+    call read_param(FILE,'Physics','nu', nu_ini, nu_ini)
+    ! third: write data in params structure
+    k = 1
+    do dF = 1, blocks_params%number_data_fields
+        ! convective velocity
+        params%u0(1:2, dF)    = u_ini(k:k+1)
+        ! diffusion coeffcient
+        params%nu(dF)           = nu_ini(dF)
+        k = k + 2
+    end do
+
     ! domain size
     call read_param(FILE,'Physics','Lx',params%Lx, 256.0_rk )
     call read_param(FILE,'Physics','Ly',params%Ly, 256.0_rk )
@@ -101,5 +122,8 @@ subroutine init_data()
     call initial_condition_dense_field()
     ! clean up
     call clean_ini_file(FILE)
+
+    deallocate( u_ini, stat=allocate_error )
+    deallocate( nu_ini, stat=allocate_error )
 
 end subroutine init_data

@@ -450,7 +450,7 @@ subroutine send_receive_data(com_id, plan_type, com_number, com_list, com_list_N
     else
         ! external communication
         ! send/receive data
-        call MPI_Sendrecv( send_buff, 1000000, MPI_REAL4, my_dest, tag, recv_buff, 1000000, MPI_REAL4, my_dest, tag, MPI_COMM_WORLD, status, ierr)
+        call MPI_Sendrecv( send_buff, (Bs+g)*g*com_number, MPI_REAL4, my_dest, tag, recv_buff, (Bs+g)*g*com_number, MPI_REAL4, my_dest, tag, MPI_COMM_WORLD, status, ierr)
         k_start = 1+com_number-k_shift
         k_end   = com_number+com_number-k_shift
     end if

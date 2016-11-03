@@ -126,13 +126,13 @@ subroutine threshold_block()
                 end if
             end do
             ! send data
-            call MPI_Bcast(send_buff, 10000, MPI_INTEGER4, k-1, MPI_COMM_WORLD, ierr)
+            call MPI_Bcast(send_buff, N_light, MPI_INTEGER4, k-1, MPI_COMM_WORLD, ierr)
 
         else
 
             ! receive data
             recv_buff = -99
-            call MPI_Bcast(recv_buff, 10000, MPI_INTEGER4, k-1, MPI_COMM_WORLD, ierr)
+            call MPI_Bcast(recv_buff, N_light, MPI_INTEGER4, k-1, MPI_COMM_WORLD, ierr)
             ! synchronize light data
             buff_i = 0
             do l = 1, N_light

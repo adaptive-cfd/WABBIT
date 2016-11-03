@@ -137,15 +137,28 @@ subroutine matrix_to_block_tree()
             end do
         end do
 
-        ! set all other datafields to zero
-        data_(:,:)                  = 0.0_rk
+!        ! set all other datafields to zero
+!        data_(:,:)                  = 0.0_rk
+!        do dF = 2, blocks_params%number_data_fields
+!            ! loop over all heavy data
+!            do i = 1, blocks_params%number_max_blocks_data
+!                if ( blocks_data(i)%block_id /= -1 ) then
+!
+!                    ! block is active
+!                    call set_heavy_data(i, data_, Bs, g, dF)
+!
+!                end if
+!            end do
+!        end do
+
+        ! set all other datafields to values from first data field
         do dF = 2, blocks_params%number_data_fields
             ! loop over all heavy data
             do i = 1, blocks_params%number_max_blocks_data
                 if ( blocks_data(i)%block_id /= -1 ) then
 
                     ! block is active
-                    call set_heavy_data(i, data_, Bs, g, dF)
+                    call set_heavy_data(i, blocks_data(i)%data_fields(1)%data_, Bs, g, dF)
 
                 end if
             end do

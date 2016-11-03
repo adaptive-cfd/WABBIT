@@ -282,7 +282,7 @@ subroutine interpolate_mesh()
                     if (dF == 1) then
                         call new_block_heavy(block_num, light_id, new_data_w_ghost, new_coord_x, new_coord_y, Bs, g, dF)
                     else
-                        call set_heavy_data(i, new_data_w_ghost, Bs, g, dF)
+                        call set_heavy_data(block_num, new_data_w_ghost, Bs, g, dF)
                     end if
 
                 end do

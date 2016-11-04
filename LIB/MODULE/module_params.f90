@@ -70,10 +70,8 @@ module module_params
         ! switch for mesh adaption
         logical                                     :: adapt_mesh
 
-        ! number of allocated light data blocks
-        integer(kind=ik)                            :: number_light_blocks
-        ! number of heavy data fields per process
-        integer(kind=ik)                            :: number_heavy_blocks
+        ! number of allocated heavy data fields per process
+        integer(kind=ik)                            :: number_blocks
         ! number of allocated data fields in heavy data array
         integer(kind=ik)                            :: number_data_fields
 
@@ -83,8 +81,6 @@ module module_params
         real(kind=rk), dimension(:), allocatable    :: nu
 
     end type type_params
-
-    type (type_params), save :: params
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

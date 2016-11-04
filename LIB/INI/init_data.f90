@@ -1,129 +1,196 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! initialize all data (params, fields, blocks, ...)
-!
+! ============================================================================================
 ! name: init_data.f90
-! date: 25.10.2016
-! author: msr, engels
-! version: 0.3
+! version: 0.4
+! author: msr
 !
-! ********************************
+! initialize all data: read params from ini file, allocate memory, initialize starting condition
+! and decompose start matrix into block data
+!
+! input:    -
+! output:   - filled user defined data structure for global params
+!           - initialized light and heavy data arrays
+!
+! = log ======================================================================================
+!
+! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
+!            initialized block data to main program
+! ********************************************************************************************
 
-subroutine init_data()
+subroutine init_data(params, block_list, block_data)
+
+!---------------------------------------------------------------------------------------------
+! modules
 
     use mpi
+    ! global parameters
     use module_params
-    use module_blocks
-    use ini_files_parser
+    ! ini file parser module
+    use module_ini_files_parser
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    type(inifile)                               :: FILE
-    character(len=80)                           :: infile
-    integer                                     :: read_logical, rank, ierr, dF, allocate_error, k
+    ! user defined parameter structure
+    type (type_params), intent(out)                 :: params
 
-    real(kind=rk), dimension(:), allocatable    :: u_ini, nu_ini
+    ! light data array
+    integer(kind=ik), allocatable, intent(out)      :: block_list(:, :)
+    ! heavy data array - block data
+    real(kind=rk), allocatable, intent(out)         :: block_data(:, :, :, :)
 
+    ! MPI error variable
+    integer(kind=ik)                                :: ierr
+    ! process rank
+    integer(kind=ik)                                :: rank
+
+    ! inifile name
+    character(len=80)                               :: filename
+    ! inifile structure
+    type(inifile)                                   :: FILE
+
+    ! auxiliary variable for reading logicals
+    integer(kind=ik)                                :: read_logical
+    ! allocation error variabel
+    integer(kind=ik)                                :: allocate_error
+
+    ! initial data field
+    real(kind=rk), allocatable                      :: phi(:, :)
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+    interface
+        subroutine allocate_block_list(block_list, number_blocks, max_treelevel)
+            use module_params
+            integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
+            integer(kind=ik), intent(in)                :: number_blocks
+            integer(kind=ik), intent(in)                :: max_treelevel
+        end subroutine allocate_block_list
+
+        subroutine allocate_block_data(block_data, number_blocks, Bs, g, dF)
+            use module_params
+            real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
+            integer(kind=ik), intent(in)                :: number_blocks
+            integer(kind=ik), intent(in)                :: Bs, g, dF
+        end subroutine allocate_block_data
+
+        subroutine inicond_gauss_blob(phi, Ds, Lx, Ly)
+            use module_params
+            real(kind=rk), allocatable, intent(out)     :: phi(:, :)
+            integer(kind=ik), intent(in)                :: Ds
+            real(kind=rk), intent(in)                   :: Lx, Ly
+        end subroutine inicond_gauss_blob
+    end interface
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! get the first command line argument
-    call get_command_argument(1,infile)
+    call get_command_argument(1, filename)
 
-    ! read the file, only process 0 create output on screen
+    ! read the file, only process 0 should create output on screen
     if (rank==0) then
-        call read_ini_file(FILE, infile, .true.)
+        call read_ini_file(FILE, filename, .true.)
     else
-        call read_ini_file(FILE, infile, .false.)
+        call read_ini_file(FILE, filename, .false.)
     end if
 
     !***************************************************************************
-    ! BLOCK STRUCTURE PARAMETERS
-    !***************************************************************************
-    call read_param(FILE,'Blocks','size_domain',blocks_params%size_domain, 513 )
-    call read_param(FILE,'Blocks','blocksize',blocks_params%size_block, 17 )
-    call read_param(FILE,'Blocks','number_data_fields',blocks_params%number_data_fields, 1)
-    call read_param(FILE,'Blocks','ghosts',blocks_params%number_ghost_nodes, 4 )
+    ! read BLOCK parameters
+    !
+    ! read number_domain_nodes
+    call read_param(FILE, 'Blocks', 'number_domain_nodes', params%number_domain_nodes, 1 )
+    ! read number_block_nodes
+    call read_param(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
+    ! read number_ghost_nodes
+    call read_param(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
+    ! read number_blocks
+    call read_param(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
+    ! read number_data_fields
+    call read_param(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
+    ! read threshold value
+    call read_param(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
+    ! read treelevel bounds
+    call read_param(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
+    call read_param(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    ! read switch to turn on|off mesh refinement
+    call read_param(FILE, 'Blocks', 'adapt_mesh', read_logical, 1 )
+    if ( read_logical == 1 ) then
+        params%adapt_mesh = .true.
+    else
+        params%adapt_mesh = .false.
+    end if
 
     !***************************************************************************
-    ! GENERAL PARAMETERS (STRUCT "FILE")
+    ! read TIME parameters
+    !
+    ! read time_max
+    call read_param(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
+    ! read CFL number
+    call read_param(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
+    ! read output write frequency
+    call read_param(FILE, 'Time', 'write_freq', params%write_freq, 25 )
+
     !***************************************************************************
-    ! time loop parameter
-    call read_param(FILE,'Time','time_max',params%time_max, 200.0_rk )
-    call read_param(FILE,'Time','CFL',params%CFL, 0.5_rk )
-    ! output write frequency
-    call read_param(FILE,'Time','write_freq',params%write_freq, 25 )
-
-    ! read separat velocity and diffusion coefficient for each data field
-    ! first: allocate memory, in params structure and local variables for reading
-    allocate( params%u0(2, blocks_params%number_data_fields), stat=allocate_error )
-    allocate( params%nu(blocks_params%number_data_fields), stat=allocate_error )
-    allocate( u_ini(blocks_params%number_data_fields*2), stat=allocate_error )
-    allocate( nu_ini(blocks_params%number_data_fields), stat=allocate_error )
-    ! set local variables
-    u_ini  = 0.0_rk
-    nu_ini = 0.0_rk
-    ! second: read from ini file
-    call read_param(FILE,'Physics','u0', u_ini, u_ini )
-    call read_param(FILE,'Physics','nu', nu_ini, nu_ini)
-    ! third: write data in params structure
-    k = 1
-    do dF = 1, blocks_params%number_data_fields
-        ! convective velocity
-        params%u0(1:2, dF)    = u_ini(k:k+1)
-        ! diffusion coeffcient
-        params%nu(dF)           = nu_ini(dF)
-        k = k + 2
-    end do
-
+    ! read PHYSICS parameters
+    !
+    ! first: allocate memory in params structure (need 2*data_fields for velocity
+    ! and 1*data_fields for diffusion coefficient)
+    allocate( params%u0( 2*params%number_data_fields ), stat=allocate_error )
+    allocate( params%nu( params%number_data_fields ), stat=allocate_error )
+    ! read velocity
+    call read_param(FILE, 'Physics', 'u0', params%u0, params%u0 )
+    ! read diffusion
+    call read_param(FILE, 'Physics', 'nu', params%nu, params%nu )
     ! domain size
-    call read_param(FILE,'Physics','Lx',params%Lx, 256.0_rk )
-    call read_param(FILE,'Physics','Ly',params%Ly, 256.0_rk )
+    call read_param(FILE, 'Physics', 'Lx', params%Lx, 256.0_rk )
+    call read_param(FILE, 'Physics', 'Ly', params%Ly, 256.0_rk )
     ! initial condition
-    call read_param(FILE,'Physics','inicond',params%inicond, "gauss_blob" )
+    call read_param(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
-    call read_param(FILE,'Physics','boundary',params%boundary, "---" )
-
-    ! eps for coarsen and refine the block
-    call read_param(FILE,'Blocks','eps',params%eps, 1e-3_rk )
-    ! set treelevel
-    call read_param(FILE,'Blocks','max_treelevel',params%max_treelevel, 6 )
-    call read_param(FILE,'Blocks','min_treelevel',params%min_treelevel, 1 )
-    ! order of predictor for refinement
-    call read_param(FILE,'Blocks','order_predictor',params%order_predictor, "multiresolution_4th" )
+    !***************************************************************************
+    ! read DISCRETIZATION parameters
+    !
     ! discretization order
-    call read_param(FILE,'Discretization','order_discretization',params%order_discretization, "FD_4th_central_optimized" )
-    ! switch to turn on|off mesh refinement
-    call read_param(FILE,'Blocks','adapt_mesh',read_logical, 1 )
-    if (read_logical==1) then
-        blocks_params%adapt_mesh = .true.
-    else
-        blocks_params%adapt_mesh = .false.
-    end if
+    call read_param(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
+    ! order of predictor for refinement
+    call read_param(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
+    ! boundary condition
+    call read_param(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
-    ! read number of maximal blocks for memory allocation
-    ! default value for number of max_blocks is: 4^(maxlevel-1) + 1, +1 needed for coarsening if all blocks at start on max_treelevel
-    call read_param(FILE,'Blocks','number_max_blocks',blocks_params%number_max_blocks, 4**(params%max_treelevel)+1 )
-    call read_param(FILE,'Blocks','number_max_blocks_data',blocks_params%number_max_blocks_data, blocks_params%number_max_blocks )
+    !***************************************************************************
+    ! allocate light/heavy data, initialize start field and write block data
+    !
+    ! allocate block_list
+    call allocate_block_list( block_list, params%number_blocks, params%max_treelevel )
+    ! allocate heavy data
+    call allocate_block_data( block_data, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_data_fields )
 
-    ! output on screen
-    if (rank==0) then
-        write(*,'(80("-"))')
-        write(*,*) "INITIALIZATION PHASE"
-        write(*,*) "we use a maximum number of blocks of:", blocks_params%number_max_blocks
-        write(*,*) "nghosts:", blocks_params%number_ghost_nodes
-        write(*,'(80("-"))')
-    end if
-
-    ! allocate the individual block's memory
-    call allocate_block_memory()
     ! initial data field
-    call initial_condition_dense_field()
+    select case( params%initial_cond )
+        case ("gauss-blob","gauss_blob")
+              call inicond_gauss_blob(phi, params%number_domain_nodes, params%Lx, params%Ly)
+
+        case default
+              write(*,*) "initial condition is unknown"
+              write(*,*) params%initial_cond
+              stop
+
+    end select
+
+
+
     ! clean up
     call clean_ini_file(FILE)
-
-    deallocate( u_ini, stat=allocate_error )
-    deallocate( nu_ini, stat=allocate_error )
 
 end subroutine init_data

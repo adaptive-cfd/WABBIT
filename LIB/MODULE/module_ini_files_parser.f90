@@ -1,16 +1,10 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: module_ini_files_parser.f90
+! version: 0.4
+! author: engels, msr
 !
-! ini file parser module
-!
-! name: ini_file_parser.f90
-! date: 29.09.2016
-! author: engels
-! version: 0.2
-!
-! ********************************
-
 !-------------------------------------------------------------------------------
 ! FORTRAN ini files parser module
 !-------------------------------------------------------------------------------
@@ -26,41 +20,61 @@
 !-------------------------------------------------------------------------------
 ! This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this
 !-------------------------------------------------------------------------------
-module ini_files_parser
+!
+! = log ======================================================================================
+!
+! 04/11/16 - linked old module version to wabbit (use module_params)
+! ********************************************************************************************
 
-  integer, parameter :: pr = selected_real_kind(8)
-  real(kind=pr), private, save :: dx=1.0_pr, dy=1.0_pr
+module module_ini_files_parser
 
-  ! maximum width of parameter file. note we have very long lines if we read long
-  ! arrays, as it happens for example when we read fourier coefficients for insect
-  ! kinematics
-  integer, parameter, private :: maxcolumns=1024
+!---------------------------------------------------------------------------------------------
+! modules
 
-  ! is set to true, we'll produce some output on the screen (for documentation of runs)
-  ! the flag is set with the read_ini_file routine
-  logical, private, save :: verbosity = .true.
+    ! global parameters
+    use module_params
 
-  ! type definition of an inifile type. it contains an allocatable string array
-  ! of maxcolumns length. we will allocate the array, then fill it with what we
-  ! read from the file.
-  type inifile
-    ! string array that contains the text file:
-    character(len=maxcolumns),allocatable,dimension(:) :: PARAMS
-    ! number of lines in file:
-    integer :: nlines
-  end type
+!---------------------------------------------------------------------------------------------
+! variables
 
-  ! the generic call "read_param" redirects to these routines, depending on the data
-  ! type and the dimensionality. vectors can be read without setting a default.
-  interface read_param
-    module procedure param_sgl, param_dbl, param_int, param_vct, param_str, param_vct_nodefault
-  end interface
+    implicit none
 
+    real(kind=rk), private, save :: dx =1.0_rk , dy = 1.0_rk
+
+    ! maximum width of parameter file. note we have very long lines if we read long
+    ! arrays, as it happens for example when we read fourier coefficients for insect
+    ! kinematics
+    integer, parameter, private :: maxcolumns = 1024
+
+    ! is set to true, we'll produce some output on the screen (for documentation of runs)
+    ! the flag is set with the read_ini_file routine
+    logical, private, save :: verbosity = .true.
+
+    ! type definition of an inifile type. it contains an allocatable string array
+    ! of maxcolumns length. we will allocate the array, then fill it with what we
+    ! read from the file.
+    type inifile
+        ! string array that contains the text file:
+        character(len=maxcolumns), allocatable, dimension(:) :: PARAMS
+        ! number of lines in file:
+        integer :: nlines
+    end type
+
+    ! the generic call "read_param" redirects to these routines, depending on the data
+    ! type and the dimensionality. vectors can be read without setting a default.
+    interface read_param
+        module procedure param_int, param_dbl, param_vct, param_str
+    end interface
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
 
 !!!!!!!!
 contains
 !!!!!!!!
-
 
   !-------------------------------------------------------------------------------
   ! clean a previously read ini file, deallocate its string array, and reset
@@ -87,15 +101,13 @@ contains
     logical, intent(in) :: verbose
     integer :: io_error, i
 
-
     ! we set the module-global variable verbosity. if set to false, all routines
     ! will perform their task quietly.
     verbosity = verbose
 
     if (verbosity) then
-      write (*,*) "*************************************************"
-      write (*,'(A,i3)') " *** info: reading params from "//trim(file)
-      write (*,*) "*************************************************"
+      write(*,'(80("_"))')
+      write (*,'(A,i3)') "INIT: reading params from file "//trim(file)
     endif
 
     !-----------------------------------------------------------------------------
@@ -125,12 +137,8 @@ contains
       i = i+1
     enddo
     close (14)
+
   end subroutine read_ini_file
-
-
-
-
-
 
   !-------------------------------------------------------------------------------
   ! Fetches a REAL VALUED parameter from the PARAMS.ini file.
@@ -146,11 +154,11 @@ contains
   subroutine param_dbl (PARAMS, section, keyword, params_real, defaultvalue)
     implicit none
     ! Contains the ascii-params file
-    type(inifile), intent(inout) :: PARAMS
-    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
-    character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
-    character(len=maxcolumns) :: value    ! returns the value
-    real(kind=pr) :: params_real, defaultvalue
+    type(inifile), intent(inout)    :: PARAMS
+    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+    character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
+    character(len=maxcolumns)       :: value    ! returns the value
+    real(kind=rk)                   :: params_real, defaultvalue
 
     call GetValue(PARAMS, section, keyword, value)
 
@@ -176,52 +184,6 @@ contains
       write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
     endif
   end subroutine param_dbl
-
-
-  !-------------------------------------------------------------------------------
-  ! Fetches a REAL VALUED parameter from the PARAMS.ini file.
-  ! Displays what it does on stdout (so you can see whats going on)
-  ! Input:
-  !       PARAMS: the complete *.ini file
-  !       section: the section we're looking for
-  !       keyword: the keyword we're looking for
-  !       defaultvalue: if the we can't find the parameter, we return this and warn
-  ! Output:
-  !       params_real: this is the parameter you were looking for
-  !-------------------------------------------------------------------------------
-  subroutine param_sgl (PARAMS, section, keyword, params_real, defaultvalue)
-    implicit none
-    ! Contains the ascii-params file
-    type(inifile), intent(inout) :: PARAMS
-    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
-    character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
-    character(len=maxcolumns) :: value    ! returns the value
-    real :: params_real, defaultvalue
-
-    call GetValue(PARAMS, section, keyword, value)
-
-    if (value /= '') then
-      if ( index(value,'*dx') == 0 ) then
-        !-- value to be read is in absolute form (i.e. we just read the value)
-        read (value, *) params_real
-        write (value,'(g10.3)') params_real
-      else
-        !-- the value is given in gridpoints (e.g. thickness=5*dx)
-        read (value(1:index(value,'*dx')-1),*) params_real
-        params_real = params_real*max(dy,dx)
-        write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/max(dy,dx)
-      endif
-    else
-      ! no value red, use default value
-      write (value,'(g10.3," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
-      params_real = defaultvalue
-    endif
-
-    ! in verbose mode, inform about what we did
-    if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
-    endif
-  end subroutine param_sgl
 
   !-------------------------------------------------------------------------------
   ! Fetches a STRING VALUED parameter from the PARAMS.ini file.
@@ -260,8 +222,6 @@ contains
     endif
   end subroutine param_str
 
-
-
   !-------------------------------------------------------------------------------
   ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
   ! Displays what it does on stdout (so you can see whats going on)
@@ -277,11 +237,11 @@ contains
   subroutine param_vct (PARAMS, section, keyword, params_vector, defaultvalue)
     implicit none
     ! Contains the ascii-params file
-    type(inifile), intent(inout) :: PARAMS
-    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
-    character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
-    real(kind=pr) :: params_vector(1:)
-    real(kind=pr) :: defaultvalue(1:)
+    type(inifile), intent(inout)    :: PARAMS
+    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+    character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
+    real(kind=rk)                   :: params_vector(1:)
+    real(kind=rk)                   :: defaultvalue(1:)
 
     integer :: n,m
     character(len=maxcolumns) :: value
@@ -314,47 +274,6 @@ contains
     endif
   end subroutine param_vct
 
-
-  !-------------------------------------------------------------------------------
-  ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
-  ! Displays what it does on stdout (so you can see whats going on)
-  ! Input:
-  !       PARAMS: the complete *.ini file
-  !       section: the section we're looking for
-  !       keyword: the keyword we're looking for
-  !       defaultvalue: if the we can't find a vector, we return this and warn
-  !       n: length of vector
-  ! Output:
-  !       params_vector: this is the parameter you were looking for
-  !-------------------------------------------------------------------------------
-  subroutine param_vct_nodefault (PARAMS, section, keyword, params_vector)
-    implicit none
-    ! Contains the ascii-params file
-    type(inifile), intent(inout) :: PARAMS
-    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
-    character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
-    real(kind=pr) :: params_vector(1:)
-    real(kind=pr),dimension(:),allocatable :: defaultvalue
-    integer :: n
-
-    !character(len=maxcolumns) :: value
-    !character(len=14)::formatstring
-
-    n = size(params_vector,1)
-
-
-    ! just set the default vector to zero and pass to subroutines. we need
-    ! that sometimes if we look for vectors that do not have a reasonable default
-    ! anyways
-    allocate( defaultvalue(1:n) )
-    defaultvalue = 0.0_pr
-    call param_vct (PARAMS, section, keyword, params_vector, defaultvalue)
-
-    deallocate( defaultvalue )
-  end subroutine param_vct_nodefault
-
-
-
   !-------------------------------------------------------------------------------
   ! Fetches a INTEGER VALUED parameter from the PARAMS.ini file.
   ! Displays what it does on stdout (so you can see whats going on)
@@ -369,11 +288,11 @@ contains
   subroutine param_int(PARAMS, section, keyword, params_int, defaultvalue)
     implicit none
     ! Contains the ascii-params file
-    type(inifile), intent(inout) :: PARAMS
-    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
-    character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
-    character(len=maxcolumns) ::  value    ! returns the value
-    integer :: params_int, defaultvalue
+    type(inifile), intent(inout)    :: PARAMS
+    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+    character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
+    character(len=maxcolumns)       ::  value    ! returns the value
+    integer(kind=ik)                :: params_int, defaultvalue
     !integer :: mpicode
 
     call GetValue(PARAMS, section, keyword, value)
@@ -392,10 +311,6 @@ contains
     endif
   end subroutine param_int
 
-
-
-
-
   !-------------------------------------------------------------------------------
   ! Extracts a value from the PARAMS.ini file, which is in "section" and
   ! which is named "keyword"
@@ -411,13 +326,13 @@ contains
   subroutine GetValue (PARAMS, section, keyword, value)
     implicit none
 
-    type(inifile), intent(inout) :: PARAMS
-    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
-    character(len=*), intent(in) :: keyword   ! what keyword do you look for? for example nx=128
+    type(inifile), intent(inout)    :: PARAMS
+    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+    character(len=*), intent(in)    :: keyword   ! what keyword do you look for? for example nx=128
     character(len=*), intent(inout) :: value   ! returns the value
-    integer :: i
-    integer :: index1,index2
-    logical :: foundsection
+    integer                         :: i
+    integer                         :: index1, index2
+    logical                         :: foundsection
 
     foundsection = .false.
     value = ''
@@ -474,7 +389,4 @@ contains
   enddo
 end subroutine getvalue
 
-
-
-
-end module
+end module module_ini_files_parser

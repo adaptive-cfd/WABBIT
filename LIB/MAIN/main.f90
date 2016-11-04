@@ -27,14 +27,41 @@ program main
     implicit none
 
     ! MPI error variable
-    integer(kind=ik)    :: ierr
+    integer(kind=ik)                    :: ierr
     ! process rank
-    integer(kind=ik)    :: rank
+    integer(kind=ik)                    :: rank
     ! number of processes
-    integer(kind=ik)    :: number_procs
+    integer(kind=ik)                    :: number_procs
 
     ! cpu time variables for running time calculation
-    real(kind=rk)       :: t0, t1
+    real(kind=rk)                       :: t0, t1
+
+    ! user defined parameter structure
+    type (type_params)                  :: params
+
+    ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
+    !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
+    !                   -> column(max_treelevel+1):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    integer(kind=ik), allocatable       :: block_list(:, :)
+
+    ! heavy data array  -> dim 1: block id  ( 1:number_blocks )
+    !                   -> dim 2: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 3: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 4: data type ( 1:number_data_fields, data_old, k1, k2, k3,
+    !                                       k4 [for runge kutta] )
+    real(kind=rk), allocatable          :: block_data(:, :, :, :)
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+    interface
+        subroutine init_data(params, block_list, block_data)
+            use module_params
+            type (type_params), intent(out)             :: params
+            integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
+            real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
+        end subroutine init_data
+    end interface
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -55,14 +82,17 @@ program main
     ! output MPI status
     if (rank==0) then
         write(*,'(80("_"))')
-        write(*, '("MPI status: using ", i5, " processes")') number_procs
+        write(*, '("MPI: using ", i5, " processes")') number_procs
     end if
+
+    ! initializing data
+    call init_data( params, block_list, block_data )
 
     ! cpu end time and output on screen
     call cpu_time(t1)
     if (rank==0) then
         write(*,'(80("_"))')
-        write(*,'("cpu-time = ",f10.6, " s")')  t1-t0
+        write(*,'("END: cpu-time = ",f10.6, " s")')  t1-t0
     end if
 
     ! end mpi

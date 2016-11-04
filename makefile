@@ -1,6 +1,6 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = #init_data.f90 allocate_block_memory.f90 initial_condition_dense_field.f90 inicond_gauss_blob.f90 matrix_to_block_tree.f90 \
+FFILES = init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 #matrix_to_block_tree.f90 \
 encoding.f90 int_to_binary.f90 initial_block_distribution.f90 new_block_light.f90 treecode_size.f90 new_block_heavy.f90 get_heavy_free_block.f90 \
 save_data.f90 write_field.f90 update_neighbors.f90 adjacent_block.f90 does_block_exist.f90 find_block_id.f90 array_compare.f90 interpolate_mesh.f90 \
 get_sister_id.f90 delete_block_heavy.f90 delete_block_light.f90 get_light_free_block.f90 find_neighbor_corner.f90 find_neighbor_edge.f90 \
@@ -13,7 +13,7 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 #module_blocks.f90 ini_files_parser.f90 hdf5_wrapper.f90 module_interpolation.f90  
+MFILES = module_params.f90 module_ini_files_parser.f90 #module_blocks.f90 hdf5_wrapper.f90 module_interpolation.f90  
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -92,14 +92,14 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 
 # Compile modules (module dependency must be specified by hand in
 # Fortran). Objects are specified in MOBJS (module objects).
+$(OBJDIR)/module_params.o: module_params.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_params.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/module_blocks.o: module_blocks.f90
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/hdf5_wrapper.o: hdf5_wrapper.f90
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-#$(OBJDIR)/ini_files_parser.o: ini_files_parser.f90
-#	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-$(OBJDIR)/module_params.o: module_params.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 #$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_blocks.o
 #	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 # Compile remaining objects from Fortran files.

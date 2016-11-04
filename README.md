@@ -37,3 +37,4 @@ wabbit [your_filename.ini]
 * **v0.1** - *2D, periodic boundary, mesh adaption* --- lots of schemes for testing
 * **v0.2** - *2D, periodic boundary, mesh adaption* --- change mesh adaption to *paris_meeting*-version, simplify code 
 * **v0.3** - *2D, periodic boundary, mesh adaption* --- MPI added, split block data in light/heavy data
+* **v0.4** - *2D, periodic boundary, mesh adaption* --- reworked data structure, order subroutines and switch to explicit variable/parameter passing 

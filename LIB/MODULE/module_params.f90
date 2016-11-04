@@ -1,38 +1,95 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! params data structure
-!
+! ============================================================================================
 ! name: module_params.f90
-! date: 25.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! params data structure, define all constant parameters for global use
+!
+! todo: module actually only works for specific RHS, split between RHS parameters and program
+!       parameters in future versions
+!
+! = log ======================================================================================
+!
+! 04/11/16 - switch to v0.4, merge old block_params structure with new structure
+! ********************************************************************************************
 
 module module_params
 
-    use module_blocks
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
+    ! define data precision parameters
+    integer, parameter, public   :: sngl_prec=selected_real_kind(4)
+    integer, parameter, public   :: dble_prec=selected_real_kind(8)
+
+    integer, parameter, public   :: int_prec=selected_int_kind(8)
+
+    integer, parameter, public   :: rk=dble_prec
+    integer, parameter, public   :: ik=int_prec
+
+    ! global user defined data structure for time independent variables
     type type_params
 
-        real(kind=rk) 			                    :: time_max
-        real(kind=rk) 			                    :: CFL
-        ! each data field can use separat velocity and diffusion coefficient
-        real(kind=rk), dimension(:,:), allocatable	:: u0
-        real(kind=rk), dimension(:), allocatable    :: nu
-        real(kind=rk)			                    :: Lx, Ly
-        integer(kind=ik)			                :: write_freq
+        ! maximal time for main time loop
+        real(kind=rk)                               :: time_max
+        ! CFL criteria for time step calculation
+        real(kind=rk)                               :: CFL
+        ! data writing frequency
+        integer(kind=ik)                            :: write_freq
+
+        ! threshold for wavelet indicator
         real(kind=rk)                               :: eps
-        integer(kind=ik)                            :: max_treelevel
+        ! minimal level for blocks in data tree
         integer(kind=ik)                            :: min_treelevel
-        character(len=80)                           :: order_discretization, order_predictor, inicond, boundary
+        ! maximal level for blocks in data tree
+        integer(kind=ik)                            :: max_treelevel
+
+        ! order of refinement predictor
+        character(len=80)                           :: order_predictor
+        ! order of spatial discretization
+        character(len=80)                           :: order_discretization
+        ! boundary condition
+        character(len=80)                           :: boundary_cond
+        ! initial condition
+        character(len=80)                           :: initial_cond
+
+        ! domain length
+        real(kind=rk)                               :: Lx, Ly
+        ! grid parameter
+        integer(kind=ik)                            :: number_domain_nodes
+        integer(kind=ik)                            :: number_block_nodes
+        integer(kind=ik)                            :: number_ghost_nodes
+
+        ! switch for mesh adaption
+        logical                                     :: adapt_mesh
+
+        ! number of allocated light data blocks
+        integer(kind=ik)                            :: number_light_blocks
+        ! number of heavy data fields per process
+        integer(kind=ik)                            :: number_heavy_blocks
+        ! number of allocated data fields in heavy data array
+        integer(kind=ik)                            :: number_data_fields
+
+        ! each data field can use separat velocity and diffusion coefficient (in 2D convection-diffusion RHS)
+        ! stored all velocity components in one 1D vector, same with the diffusion coefficients
+        real(kind=rk), dimension(:), allocatable    :: u0
+        real(kind=rk), dimension(:), allocatable    :: nu
 
     end type type_params
 
     type (type_params), save :: params
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
 
 end module module_params

@@ -1,19 +1,74 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! main program, time loop
-!
+! ============================================================================================
 ! name: main.f90
-! date: 25.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! main program, init all data, start time loop, output on screen during program run
+!
+! = log ======================================================================================
+!
+! 04/11/16 - switch to v0.4
+! ********************************************************************************************
 
 program main
 
-!    use mpi
+!---------------------------------------------------------------------------------------------
+! modules
+
+    use mpi
+    ! global parameters
+    use module_params
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    ! MPI error variable
+    integer(kind=ik)    :: ierr
+    ! process rank
+    integer(kind=ik)    :: rank
+    ! number of processes
+    integer(kind=ik)    :: number_procs
+
+    ! cpu time variables for running time calculation
+    real(kind=rk)       :: t0, t1
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! init mpi
+    call MPI_Init(ierr)
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! determinate process number
+    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+
+    ! cpu start time
+    call cpu_time(t0)
+
+    ! output MPI status
+    if (rank==0) then
+        write(*,'(80("_"))')
+        write(*, '("MPI status: using ", i5, " processes")') number_procs
+    end if
+
+    ! cpu end time and output on screen
+    call cpu_time(t1)
+    if (rank==0) then
+        write(*,'(80("_"))')
+        write(*,'("cpu-time = ",f10.6, " s")')  t1-t0
+    end if
+
+    ! end mpi
+    call MPI_Finalize(ierr)
+
+
 !    use module_params
 !    use module_blocks
 !

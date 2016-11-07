@@ -41,14 +41,17 @@ program main
 
     ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
-    !                   -> column(max_treelevel+1):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    !                   -> column(max_treelevel+1): treecode length = mesh level
+    !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: block_list(:, :)
 
     ! heavy data array  -> dim 1: block id  ( 1:number_blocks )
     !                   -> dim 2: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( 1:number_data_fields, data_old, k1, k2, k3,
+    !                   -> dim 4: data type ( field_1, 2:number_data_fields, data_old, k1, k2, k3,
     !                                       k4 [for runge kutta] )
+    !           field_1 (to save mixed data):   line 1: x coordinates
+    !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: block_data(:, :, :, :)
 
 !---------------------------------------------------------------------------------------------
@@ -99,46 +102,21 @@ program main
     call MPI_Finalize(ierr)
 
 
-!    use module_params
-!    use module_blocks
-!
-!    implicit none
-!
+
 !    ! time loop variables
 !    real(kind=rk) 	                    :: time
 !    integer(kind=ik)	                :: iteration, active_blocks
-!    ! cpu time variables
-!    real(kind=rk)                       :: t0, t1
-!    ! MPI variables
-!    integer(kind=ik)                    :: ierr, rank, n_proc
 !
 !    ! initialize local variables
 !    time          = 0.0_rk
 !    iteration     = 0
 !    active_blocks = 0
 !
-!    ! init mpi
-!    call MPI_Init(ierr)
-!    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-!    call MPI_Comm_size(MPI_COMM_WORLD, n_proc, ierr)
-!
-!    ! cpu time start
-!    call cpu_time(t0)
-!
-!    ! initializing data
-!    call init_data()
-!
 !    ! create block tree
 !    call matrix_to_block_tree()
 !
 !    ! update neighbor relations
 !    call update_neighbors()
-!
-!    ! output MPI status
-!    if (rank==0) then
-!        write(*, '("MPI: using ", i7, " processes")') n_proc
-!        write(*,'(80("-"))')
-!    end if
 !
 !    ! save start field to disk
 !    call save_data(iteration, time)
@@ -177,13 +155,5 @@ program main
 !    ! save end field to disk
 !    call save_data(iteration, time)
 !
-!    ! cpu time calculation and writing
-!    call cpu_time(t1)
-!    if (rank==0) then
-!        write(*,'(a,f10.6)') "cpu-time = ", t1-t0
-!    end if
-!
-!    ! end mpi
-!    call MPI_Finalize(ierr)
 
 end program main

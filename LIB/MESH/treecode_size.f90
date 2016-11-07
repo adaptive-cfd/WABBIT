@@ -1,30 +1,52 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! calculate treecode size, count
-! elements which are not -1
-!
+! ============================================================================================
 ! name: treecode_size.f90
-! date: 25.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! calculate treecode size, count elements which are not -1
+!
+! input:    - treecode
+!           - length of treecode input vector
+! output:   - real treecode size (level of treecode)
+!
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
-integer function treecode_size(treecode)
+integer function treecode_size(treecode, N)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), dimension(10)     :: treecode
-    integer                             :: i
+    ! length of treecode vector
+    integer(kind=ik), intent(in)    :: N
+
+    ! treecode vector
+    integer(kind=ik), intent(in)    :: treecode(N)
+
+    ! loop variables
+    integer(kind=ik)                :: i
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
     treecode_size = 0
 
-    do i = 1, 10
+!---------------------------------------------------------------------------------------------
+! main body
+
+    do i = 1, N
         if ( treecode(i) /= -1 ) treecode_size = treecode_size + 1
     end do
 

@@ -1,43 +1,81 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: encoding.f90
+! version: 0.4
+! author: msr
 !
 ! encoding treecode
 !
-! name: encoding.f90
-! date: 25.10.2016
-! author: msr
-! version: 0.3
+! input:    - block position varaibles i, j
+!           - number of blocks
+!           - length of treecode in light data
+! output:   - treecode
 !
-! ********************************
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
-subroutine encoding(treecode, i, j, nx, ny)
+subroutine encoding(treecode, i, j, nx, ny, treeN)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), intent(in)                        :: i, j, nx, ny
-    integer(kind=ik), dimension(10), intent(out)        :: treecode
+    ! block position coordinates
+    integer(kind=ik), intent(in)    :: i, j
+    ! number of blocks
+    integer(kind=ik), intent(in)    :: nx, ny
 
-    real(kind=rk)                                       :: Jx, Jy
-    integer(kind=ik)                                    :: N, k, allocate_error
-    integer(kind=ik), dimension(:), allocatable         :: c, d
+    ! treecode size
+    integer(kind=ik), intent(in)    :: treeN
+    ! treecode
+    integer(kind=ik), intent(out)   :: treecode(treeN)
 
+    ! variables for calculate real treecode length N
+    real(kind=rk)                   :: Jx, Jy
+    integer(kind=ik)                :: N
+
+    ! loop variables
+    integer(kind=ik)                :: k
+
+    ! allocation error variable
+    integer(kind=ik)                :: allocate_error
+
+    ! auxiliary vectors
+    integer(kind=ik), allocatable   :: c(:), d(:)
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    ! real treecode length
     Jx = log(dble(nx)) / log(2.0_rk)
     Jy = log(dble(ny)) / log(2.0_rk)
-
     N = nint(Jx)
 
+    ! reset output
     treecode = -1
 
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! allocate auxiliary vectors
     allocate( c(N), stat=allocate_error)
     allocate( d(N), stat=allocate_error)
 
+    ! convert block coordinates into binary numbers
     call int_to_binary(i-1, N, c)
     call int_to_binary(j-1, N, d)
 
+    ! loop over binary vectors to calculate treecode
     do k = 1, N
         if (c(N-k+1)==0 .and. d(N-k+1)==0) then
             treecode(k) = 0
@@ -53,6 +91,7 @@ subroutine encoding(treecode, i, j, nx, ny)
         end if
     end do
 
+    ! clean up
     deallocate( c, stat=allocate_error)
     deallocate( d, stat=allocate_error)
 

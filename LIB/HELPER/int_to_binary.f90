@@ -1,29 +1,56 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: int_to_binary.f90
+! version: 0.4
+! author: msr
 !
 ! convert a integer i to binary b
 ! binary return as vector with length N
 !
-! name: int_to_binary.f90
-! date: 25.10.2016
-! author: msr
-! version: 0.3
+! input:    - integer to convert
+!           - length of output vector
+! output:   - "binary" vector
 !
-! ********************************
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
 subroutine int_to_binary(i, N, b)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
+    use module_params
+
+!---------------------------------------------------------------------------------------------
+! variables
+
     implicit none
 
-    integer, intent(in)                     :: i, N
-    integer, dimension(N), intent(out)      :: b
+    ! integer to convert into binary
+    integer(kind=ik), intent(in)    :: i
 
-    integer                                 :: j, k
+    ! length of binary output vector
+    integer(kind=ik), intent(in)    :: N
+
+    ! output vector
+    integer(kind=ik), intent(out)   :: b(N)
+
+    ! loop variables
+    integer(kind=ik)                :: j, k
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
     j = 1
     b = 0
     k = i
+
+!---------------------------------------------------------------------------------------------
+! main body
 
     do while (k > 0)
         b(j) = mod(k, 2)

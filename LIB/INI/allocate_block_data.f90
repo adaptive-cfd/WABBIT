@@ -10,8 +10,10 @@
 ! heavy data array  -> dim 1: block id  ( 1:number_blocks )
 !                   -> dim 2: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
 !                   -> dim 3: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-!                   -> dim 4: data type ( 1:number_data_fields, data_old, k1, k2, k3,
+!                   -> dim 4: data type ( field_1, 2:number_data_fields, data_old, k1, k2, k3,
 !                                       k4 [for runge kutta] )
+!           field_1 (to save mixed data):   line 1: x coordinates
+!                                           line 2: y coordinates
 !
 ! input:    - maximal number of blocks per process
 !           - grid parameter
@@ -62,7 +64,7 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! allocate memory
-    allocate( block_data( number_blocks, Bs+2*g, Bs+2*g, dF+5 ), stat=allocate_error )
+    allocate( block_data( number_blocks, Bs+2*g, Bs+2*g, dF+6 ), stat=allocate_error )
 
     ! reset data
     !
@@ -71,7 +73,7 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     ! output
     if (rank==0) then
         write(*,'(80("_"))')
-        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, dF+5
+        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, dF+6
     end if
 
 end subroutine allocate_block_data

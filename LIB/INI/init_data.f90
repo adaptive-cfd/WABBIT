@@ -60,6 +60,9 @@ subroutine init_data(params, block_list, block_data)
     ! initial data field
     real(kind=rk), allocatable                      :: phi(:, :)
 
+    ! loop variable
+    integer(kind=ik)                                :: k
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -84,6 +87,14 @@ subroutine init_data(params, block_list, block_data)
             integer(kind=ik), intent(in)                :: Ds
             real(kind=rk), intent(in)                   :: Lx, Ly
         end subroutine inicond_gauss_blob
+
+        subroutine initial_block_distribution(params, block_list, block_data, phi)
+            use module_params
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(inout)             :: block_list(:, :)
+            real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
+            real(kind=rk), intent(in)                   :: phi(:, :)
+        end subroutine initial_block_distribution
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -130,6 +141,8 @@ subroutine init_data(params, block_list, block_data)
     else
         params%adapt_mesh = .false.
     end if
+    ! block distribution
+    call read_param(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
 
     !***************************************************************************
     ! read TIME parameters
@@ -182,15 +195,27 @@ subroutine init_data(params, block_list, block_data)
               call inicond_gauss_blob(phi, params%number_domain_nodes, params%Lx, params%Ly)
 
         case default
-              write(*,*) "initial condition is unknown"
-              write(*,*) params%initial_cond
-              stop
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: initial condition is unknown"
+            write(*,*) params%initial_cond
+            stop
 
     end select
 
+    ! decompose init field phi to block data
+    ! first: init light and heavy data for datafield 1, create starting block distribution
+    call initial_block_distribution( params, block_list, block_data, phi )
 
+    ! second: write heavy data for other datafields
+    do k = 3, params%number_data_fields+6
+        block_data( :, :, :, k ) = 9.0e9_rk
+    end do
 
     ! clean up
     call clean_ini_file(FILE)
+
+    deallocate( params%u0, stat=allocate_error )
+    deallocate( params%nu, stat=allocate_error )
+    deallocate( phi, stat=allocate_error )
 
 end subroutine init_data

@@ -80,6 +80,9 @@ module module_params
         real(kind=rk), dimension(:), allocatable    :: u0
         real(kind=rk), dimension(:), allocatable    :: nu
 
+        ! block distribution for load balancing (also used for start distribution)
+        character(len=80)                           :: block_distribution
+
     end type type_params
 
 !---------------------------------------------------------------------------------------------

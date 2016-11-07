@@ -1,49 +1,68 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! create new block, heavy data
-!
+! ============================================================================================
 ! name: new_block_heavy.f90
-! date: 25.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! write heavy block data in first datafield, reset all other datafields
+!
+! input:    - heavy data id
+!           - data for second datafield
+!           - coordinate vectors (store in first datafield)
+!           - grid parameters
+!           - number of data fields
+! output:   - heavy block data array
+!
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
-subroutine new_block_heavy(proc_k, k, data_, ix, iy, Bs, g, dF)
+subroutine new_block_heavy(block_data, heavy_id, data_, coord_x, coord_y, Bs, g, dF)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), intent(in)                                :: proc_k, k, Bs, g, dF
+    ! heavy data array - block data
+    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
+    ! heavy data id
+    integer(kind=ik), intent(in)        :: heavy_id
+    ! grid parameter
+    integer(kind=ik), intent(in)        :: Bs, g
+    ! input data
+    real(kind=rk), intent(in)           :: data_( Bs, Bs )
+    ! coordinate vectors
+    real(kind=rk), intent(in)           :: coord_x(Bs), coord_y(Bs)
+    ! number of datafields
+    integer(kind=ik), intent(in)        :: dF
 
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g), intent(in)        :: data_
-    real(kind=rk), dimension(Bs), intent(in)                    :: ix, iy
+    ! loop variable
+    integer(kind=ik)                    :: k
 
-    ! error handling
-    if ( (k <= 0) .or. (k > blocks_params%number_max_blocks) ) then
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
-      write(*,*) "ERROR! You try to create a block outside of the list"
-      write(*,'("your id: ",i8," N_max_blocks=",i8)') k, blocks_params%number_max_blocks
-      stop
+!---------------------------------------------------------------------------------------------
+! main body
 
-    endif
+    ! save coordinates in field 1 of heavy data array
+    block_data( heavy_id, 1, 1:Bs, 1 )              = coord_x
+    block_data( heavy_id, 2, 1:Bs, 1 )              = coord_y
 
-    ! save data
-    blocks_data(proc_k)%data_fields(dF)%data_       = data_
-
-    ! save coordinates
-    blocks_data(proc_k)%coord_x                     = ix
-    blocks_data(proc_k)%coord_y                     = iy
-
-    ! update spacing
-    blocks_data(proc_k)%dx                          = abs(ix(2) - ix(1))
-    blocks_data(proc_k)%dy                          = abs(iy(2) - iy(1))
-
-    ! save light-data id
-    blocks_data(proc_k)%block_id                    = k
+    ! save data in first datafield
+    block_data( heavy_id, g+1:Bs+g, g+1:Bs+g, 2 )   = data_
+    ! reset all other datafields
+    do k = 3, dF
+        block_data( heavy_id, :, :, k )             = 9.0e9_rk
+    end do
 
 end subroutine new_block_heavy

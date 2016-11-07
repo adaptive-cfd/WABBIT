@@ -163,6 +163,7 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
                     ! determine proc
                     if (block_proc_list(k) == 0) then
                         k = k + 1
+                        block_proc_list(k) = block_proc_list(k) - 1
                     else
                         block_proc_list(k) = block_proc_list(k) - 1
                     end if

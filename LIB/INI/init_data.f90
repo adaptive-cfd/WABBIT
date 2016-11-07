@@ -131,6 +131,8 @@ subroutine init_data(params, block_list, block_data)
     call read_param(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
     ! read number_data_fields
     call read_param(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
+    ! set number of fields in heavy data
+    params%number_fields = params%number_data_fields + 6
     ! read threshold value
     call read_param(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     ! read treelevel bounds
@@ -209,7 +211,7 @@ subroutine init_data(params, block_list, block_data)
     call initial_block_distribution( params, block_list, block_data, phi )
 
     ! second: write heavy data for other datafields
-    do k = 3, params%number_data_fields+6
+    do k = 3, params%number_fields
         block_data( :, :, :, k ) = 9.0e9_rk
     end do
 

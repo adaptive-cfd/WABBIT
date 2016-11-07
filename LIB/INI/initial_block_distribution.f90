@@ -180,7 +180,7 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
                                             coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
                                             Bs, &
                                             g, &
-                                            params%number_data_fields+6)
+                                            params%number_fields)
                     end if
 
                     ! ------------------------------------------------------------------------------------------------------

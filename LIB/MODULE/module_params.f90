@@ -72,8 +72,9 @@ module module_params
 
         ! number of allocated heavy data fields per process
         integer(kind=ik)                            :: number_blocks
-        ! number of allocated data fields in heavy data array
+        ! number of allocated data fields in heavy data array, number of fields in heavy data (depend from time step scheme, ...)
         integer(kind=ik)                            :: number_data_fields
+        integer(kind=ik)                            :: number_fields
 
         ! each data field can use separat velocity and diffusion coefficient (in 2D convection-diffusion RHS)
         ! stored all velocity components in one 1D vector, same with the diffusion coefficients

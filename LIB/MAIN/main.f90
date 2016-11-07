@@ -73,9 +73,9 @@ program main
             use module_params
             real(kind=rk), intent(in)                   :: time
             integer(kind=ik), intent(in)                :: iteration
-            type (type_params), intent(out)             :: params
-            integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
-            real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            real(kind=rk), intent(in)                   :: block_data(:, :, :, :)
         end subroutine save_data
 
     end interface

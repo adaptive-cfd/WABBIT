@@ -36,22 +36,28 @@ subroutine save_data(iteration, time, params, block_list, block_data)
     integer(kind=ik), intent(in)                    :: iteration
 
     ! user defined parameter structure
-    type (type_params), intent(out)                 :: params
+    type (type_params), intent(in)                  :: params
     ! light data array
-    integer(kind=ik), allocatable, intent(out)      :: block_list(:, :)
+    integer(kind=ik), intent(in)                    :: block_list(:, :)
     ! heavy data array - block data
-    real(kind=rk), allocatable, intent(out)         :: block_data(:, :, :, :)
+    real(kind=rk), intent(in)                       :: block_data(:, :, :, :)
+
+    ! loop variable
+    integer(kind=ik)                                :: k
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
     interface
-!        subroutine write_field(block_list, number_blocks, max_treelevel)
-!            use module_params
-!            integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
-!            integer(kind=ik), intent(in)                :: number_blocks
-!            integer(kind=ik), intent(in)                :: max_treelevel
-!        end subroutine write_field
+        subroutine write_field(time, iteration, dF, params, block_list, block_data)
+            use module_params
+            real(kind=rk), intent(in)                   :: time
+            integer(kind=ik), intent(in)                :: iteration
+            integer(kind=ik), intent(in)                :: dF
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            real(kind=rk), intent(in)                   :: block_data(:, :, :, :)
+        end subroutine write_field
 
     end interface
 
@@ -61,8 +67,9 @@ subroutine save_data(iteration, time, params, block_list, block_data)
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    !do dF = 1, blocks_params%number_data_fields
-    !    call write_field(iteration, time, dF, fname)
-    !end do
+    ! real datafields start at datafield 2
+    do k = 2, params%number_data_fields+1
+        call write_field(time, iteration, k, params, block_list, block_data)
+    end do
 
 end subroutine save_data

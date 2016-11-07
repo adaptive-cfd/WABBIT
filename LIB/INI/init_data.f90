@@ -8,7 +8,9 @@
 ! initialize all data: read params from ini file, allocate memory, initialize starting condition
 ! and decompose start matrix into block data
 !
-! input:    -
+! input:    - parameter array
+!           - light data array
+!           - heavy data array
 ! output:   - filled user defined data structure for global params
 !           - initialized light and heavy data arrays
 !

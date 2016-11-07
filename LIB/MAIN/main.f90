@@ -54,6 +54,10 @@ program main
     !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: block_data(:, :, :, :)
 
+    ! time loop variables
+    real(kind=rk)                       :: time
+    integer(kind=ik)                    :: iteration
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -64,10 +68,24 @@ program main
             integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
             real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
         end subroutine init_data
+
+        subroutine save_data(iteration, time, params, block_list, block_data)
+            use module_params
+            real(kind=rk), intent(in)                   :: time
+            integer(kind=ik), intent(in)                :: iteration
+            type (type_params), intent(out)             :: params
+            integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
+            real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
+        end subroutine save_data
+
     end interface
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! init time loop
+    time          = 0.0_rk
+    iteration     = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -91,6 +109,9 @@ program main
     ! initializing data
     call init_data( params, block_list, block_data )
 
+    ! save start data
+    call save_data( iteration, time, params, block_list, block_data )
+
     ! cpu end time and output on screen
     call cpu_time(t1)
     if (rank==0) then
@@ -103,23 +124,15 @@ program main
 
 
 
-!    ! time loop variables
-!    real(kind=rk) 	                    :: time
-!    integer(kind=ik)	                :: iteration, active_blocks
+!    integer(kind=ik)	                :: active_blocks
 !
 !    ! initialize local variables
-!    time          = 0.0_rk
-!    iteration     = 0
-!    active_blocks = 0
 !
-!    ! create block tree
-!    call matrix_to_block_tree()
+!    active_blocks = 0
 !
 !    ! update neighbor relations
 !    call update_neighbors()
-!
-!    ! save start field to disk
-!    call save_data(iteration, time)
+
 !
 !    ! main time loop
 !    do while ( time < params%time_max )

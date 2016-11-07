@@ -209,46 +209,6 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
 
     end select
 
-!
-!    select case(distribution)
-!        case("equal")
-!
-!            proc_id = 0
-!            ! loop over all blocks
-!            do light_id = 1, blocks_params%number_max_blocks
-!
-!                ! block is active
-!                if ( blocks(light_id).active == .true. ) then
-!
-!                    ! find free heavy id
-!                    if ( rank == proc_id ) then
-!                        ! find free id
-!                        call get_heavy_free_block(heavy_id)
-!                        ! save light data id in heavy data on specific proc
-!                        blocks_data(heavy_id)%block_id = light_id
-!                    end if
-!                    ! sychronize free id
-!                    call MPI_Bcast(heavy_id, 1, MPI_INTEGER4, proc_id, MPI_COMM_WORLD, ierr)
-!
-!                    ! save heavy-id and proc-id in light data
-!                    blocks(light_id).proc_data_id   = heavy_id
-!                    blocks(light_id).proc_rank      = proc_id
-!                    ! increase proc-id
-!                    proc_id                         = proc_id + 1
-!
-!                else
-!                    ! block is not active, so reset id's to heavy data
-!                    blocks(light_id).proc_data_id   = -1
-!                    blocks(light_id).proc_rank      = -1
-!
-!                end if
-!                ! reset proc counter
-!                if ( proc_id==n_procs ) proc_id = 0
-!
-!            end do
-!
-!    end select
-
     ! clean up
     deallocate( block_proc_list, stat=allocate_error )
     deallocate( coord_x, stat=allocate_error )

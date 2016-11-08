@@ -180,7 +180,7 @@ subroutine find_neighbor_edge(heavy_id, light_id, block_list, max_treelevel, dir
             virt_treecode( level+1 ) = virt_code1
 
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block( virt_treecode, neighbor, dir, level, max_treelevel)
+            call adjacent_block( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
             call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
 
@@ -200,7 +200,7 @@ subroutine find_neighbor_edge(heavy_id, light_id, block_list, max_treelevel, dir
             virt_treecode( level+1 ) = virt_code2
 
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block( virt_treecode, neighbor, dir, level, max_treelevel)
+            call adjacent_block( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
             call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
 

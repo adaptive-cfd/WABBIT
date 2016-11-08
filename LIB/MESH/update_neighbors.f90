@@ -122,4 +122,7 @@ subroutine update_neighbors(block_list, neighbor_list, N, max_treelevel)
 
     end do
 
+    ! barrier
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
 end subroutine update_neighbors

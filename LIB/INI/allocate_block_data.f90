@@ -10,7 +10,7 @@
 ! heavy data array  -> dim 1: block id  ( 1:number_blocks )
 !                   -> dim 2: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
 !                   -> dim 3: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-!                   -> dim 4: data type ( field_1, 2:number_data_fields, data_old, k1, k2, k3,
+!                   -> dim 4: data type ( field_1, 2:number_data_fields+1, data_old, k1, k2, k3,
 !                                       k4 [for runge kutta] )
 !           field_1 (to save mixed data):   line 1: x coordinates
 !                                           line 2: y coordinates

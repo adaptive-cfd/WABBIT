@@ -48,7 +48,7 @@ program main
     ! heavy data array  -> dim 1: block id  ( 1:number_blocks )
     !                   -> dim 2: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( field_1, 2:number_data_fields, data_old, k1, k2, k3,
+    !                   -> dim 4: data type ( field_1, 2:number_data_fields+1, data_old, k1, k2, k3,
     !                                       k4 [for runge kutta] )
     !           field_1 (to save mixed data):   line 1: x coordinates
     !                                           line 2: y coordinates
@@ -63,6 +63,9 @@ program main
     ! time loop variables
     real(kind=rk)                       :: time
     integer(kind=ik)                    :: iteration
+
+    ! number of active blocks
+    integer(kind=ik)                    :: block_number
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -94,6 +97,19 @@ program main
             integer(kind=ik), intent(in)                :: max_treelevel
         end subroutine update_neighbors
 
+        subroutine block_count(block_list, block_number)
+            use module_params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            integer(kind=ik), intent(out)               :: block_number
+        end subroutine block_count
+
+        subroutine refine_everywhere( params, block_list, block_data )
+            use module_params
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(inout)             :: block_list(:, :)
+            real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
+        end subroutine refine_everywhere
+
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -102,6 +118,7 @@ program main
     ! init time loop
     time          = 0.0_rk
     iteration     = 0
+    block_number  = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -131,6 +148,33 @@ program main
     ! save start data
     call save_data( iteration, time, params, block_list, block_data, neighbor_list )
 
+    ! main time loop
+    do while ( time < params%time_max )
+
+        iteration = iteration + 1
+
+        ! refine every block to create the safety zone
+        if ( params%adapt_mesh ) call refine_everywhere( params, block_list, block_data )
+
+        ! write data to disk
+        if (modulo(iteration, params%write_freq) == 0) then
+          call save_data( iteration, time, params, block_list, block_data, neighbor_list )
+        endif
+
+        ! output on screen
+        if (rank==0) then
+            write(*,'(80("-"))')
+            call block_count(block_list, block_number)
+            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, block_number
+
+        end if
+call save_data( iteration, 1.0_rk, params, block_list, block_data, neighbor_list )
+stop
+    end do
+
+    ! save end field to disk
+    call save_data( iteration, time, params, block_list, block_data, neighbor_list )
+
     ! cpu end time and output on screen
     call cpu_time(t1)
     if (rank==0) then
@@ -142,17 +186,6 @@ program main
     call MPI_Finalize(ierr)
 
 
-
-!    integer(kind=ik)	                :: active_blocks
-!
-!    ! initialize local variables
-!
-!    active_blocks = 0
-!
-!    ! main time loop
-!    do while ( time < params%time_max )
-!
-!        iteration = iteration + 1
 !
 !        ! refine every block to create the safety zone
 !        if (blocks_params%adapt_mesh) call refine_everywhere()
@@ -165,23 +198,6 @@ program main
 !
 !        ! adapt the mesh
 !        if (blocks_params%adapt_mesh) call adapt_mesh()
-!
-!        ! write data to disk
-!        if (modulo(iteration, params%write_freq) == 0) then
-!          call save_data(iteration, time)
-!        endif
-!
-!        ! output on screen
-!        if (rank==0) then
-!            call block_count(active_blocks)
-!            write(*, '("iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, active_blocks
-!            write(*,'(80("-"))')
-!        end if
-!
-!    end do
-!
-!    ! save end field to disk
-!    call save_data(iteration, time)
-!
+
 
 end program main

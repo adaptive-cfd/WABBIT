@@ -1,42 +1,63 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! unset refinement status in respect
-! of min/max treelevel
-!
+! ============================================================================================
 ! name: respect_min_max_treelevel.f90
-! date: 27.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! unset refinement status in respect of min/max treelevel
+!
+! input:    - light data
+!           - min/max treelevel
+! output:   - light data arrays
+!
+! = log ======================================================================================
+!
+! 08/11/16 - switch to v0.4
+! ********************************************************************************************
 
-subroutine respect_min_max_treelevel()
+subroutine respect_min_max_treelevel( block_list, max_level, min_level)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik)                            :: k, N
+    ! light data array
+    integer(kind=ik), intent(inout)     :: block_list(:, :)
+    ! heavy data array - block data
+    integer(kind=ik), intent(in)        :: max_level, min_level
 
-    ! loop over all heavy data
-    N           = blocks_params%number_max_blocks
+    ! loop variables
+    integer(kind=ik)                    :: k, N
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    N = size(block_list, 1)
+
+!---------------------------------------------------------------------------------------------
+! main body
 
     ! loop over all blocks
     do k = 1, N
 
-        if ( blocks(k)%active ) then
+        if ( block_list(k, 1) /= -1 ) then
 
-            if ( (blocks(k)%refinement == 1) .and. (blocks(k)%level >= params%max_treelevel) ) then
+            if ( ( block_list(k, max_level+2 ) ==  1) .and. ( block_list(k, max_level+1 ) >= max_level ) ) then
                 ! can not refine
-                blocks(k)%refinement = 0
+                block_list(k, max_level+2 ) = 0
             end if
 
-            if ( (blocks(k)%refinement == -1) .and. (blocks(k)%level <= params%min_treelevel) ) then
+            if ( ( block_list(k, max_level+2 ) == -1) .and. ( block_list(k, max_level+1 ) <= min_level ) ) then
                 ! can not coarsen
-                blocks(k)%refinement = 0
+                block_list(k, max_level+2 ) = 0
             end if
 
         end if

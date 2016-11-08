@@ -1,21 +1,22 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: find_neighbor_corner.f90
+! name: get_free_light_id.f90
 ! version: 0.4
-! author: msr
+! author: msr, engels
 !
-! count active blocks
+! return light free block id
 !
-! input:    - light data array
-! output:   - number of active blocks
+! input:    - first column of light data array
+!           - length of input vector
+! output:   - id of first passive block
 !
 ! = log ======================================================================================
 !
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine block_count(block_list, block_number)
+subroutine get_free_light_id( id, block_list, N )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -28,29 +29,38 @@ subroutine block_count(block_list, block_number)
 
     implicit none
 
-    ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
+    ! user defined parameter structure
+    integer(kind=ik), intent(in)        :: N
+    ! light data array, first column
+    integer(kind=ik), intent(in)        :: block_list(N)
 
-    ! number of active blocks
-    integer(kind=ik), intent(out)       :: block_number
+    ! free id
+    integer(kind=ik), intent(out)       :: id
 
     ! loop variables
-    integer(kind=ik)                    :: k, N
+    integer(kind=ik)                    :: k
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N               = size(block_list, 1)
-    block_number    = 0
+    id = -1
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all blocks
+    ! loop over list
     do k = 1, N
-        if ( block_list(k, 1) /= -1 ) then
-            block_number = block_number + 1
-        end if
+      ! check: if the block is not active, then we found a free block to return
+      if ( block_list(k) == -1 ) then
+        id = k
+        exit
+      end if
     end do
 
-end subroutine block_count
+    ! error catching: is there no more free blocks on the list?
+    if (id == -1) then
+      write(*,*) "ERROR: We try to fetch a light free block ID from the list but all blocks are used."
+      stop
+    end if
+
+end subroutine get_free_light_id

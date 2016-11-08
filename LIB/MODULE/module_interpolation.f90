@@ -1,29 +1,40 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: module_interpolation.f90
+! version: 0.4
+! author: msr
 !
 ! refinement and coarsening subroutines
 !
-! name: module_interpolation.f90
-! date: 26.10.2016
-! author: msr
-! version: 0.3
+! = log ======================================================================================
 !
-! ********************************
+! 04/11/16 - switch to v0.4
+! ********************************************************************************************
 
 module module_interpolation
-  use module_params
-  use module_blocks
 
-  implicit none
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
+    use module_params
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
 
 contains
 
     ! coarsen the block by one level
     subroutine restriction_2D(fine, coarse)
-
-        use module_params
-        use module_blocks
 
         implicit none
 
@@ -35,7 +46,7 @@ contains
         nfine = size(fine,1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "restriction_2D: arrays wrongly sized.."
+          write(*,*) "ERROR: restriction_2D: arrays wrongly sized.."
           stop
         endif
 
@@ -45,15 +56,14 @@ contains
     end subroutine restriction_2D
 
     ! refine the block by one level
-    subroutine prediction_2D(coarse, fine)
-
-        use module_params
-        use module_blocks
+    subroutine prediction_2D(coarse, fine, order_predictor)
 
         implicit none
 
         real(kind=rk), dimension(1:,1:), intent(out) :: fine
         real(kind=rk), dimension(1:,1:), intent(in)  :: coarse
+
+        character(len=80), intent(in)                :: order_predictor
 
         integer(kind=ik) :: i, j
         integer(kind=ik) :: ncoarse, nfine
@@ -63,7 +73,7 @@ contains
         nfine   = size(fine, 1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "prediction_2D: arrays wrongly sized.."
+          write(*,*) "ERROR: prediction_2D: arrays wrongly sized.."
           stop
         endif
 
@@ -74,7 +84,7 @@ contains
         fine(1:nfine:2, 1:nfine:2) = coarse(:,:)
 
 
-        if ( params%order_predictor == "multiresolution_2nd" ) then
+        if ( order_predictor == "multiresolution_2nd" ) then
             !-----------------------------------------------------------------------
             ! second order interpolation
             !-----------------------------------------------------------------------
@@ -91,7 +101,7 @@ contains
                 fine(i,j) = ( fine(i, j-1) + fine(i, j+1) ) / 2.0_rk
               end do
             end do
-        elseif ( params%order_predictor == "multiresolution_4th"  ) then
+        elseif ( order_predictor == "multiresolution_4th"  ) then
             !-----------------------------------------------------------------------
             ! fourth order interpolation
             !-----------------------------------------------------------------------
@@ -114,7 +124,7 @@ contains
              end do
         else
              ! error case
-             write(*,*) "prediction_2D: wrong method.."
+             write(*,*) "ERROR: prediction_2D: wrong method.."
              stop
         endif
 
@@ -122,9 +132,6 @@ contains
 
 
     subroutine prediction1D(coarse, fine)
-
-        use module_params
-        use module_blocks
 
         implicit none
 
@@ -138,7 +145,7 @@ contains
         nfine = size(fine,1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "prediction1d: arrays wrongly sized.."
+          write(*,*) "ERROR: prediction1d: arrays wrongly sized.."
           stop
         endif
 

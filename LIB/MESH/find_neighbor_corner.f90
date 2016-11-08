@@ -160,7 +160,7 @@ subroutine find_neighbor_corner(heavy_id, light_id, block_list, max_treelevel, d
             virt_treecode( level+1 ) = virt_code
 
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block( virt_treecode, neighbor, dir, level, max_treelevel)
+            call adjacent_block( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
             call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
 

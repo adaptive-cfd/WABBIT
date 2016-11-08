@@ -169,8 +169,8 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
                     end if
 
                     ! find and set free heavy data id, note: look for free id in light data
-                    ! -> call subroutine with reduced light data array (only lines corresponding to proc and first column)
-                    call get_heavy_free_block( heavy_id, block_list( (k-1)*params%number_blocks + 1 : ((k-1)+1)*params%number_blocks, 1 ), params%number_blocks )
+                    ! search routine only on corresponding light data -> so, returned id works directly on heavy data
+                    call get_free_light_id( heavy_id, block_list( (k-1)*params%number_blocks + 1 : ((k-1)+1)*params%number_blocks, 1 ), params%number_blocks )
 
                     ! save data, write start field phi in first datafield
                     if (rank == (k-1)) then

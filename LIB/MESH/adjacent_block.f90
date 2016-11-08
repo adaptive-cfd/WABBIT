@@ -1,42 +1,67 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: adjacent_block.f90
+! version: 0.4
+! author: msr
 !
 ! give treecode for adjacent block
 !
-! name: adjacent_block.f90
-! date: 25.10.2016
-! author: msr
-! version: 0.3
+! input:    - treecode for block N
+!           - direction for neighbor search
+!           - max treelevel
+! output:   - neighbor treecode, for neighbor on same level
 !
-! ********************************
+!
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
-recursive subroutine adjacent_block(me, neighbor, direction)
+recursive subroutine adjacent_block(me, neighbor, direction, level, max_treelevel)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), dimension(10), intent(in)        :: me
-    integer(kind=ik), dimension(10), intent(out)       :: neighbor
-    character(len=3), intent(in)                       :: direction
+    ! max treelevel
+    integer(kind=ik), intent(in)        :: max_treelevel
+    ! mesh level
+    integer(kind=ik), intent(in)        :: level
+    ! block treecode
+    integer(kind=ik), intent(in)        :: me(max_treelevel)
+    ! direction for neighbor search
+    character(len=3), intent(in)        :: direction
 
-    integer(kind=ik)                                   :: i, n, treecode_size
-    integer(kind=ik), dimension(10)                    :: neighbor2
+    ! neighbor treecode
+    integer(kind=ik), intent(out)       :: neighbor(max_treelevel)
 
-    neighbor    = -1
-    n           = 0
+    ! treecode variable
+    integer(kind=ik)                    :: neighbor2(max_treelevel)
+    ! loop variable
+    integer(kind=ik)                    :: i
 
-    ! treecode size
-    n = treecode_size(me)
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    neighbor = -1
+
+!---------------------------------------------------------------------------------------------
+! main body
 
     select case(direction)
 
         case('__N')
         ! north
-            neighbor(n) = modulo(me(n)+2, 4)
-            i = n - 1
+            neighbor(level) = modulo(me(level)+2, 4)
+            i = level - 1
 
             do while (i /= 0)
                 if ( (me(i+1)==2) .or. (me(i+1)==3) ) then
@@ -50,8 +75,8 @@ recursive subroutine adjacent_block(me, neighbor, direction)
 
         case('__S')
         ! south
-            neighbor(n) = modulo(me(n)+2, 4)
-            i = n - 1
+            neighbor(level) = modulo(me(level)+2, 4)
+            i = level - 1
 
             do while (i /= 0)
                 if ( (me(i+1)==0) .or. (me(i+1)==1) ) then
@@ -65,13 +90,13 @@ recursive subroutine adjacent_block(me, neighbor, direction)
 
         case('__E')
         ! east
-            if ( (me(n)==0) .or. (me(n)==2) ) then
-                neighbor(n) = modulo(me(n)+1, 4)
+            if ( (me(level)==0) .or. (me(level)==2) ) then
+                neighbor(level) = modulo(me(level)+1, 4)
             else
-                neighbor(n) = modulo(me(n)-1, 4)
+                neighbor(level) = modulo(me(level)-1, 4)
             end if
 
-            i = n - 1
+            i = level - 1
 
             do while (i /= 0)
                 if ( (me(i+1)==0) .or. (me(i+1)==2) ) then
@@ -89,13 +114,13 @@ recursive subroutine adjacent_block(me, neighbor, direction)
 
         case('__W')
         ! west
-            if ( (me(n)==0) .or. (me(n)==2) ) then
-                neighbor(n) = modulo(me(n)+1, 4)
+            if ( (me(level)==0) .or. (me(level)==2) ) then
+                neighbor(level) = modulo(me(level)+1, 4)
             else
-                neighbor(n) = modulo(me(n)-1, 4)
+                neighbor(level) = modulo(me(level)-1, 4)
             end if
 
-            i = n - 1
+            i = level - 1
 
             do while (i /= 0)
                 if ( (me(i+1)==1) .or. (me(i+1)==3) ) then
@@ -113,23 +138,23 @@ recursive subroutine adjacent_block(me, neighbor, direction)
 
         case('_NE')
         ! northeast
-            call adjacent_block(me, neighbor2, '__N')
-            call adjacent_block(neighbor2, neighbor, '__E')
+            call adjacent_block(me, neighbor2, '__N', level, max_treelevel)
+            call adjacent_block(neighbor2, neighbor, '__E', level, max_treelevel)
 
         case('_NW')
         ! northwest
-            call adjacent_block(me, neighbor2, '__N')
-            call adjacent_block(neighbor2, neighbor, '__W')
+            call adjacent_block(me, neighbor2, '__N', level, max_treelevel)
+            call adjacent_block(neighbor2, neighbor, '__W', level, max_treelevel)
 
         case('_SE')
         ! southeast
-            call adjacent_block(me, neighbor2, '__S')
-            call adjacent_block(neighbor2, neighbor, '__E')
+            call adjacent_block(me, neighbor2, '__S', level, max_treelevel)
+            call adjacent_block(neighbor2, neighbor, '__E', level, max_treelevel)
 
         case('_SW')
         ! southwest
-            call adjacent_block(me, neighbor2, '__S')
-            call adjacent_block(neighbor2, neighbor, '__W')
+            call adjacent_block(me, neighbor2, '__S', level, max_treelevel)
+            call adjacent_block(neighbor2, neighbor, '__W', level, max_treelevel)
 
     end select
 

@@ -18,7 +18,7 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, block_list, block_data)
+subroutine save_data(iteration, time, params, block_list, block_data, neighbor_list)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -41,6 +41,8 @@ subroutine save_data(iteration, time, params, block_list, block_data)
     integer(kind=ik), intent(in)                    :: block_list(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(in)                       :: block_data(:, :, :, :)
+    ! heavy data array - neifghbor data
+    integer(kind=ik), intent(in)                    :: neighbor_list(:)
 
     ! loop variable
     integer(kind=ik)                                :: k
@@ -49,7 +51,7 @@ subroutine save_data(iteration, time, params, block_list, block_data)
 ! interfaces
 
     interface
-        subroutine write_field(time, iteration, dF, params, block_list, block_data)
+        subroutine write_field(time, iteration, dF, params, block_list, block_data, neighbor_list)
             use module_params
             real(kind=rk), intent(in)                   :: time
             integer(kind=ik), intent(in)                :: iteration
@@ -57,6 +59,7 @@ subroutine save_data(iteration, time, params, block_list, block_data)
             type (type_params), intent(in)              :: params
             integer(kind=ik), intent(in)                :: block_list(:, :)
             real(kind=rk), intent(in)                   :: block_data(:, :, :, :)
+            integer(kind=ik), intent(in)                :: neighbor_list(:)
         end subroutine write_field
 
     end interface
@@ -69,7 +72,7 @@ subroutine save_data(iteration, time, params, block_list, block_data)
 
     ! real datafields start at datafield 2
     do k = 2, params%number_data_fields+1
-        call write_field(time, iteration, k, params, block_list, block_data)
+        call write_field(time, iteration, k, params, block_list, block_data, neighbor_list)
     end do
 
 end subroutine save_data

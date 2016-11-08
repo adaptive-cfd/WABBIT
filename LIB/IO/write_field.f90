@@ -19,7 +19,7 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine write_field(time, iteration, dF, params, block_list, block_data)
+subroutine write_field(time, iteration, dF, params, block_list, block_data, neighbor_list)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -48,11 +48,15 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data)
     integer(kind=ik), intent(in)        :: block_list(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(in)           :: block_data(:, :, :, :)
+    ! heavy data array - neifghbor data
+    integer(kind=ik), intent(in)        :: neighbor_list(:)
 
     ! file name
     character(len=80)                   :: fname
     ! set name
     character(len=80)                   :: dsetname
+    ! neighbor name list
+    character(len=3)                    :: dirs(16)
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -60,7 +64,7 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data)
     integer(kind=ik)                    :: rank
 
     ! loop variable
-    integer(kind=ik)                    :: k, l
+    integer(kind=ik)                    :: k, l, i
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
@@ -69,6 +73,8 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data)
 
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
+
+    dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -83,7 +89,7 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data)
     if ( (rank == 0) .and. (dF == 2) ) then
 
         write(*,'(80("_"))')
-        write(*,'("IO: Writing data... time=",f15.8," fname=",A)') time, trim(adjustl(fname))
+        write(*,'("IO: writing data for time = ", f15.8," file = ",A)') time, trim(adjustl(fname))
 
         ! overwrite the file, if it already exists
         call init_empty_file( fname )
@@ -108,7 +114,9 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data)
             call write_field_hdf5( fname, dsetname, block_data( k - (l-1)*params%number_blocks, g+1:Bs+g, g+1:Bs+g, dF), .false.)
 
             ! add useful attributes to the block:
-            call write_attribute( fname, dsetname, "treecode", block_list(k, 1:params%max_treelevel) )
+            ! write treecode
+            call write_attribute( fname, dsetname, "treecode", block_list(k, 1:block_list(k, params%max_treelevel+1) ) )
+
             call write_attribute( fname, dsetname, "time", (/time/))
             call write_attribute( fname, dsetname, "iteration", (/iteration/))
             call write_attribute( fname, dsetname, "rank", (/rank/))
@@ -116,6 +124,15 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data)
             ! save coordinates
             call write_attribute( fname, dsetname, "coord_x", block_data( k - (l-1)*params%number_blocks, 1, 1:Bs, 1))
             call write_attribute( fname, dsetname, "coord_y", block_data( k - (l-1)*params%number_blocks, 2, 1:Bs, 1))
+
+            ! save neighbors
+            ! loop over all neighbors
+            do i = 1, 16
+                ! neighbor exists
+                if ( neighbor_list( (k - (l-1)*params%number_blocks - 1)*16 + i ) /= -1 ) then
+                    call write_attribute( fname, dsetname, dirs(i),  block_list(neighbor_list( (k - (l-1)*params%number_blocks - 1)*16 + i ), 1:block_list(neighbor_list( (k - (l-1)*params%number_blocks - 1)*16 + i ), params%max_treelevel+1) ) )
+                end if
+            end do
 
         end if
 

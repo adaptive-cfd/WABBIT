@@ -25,7 +25,7 @@
 ! 04/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
+subroutine  allocate_block_data(block_data, number_blocks, Bs, g, F)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,8 +43,8 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
     ! number of heavy data
     integer(kind=ik), intent(in)                :: number_blocks
-    ! grid parameter, blocksize (Bs), ghostnodes (g), data fields (dF)
-    integer(kind=ik), intent(in)                :: Bs, g, dF
+    ! grid parameter, blocksize (Bs), ghostnodes (g), number of fields (F)
+    integer(kind=ik), intent(in)                :: Bs, g, F
 
     ! allocation error variable
     integer(kind=ik)                            :: allocate_error
@@ -64,7 +64,7 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! allocate memory
-    allocate( block_data( number_blocks, Bs+2*g, Bs+2*g, dF+6 ), stat=allocate_error )
+    allocate( block_data( number_blocks, Bs+2*g, Bs+2*g, F ), stat=allocate_error )
 
     ! reset data
     !
@@ -73,7 +73,7 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     ! output
     if (rank==0) then
         write(*,'(80("_"))')
-        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, dF+6
+        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, F
     end if
 
 end subroutine allocate_block_data

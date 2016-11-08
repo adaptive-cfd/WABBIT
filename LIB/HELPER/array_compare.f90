@@ -1,26 +1,51 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: array_compare.f90
+! version: 0.4
+! author: msr
 !
 ! compare 2 arrays
 !
-! name: array_compare.f90
-! date: 25.10.2016
-! author: msr
-! version: 0.3
+! input:    - 2 array
+!           - array size N
+! output:   - .true. if arrays are equal
 !
-! ********************************
+!
+! = log ======================================================================================
+!
+! 08/11/16 - switch to v0.4
+! ********************************************************************************************
 
 logical function array_compare(array1, array2, N)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
+    use module_params
+
+!---------------------------------------------------------------------------------------------
+! variables
+
     implicit none
 
-    integer, intent(in)                   :: N
-    integer, dimension(N), intent(in)     :: array1, array2
+    ! array size
+    integer(kind=ik), intent(in)        :: N
+    ! arrays
+    integer(kind=ik), intent(in)        :: array1(N), array2(N)
 
-    integer                               :: i
+    ! loop variable
+    integer(kind=ik)                    :: i
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
     array_compare = .true.
+
+!---------------------------------------------------------------------------------------------
+! main body
+
     do i = 1, N
         if ( array1(i) /= array2(i) ) array_compare = .false.
     enddo

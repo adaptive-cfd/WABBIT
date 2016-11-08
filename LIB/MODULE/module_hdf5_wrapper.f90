@@ -175,7 +175,8 @@ subroutine write_field_hdf5( filename, dsetname, field, overwrite)
   ! check if the dataset already exists
   call h5lexists_f(file_id, dsetname, exist1, error)
   if (exist1) then
-    write(*,*) "You are trying to write to an existing dataset...this is not supported."
+    write(*,'(80("_"))')
+    write(*,*) "ERROR: You are trying to write to an existing dataset...this is not supported."
     stop
   endif
 

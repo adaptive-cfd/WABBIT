@@ -54,6 +54,12 @@ program main
     !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: block_data(:, :, :, :)
 
+    ! neighbor array (heavy data) -> number_lines = number_blocks * 16 (...different neighbor relations:
+    ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
+    !         saved data -> -1 ... no neighbor
+    !                    -> light data line number (id)
+    integer(kind=ik), allocatable       :: neighbor_list(:)
+
     ! time loop variables
     real(kind=rk)                       :: time
     integer(kind=ik)                    :: iteration
@@ -62,21 +68,31 @@ program main
 ! interfaces
 
     interface
-        subroutine init_data(params, block_list, block_data)
+        subroutine init_data(params, block_list, block_data, neighbor_list)
             use module_params
             type (type_params), intent(out)             :: params
             integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
             real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
+            integer(kind=ik), allocatable, intent(out)  :: neighbor_list(:)
         end subroutine init_data
 
-        subroutine save_data(iteration, time, params, block_list, block_data)
+        subroutine save_data(iteration, time, params, block_list, block_data, neighbor_list)
             use module_params
             real(kind=rk), intent(in)                   :: time
             integer(kind=ik), intent(in)                :: iteration
             type (type_params), intent(in)              :: params
             integer(kind=ik), intent(in)                :: block_list(:, :)
             real(kind=rk), intent(in)                   :: block_data(:, :, :, :)
+            integer(kind=ik), intent(in)                :: neighbor_list(:)
         end subroutine save_data
+
+        subroutine update_neighbors(block_list, neighbor_list, N, max_treelevel)
+            use module_params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            integer(kind=ik), intent(out)               :: neighbor_list(:)
+            integer(kind=ik), intent(in)                :: N
+            integer(kind=ik), intent(in)                :: max_treelevel
+        end subroutine update_neighbors
 
     end interface
 
@@ -107,10 +123,13 @@ program main
     end if
 
     ! initializing data
-    call init_data( params, block_list, block_data )
+    call init_data( params, block_list, block_data, neighbor_list )
+
+    ! update neighbor relations
+    call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
 
     ! save start data
-    call save_data( iteration, time, params, block_list, block_data )
+    call save_data( iteration, time, params, block_list, block_data, neighbor_list )
 
     ! cpu end time and output on screen
     call cpu_time(t1)
@@ -129,10 +148,6 @@ program main
 !    ! initialize local variables
 !
 !    active_blocks = 0
-!
-!    ! update neighbor relations
-!    call update_neighbors()
-
 !
 !    ! main time loop
 !    do while ( time < params%time_max )

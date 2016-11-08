@@ -11,6 +11,7 @@
 ! input:    - parameter array
 !           - light data array
 !           - heavy data array
+!           - neighbor data array
 ! output:   - filled user defined data structure for global params
 !           - initialized light and heavy data arrays
 !
@@ -20,7 +21,7 @@
 !            initialized block data to main program
 ! ********************************************************************************************
 
-subroutine init_data(params, block_list, block_data)
+subroutine init_data(params, block_list, block_data, neighbor_list)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,6 +44,11 @@ subroutine init_data(params, block_list, block_data)
     integer(kind=ik), allocatable, intent(out)      :: block_list(:, :)
     ! heavy data array - block data
     real(kind=rk), allocatable, intent(out)         :: block_data(:, :, :, :)
+    ! neighbor array (heavy data) -> number_lines = number_blocks * 16 (...different neighbor relations:
+    ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
+    !         saved data -> -1 ... no neighbor
+    !                    -> light data line number (id)
+    integer(kind=ik), allocatable, intent(out)      :: neighbor_list(:)
 
     ! MPI error variable
     integer(kind=ik)                                :: ierr
@@ -191,7 +197,7 @@ subroutine init_data(params, block_list, block_data)
     ! allocate block_list
     call allocate_block_list( block_list, params%number_blocks, params%max_treelevel )
     ! allocate heavy data
-    call allocate_block_data( block_data, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_data_fields )
+    call allocate_block_data( block_data, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_fields )
 
     ! initial data field
     select case( params%initial_cond )
@@ -214,6 +220,11 @@ subroutine init_data(params, block_list, block_data)
     do k = 3, params%number_fields
         block_data( :, :, :, k ) = 9.0e9_rk
     end do
+
+    ! ------------------------------------------------------------------------------------------------------
+    ! init neighbor data array
+    allocate( neighbor_list( params%number_blocks*16 ), stat=allocate_error )
+    neighbor_list = -1
 
     ! clean up
     call clean_ini_file(FILE)

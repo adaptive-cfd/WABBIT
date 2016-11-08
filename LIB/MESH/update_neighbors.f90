@@ -1,79 +1,122 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! update neighbor relations:
-! all procs loop over all blocks
-! create new com_list after neighbor updating
-!
-! note: proc_rank and proc_block_id are not stored here
-!
+! ============================================================================================
 ! name: update_neighbors.f90
-! date: 25.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! update neighbor relations with light data, store neighbors in neighbor list (heavy data)
+!
+! input:    - light data array
+!           - number of blocks per proc
+! output:   - neighbor list array
+!
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
-subroutine update_neighbors()
+subroutine update_neighbors(block_list, neighbor_list, N, max_treelevel)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    use mpi
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik)                                    :: N, light_id, l
-    character(len=3), dimension(16)                     :: dirs
-    logical                                             :: exists
+    ! light data array
+    integer(kind=ik), intent(in)        :: block_list(:, :)
+    ! heavy data array - neifghbor data
+    integer(kind=ik), intent(out)       :: neighbor_list(:)
+    ! number of blocks per proc
+    integer(kind=ik), intent(in)        :: N
+    ! max treelevel
+    integer(kind=ik), intent(in)        :: max_treelevel
 
-    N               = blocks_params%number_max_blocks
-    exists          = .false.
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
+    ! process rank
+    integer(kind=ik)                    :: rank
 
-    dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+    ! loop variable
+    integer(kind=ik)                    :: k
 
-    ! loop over all blocks
-    do light_id = 1, N
+!---------------------------------------------------------------------------------------------
+! interfaces
 
-        if ( blocks(light_id)%active == .true. ) then
+    interface
+        subroutine find_neighbor_edge(heavy_id, light_id, block_list, max_treelevel, dir, neighbor_list)
+            use module_params
+            integer(kind=ik), intent(in)                :: heavy_id
+            integer(kind=ik), intent(in)                :: light_id
+            integer(kind=ik), intent(in)                :: max_treelevel
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            character(len=3), intent(in)                :: dir
+            integer(kind=ik), intent(out)               :: neighbor_list(:)
+        end subroutine find_neighbor_edge
 
-            ! reset neighbor lists
-            blocks(light_id)%neighbor_treecode(:,:) = -1
-            blocks(light_id)%neighbor_dir(:)        = ""
-            blocks(light_id)%neighbor_id(:)         = -1
+        subroutine find_neighbor_corner(heavy_id, light_id, block_list, max_treelevel, dir, neighbor_list)
+            use module_params
+            integer(kind=ik), intent(in)                :: heavy_id
+            integer(kind=ik), intent(in)                :: light_id
+            integer(kind=ik), intent(in)                :: max_treelevel
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            character(len=3), intent(in)                :: dir
+            integer(kind=ik), intent(out)               :: neighbor_list(:)
+        end subroutine find_neighbor_corner
 
-            if ( blocks_params%size_domain == blocks_params%size_block ) then
-                ! only one block, so all neighbors are this block
-                ! one block domian has 8 neighbors
-                do l = 1, 8
+    end interface
 
-                    blocks(light_id)%neighbor_treecode(l,:)    = blocks(light_id)%treecode
-                    blocks(light_id)%neighbor_dir(l)           = dirs(l)
-                    blocks(light_id)%neighbor_id(l)            = light_id
-                end do
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
-            else
-                ! more than one block
-                ! find neighbors on edges
-                ! north
-                call find_neighbor_edge(light_id, '__N')
-                ! east
-                call find_neighbor_edge(light_id, '__E')
-                ! south
-                call find_neighbor_edge(light_id, '__S')
-                ! west
-                call find_neighbor_edge(light_id, '__W')
+    ! reset neighbor list
+    neighbor_list = -1
 
-                ! find neighbors on corners
-                ! northeast
-                call find_neighbor_corner(light_id, '_NE')
-                ! northwest
-                call find_neighbor_corner(light_id, '_NW')
-                ! southeast
-                call find_neighbor_corner(light_id, '_SE')
-                ! southwest
-                call find_neighbor_corner(light_id, '_SW')
+!---------------------------------------------------------------------------------------------
+! main body
 
-            end if
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+    ! special case:
+    ! if there is only one block => all neighbors are this block
+    ! one block criteria: size of block_list should be one!
+    if ( size(block_list,1) == 1 ) then
+        neighbor_list(1:8) = 1
+    end if
+
+    ! loop over all heavy data blocks
+    do k = 1, N
+
+        ! block is active
+        if ( block_list( rank*N + k , 1) /= -1 ) then
+
+            ! find edge neighbors
+            ! north
+            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__N', neighbor_list)
+            ! east
+            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__E', neighbor_list)
+            ! south
+            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__S', neighbor_list)
+            ! west
+            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__W', neighbor_list)
+
+            ! find corner neighbor
+            ! northeast
+            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_NE', neighbor_list)
+            ! northwest
+            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_NW', neighbor_list)
+            ! southeast
+            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_SE', neighbor_list)
+            ! southwest
+            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_SW', neighbor_list)
 
         end if
 

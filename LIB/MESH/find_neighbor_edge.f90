@@ -1,6 +1,9 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: find_neighbor_edge.f90
+! version: 0.4
+! author: msr
 !
 ! find neighbor on block edge
 ! valid cases for edge neighbors:
@@ -9,49 +12,96 @@
 ! neighbor relations
 ! iii) one level up: allways two neighbors
 !
-! name: find_neighbor_edge.f90
-! date: 31.10.2016
-! author: msr
-! version: 0.3
+! input:    - heavy and light data id
+!           - light data array and max treelevel
+!           - direction for neighbor search
+! output:   - neighbor list array
 !
-! ********************************
+! -------------------------------------------------------------------------------------------------------------------------
+! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+! -------------------------------------------------------------------------------------------------------------------------
+!
+! = log ======================================================================================
+!
+! 07/11/16 - switch to v0.4
+! ********************************************************************************************
 
-subroutine find_neighbor_edge(light_id, dir)
+subroutine find_neighbor_edge(heavy_id, light_id, block_list, max_treelevel, dir, neighbor_list)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), intent(in)      :: light_id
-    character(len=3), intent(in)      :: dir
+    ! heavy data id
+    integer(kind=ik), intent(in)        :: heavy_id
+    ! light data id
+    integer(kind=ik), intent(in)        :: light_id
+    ! max treelevel
+    integer(kind=ik), intent(in)        :: max_treelevel
+    ! light data array
+    integer(kind=ik), intent(in)        :: block_list(:, :)
+    ! direction for neighbor search
+    character(len=3), intent(in)        :: dir
 
-    integer(kind=ik)                  :: list_id, list_id2, virt_list_id1, virt_list_id2, virt_code1, virt_code2, neighbor_light_id
-    integer(kind=ik), dimension(10)   :: neighbor, virt_treecode
-    logical                           :: exists
-    character(len=3)                  :: dir2, virt_dir1, virt_dir2
+    ! heavy data array - neifghbor data
+    integer(kind=ik), intent(out)       :: neighbor_list(:)
 
-    ! -------------------------------------------------------------------------------------------------------------------------
-    ! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
-    ! -------------------------------------------------------------------------------------------------------------------------
+    ! auxiliary variables
+    integer(kind=ik)                    :: list_id, virt_code1, virt_list_id1, virt_code2, virt_list_id2, list_id2
 
-    ! find id in light data list, set virt_code and lvl_down_neighbor
+    ! mesh level
+    integer(kind=ik)                    :: level
+    ! treecode varaibles
+    integer(kind=ik)                    :: my_treecode(max_treelevel), neighbor(max_treelevel), virt_treecode(max_treelevel)
+    ! return value from function "does_block_exist"
+    logical                             :: exists
+    ! neighbor light data id
+    integer(kind=ik)                    :: neighbor_light_id
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+    interface
+        subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_id)
+            use module_params
+            integer(kind=ik), intent(in)        :: max_treelevel
+            integer(kind=ik), intent(in)        :: treecode(max_treelevel)
+            integer(kind=ik), intent(in)        :: block_list(:, :)
+            logical, intent(out)                :: exists
+            integer(kind=ik), intent(out)       :: light_id
+        end subroutine does_block_exist
+
+    end interface
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    my_treecode     = block_list( light_id, 1:max_treelevel )
+    level           = block_list( light_id, max_treelevel + 1 )
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! set virt_code and lvl_down_neighbor
     select case(dir)
         case('__N')
             list_id    = 1
-            ! virtual treecodes, dirs, list_ids for neighbors on higher level
+            ! virtual treecodes, list_ids for neighbors on higher level
             virt_code1    = 0
-            virt_dir1     = 'NNW'
             virt_list_id1 = 10
             virt_code2    = 1
-            virt_dir2     = 'NNE'
             virt_list_id2 = 9
-            ! dir2 for cases with neighbor one level down
-            if (blocks(light_id)%treecode( blocks(light_id)%level ) == 0) then
-                dir2     = 'NNW'
+            ! id2 for cases with neighbor one level down
+            if ( block_list(light_id, level) == 0) then
                 list_id2 = 10
-            elseif (blocks(light_id)%treecode( blocks(light_id)%level ) == 1) then
-                dir2     = 'NNE'
+            elseif ( block_list(light_id, level) == 1) then
                 list_id2 = 9
             end if
 
@@ -59,17 +109,13 @@ subroutine find_neighbor_edge(light_id, dir)
             list_id = 2
             ! virtual treecodes for neighbors on higher level
             virt_code1    = 1
-            virt_dir1     = 'ENE'
             virt_list_id1 = 13
             virt_code2    = 3
-            virt_dir2     = 'ESE'
             virt_list_id2 = 14
-            ! dir2 for cases with neighbor one level down
-            if (blocks(light_id)%treecode( blocks(light_id)%level ) == 1) then
-                dir2     = 'ENE'
+            ! id2 for cases with neighbor one level down
+            if ( block_list(light_id, level) == 1) then
                 list_id2 = 13
-            elseif (blocks(light_id)%treecode( blocks(light_id)%level ) == 3) then
-                dir2     = 'ESE'
+            elseif ( block_list(light_id, level) == 3) then
                 list_id2 = 14
             end if
 
@@ -77,17 +123,13 @@ subroutine find_neighbor_edge(light_id, dir)
             list_id   = 3
             ! virtual treecodes for neighbors on higher level
             virt_code1    = 2
-            virt_dir1     = 'SSW'
             virt_list_id1 = 12
             virt_code2    = 3
-            virt_dir2     = 'SSE'
             virt_list_id2 = 11
-            ! dir2 for cases with neighbor one level down
-            if (blocks(light_id)%treecode( blocks(light_id)%level ) == 3) then
-                dir2     = 'SSE'
+            ! id2 for cases with neighbor one level down
+            if ( block_list(light_id, level) == 3) then
                 list_id2 = 11
-            elseif (blocks(light_id)%treecode( blocks(light_id)%level ) == 2) then
-                dir2     = 'SSW'
+            elseif ( block_list(light_id, level) == 2) then
                 list_id2 = 12
             end if
 
@@ -95,102 +137,86 @@ subroutine find_neighbor_edge(light_id, dir)
             list_id   = 4
             ! virtual treecodes for neighbors on higher level
             virt_code1    = 0
-            virt_dir1     = 'WNW'
             virt_list_id1 = 15
             virt_code2    = 2
-            virt_dir2     = 'WSW'
             virt_list_id2 = 16
-            ! dir2 for cases with neighbor one level down
-            if (blocks(light_id)%treecode( blocks(light_id)%level ) == 0) then
-                dir2     = 'WNW'
+            ! id2 for cases with neighbor one level down
+            if ( block_list(light_id, level) == 0) then
                 list_id2 = 15
-            elseif (blocks(light_id)%treecode( blocks(light_id)%level ) == 2) then
-                dir2     = 'WSW'
+            elseif ( block_list(light_id, level) == 2) then
                 list_id2 = 16
             end if
 
     end select
 
     ! calculate treecode for neighbor on same level
-    call adjacent_block(blocks(light_id)%treecode, neighbor, dir)
+    call adjacent_block( my_treecode, neighbor, dir, level, max_treelevel)
 
-    ! proof existence of neighbor block
-    call does_block_exist(neighbor, exists)
+    ! proof existence of neighbor block and find light data id
+    call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
 
     if (exists) then
 
         ! neighbor on same level
-        ! find light block id
-        call find_block_id(neighbor, neighbor_light_id)
-        ! write light data
-        blocks(light_id)%neighbor_treecode(list_id,:)    = neighbor
-        blocks(light_id)%neighbor_dir(list_id)           = dir
-        blocks(light_id)%neighbor_id(list_id)            = neighbor_light_id
+        ! write neighbor data, 2D: 16 possible neighbor relations
+        neighbor_list( (heavy_id-1)*16 + list_id ) = neighbor_light_id
 
     else
 
         ! neighbor could be one level down
-        neighbor( blocks(light_id)%level ) = -1
+        neighbor( level ) = -1
         ! proof existence of neighbor block
-        call does_block_exist(neighbor, exists)
+        call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
         if ( exists ) then
             ! neigbor is one level down
-            ! find light block id
-            call find_block_id(neighbor, neighbor_light_id)
-            ! save dir2, list_id2
-            blocks(light_id)%neighbor_treecode(list_id2,:)    = neighbor
-            blocks(light_id)%neighbor_dir(list_id2)           = dir2
-            blocks(light_id)%neighbor_id(list_id2)            = neighbor_light_id
+            ! save list_id2
+            neighbor_list( (heavy_id-1)*16 + list_id2 ) = neighbor_light_id
 
         elseif ( .not.(exists) ) then
             ! 2 neighbors one level up
+
             ! first neighbor virtual treecode, one level up
-            virt_treecode = blocks(light_id)%treecode
-            virt_treecode( blocks(light_id)%level+1 ) = virt_code1
+            virt_treecode = my_treecode
+            virt_treecode( level+1 ) = virt_code1
+
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block(virt_treecode, neighbor, dir)
+            call adjacent_block( virt_treecode, neighbor, dir, level, max_treelevel)
             ! proof existence of neighbor block
-            call does_block_exist(neighbor, exists)
+            call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
 
             if (exists) then
                 ! neigbor is one level up
-                ! find light block id
-                call find_block_id(neighbor, neighbor_light_id)
                 ! write data
-                blocks(light_id)%neighbor_treecode(virt_list_id1,:)    = neighbor
-                blocks(light_id)%neighbor_dir(virt_list_id1)           = virt_dir1
-                blocks(light_id)%neighbor_id(virt_list_id1)            = neighbor_light_id
+                neighbor_list( (heavy_id-1)*16 + virt_list_id1 ) = neighbor_light_id
+
             else
                 ! error case
-                print*, 'error: can not find edge neighbor)'
+                print*, 'ERROR: can not find edge neighbor)'
                 stop
             end if
 
             ! second neighbor virtual treecode, one level up
-            virt_treecode = blocks(light_id)%treecode
-            virt_treecode( blocks(light_id)%level+1 ) = virt_code2
+            virt_treecode = my_treecode
+            virt_treecode( level+1 ) = virt_code2
+
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block(virt_treecode, neighbor, dir)
+            call adjacent_block( virt_treecode, neighbor, dir, level, max_treelevel)
             ! proof existence of neighbor block
-            call does_block_exist(neighbor, exists)
+            call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id)
 
             if (exists) then
                 ! neigbor is one level up
-                ! find light block id
-                call find_block_id(neighbor, neighbor_light_id)
                 ! write data
-                blocks(light_id)%neighbor_treecode(virt_list_id2,:)    = neighbor
-                blocks(light_id)%neighbor_dir(virt_list_id2)           = virt_dir2
-                blocks(light_id)%neighbor_id(virt_list_id2)            = neighbor_light_id
+                neighbor_list( (heavy_id-1)*16 + virt_list_id2 ) = neighbor_light_id
+
             else
                 ! error case
-                print*, 'error: can not find edge neighbor)'
+                print*, 'ERROR: can not find edge neighbor)'
                 stop
             end if
 
         end if
 
     end if
-
 
 end subroutine find_neighbor_edge

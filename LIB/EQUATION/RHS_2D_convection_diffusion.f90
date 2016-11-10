@@ -11,36 +11,70 @@
 !
 ! ********************************
 
-subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N, u01, u02, nu)
+! ********************************************************************************************
+! WABBIT
+! ============================================================================================
+! name: RHS_2D_convection_diffusion.f90
+! version: 0.4
+! author: msr, engels
+!
+! refine every block to create the wavelet safety zone
+!
+! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order
+! output:   - RHS(datafield)
+!
+! = log ======================================================================================
+!
+! 10/11/16 - switch to v0.4
+! ********************************************************************************************
 
+subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_discretization)
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), intent(in)					            :: g, N
+    ! grid parameter
+    integer(kind=ik), intent(in)                                :: g, Bs
+    ! rhs parameter
     real(kind=rk), intent(in)                                   :: dx, dy, u01, u02, nu
-    real(kind=rk), dimension(N+2*g, N+2*g), intent(inout)       :: phi
+    ! datafield
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g), intent(inout)     :: phi
+    ! order discretization
+    character(len=80)                                           :: order_discretization
 
-    real(kind=rk), dimension(N+2*g, N+2*g)			            :: grad_phi, laplace_phi, rhs
+    ! auxiliary fields for rhs calculation
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g)                    :: rhs
+    ! auxiliary variables
     real(kind=rk)                                               :: phi_dx, phi_dy, phi_dxdx, phi_dydy, dx_inv, dy_inv, dx2_inv, dy2_inv
-    real(kind=rk)                                               :: a(-3:+3),b1,b2,b3,b4,b5
+    real(kind=rk)                                               :: a(-3:+3), b1, b2, b3 ,b4 ,b5
+    ! loop variables
+    integer                                                     :: ix, iy
 
-    integer                                                     :: ix,iy
+!---------------------------------------------------------------------------------------------
+! interfaces
 
-    grad_phi 		= 0.0_rk
-    laplace_phi	    = 0.0_rk
-    rhs             = 0.0_rk
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    rhs = 0.0_rk
 
     ! division is expensive, multiplication is cheap, so here we save some time
     dx_inv = 1.0_rk / (dx)
     dy_inv = 1.0_rk / (dy)
-    dx2_inv = 1.0_rk / dx**2
-    dy2_inv = 1.0_rk / dy**2
+    dx2_inv = 1.0_rk / dx**2.0_rk
+    dy2_inv = 1.0_rk / dy**2.0_rk
 
     ! Tam & Webb, 4th order optimized (for first derivative)
-    a=(/-0.02651995d0, +0.18941314d0, -0.79926643d0, 0.0d0, &
-         0.79926643d0, -0.18941314d0, 0.02651995d0/)
+    a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
+         0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
     ! 4th order coefficients for second derivative
     b1 = -1.0_rk/12.0_rk
@@ -49,13 +83,16 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N, u01, u02, nu)
     b4 = 4.0_rk/3.0_rk
     b5 = -1.0_rk/12.0_rk
 
-    if (params%order_discretization == "FD_2nd_central" ) then
+!---------------------------------------------------------------------------------------------
+! main body
+
+    if (order_discretization == "FD_2nd_central" ) then
       !-----------------------------------------------------------------------
       ! 2nd order
       !-----------------------------------------------------------------------
       ! loop over interior points only (EXCLUDE ghost nodes)
-      do ix = g+1, N+g
-        do iy = g+1, N+g
+      do ix = g+1, Bs+g
+        do iy = g+1, Bs+g
           phi_dx = (phi(ix+1,iy)-phi(ix-1,iy))/(2.0_rk*dx)
           phi_dy = (phi(ix,iy+1)-phi(ix,iy-1))/(2.0_rk*dy)
           phi_dxdx = (phi(ix-1,iy)-2.d0*phi(ix,iy)+phi(ix+1,iy))*dy2_inv
@@ -66,13 +103,13 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N, u01, u02, nu)
         end do
       end do
 
-    elseif (params%order_discretization == "FD_4th_central_optimized") then
+    elseif (order_discretization == "FD_4th_central_optimized") then
       !-----------------------------------------------------------------------
       ! 4th order
       !-----------------------------------------------------------------------
       ! loop over interior points only (EXCLUDE ghost nodes)
-      do ix = g+1, N+g
-        do iy = g+1, N+g
+      do ix = g+1, Bs+g
+        do iy = g+1, Bs+g
           phi_dx = (a(-3)*phi(ix-3,iy) + a(-2)*phi(ix-2,iy) + a(-1)*phi(ix-1,iy) + a(0)*phi(ix,iy)&
                  +  a(+3)*phi(ix+3,iy) + a(+2)*phi(ix+2,iy) + a(+1)*phi(ix+1,iy))*dx_inv
           phi_dy = (a(-3)*phi(ix,iy-3) + a(-2)*phi(ix,iy-2) + a(-1)*phi(ix,iy-1) + a(0)*phi(ix,iy)&
@@ -89,8 +126,8 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, N, u01, u02, nu)
       end do
 
     else
-      write(*,*) "discretization method in params%order_discretization is unknown"
-      write(*,*) params%order_discretization
+      write(*,*) "ERROR: discretization method in params%order_discretization is unknown"
+      write(*,*) order_discretization
       stop
     end if
 

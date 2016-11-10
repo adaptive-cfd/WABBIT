@@ -4,9 +4,9 @@ FFILES = init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_g
 encoding.f90 int_to_binary.f90 treecode_size.f90 new_block_heavy.f90 save_data.f90 write_field.f90 update_neighbors.f90 find_neighbor_edge.f90 \
 adjacent_block.f90 does_block_exist.f90 array_compare.f90 find_neighbor_corner.f90 block_count.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 \
 refine_mesh.f90 get_free_light_id.f90 time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 sort_com_list.f90 com_allowed.f90 \
-send_receive_data.f90 # new_block_light.f90   find_block_id.f90  get_sister_id.f90 delete_block_heavy.f90 delete_block_light.f90    \
+send_receive_data.f90 RHS_2D_convection_diffusion.f90 # new_block_light.f90   find_block_id.f90  get_sister_id.f90 delete_block_heavy.f90 delete_block_light.f90    \
 synchronize_ghosts.f90 create_com_list.f90 find_neighborhood.f90    calc_dt.f90 \
-  RHS_2D_convection_diffusion.f90    get_light_free_block.f90 \
+      get_light_free_block.f90 \
 adapt_mesh.f90 threshold_block.f90 calculate_detail.f90 ensure_gradedness.f90 ensure_completeness.f90 set_heavy_data.f90 get_heavy_free_block.f90
 
 # Object and module directory:

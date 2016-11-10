@@ -183,8 +183,7 @@ program main
             write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, block_number
 
         end if
-call save_data( iteration, 1.0_rk, params, block_list, block_data, neighbor_list )
-stop
+
     end do
 
     ! save end field to disk

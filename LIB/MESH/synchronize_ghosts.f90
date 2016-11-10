@@ -10,6 +10,8 @@
 ! input:    - params, light and heavy data
 ! output:   - heavy data array
 !
+! todo: change soubroutine, to work only on one datafield, not on all to the same time
+!
 ! -------------------------------------------------------------------------------------------------------------------------
 ! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
 ! -------------------------------------------------------------------------------------------------------------------------

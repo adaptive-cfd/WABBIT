@@ -104,7 +104,7 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
     call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
 
     ! calculate time step, loop over all data fields
-    do dF = 2, params%number_data_fields+1
+    do dF = 2, N_dF+1
         dt = min(dt, params%CFL * dx / norm2( params%u0( (dF-2)*2 + 1 : (dF-2)*2 + 2 ) ) )
     end do
 

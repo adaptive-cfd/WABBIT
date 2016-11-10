@@ -119,6 +119,14 @@ program main
             integer(kind=ik), intent(in)                :: neighbor_list(:)
         end subroutine time_step_RK4
 
+        subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
+            use module_params
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(inout)             :: block_list(:, :)
+            real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
+            integer(kind=ik), intent(in)                :: neighbor_list(:)
+        end subroutine adapt_mesh
+
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -171,6 +179,12 @@ program main
         ! advance in time
         call time_step_RK4( time, params, block_list, block_data, neighbor_list )
 
+        ! adapt the mesh
+        if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list )
+
+        ! update neighbor relations
+        call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
+
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
           call save_data( iteration, time, params, block_list, block_data, neighbor_list )
@@ -198,15 +212,5 @@ program main
 
     ! end mpi
     call MPI_Finalize(ierr)
-
-
-
-
-!        ! advance in time
-!        call time_step_RK4(time)
-!
-!        ! adapt the mesh
-!        if (blocks_params%adapt_mesh) call adapt_mesh()
-
 
 end program main

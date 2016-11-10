@@ -110,6 +110,15 @@ program main
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
         end subroutine refine_everywhere
 
+        subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
+            use module_params
+            real(kind=rk), intent(inout)                :: time
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
+            integer(kind=ik), intent(in)                :: neighbor_list(:)
+        end subroutine time_step_RK4
+
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -156,6 +165,12 @@ program main
         ! refine every block to create the safety zone
         if ( params%adapt_mesh ) call refine_everywhere( params, block_list, block_data )
 
+        ! update neighbor relations
+        call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
+
+        ! advance in time
+        call time_step_RK4( time, params, block_list, block_data, neighbor_list )
+
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
           call save_data( iteration, time, params, block_list, block_data, neighbor_list )
@@ -186,13 +201,8 @@ stop
     call MPI_Finalize(ierr)
 
 
-!
-!        ! refine every block to create the safety zone
-!        if (blocks_params%adapt_mesh) call refine_everywhere()
-!
-!        ! update the neighbor relations
-!        call update_neighbors()
-!
+
+
 !        ! advance in time
 !        call time_step_RK4(time)
 !

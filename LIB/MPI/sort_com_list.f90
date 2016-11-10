@@ -1,47 +1,87 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
+! ============================================================================================
+! name: sort_com_list.f90
+! version: 0.4
+! author: msr
 !
 ! sort com_list
 !
-! name: sort_com_list.f90
-! date: 26.10.2016
-! author: msr
-! version: 0.3
+! input:    - com_list
+!           - number of procs
+!           - number of communications
+! output:   - sorted com_list
+!           - com_plan
 !
-! ********************************
+! = log ======================================================================================
+!
+! 08/11/16 - switch to v0.4
+! ********************************************************************************************
 
-subroutine sort_com_list(com_list, com_plan, n_proc, n_com, com_list_N)
+subroutine sort_com_list(com_list, com_list_N, com_plan, com_plan_N, n_proc, n_com)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
     use module_params
-    use module_blocks
+
+!---------------------------------------------------------------------------------------------
+! variables
 
     implicit none
 
-    integer(kind=ik), intent(in)                                :: com_list_N
+    ! com_list length
+    integer(kind=ik), intent(in)          :: com_list_N
+    ! com list
+    integer(kind=ik), intent(inout)       :: com_list(com_list_N, 8)
 
-    integer(kind=ik), dimension(com_list_N, 7), intent(inout)   :: com_list
-    integer, dimension(2000, 2), intent(out)                    :: com_plan
-    integer(kind=ik), intent(in)                                :: n_proc, n_com
+    ! com_plan length
+    integer(kind=ik), intent(in)          :: com_plan_N
+    ! com plan
+    integer, intent(out)                  :: com_plan(com_plan_N)
 
-    integer                                                     :: i, j, k, allocate_error, com_count, plan_type
-    integer, dimension(7)                                       :: com_list_elem
+    ! number of procs, number of communications
+    integer(kind=ik), intent(in)          :: n_proc, n_com
 
-    logical, dimension(:), allocatable                          :: proc_status
-    logical                                                     :: com_allowed
+    ! allocation error variable
+    integer(kind=ik)                      :: allocate_error
+
+    ! loop variables
+    integer(kind=ik)                      :: i, j, k
+
+    ! number of communications for com_plan
+    integer(kind=ik)                      :: com_count
+
+    ! line of com_list to copy/sort list
+    integer, dimension(8)                 :: com_list_elem
+
+    ! status of proc: .true. - can send/receive, .false. - con not send/receive
+    logical, dimension(:), allocatable    :: proc_status
+    ! .true. - there are communications between procs left - use to parallelize communication
+    logical                               :: com_allowed
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
     ! reset com_plan
-    com_plan    = -99
+    com_plan    = -1
 
     allocate( proc_status(n_proc), stat=allocate_error )
     ! at start all procs can communicate
     proc_status = .true.
 
+!---------------------------------------------------------------------------------------------
+! main body
+
     ! create communication plan and sort com_list
     i = 1
     j = 1
 
-    do while ( com_list(i,1) /= -99 )
+    do while ( com_list(i,1) /= -1 )
 
         com_count = 0
 
@@ -108,39 +148,17 @@ subroutine sort_com_list(com_list, com_plan, n_proc, n_com, com_list_N)
             end do
         end if
 
-        ! set type off communication (1: internal, 2: external)
-        if ( com_list(i,2) == com_list(i,3) ) then
-            plan_type = 1
-        else
-            plan_type = 2
-        end if
-
         ! move list index
-        if (plan_type == 1) then
-            ! internal com
-            i = i + com_count
-        else
-            ! external com
-            i = i + 2*com_count
-        end if
+        i = i + 2*com_count
 
         if ( com_count > 0) then
 
-            if (plan_type == 1) then
-                ! set com plan, internal com
-                com_plan(j, 1)    = plan_type
-                com_plan(j, 2)    = com_count
-                ! prepare for next loop
-                j = j + 1
-            else
-                ! set com plan, external com
-                com_plan(j, 1)    = plan_type
-                com_plan(j, 2)    = com_count
-                com_plan(j+1, 1)  = plan_type
-                com_plan(j+1, 2)  = com_count
-                ! prepare for next loop
-                j = j + 2
-            end if
+            ! set com plan, external com
+            com_plan(j)    = com_count
+            com_plan(j+1)  = com_count
+            ! prepare for next loop
+            j = j + 2
+
         end if
 
         ! reset proc_status, if necessary

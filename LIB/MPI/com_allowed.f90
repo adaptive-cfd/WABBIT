@@ -1,28 +1,55 @@
-! ********************************
+! ********************************************************************************************
 ! WABBIT
-! --------------------------------
-!
-! check if communication between two procs is possible
-!
+! ============================================================================================
 ! name: com_allowed.f90
-! date: 26.10.2016
+! version: 0.4
 ! author: msr
-! version: 0.3
 !
-! ********************************
+! check if communication between two procs is possible -> if more than one .true. in array
+!
+! input:    - logical array
+!           - size of array
+! output:   - .true. or .false.
+!
+! = log ======================================================================================
+!
+! 08/11/16 - switch to v0.4
+! ********************************************************************************************
 
 logical function com_allowed(array, N)
 
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
+    use module_params
+
+!---------------------------------------------------------------------------------------------
+! variables
+
     implicit none
 
+    ! array size
     integer, intent(in)                   :: N
-    logical, dimension(N), intent(in)     :: array
+    ! array with proc status
+    logical, intent(in)                     :: array(N)
 
+    ! loop variable
     integer                               :: i
+    ! found one .true. in array
     logical                               :: one_com_allowed
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
 
     com_allowed   = .false.
     one_com_allowed = .false.
+
+!---------------------------------------------------------------------------------------------
+! main body
 
     do i = 1, N
 

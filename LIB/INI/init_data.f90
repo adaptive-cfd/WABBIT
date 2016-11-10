@@ -228,9 +228,6 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
 
     ! clean up
     call clean_ini_file(FILE)
-
-    deallocate( params%u0, stat=allocate_error )
-    deallocate( params%nu, stat=allocate_error )
     deallocate( phi, stat=allocate_error )
 
 end subroutine init_data

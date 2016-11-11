@@ -35,7 +35,7 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
     ! heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
     ! neighbor list
-    integer(kind=ik), intent(in)        :: neighbor_list(:)
+    integer(kind=ik), intent(inout)     :: neighbor_list(:)
 
     ! loop variables
     integer(kind=ik)                    :: k
@@ -72,6 +72,14 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
         end subroutine coarse_mesh
 
+        subroutine update_neighbors(block_list, neighbor_list, N, max_treelevel)
+            use module_params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            integer(kind=ik), intent(out)               :: neighbor_list(:)
+            integer(kind=ik), intent(in)                :: N
+            integer(kind=ik), intent(in)                :: max_treelevel
+        end subroutine update_neighbors
+
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -93,7 +101,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
         call ensure_completeness( block_list, params%max_treelevel )
 
         ! adapt the mesh
-        !call interpolate_mesh()
+        call coarse_mesh( params, block_list, block_data )
+
+        ! update neighbor relations
+        call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
 
     end do
 

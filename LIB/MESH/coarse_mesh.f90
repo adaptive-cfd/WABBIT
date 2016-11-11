@@ -164,7 +164,7 @@ subroutine coarse_mesh( params, block_list, block_data )
 
             s3                                                  = block_list(id(3), 1:maxtL)
             light_ids( s3( block_list(id(3), maxtL+1) ) + 1 )   = id(3)
-            light_ids( s3( block_list(id(3), maxtL+1) ) + 1 )   = id(3) - ((id(3)-1) / params%number_blocks) * params%number_blocks
+            heavy_ids( s3( block_list(id(3), maxtL+1) ) + 1 )   = id(3) - ((id(3)-1) / params%number_blocks) * params%number_blocks
             proc_rank( s3( block_list(id(3), maxtL+1) ) + 1 )   = (id(3)-1) / params%number_blocks
 
             ! proc with block k keep the data
@@ -188,14 +188,14 @@ subroutine coarse_mesh( params, block_list, block_data )
                         select case(i)
                             case(1)
                                 ! sister 0
-                                new_coord_x(1:(Bs-1)/2+1)              = block_data( heavy_ids(1), 1, 1:Bs:2, 1 )
-                                new_coord_y(1:(Bs-1)/2+1)              = block_data( heavy_ids(1), 2, 1:Bs:2, 1 )
+                                new_coord_x(1:(Bs-1)/2+1)              = block_data( 1, 1:Bs:2, 1, heavy_ids(1) )
+                                new_coord_y(1:(Bs-1)/2+1)              = block_data( 2, 1:Bs:2, 1, heavy_ids(1) )
                             case(2)
                                 ! sister 1
-                                new_coord_x((Bs-1)/2+1:Bs)             = block_data( heavy_ids(2), 1, 1:Bs:2, 1 )
+                                new_coord_x((Bs-1)/2+1:Bs)             = block_data( 1, 1:Bs:2, 1, heavy_ids(2) )
                             case(3)
                                 ! sister 2
-                                new_coord_y((Bs-1)/2+1:Bs)             = block_data( heavy_ids(3), 2, 1:Bs:2, 1 )
+                                new_coord_y((Bs-1)/2+1:Bs)             = block_data( 2, 1:Bs:2, 1, heavy_ids(3) )
                             case(4)
                                 ! sister 3
                                 ! nothing to do
@@ -232,19 +232,19 @@ subroutine coarse_mesh( params, block_list, block_data )
                         case(1)
                             ! sister 0
                             ! send coord
-                            send_receive_coord = block_data( heavy_ids(1), 1, 1:Bs, 1 )
+                            send_receive_coord = block_data( 1, 1:Bs, 1, heavy_ids(1) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
-                            send_receive_coord = block_data( heavy_ids(1), 2, 1:Bs, 1 )
+                            send_receive_coord = block_data( 2, 1:Bs, 1, heavy_ids(1) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         case(2)
                             ! sister 1
                             ! send coord
-                            send_receive_coord = block_data( heavy_ids(2), 1, 1:Bs, 1 )
+                            send_receive_coord = block_data( 1, 1:Bs, 1, heavy_ids(2) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         case(3)
                             ! sister 2
                             ! send coord
-                            send_receive_coord = block_data( heavy_ids(3), 2, 1:Bs, 1 )
+                            send_receive_coord = block_data( 2, 1:Bs, 1, heavy_ids(3) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         case(4)
                             ! sister 3
@@ -263,16 +263,16 @@ subroutine coarse_mesh( params, block_list, block_data )
                             select case(i)
                                 case(1)
                                     ! sister 0
-                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF)   = block_data( heavy_ids(1), g+1:Bs+g:2, g+1:Bs+g:2, dF )
+                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(1) )
                                 case(2)
                                     ! sister 1
-                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF)  = block_data( heavy_ids(2), g+1:Bs+g:2, g+1:Bs+g:2, dF )
+                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(2) )
                                 case(3)
                                     ! sister 2
-                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF)  = block_data( heavy_ids(3), g+1:Bs+g:2, g+1:Bs+g:2, dF )
+                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(3) )
                                 case(4)
                                     ! sister 3
-                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF) = block_data( heavy_ids(4), g+1:Bs+g:2, g+1:Bs+g:2, dF )
+                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(4) )
                             end select
                         else
                             ! receive data from other proc, note: not all blocks have to send coord vectors
@@ -281,22 +281,22 @@ subroutine coarse_mesh( params, block_list, block_data )
                                     ! sister 0
                                     ! receive data
                                     call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF)   = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = send_receive_data(1:Bs:2, 1:Bs:2)
                                 case(2)
                                     ! sister 1
                                     ! receive data
                                     call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF)  = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = send_receive_data(1:Bs:2, 1:Bs:2)
                                 case(3)
                                     ! sister 2
                                     ! receive data
                                     call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF)  = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = send_receive_data(1:Bs:2, 1:Bs:2)
                                 case(4)
                                     ! sister 3
                                     ! receive data
                                     call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF) = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = send_receive_data(1:Bs:2, 1:Bs:2)
                             end select
                         end if
 
@@ -306,22 +306,22 @@ subroutine coarse_mesh( params, block_list, block_data )
                             case(1)
                                 ! sister 0
                                 ! send data
-                                send_receive_data = block_data( heavy_ids(1), g+1:Bs+g, g+1:Bs+g, dF )
+                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(1) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(2)
                                 ! sister 1
                                 ! send data
-                                send_receive_data = block_data( heavy_ids(2), g+1:Bs+g, g+1:Bs+g, dF )
+                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(2) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(3)
                                 ! sister 2
                                 ! send data
-                                send_receive_data = block_data( heavy_ids(3), g+1:Bs+g, g+1:Bs+g, dF )
+                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(3) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(4)
                                 ! sister 3
                                 ! send data
-                                send_receive_data = block_data( heavy_ids(4), g+1:Bs+g, g+1:Bs+g, dF )
+                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(4) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         end select
                     else
@@ -332,10 +332,10 @@ subroutine coarse_mesh( params, block_list, block_data )
             end do
 
             ! delete all heavy data
-            if ( proc_rank(1) == rank ) block_data( heavy_ids(1), :, :, : ) = 0.0_rk
-            if ( proc_rank(2) == rank ) block_data( heavy_ids(2), :, :, : ) = 0.0_rk
-            if ( proc_rank(3) == rank ) block_data( heavy_ids(3), :, :, : ) = 0.0_rk
-            if ( proc_rank(4) == rank ) block_data( heavy_ids(4), :, :, : ) = 0.0_rk
+            if ( proc_rank(1) == rank ) block_data( :, :, :, heavy_ids(1) ) = 0.0_rk
+            if ( proc_rank(2) == rank ) block_data( :, :, :, heavy_ids(2) ) = 0.0_rk
+            if ( proc_rank(3) == rank ) block_data( :, :, :, heavy_ids(3) ) = 0.0_rk
+            if ( proc_rank(4) == rank ) block_data( :, :, :, heavy_ids(4) ) = 0.0_rk
 
             ! delete light data
             block_list(light_ids(1), : ) = -1
@@ -356,14 +356,14 @@ subroutine coarse_mesh( params, block_list, block_data )
             if ( data_rank == rank ) then
 
                 ! write coordinates
-                block_data( k - ((k-1) / params%number_blocks) * params%number_blocks, 1, 1:Bs, 1 ) = new_coord_x
-                block_data( k - ((k-1) / params%number_blocks) * params%number_blocks, 2, 1:Bs, 1 ) = new_coord_y
+                block_data( 1, 1:Bs, 1, k - ((k-1) / params%number_blocks) * params%number_blocks ) = new_coord_x
+                block_data( 2, 1:Bs, 1, k - ((k-1) / params%number_blocks) * params%number_blocks ) = new_coord_y
 
                 ! loop over all dataFields
                 do dF = 2, params%number_data_fields+1
 
                     ! write data
-                    block_data( k - ((k-1) / params%number_blocks) * params%number_blocks, g+1:Bs+g, g+1:Bs+g, dF ) = new_data(:,:,dF-1)
+                    block_data( g+1:Bs+g, g+1:Bs+g, dF, k - ((k-1) / params%number_blocks) * params%number_blocks ) = new_data(:,:,dF-1)
 
                 end do
 

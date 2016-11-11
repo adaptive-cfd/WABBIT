@@ -138,28 +138,28 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
             ! '__N'
             case(1)
                 do l = 1, g
-                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( my_block, g+l+1, g+1:Bs+g, dF )
+                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( g+l+1, g+1:Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '__E'
             case(2)
                 do l = 1, g
-                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( my_block, g+1:Bs+g, Bs+g-l, dF )
+                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( g+1:Bs+g, Bs+g-l, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '__S'
             case(3)
                 do l = 1, g
-                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( my_block, Bs+g-l, g+1:Bs+g, dF )
+                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( Bs+g-l, g+1:Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '__W'
             case(4)
                 do l = 1, g
-                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( my_block, g+1:Bs+g, g+l+1, dF )
+                    send_buff(buffer_i:buffer_i+Bs-1)   = block_data( g+1:Bs+g, g+l+1, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
@@ -167,13 +167,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
             case(5)
                 if ( level_diff == 0 ) then
                     ! blocks on same level
-                    data_corner = block_data( my_block, g+2:g+1+g, Bs:Bs-1+g, dF )
+                    data_corner = block_data( g+2:g+1+g, Bs:Bs-1+g, dF, my_block )
 
                 elseif ( level_diff == -1 ) then
                     ! sender one level down
                     ! interpolate data
                     ! data to refine
-                    data_corner = block_data( my_block, g+1:g+g, Bs+1:Bs+g, dF )
+                    data_corner = block_data( g+1:g+g, Bs+1:Bs+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_corner , data_corner_fine, params%order_predictor)
                     ! data to synchronize
@@ -181,7 +181,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
 
                 elseif ( level_diff == 1) then
                     ! sender one level up
-                    data_corner = block_data( my_block, g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, dF )
+                    data_corner = block_data( g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, dF, my_block )
 
                 else
                     ! error case
@@ -201,13 +201,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == 0 ) then
                     ! blocks on same level
                     ! loop over all datafields
-                    data_corner = block_data( my_block, g+2:g+1+g, g+2:g+1+g, dF )
+                    data_corner = block_data( g+2:g+1+g, g+2:g+1+g, dF, my_block )
 
                 elseif ( level_diff == -1 ) then
                     ! sender one level down
                     ! interpolate data
                     ! data to refine
-                    data_corner = block_data( my_block, g+1:g+g, g+1:g+g, dF )
+                    data_corner = block_data( g+1:g+g, g+1:g+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_corner , data_corner_fine, params%order_predictor)
                     ! data to synchronize
@@ -215,7 +215,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
 
                 elseif ( level_diff == 1) then
                     ! sender one level up
-                    data_corner = block_data( my_block, g+3:g+1+g+g:2, g+3:g+1+g+g:2, dF )
+                    data_corner = block_data( g+3:g+1+g+g:2, g+3:g+1+g+g:2, dF, my_block )
 
                 else
                     ! error case
@@ -234,13 +234,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
             case(7)
                 if ( level_diff == 0 ) then
                     ! blocks on same level
-                    data_corner = block_data( my_block, Bs:Bs-1+g, Bs:Bs-1+g, dF )
+                    data_corner = block_data( Bs:Bs-1+g, Bs:Bs-1+g, dF, my_block )
 
                 elseif ( level_diff == -1 ) then
                     ! sender one level down
                     ! interpolate data
                     ! data to refine
-                    data_corner = block_data( my_block, Bs+1:Bs+g, Bs+1:Bs+g, dF )
+                    data_corner = block_data( Bs+1:Bs+g, Bs+1:Bs+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_corner , data_corner_fine, params%order_predictor)
                     ! data to synchronize
@@ -248,7 +248,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
 
                 elseif ( level_diff == 1) then
                     ! sender one level up
-                    data_corner = block_data( my_block, Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, dF )
+                    data_corner = block_data( Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, dF, my_block )
 
                 else
                     ! error case
@@ -267,13 +267,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
             case(8)
                 if ( level_diff == 0 ) then
                     ! blocks on same level
-                    data_corner = block_data( my_block, Bs:Bs-1+g, g+2:g+1+g, dF )
+                    data_corner = block_data( Bs:Bs-1+g, g+2:g+1+g, dF, my_block )
 
                 elseif ( level_diff == -1 ) then
                     ! sender one level down
                     ! interpolate data
                     ! data to refine
-                    data_corner = block_data( my_block, Bs+1:Bs+g, g+1:g+g, dF )
+                    data_corner = block_data( Bs+1:Bs+g, g+1:g+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_corner , data_corner_fine, params%order_predictor)
                     ! data to synchronize
@@ -281,7 +281,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
 
                 elseif ( level_diff == 1) then
                     ! sender one level up
-                    data_corner = block_data( my_block, Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, dF )
+                    data_corner = block_data( Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, dF, my_block )
 
                 else
                     ! error case
@@ -301,7 +301,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF )
+                    data_edge = block_data( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
 
@@ -315,7 +315,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     ! sender on higher level
                     ! send data
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, g+(2*l)+1, g+1:Bs+g:2, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( g+(2*l)+1, g+1:Bs+g:2, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -331,7 +331,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF )
+                    data_edge = block_data( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
 
@@ -345,7 +345,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     ! sender on higher level
                     ! send data
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, g+(2*l)+1, g+1:Bs+g:2, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( g+(2*l)+1, g+1:Bs+g:2, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -361,7 +361,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF )
+                    data_edge = block_data( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                     ! send data
@@ -374,7 +374,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     ! sender on higher level
                     ! send data
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, Bs+g-(2*l), g+1:Bs+g:2, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( Bs+g-(2*l), g+1:Bs+g:2, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -390,7 +390,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF )
+                    data_edge = block_data( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                     ! send data
@@ -403,7 +403,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     ! sender on higher level
                     ! send data
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, Bs+g-(2*l), g+1:Bs+g:2, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( Bs+g-(2*l), g+1:Bs+g:2, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -419,7 +419,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF )
+                    data_edge = block_data( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                     ! send data
@@ -432,7 +432,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     ! sender on higher level
                     ! send data
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, g+1:Bs+g:2, Bs-g+2*l-2, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( g+1:Bs+g:2, Bs-g+2*l-2, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -448,7 +448,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF )
+                    data_edge = block_data( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                     ! send data
@@ -460,7 +460,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, g+1:Bs+g:2, Bs-g+2*l-2, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( g+1:Bs+g:2, Bs-g+2*l-2, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -476,7 +476,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF )
+                    data_edge = block_data( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                     ! send data
@@ -488,7 +488,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, g+1:Bs+g:2, g+(2*l)+1, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( g+1:Bs+g:2, g+(2*l)+1, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -504,7 +504,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! data to interpolate
-                    data_edge = block_data( my_block, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF )
+                    data_edge = block_data( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
                     ! interpolate data
                     call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                     ! send data
@@ -517,7 +517,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     ! sender on higher level
                     ! send data
                     do l = 1, g
-                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( my_block, g+1:Bs+g:2, g+(2*l)+1, dF )
+                        send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = block_data( g+1:Bs+g:2, g+(2*l)+1, dF, my_block )
                         buffer_i                                  = buffer_i + (Bs+1)/2
                     end do
 
@@ -558,28 +558,28 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
             ! '__N'
             case(1)
                 do l = 1, g
-                    block_data( my_block, Bs+g+l, g+1:Bs+g, dF )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                    block_data( Bs+g+l, g+1:Bs+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                     buffer_i                                         = buffer_i + Bs
                 end do
 
             ! '__E'
             case(2)
                 do l = 1, g
-                    block_data( my_block, g+1:Bs+g, g+1-l, dF )      = recv_buff(buffer_i:buffer_i+Bs-1)
+                    block_data( g+1:Bs+g, g+1-l, dF , my_block)      = recv_buff(buffer_i:buffer_i+Bs-1)
                     buffer_i                                         = buffer_i + Bs
                 end do
 
             ! '__S'
             case(3)
                 do l = 1, g
-                    block_data( my_block, g+1-l, g+1:Bs+g, dF )      = recv_buff(buffer_i:buffer_i+Bs-1)
+                    block_data( g+1-l, g+1:Bs+g, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
                     buffer_i                                         = buffer_i + Bs
                 end do
 
             ! '__W'
             case(4)
                 do l = 1, g
-                    block_data( my_block, g+1:Bs+g, Bs+g+l, dF )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                    block_data( g+1:Bs+g, Bs+g+l, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                     buffer_i                                         = buffer_i + Bs
                 end do
 
@@ -591,7 +591,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     buffer_i            = buffer_i + g
                 end do
                 ! write data
-                block_data( my_block, Bs+g+1:Bs+g+g, 1:g, dF ) = data_corner
+                block_data( Bs+g+1:Bs+g+g, 1:g, dF, my_block ) = data_corner
 
             ! '_NW'
             case(6)
@@ -601,7 +601,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     buffer_i            = buffer_i + g
                 end do
                 ! write data
-                block_data( my_block, Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF ) = data_corner
+                block_data( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner
 
             ! '_SE'
             case(7)
@@ -611,7 +611,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     buffer_i            = buffer_i + g
                 end do
                 ! write data
-                block_data( my_block, 1:g, 1:g, dF ) = data_corner
+                block_data( 1:g, 1:g, dF, my_block ) = data_corner
 
             ! '_SW'
             case(8)
@@ -621,7 +621,7 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     buffer_i            = buffer_i + g
                 end do
                 ! write data
-                block_data( my_block, 1:g, Bs+g+1:Bs+g+g, dF ) = data_corner
+                block_data( 1:g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner
 
             ! 'NNE'
             case(9)
@@ -634,13 +634,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                     end do
 
                     ! write data
-                    block_data( my_block, Bs+g+1:Bs+g+g, 1:Bs+g, dF ) = data_edge_fine(1:g, 1:Bs+g)
+                    block_data( Bs+g+1:Bs+g+g, 1:Bs+g, dF, my_block ) = data_edge_fine(1:g, 1:Bs+g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, Bs+g+l, g+(Bs+1)/2:Bs+g, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( Bs+g+l, g+(Bs+1)/2:Bs+g, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                             = buffer_i + (Bs+1)/2
                     end do
 
@@ -661,13 +661,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                          = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, Bs+g+1:Bs+g+g, g+1:Bs+2*g, dF ) = data_edge_fine(1:g, 1:Bs+g)
+                    block_data( Bs+g+1:Bs+g+g, g+1:Bs+2*g, dF, my_block ) = data_edge_fine(1:g, 1:Bs+g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, Bs+g+l, g+1:g+(Bs+1)/2, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( Bs+g+l, g+1:g+(Bs+1)/2, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                            = buffer_i + (Bs+1)/2
                     end do
 
@@ -688,13 +688,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                          = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, 1:g, 1:Bs+g, dF ) = data_edge_fine(1:g, 1:Bs+g)
+                    block_data( 1:g, 1:Bs+g, dF, my_block ) = data_edge_fine(1:g, 1:Bs+g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, g-l+1, g+(Bs+1)/2:Bs+g, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( g-l+1, g+(Bs+1)/2:Bs+g, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                            = buffer_i + (Bs+1)/2
                     end do
 
@@ -715,13 +715,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                          = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, 1:g, g+1:Bs+2*g, dF ) = data_edge_fine(1:g, 1:Bs+g)
+                    block_data( 1:g, g+1:Bs+2*g, dF, my_block ) = data_edge_fine(1:g, 1:Bs+g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, g-l+1, g+1:g+(Bs+1)/2, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( g-l+1, g+1:g+(Bs+1)/2, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                           = buffer_i + (Bs+1)/2
                     end do
 
@@ -742,13 +742,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                         = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, g+1:Bs+2*g, 1:g, dF ) = data_edge_fine(1:Bs+g, Bs+1:Bs+g)
+                    block_data( g+1:Bs+2*g, 1:g, dF, my_block ) = data_edge_fine(1:Bs+g, Bs+1:Bs+g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, g+1:g+(Bs+1)/2, l, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( g+1:g+(Bs+1)/2, l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                       = buffer_i + (Bs+1)/2
                     end do
 
@@ -769,13 +769,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                          = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, 1:Bs+g, 1:g, dF ) = data_edge_fine(1:Bs+g, Bs+1:Bs+g)
+                    block_data( 1:Bs+g, 1:g, dF, my_block ) = data_edge_fine(1:Bs+g, Bs+1:Bs+g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, g+(Bs+1)/2:Bs+g, l, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( g+(Bs+1)/2:Bs+g, l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                        = buffer_i + (Bs+1)/2
                     end do
 
@@ -796,13 +796,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                      = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, g+1:Bs+2*g, Bs+g+1:Bs+g+g, dF ) = data_edge_fine(1:Bs+g, 1:g)
+                    block_data( g+1:Bs+2*g, Bs+g+1:Bs+g+g, dF, my_block ) = data_edge_fine(1:Bs+g, 1:g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, g+1:g+(Bs+1)/2, Bs+g+l, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( g+1:g+(Bs+1)/2, Bs+g+l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                            = buffer_i + (Bs+1)/2
                     end do
 
@@ -823,13 +823,13 @@ subroutine send_receive_data(params, block_data, com_id, com_list, com_number, d
                         buffer_i                      = buffer_i + Bs+g
                     end do
                     ! write data
-                    block_data( my_block, 1:Bs+g, Bs+g+1:Bs+g+g, dF ) = data_edge_fine(1:Bs+g, 1:g)
+                    block_data( 1:Bs+g, Bs+g+1:Bs+g+g, dF, my_block ) = data_edge_fine(1:Bs+g, 1:g)
 
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! receive data
                     do l = 1, g
-                        block_data( my_block, g+(Bs+1)/2:Bs+g, Bs+g+l, dF )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        block_data( g+(Bs+1)/2:Bs+g, Bs+g+l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                         buffer_i                                             = buffer_i + (Bs+1)/2
                     end do
 

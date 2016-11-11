@@ -122,7 +122,7 @@ subroutine refine_mesh( params, block_list, block_data )
             ! loop over all data fields
             do dF = 2, params%number_data_fields+1
                 ! reset data
-                data_predict_coarse = block_data(k, g+1:Bs*g, g+1:Bs*g, dF )
+                data_predict_coarse = block_data(g+1:Bs*g, g+1:Bs*g, dF, k )
                 data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
@@ -150,20 +150,20 @@ subroutine refine_mesh( params, block_list, block_data )
             my_block_list( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( k, 1, 1:(Bs-1)/2+1, 1 )
-            new_coord_y(1:Bs:2) = block_data( k, 2, 1:(Bs-1)/2+1, 1 )
+            new_coord_x(1:Bs:2) = block_data( 1, 1:(Bs-1)/2+1, 1, k )
+            new_coord_y(1:Bs:2) = block_data( 2, 1:(Bs-1)/2+1, 1, k )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( free_heavy_id, 1, 1:Bs, 1 ) = new_coord_x
-            block_data( free_heavy_id, 2, 1:Bs, 1 ) = new_coord_y
+            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( free_heavy_id, g+1:Bs+g, g+1:Bs+g, dF ) = new_data(1:Bs, 1:Bs, dF-1)
+                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, dF-1)
             end do
 
             !--------------------------
@@ -184,20 +184,20 @@ subroutine refine_mesh( params, block_list, block_data )
             my_block_list( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( k, 1, (Bs-1)/2+1:Bs, 1 )
-            new_coord_y(1:Bs:2) = block_data( k, 2, 1:(Bs-1)/2+1, 1 )
+            new_coord_x(1:Bs:2) = block_data( 1, (Bs-1)/2+1:Bs, 1, k )
+            new_coord_y(1:Bs:2) = block_data( 2, 1:(Bs-1)/2+1, 1, k )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( free_heavy_id, 1, 1:Bs, 1 ) = new_coord_x
-            block_data( free_heavy_id, 2, 1:Bs, 1 ) = new_coord_y
+            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( free_heavy_id, g+1:Bs+g, g+1:Bs+g, dF ) = new_data(1:Bs, Bs:2*Bs-1, dF-1)
+                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, dF-1)
             end do
 
             !--------------------------
@@ -218,20 +218,20 @@ subroutine refine_mesh( params, block_list, block_data )
             my_block_list( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( k, 1, 1:(Bs-1)/2+1, 1 )
-            new_coord_y(1:Bs:2) = block_data( k, 2, (Bs-1)/2+1:Bs, 1 )
+            new_coord_x(1:Bs:2) = block_data( 1, 1:(Bs-1)/2+1, 1, k )
+            new_coord_y(1:Bs:2) = block_data( 2, (Bs-1)/2+1:Bs, 1, k )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( free_heavy_id, 1, 1:Bs, 1 ) = new_coord_x
-            block_data( free_heavy_id, 2, 1:Bs, 1 ) = new_coord_y
+            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( free_heavy_id, g+1:Bs+g, g+1:Bs+g, dF ) = new_data(Bs:2*Bs-1, 1:Bs, dF-1)
+                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, dF-1)
             end do
 
             !--------------------------
@@ -252,20 +252,20 @@ subroutine refine_mesh( params, block_list, block_data )
             my_block_list( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( k, 1, (Bs-1)/2+1:Bs, 1 )
-            new_coord_y(1:Bs:2) = block_data( k, 2, (Bs-1)/2+1:Bs, 1 )
+            new_coord_x(1:Bs:2) = block_data( 1, (Bs-1)/2+1:Bs, 1, k )
+            new_coord_y(1:Bs:2) = block_data( 2, (Bs-1)/2+1:Bs, 1, k )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( free_heavy_id, 1, 1:Bs, 1 ) = new_coord_x
-            block_data( free_heavy_id, 2, 1:Bs, 1 ) = new_coord_y
+            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( free_heavy_id, g+1:Bs+g, g+1:Bs+g, dF ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, dF-1)
+                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, dF-1)
             end do
 
         end if

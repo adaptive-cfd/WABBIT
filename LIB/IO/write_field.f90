@@ -111,7 +111,7 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data, neig
             write(dsetname,'("block_",i8.8)') k
 
             ! write data field
-            call write_field_hdf5( fname, dsetname, block_data( k - (l-1)*params%number_blocks, g+1:Bs+g, g+1:Bs+g, dF), .false.)
+            call write_field_hdf5( fname, dsetname, block_data( g+1:Bs+g, g+1:Bs+g, dF, k - (l-1)*params%number_blocks), .false.)
 
             ! add useful attributes to the block:
             ! write treecode
@@ -122,8 +122,8 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data, neig
             call write_attribute( fname, dsetname, "rank", (/rank/))
 
             ! save coordinates
-            call write_attribute( fname, dsetname, "coord_x", block_data( k - (l-1)*params%number_blocks, 1, 1:Bs, 1))
-            call write_attribute( fname, dsetname, "coord_y", block_data( k - (l-1)*params%number_blocks, 2, 1:Bs, 1))
+            call write_attribute( fname, dsetname, "coord_x", block_data( 1, 1:Bs, 1, k - (l-1)*params%number_blocks))
+            call write_attribute( fname, dsetname, "coord_y", block_data( 2, 1:Bs, 1, k - (l-1)*params%number_blocks))
 
             ! save neighbors
             ! loop over all neighbors

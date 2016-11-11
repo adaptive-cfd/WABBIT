@@ -96,7 +96,7 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
     do k = 1, N
         ! block is active
         if ( block_list(rank*N + k , 1) /= -1 ) then
-            my_dx = min(my_dx, block_data(k, 1, 2, 1 ) - block_data(k, 1, 1, 1 ) )
+            my_dx = min(my_dx, block_data(1, 2, 1, k ) - block_data(1, 1, 1, k ) )
         end if
     end do
 
@@ -129,13 +129,13 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! save old data
-                block_data( k, :, :, N_dF+2 ) = block_data( k, :, :, dF )
+                block_data( :, :, N_dF+2, k ) = block_data( :, :, dF, k )
                 ! set k1 step
-                block_data( k, :, :, N_dF+3 ) = block_data( k, :, :, dF )
+                block_data( :, :, N_dF+3, k ) = block_data( :, :, dF, k )
                 ! RHS
-                call RHS_2D_convection_diffusion( block_data( k, :, :, N_dF+3 ), &
-                                                  abs(block_data( k, 1, 2, 1 ) - block_data( k, 1, 1, 1 )), &
-                                                  abs(block_data( k, 2, 2, 1 ) - block_data( k, 2, 1, 1 )), &
+                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+3, k ), &
+                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
+                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
                                                   g, Bs, &
                                                   params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
                                                   params%order_discretization  )
@@ -148,7 +148,7 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! save old data
-                block_data( k, :, :, dF ) = block_data( k, :, :, N_dF+2 ) + (0.5_rk * dt) * block_data( k, :, :, N_dF+3 )
+                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) + (0.5_rk * dt) * block_data( :, :, N_dF+3, k )
             end if
         end do
 
@@ -161,11 +161,11 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! set k2 step
-                block_data( k, :, :, N_dF+4 ) = block_data( k, :, :, dF )
+                block_data( :, :, N_dF+4, k ) = block_data( :, :, dF, k )
                 ! RHS
-                call RHS_2D_convection_diffusion( block_data( k, :, :, N_dF+4 ), &
-                                                  abs(block_data( k, 1, 2, 1 ) - block_data( k, 1, 1, 1 )), &
-                                                  abs(block_data( k, 2, 2, 1 ) - block_data( k, 2, 1, 1 )), &
+                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+4, k ), &
+                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
+                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
                                                   g, Bs, &
                                                   params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
                                                   params%order_discretization  )
@@ -178,7 +178,7 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! save old data
-                block_data( k, :, :, dF ) = block_data( k, :, :, N_dF+2 ) + (0.5_rk * dt) * block_data( k, :, :, N_dF+4 )
+                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) + (0.5_rk * dt) * block_data( :, :, N_dF+4, k )
             end if
         end do
 
@@ -189,11 +189,11 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! set k3 step
-                block_data( k, :, :, N_dF+5 ) = block_data( k, :, :, dF )
+                block_data( :, :, N_dF+5, k ) = block_data( :, :, dF, k )
                 ! RHS
-                call RHS_2D_convection_diffusion( block_data( k, :, :, N_dF+5 ), &
-                                                  abs(block_data( k, 1, 2, 1 ) - block_data( k, 1, 1, 1 )), &
-                                                  abs(block_data( k, 2, 2, 1 ) - block_data( k, 2, 1, 1 )), &
+                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+5, k ), &
+                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
+                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
                                                   g, Bs, &
                                                   params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
                                                   params%order_discretization  )
@@ -206,7 +206,7 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! save old data
-                block_data( k, :, :, dF ) = block_data( k, :, :, N_dF+2 ) + (0.5_rk * dt) * block_data( k, :, :, N_dF+5 )
+                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) + (0.5_rk * dt) * block_data( :, :, N_dF+5, k )
             end if
         end do
 
@@ -217,11 +217,11 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! set k4 step
-                block_data( k, :, :, N_dF+6 ) = block_data( k, :, :, dF )
+                block_data( :, :, N_dF+6, k ) = block_data( :, :, dF, k )
                 ! RHS
-                call RHS_2D_convection_diffusion( block_data( k, :, :, N_dF+6 ), &
-                                                  abs(block_data( k, 1, 2, 1 ) - block_data( k, 1, 1, 1 )), &
-                                                  abs(block_data( k, 2, 2, 1 ) - block_data( k, 2, 1, 1 )), &
+                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+6, k ), &
+                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
+                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
                                                   g, Bs, &
                                                   params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
                                                   params%order_discretization  )
@@ -234,11 +234,11 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
             ! block is active
             if ( block_list( rank*N + k , 1) /= -1 ) then
                 ! final step
-                block_data( k, :, :, dF ) = block_data( k, :, :, N_dF+2 ) &
-                                          + (dt/6.0_rk) * ( block_data( k, :, :, N_dF+3 ) &
-                                          + 2.0_rk * block_data( k, :, :, N_dF+4 ) &
-                                          + 2.0_rk * block_data( k, :, :, N_dF+5 ) &
-                                          + block_data( k, :, :, N_dF+6 ) )
+                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) &
+                                          + (dt/6.0_rk) * ( block_data( :, :, N_dF+3, k ) &
+                                          + 2.0_rk * block_data( :, :, N_dF+4, k ) &
+                                          + 2.0_rk * block_data( :, :, N_dF+5, k ) &
+                                          + block_data( :, :, N_dF+6, k ) )
             end if
         end do
 

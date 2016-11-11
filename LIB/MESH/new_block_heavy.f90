@@ -55,14 +55,14 @@ subroutine new_block_heavy(block_data, heavy_id, data_, coord_x, coord_y, Bs, g,
 ! main body
 
     ! save coordinates in field 1 of heavy data array
-    block_data( heavy_id, 1, 1:Bs, 1 )              = coord_x
-    block_data( heavy_id, 2, 1:Bs, 1 )              = coord_y
+    block_data( 1, 1:Bs, 1, heavy_id )              = coord_x
+    block_data( 2, 1:Bs, 1, heavy_id )              = coord_y
 
     ! save data in first datafield
-    block_data( heavy_id, g+1:Bs+g, g+1:Bs+g, 2 )   = data_
+    block_data( g+1:Bs+g, g+1:Bs+g, 2, heavy_id )   = data_
     ! reset all other datafields
     do k = 3, dF
-        block_data( heavy_id, :, :, k )             = 9.0e9_rk
+        block_data( :, :, k, heavy_id )             = 0.0_rk
     end do
 
 end subroutine new_block_heavy

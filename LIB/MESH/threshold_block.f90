@@ -137,7 +137,7 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list )
             do dF = 2, params%number_data_fields+1
 
                 ! reset interpolation fields
-                u1        = block_data( k, :, :, dF)
+                u1        = block_data( :, :, dF, k)
                 u2        = 0.0_rk
                 u3        = 0.0_rk
 

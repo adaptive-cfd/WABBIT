@@ -45,10 +45,10 @@ program main
     !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: block_list(:, :)
 
-    ! heavy data array  -> dim 1: block id  ( 1:number_blocks )
-    !                   -> dim 2: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( field_1, 2:number_data_fields+1, data_old, k1, k2, k3,
+    ! heavy data array  -> dim 4: block id  ( 1:number_blocks )
+    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 3: data type ( field_1, 2:number_data_fields+1, data_old, k1, k2, k3,
     !                                       k4 [for runge kutta] )
     !           field_1 (to save mixed data):   line 1: x coordinates
     !                                           line 2: y coordinates
@@ -124,7 +124,7 @@ program main
             type (type_params), intent(in)              :: params
             integer(kind=ik), intent(inout)             :: block_list(:, :)
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
-            integer(kind=ik), intent(in)                :: neighbor_list(:)
+            integer(kind=ik), intent(inout)             :: neighbor_list(:)
         end subroutine adapt_mesh
 
     end interface
@@ -181,9 +181,6 @@ program main
 
         ! adapt the mesh
         if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list )
-
-        ! update neighbor relations
-        call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then

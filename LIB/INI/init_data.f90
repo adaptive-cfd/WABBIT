@@ -218,7 +218,8 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
 
     ! second: write heavy data for other datafields
     do k = 3, params%number_fields
-        block_data( :, :, k, : ) = 0.0_rk
+        !block_data( :, :, k, : ) = 0.0_rk
+        block_data( :, :, k, : ) = block_data( :, :, 2, : )
     end do
 
     ! ------------------------------------------------------------------------------------------------------

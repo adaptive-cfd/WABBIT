@@ -200,7 +200,7 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
         if ( (com_list(k, 2) == rank) .or. (com_list(k, 3) == rank) ) then
 
             ! proc has to send/receive data, loop over all data fields
-            do dF = 2, params%number_data_fields
+            do dF = 2, params%number_data_fields+1
                 call send_receive_data( params, block_data, k, com_list, com_plan(i), dF)
             end do
 

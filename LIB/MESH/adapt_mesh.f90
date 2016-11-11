@@ -80,6 +80,16 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
             integer(kind=ik), intent(in)                :: max_treelevel
         end subroutine update_neighbors
 
+     subroutine save_data(iteration, time, params, block_list, block_data, neighbor_list)
+            use module_params
+            real(kind=rk), intent(in)                   :: time
+            integer(kind=ik), intent(in)                :: iteration
+            type (type_params), intent(in)              :: params
+            integer(kind=ik), intent(in)                :: block_list(:, :)
+            real(kind=rk), intent(in)                   :: block_data(:, :, :, :)
+            integer(kind=ik), intent(in)                :: neighbor_list(:)
+        end subroutine save_data
+
     end interface
 
 !---------------------------------------------------------------------------------------------

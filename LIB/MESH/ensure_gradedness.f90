@@ -46,7 +46,7 @@ subroutine ensure_gradedness( block_list, neighbor_list, N, max_treelevel )
     ! loop variables
     integer(kind=ik)                    :: k, i, mylevel, neighbor_level, counter
     ! status of grid changing
-    logical                             :: grid_changed
+    logical                             :: grid_changed, my_grid_changed
 
     ! light data list for working
     integer(kind=ik)                    :: my_block_list( size(block_list, 1), max_treelevel+2)
@@ -74,7 +74,8 @@ subroutine ensure_gradedness( block_list, neighbor_list, N, max_treelevel )
 
     do while ( grid_changed )
         ! we hope not to set the flag to .true. again in this iteration
-        grid_changed = .false.
+        grid_changed    = .false.
+        my_grid_changed = .false.
 
         ! loop over heavy data
         do k = 1, N
@@ -100,7 +101,7 @@ subroutine ensure_gradedness( block_list, neighbor_list, N, max_treelevel )
                               ! block can not coarsen, if neighbor wants to refine
                               if ( block_list( neighbor_list( (k - 1)*16 + i ) , max_treelevel+2 ) == 1) then
                                 my_block_list( rank*N + k, max_treelevel+2 ) = max(0, block_list( rank*N + k , max_treelevel+2 ) )
-                                grid_changed = .true. ! we changed something in the grid
+                                my_grid_changed = .true. ! we changed something in the grid
                               end if
 
                             elseif (mylevel - neighbor_level == 1) then
@@ -113,13 +114,13 @@ subroutine ensure_gradedness( block_list, neighbor_list, N, max_treelevel )
                               if ( block_list( neighbor_list( (k - 1)*16 + i ) , max_treelevel+2 ) == 1) then
                                   ! ... so I also have to refine
                                   my_block_list( rank*N + k, max_treelevel+2 ) = 1
-                                  grid_changed = .true. ! we changed something in the grid
+                                  my_grid_changed = .true. ! we changed something in the grid
                               else
                                   ! neighbor stays on his level or want to coarsen,
                                   ! so block can not coarsen
                                   ! TODO: block can coarsen, if neighbor also want to coarsen
                                   my_block_list( rank*N + k, max_treelevel+2 ) = max(0, my_block_list( rank*N + k, max_treelevel+2 ) )
-                                  grid_changed = .true. ! we changed something in the grid
+                                  my_grid_changed = .true. ! we changed something in the grid
                               end if
 
                             else
@@ -136,10 +137,20 @@ subroutine ensure_gradedness( block_list, neighbor_list, N, max_treelevel )
 
             end if
 
+            ! synchronize grid changed status
+            call MPI_Allreduce(my_grid_changed, grid_changed, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+
+            ! synchronize light data, if something was changed
+            if ( grid_changed ) then
+                block_list = 0
+                call MPI_Allreduce(my_block_list, block_list, size(block_list,1)*size(block_list,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+                my_block_list( rank*N+1: rank*N+N, :) = block_list( rank*N+1: rank*N+N, :)
+            end if
+
         end do
 
     counter = counter + 1
-    if (counter == 99) then
+    if (counter == 10) then
         print*, "ERROR: unable to build a graded mesh"
         stop
     end if

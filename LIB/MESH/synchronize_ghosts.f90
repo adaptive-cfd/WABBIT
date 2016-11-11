@@ -170,44 +170,20 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     ! synchronize com_list
     call MPI_Allreduce(my_com_list, com_list, N*12*number_procs*8, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
-    i = 1
-    ! remove empty lines, loop over com_list
-    do while ( i < N*12*number_procs )
-        if ( com_list(i,1) == -1 ) then
-            ! empty line
-
-            ! last line reached
-            if ( i == N*12*number_procs ) exit
-
-            ! find next non empty line
-            k = i + 1
-            do while ( com_list(k, 1) == -1 )
-                if ( k == N*12*number_procs ) then
-                    ! end of com_list reached
-                    exit
-                else
-                    k = k + 1
-                end if
-            end do
-
-            ! sort list
-            com_list( i:N*12*number_procs-(k-i) , : ) = com_list( k:N*12*number_procs , : )
-            com_list( N*12*number_procs-(k-i):N*12*number_procs , : ) = -1
-
-            ! next line
-            i = i + 1
-        else
-            ! nothing to do, go to next line
-            i = i + 1
-        end if
+    k = 1
+    my_com_list = -1
+    ! loop over com_list
+    do i = 1, N*12*number_procs
+       if ( com_list(i,1) /= -1 ) then
+           ! non empty element
+           my_com_list(k,:) = com_list(i,:)
+           k = k + 1
+       end if
     end do
+    com_list = my_com_list
 
-    ! count number of communications
-    n_com = 1
-    do while ( com_list(n_com, 1) /= -1 )
-        n_com = n_com + 1
-    end do
-    n_com = n_com - 1
+    ! number of communications
+    n_com = k - 1
 
     ! ----------------------------------------------------------------------------------------
     ! second: sort com_list, create com_plan

@@ -26,22 +26,22 @@ FC = mpif90
 # COMPILER-DEPENDEND PART
 #-------------------------------------------------------------------------------
 # GNU compiler
-#ifeq ($(shell $(FC) --version 2>&1 | head -n 1 | head -c 3),GNU)
-## Specify directory for compiled modules:
-#FFLAGS += -J$(OBJDIR) # specify directory for modules.
-#FFLAGS += -O3 -ffree-line-length-none
-#PPFLAG= -cpp #preprocessor flag
-#LDFLAGS = -llapack
-## Debug flags for gfortran:
-##FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-##FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
-#FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
-## HDF_ROOT is set in environment.
-#HDF_LIB = $(HDF_ROOT)/lib
-#HDF_INC = $(HDF_ROOT)/include
-#LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
-#FFLAGS += -I$(HDF_INC)
-#endif
+ifeq ($(shell $(FC) --version 2>&1 | head -n 1 | head -c 3),GNU)
+# Specify directory for compiled modules:
+FFLAGS += -J$(OBJDIR) # specify directory for modules.
+FFLAGS += -O3 -ffree-line-length-none
+PPFLAG= -cpp #preprocessor flag
+LDFLAGS = -llapack
+# Debug flags for gfortran:
+#FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
+#FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+# HDF_ROOT is set in environment.
+HDF_LIB = $(HDF_ROOT)/lib
+HDF_INC = $(HDF_ROOT)/include
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+FFLAGS += -I$(HDF_INC)
+endif
 
 # Intel compiler
 #ifort:=$(shell $(FC) --version | head -c 5)

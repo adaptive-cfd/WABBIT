@@ -110,8 +110,8 @@ subroutine balance_load( params, block_list, block_data )
                 opt_dist_list(1:mod(num_blocks, number_procs)) = (num_blocks - mod(num_blocks, number_procs))/number_procs + 1
             end if
 
-            print*, opt_dist_list - dist_list
-            stop
+            !print*, opt_dist_list - dist_list
+            !stop
 
 
         case("sfc1")

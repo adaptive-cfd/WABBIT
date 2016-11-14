@@ -122,7 +122,7 @@ subroutine refine_mesh( params, block_list, block_data )
             ! loop over all data fields
             do dF = 2, params%number_data_fields+1
                 ! reset data
-                data_predict_coarse = block_data(g+1:Bs*g, g+1:Bs*g, dF, k )
+                data_predict_coarse = block_data(g+1:Bs+g, g+1:Bs+g, dF, k )
                 data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
@@ -135,7 +135,7 @@ subroutine refine_mesh( params, block_list, block_data )
             !--------------------------
             ! first new block
             ! find free light id, work only on corresponding light data, so returned id is the heavy id
-            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+1+N , 1 ), N )
+            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+N , 1 ), N )
             ! calculate light id
             free_light_id = my_light_start + free_heavy_id
 
@@ -169,7 +169,7 @@ subroutine refine_mesh( params, block_list, block_data )
             !--------------------------
             ! second new block
             ! find free light id, work only on corresponding light data, so returned id is the heavy id
-            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+1+N , 1 ), N )
+            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+N , 1 ), N )
             ! calculate light id
             free_light_id = my_light_start + free_heavy_id
 
@@ -203,7 +203,7 @@ subroutine refine_mesh( params, block_list, block_data )
             !--------------------------
             ! third new block
             ! find free light id, work only on corresponding light data, so returned id is the heavy id
-            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+1+N , 1 ), N )
+            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+N , 1 ), N )
             ! calculate light id
             free_light_id = my_light_start + free_heavy_id
 

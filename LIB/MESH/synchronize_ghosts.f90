@@ -170,6 +170,7 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     ! synchronize com_list
     call MPI_Allreduce(my_com_list, com_list, N*12*number_procs*8, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
+
     k = 1
     my_com_list = -1
     ! loop over com_list
@@ -185,9 +186,31 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     ! number of communications
     n_com = k - 1
 
+            ! test output
+    i = 1
+        if (rank == 0) then
+            do while ( com_list(i,1) /= -1 )
+                write(*,'(a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1)', advance='yes') "com-id: ", com_list(i,1), ", rank: ", com_list(i,2), ", neighbor-rank: ", com_list(i,3), ", block: ", com_list(i,4), ", neighbor-block: ", com_list(i,5), ", dirs: ", com_list(i,6), ", ", com_list(i,7)
+                i = i + 1
+            end do
+            write(*,'(80("#"))')
+    end if
+
+call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
     ! ----------------------------------------------------------------------------------------
     ! second: sort com_list, create com_plan
     call sort_com_list(com_list, size(com_list,1), com_plan, size(com_plan,1), number_procs, n_com)
+
+            ! test output
+    i = 1
+        if (rank == 0) then
+            do while ( com_list(i,1) /= -1 )
+                write(*,'(a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1)', advance='yes') "com-id: ", com_list(i,1), ", rank: ", com_list(i,2), ", neighbor-rank: ", com_list(i,3), ", block: ", com_list(i,4), ", neighbor-block: ", com_list(i,5), ", dirs: ", com_list(i,6), ", ", com_list(i,7)
+                i = i + 1
+            end do
+            write(*,'(80("#"))')
+    end if
 
     ! ----------------------------------------------------------------------------------------
     ! third: start external communications

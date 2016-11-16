@@ -194,10 +194,14 @@ subroutine balance_load( params, block_list, block_data )
                             ! new com was created
                             com_i = com_i + 1
 
+                        else
+                            ! nothing to do
+                            ! no receiver found, could be possible
+
                         end if
 
                         ! no blocks left for sending, note: a proc can have one block more than all other procs
-                        if ( (opt_dist_list(k) - dist_list(k)) >= -1 ) exit
+                        !if ( (opt_dist_list(k) - dist_list(k)) >= -1 ) exit
 
                     end do
                 end if
@@ -206,6 +210,9 @@ subroutine balance_load( params, block_list, block_data )
             !---------------------------------------------------------------------------------
             ! third: send/receive data
 
+            ! reset block index
+            l = 1
+
             ! loop over all planed communications
             do k = 1, com_i-1
 
@@ -213,7 +220,6 @@ subroutine balance_load( params, block_list, block_data )
                     ! proc have to send data
                     ! create send buffer, loop over all blocks
                     com_N = 1
-                    l     = 1
 
                     do while ( com_N <= com_plan(k, 3) )
 

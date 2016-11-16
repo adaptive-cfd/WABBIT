@@ -23,6 +23,7 @@ subroutine sort_com_list(com_list, com_list_N, com_plan, com_plan_N, n_proc, n_c
 !---------------------------------------------------------------------------------------------
 ! modules
 
+use mpi
     ! global parameters
     use module_params
 
@@ -61,6 +62,11 @@ subroutine sort_com_list(com_list, com_list_N, com_plan, com_plan_N, n_proc, n_c
     ! .true. - there are communications between procs left - use to parallelize communication
     logical                               :: com_allowed
 
+! MPI error variable
+integer(kind=ik)                    :: ierr
+! process rank
+integer(kind=ik)                    :: rank
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -73,6 +79,9 @@ subroutine sort_com_list(com_list, com_list_N, com_plan, com_plan_N, n_proc, n_c
     allocate( proc_status(n_proc), stat=allocate_error )
     ! at start all procs can communicate
     proc_status = .true.
+
+! determinate process rank
+call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -221,9 +230,20 @@ subroutine sort_com_list(com_list, com_list_N, com_plan, com_plan_N, n_proc, n_c
 
        ! error case
        if ( com_count /= com_count2 ) then
-          print*, "ERROR: communication list error"
+
+           ! test output
+    i = 1
+        if (rank == 0) then
+            do while ( com_list(i,1) /= -1 )
+                write(*,'(a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1)', advance='yes') "com-id: ", com_list(i,1), ", rank: ", com_list(i,2), ", neighbor-rank: ", com_list(i,3), ", block: ", com_list(i,4), ", neighbor-block: ", com_list(i,5), ", dirs: ", com_list(i,6), ", ", com_list(i,7)
+                i = i + 1
+            end do
+            write(*,'(80("#"))')
+                      print*, "ERROR: communication list error"
           stop
-       end if
+    end if
+
+              end if
 
 
         ! move list index

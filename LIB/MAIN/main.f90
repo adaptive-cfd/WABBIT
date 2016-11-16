@@ -179,12 +179,6 @@ program main
         ! advance in time
         call time_step_RK4( time, params, block_list, block_data, neighbor_list )
 
-if (iteration==2) then
-call save_data( 2, 1.0_rk, params, block_list, block_data, neighbor_list )
-stop
-end if
-
-
         ! adapt the mesh
         if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list )
 
@@ -200,8 +194,6 @@ end if
         if (modulo(iteration, params%write_freq) == 0) then
           call save_data( iteration, time, params, block_list, block_data, neighbor_list )
         endif
-
-if (iteration==2) stop
 
     end do
 

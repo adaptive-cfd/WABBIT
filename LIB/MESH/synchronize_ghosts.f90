@@ -113,9 +113,9 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
     ! allocate com_list: max linenumber -> max number of blocks * max number of neighbors * number of procs
-    allocate( com_list( N*12*number_procs , 8), stat=allocate_error )
+    allocate( com_list( N*16*number_procs , 8), stat=allocate_error )
     ! allocate local com_list
-    allocate( my_com_list( N*12*number_procs , 8), stat=allocate_error )
+    allocate( my_com_list( N*16*number_procs , 8), stat=allocate_error )
     ! allocate com_plan: max linenumber -> every proc has a neighborhood with every other proc
     !                                       * 2 (sender + receiver proc creates entry)
     allocate( com_plan( number_procs*number_procs*2), stat=allocate_error )
@@ -151,14 +151,14 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
                         call copy_ghost_nodes( params, block_data, k, neighbor_light_id-rank*N, i, level_diff )
                     else
                         ! external neighbor -> new com_list entry
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 1)  = k+i
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 2)  = rank
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 3)  = (neighbor_light_id - 1) / N
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 4)  = k
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 5)  = neighbor_light_id - ( (neighbor_light_id - 1) / N )*N
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 6)  = i
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 7)  = i
-                        my_com_list( rank*N*12 + (k-1)*12 + i , 8)  = level_diff
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 1)  = k+i
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 2)  = rank
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 3)  = (neighbor_light_id - 1) / N
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 4)  = k
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 5)  = neighbor_light_id - ( (neighbor_light_id - 1) / N )*N
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 6)  = i
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 7)  = i
+                        my_com_list( rank*N*16 + (k-1)*16 + i , 8)  = level_diff
 
                     end if
 
@@ -168,13 +168,12 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     end do
 
     ! synchronize com_list
-    call MPI_Allreduce(my_com_list, com_list, N*12*number_procs*8, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
-
+    call MPI_Allreduce(my_com_list, com_list, N*16*number_procs*8, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
     k = 1
     my_com_list = -1
     ! loop over com_list
-    do i = 1, N*12*number_procs
+    do i = 1, size(com_list, 1)
        if ( com_list(i,1) /= -1 ) then
            ! non empty element
            my_com_list(k,:) = com_list(i,:)
@@ -186,31 +185,9 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     ! number of communications
     n_com = k - 1
 
-            ! test output
-    i = 1
-        if (rank == 0) then
-            do while ( com_list(i,1) /= -1 )
-                write(*,'(a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1)', advance='yes') "com-id: ", com_list(i,1), ", rank: ", com_list(i,2), ", neighbor-rank: ", com_list(i,3), ", block: ", com_list(i,4), ", neighbor-block: ", com_list(i,5), ", dirs: ", com_list(i,6), ", ", com_list(i,7)
-                i = i + 1
-            end do
-            write(*,'(80("#"))')
-    end if
-
-call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
     ! ----------------------------------------------------------------------------------------
     ! second: sort com_list, create com_plan
     call sort_com_list(com_list, size(com_list,1), com_plan, size(com_plan,1), number_procs, n_com)
-
-            ! test output
-    i = 1
-        if (rank == 0) then
-            do while ( com_list(i,1) /= -1 )
-                write(*,'(a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1,a,i4.1)', advance='yes') "com-id: ", com_list(i,1), ", rank: ", com_list(i,2), ", neighbor-rank: ", com_list(i,3), ", block: ", com_list(i,4), ", neighbor-block: ", com_list(i,5), ", dirs: ", com_list(i,6), ", ", com_list(i,7)
-                i = i + 1
-            end do
-            write(*,'(80("#"))')
-    end if
 
     ! ----------------------------------------------------------------------------------------
     ! third: start external communications

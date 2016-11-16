@@ -111,8 +111,7 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data, neig
             write(dsetname,'("block_",i8.8)') k
 
             ! write data field
-            !call write_field_hdf5( fname, dsetname, block_data( g+1:Bs+g, g+1:Bs+g, dF, k - (l-1)*params%number_blocks), .false.)
-            call write_field_hdf5( fname, dsetname, block_data( 1:Bs+2*g, 1:Bs+2*g, dF, k - (l-1)*params%number_blocks), .false.)
+            call write_field_hdf5( fname, dsetname, block_data( g+1:Bs+g, g+1:Bs+g, dF, k - (l-1)*params%number_blocks), .false.)
 
             ! add useful attributes to the block:
             ! write treecode

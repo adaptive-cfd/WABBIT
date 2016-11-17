@@ -80,11 +80,12 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
             integer(kind=ik), intent(in)                :: max_treelevel
         end subroutine update_neighbors
 
-        subroutine balance_load( params, block_list, block_data )
+        subroutine balance_load( params, block_list, block_data, neighbor_list )
             use module_params
             type (type_params), intent(in)              :: params
             integer(kind=ik), intent(inout)             :: block_list(:, :)
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
+            integer(kind=ik), intent(out)               :: neighbor_list(:)
         end subroutine balance_load
 
     end interface
@@ -116,7 +117,7 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
     end do
 
     ! balance load
-    call balance_load( params, block_list, block_data )
+    call balance_load( params, block_list, block_data, neighbor_list )
 
     ! update neighbor relations
     call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )

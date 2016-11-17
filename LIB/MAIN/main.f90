@@ -45,11 +45,11 @@ program main
     !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: block_list(:, :)
 
-    ! heavy data array  -> dim 4: block id  ( 1:number_blocks )
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: data type ( field_1, 2:number_data_fields+1, data_old, k1, k2, k3,
     !                                       k4 [for runge kutta] )
+    ! heavy data array  -> dim 4: block id  ( 1:number_blocks )
     !           field_1 (to save mixed data):   line 1: x coordinates
     !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: block_data(:, :, :, :)
@@ -154,6 +154,8 @@ program main
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') number_procs
+        open (15, file='load_balancing.t', status='replace')
+        close(15)
     end if
 
     ! initializing data

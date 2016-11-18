@@ -393,6 +393,7 @@ subroutine set_desired_num_blocks_per_rank(params, block_list, dist_list, opt_di
   integer(kind=ik), intent(out)    :: dist_list(:), opt_dist_list(:)
   ! integer(kind=ik), intent(out)    :: currnt_BlocksPerRank(:), desired_BlocksPerRank(:)
   integer :: k, num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks, ierr
+  integer :: N_light
 
   ! determinate process rank
   call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -401,9 +402,9 @@ subroutine set_desired_num_blocks_per_rank(params, block_list, dist_list, opt_di
 
   dist_list = 0
   opt_dist_list = 0
-
+  N_light = size(block_list,1)
   ! count number of active blocks and current block distribution
-  do k = 1, params%number_blocks
+  do k = 1, N_light
       ! block is active? we can tell by the first treecode entry. if it is -1
       ! then the block is not active
       if ( block_list(k, 1) /= -1 ) then

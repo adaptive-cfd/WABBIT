@@ -330,10 +330,14 @@ end interface
 
 end subroutine balance_load
 
-
+!-------------------------------------------------------------------------------
 ! compute the affinity for all my blocks to a given rank.
 ! That means, if a block has many neighbor relations with the target rank, it has a high
 ! value in the array, otherwise a low value or -10 if the block is not active at all
+!
+! This list is at the core of heuristic load balancing: we know whom to send to, and using this list
+! we decide which blocks will be sent.
+!-------------------------------------------------------------------------------
 subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank, rank_partner, affinity)
   use mpi
   use module_params
@@ -370,6 +374,11 @@ subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank,
         direc_id = (heavy_id-1)*16 + q ! where is this direction for this heavy_id in the neighbor list
         proc_id = (neighbor_list(direc_id) / params%number_blocks) + 1 ! one based proc_id
         if (proc_id-1 == rank_partner) then !receiver? ZERO BASED
+          ! a shared border with the target rank is a high priority
+          affinity(heavy_id) = affinity(heavy_id)+20
+        elseif (proc_id-1 /= rank) then
+          ! so I dont share this border with the target rank, but it is an mpi border
+          ! when I'm out of good candidates, I should at leasr send blocks that are not surrounded only by my blocks
           affinity(heavy_id) = affinity(heavy_id)+1
         endif
       enddo

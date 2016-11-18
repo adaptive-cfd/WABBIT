@@ -85,7 +85,7 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
             type (type_params), intent(in)              :: params
             integer(kind=ik), intent(inout)             :: block_list(:, :)
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
-            integer(kind=ik), intent(out)               :: neighbor_list(:)
+            integer(kind=ik), intent(inout)               :: neighbor_list(:)
         end subroutine balance_load
 
     end interface

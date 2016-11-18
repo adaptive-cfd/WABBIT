@@ -378,7 +378,7 @@ subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank,
           affinity(heavy_id) = affinity(heavy_id)+20
         elseif (proc_id-1 /= rank) then
           ! so I dont share this border with the target rank, but it is an mpi border
-          ! when I'm out of good candidates, I should at leasr send blocks that are not surrounded only by my blocks
+          ! when I'm out of good candidates, I should at least send blocks that are not surrounded only by my blocks
           affinity(heavy_id) = affinity(heavy_id)+1
         endif
       enddo
@@ -521,14 +521,15 @@ subroutine compute_friends_table(params, neighbor_list, friends)
 
   integer(kind=ik), allocatable :: friends_loc(:,:)
   integer(kind=ik) :: k, proc_id, number_procs, rank, ierr
+  
+  call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+  call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
   ! We need the buffer for the friends array:
   allocate( friends_loc( 1:number_procs, 1:number_procs ))
   friends_loc = 0
   friends = 0
 
-  call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-  call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
   ! loop over all entries in the neighbor array. note this is currently one-D and contains
   ! 16 entries per heavy data.

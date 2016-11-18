@@ -172,7 +172,10 @@ end interface
             call set_desired_num_blocks_per_rank(params, block_list, dist_list, opt_dist_list)
             ! at this point, we know how many blocks a mpirank has: "dist_list(myrank)"
             ! and how many it should have, if equally distributed: "opt_dist_list(myrank)"
-
+            if (maxval(abs(dist_list-opt_dist_list))==0) then
+              ! the distribution is fine, nothing to do.
+              return
+            endif
             ! determine matrix of number of neighbor relations between mpiranks
             call compute_friends_table(params, neighbor_list, friends)
 
@@ -300,12 +303,12 @@ end interface
                         ! write heavy data
                         block_data(:, :, :, free_heavy_id) = buffer_data(:, :, :, l)
 
+                        if (my_block_list(free_light_id, 1)<0 .or. my_block_list(free_light_id, 1)>3) then
+                          write(*,*) "For some reason, someone sent me an empty block (code: 7712345)"
+                          stop
+                        endif
                     end do
-                end if !end recv case
-                ! synchronize light data
-                block_list = 0
-                call MPI_Allreduce(my_block_list, block_list, size(block_list,1)*size(block_list,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-
+                end if
             end do
 
             ! synchronize light data
@@ -372,14 +375,16 @@ subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank,
       ! loop over all directions and count how many neighbor relations I do have with the rank_partner
       do q = 1, 16 ! q is relative direction
         direc_id = (heavy_id-1)*16 + q ! where is this direction for this heavy_id in the neighbor list
-        proc_id = (neighbor_list(direc_id) / params%number_blocks) + 1 ! one based proc_id
-        if (proc_id-1 == rank_partner) then !receiver? ZERO BASED
-          ! a shared border with the target rank is a high priority
-          affinity(heavy_id) = affinity(heavy_id)+20
-        elseif (proc_id-1 /= rank) then
-          ! so I dont share this border with the target rank, but it is an mpi border
-          ! when I'm out of good candidates, I should at least send blocks that are not surrounded only by my blocks
-          affinity(heavy_id) = affinity(heavy_id)+1
+        if (neighbor_list(direc_id) > 0) then ! is there a neighbor?
+          proc_id = (neighbor_list(direc_id) / params%number_blocks) + 1 ! one based proc_id
+          if (proc_id-1 == rank_partner) then !receiver? ZERO BASED
+            ! a shared border with the target rank is a high priority
+            affinity(heavy_id) = affinity(heavy_id)+20
+          elseif (proc_id-1 /= rank) then
+            ! so I dont share this border with the target rank, but it is an mpi border
+            ! when I'm out of good candidates, I should at least send blocks that are not surrounded only by my blocks
+            affinity(heavy_id) = affinity(heavy_id)+1
+          endif
         endif
       enddo
     end if
@@ -521,7 +526,7 @@ subroutine compute_friends_table(params, neighbor_list, friends)
 
   integer(kind=ik), allocatable :: friends_loc(:,:)
   integer(kind=ik) :: k, proc_id, number_procs, rank, ierr
-  
+
   call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
   call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
@@ -538,6 +543,7 @@ subroutine compute_friends_table(params, neighbor_list, friends)
     if (neighbor_list(k)/=-1) then
       ! one-based indexing
       proc_id = (neighbor_list(k) / params%number_blocks) + 1
+      ! note each rank fills only one line in this array, the others are all zero
       friends_loc(rank+1, proc_id) = friends_loc(rank+1, proc_id)+1
     endif
   enddo

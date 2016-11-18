@@ -156,6 +156,8 @@ program main
         write(*, '("MPI: using ", i5, " processes")') number_procs
         open (15, file='load_balancing.t', status='replace')
         close(15)
+        open (15, file='blocks_per_rank.t', status='replace')
+        close(15)
     end if
 
     ! initializing data

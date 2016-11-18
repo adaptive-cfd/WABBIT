@@ -115,7 +115,7 @@ interface
     type (type_params), intent(in) :: params
     integer(kind=ik),intent(inout) :: friends(:,:)
     ! heavy data array - neifghbor data
-    integer(kind=ik), intent(inout) :: neighbor_list(:)
+    integer(kind=ik), intent(in) :: neighbor_list(:)
   end subroutine
 end interface
 
@@ -376,7 +376,6 @@ subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank,
     end if
   end do
 
-  write(*,'("rank=",i1,"->",i1,1x,256(i2,1x))') rank, rank_partner, affinity
 end subroutine compute_affinity
 
 
@@ -483,6 +482,10 @@ subroutine set_desired_num_blocks_per_rank(params, block_list, dist_list, opt_di
     open(14,file='load_balancing.t',status='unknown',position='append')
     write(14,'(10(i5,1x))') opt_dist_list-dist_list
     close(14)
+
+    open(14,file='blocks_per_rank.t',status='unknown',position='append')
+    write(14,'(10(i5,1x))') dist_list
+    close(14)
   end if
 
 end subroutine
@@ -501,9 +504,10 @@ end subroutine
 subroutine compute_friends_table(params, neighbor_list, friends)
   use module_params
   use mpi
+  implicit none
   type (type_params), intent(in) :: params
   integer(kind=ik),intent(inout) :: friends(:,:)
-  integer(kind=ik),intent(inout) :: neighbor_list(:)
+  integer(kind=ik),intent(in) :: neighbor_list(:)
 
 
   integer(kind=ik), allocatable :: friends_loc(:,:)
@@ -534,11 +538,4 @@ subroutine compute_friends_table(params, neighbor_list, friends)
   call MPI_Allreduce(friends_loc, friends, number_procs**2, MPI_INTEGER,MPI_SUM, MPI_COMM_WORLD, ierr)
 
   deallocate(friends_loc)
-
-  if (rank==0) then
-    do k = 1, number_procs
-      write(*,'(24(i4,1x))') friends(k,:)
-    enddo
-  endif
-
 end subroutine

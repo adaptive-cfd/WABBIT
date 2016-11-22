@@ -18,7 +18,7 @@
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_id)
+subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_id, active)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -38,6 +38,7 @@ subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_i
 
     ! light data array
     integer(kind=ik), intent(in)        :: block_list(:, :)
+    integer(kind=ik), intent(in)        :: active(:)
 
     ! .true. if block with treecode exists
     logical, intent(out)                :: exists
@@ -48,12 +49,13 @@ subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_i
     logical                             :: array_compare
 
     ! loop variables
-    integer(kind=ik)                    :: k, N
+    integer(kind=ik)                    :: k, N, lgtID
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N        = size( block_list, 1)
+    N        = size( active, 1)
+    ! N        = size( block_list, 1)
     exists   = .false.
     light_id = -1
 
@@ -62,13 +64,14 @@ subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_i
 
     ! loop over all blocks
     do k = 1, N
-
+        lgtID = active(k)
+        ! lgtID = k
         ! block is active
-        if ( block_list(k, 1) /= -1 ) then
+        if ( block_list(lgtID, 1) /= -1 ) then
 
-            if ( array_compare( block_list(k, 1:max_treelevel), treecode, max_treelevel) ) then
+            if ( array_compare( block_list(lgtID, 1:max_treelevel), treecode, max_treelevel) ) then
                 exists   = .true.
-                light_id = k
+                light_id = lgtID
             end if
 
         end if

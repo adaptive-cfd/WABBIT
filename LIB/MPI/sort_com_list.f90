@@ -23,7 +23,6 @@ subroutine sort_com_list(com_list, com_list_N, com_plan, com_plan_N, n_proc, n_c
 !---------------------------------------------------------------------------------------------
 ! modules
 
-use mpi
     ! global parameters
     use module_params
 
@@ -62,11 +61,6 @@ use mpi
     ! .true. - there are communications between procs left - use to parallelize communication
     logical                               :: com_allowed
 
-! MPI error variable
-integer(kind=ik)                    :: ierr
-! process rank
-integer(kind=ik)                    :: rank
-
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -79,9 +73,6 @@ integer(kind=ik)                    :: rank
     allocate( proc_status(n_proc), stat=allocate_error )
     ! at start all procs can communicate
     proc_status = .true.
-
-! determinate process rank
-call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -165,85 +156,79 @@ call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
        ! third: sort all reverse communications
        ! find first reverse communication
-       k = i + com_count
-       l = k
-       do while ( k <= n_com)
-           if ( (com_list(k,2) == com_list(i,3)) .and. (com_list(k,3) == com_list(i,2)) ) then
-               ! first reverse communication found
-               ! sort list
-               if ( k == l ) then
-                   ! end loop
-                   k = n_com+1
+       ! step only if at least one communication is found
+       com_count2 = 0
+       if ( com_count > 0 ) then
+           k = i + com_count
+           l = k
+           do while ( k <= n_com)
+               if ( (com_list(k,2) == com_list(i,3)) .and. (com_list(k,3) == com_list(i,2)) ) then
+                   ! first reverse communication found
+                   ! sort list
+                   if ( k == l ) then
+                       ! end loop
+                       k = n_com+1
+                   else
+
+                       com_list_elem       = com_list(k,:)
+                       com_list(l+1:k, :)  = com_list(l:k-1, :)
+                       com_list(l, :)      = com_list_elem
+                       ! end loop
+                       k         = n_com + 1
+                   end if
                else
-
-                   com_list_elem       = com_list(k,:)
-                   com_list(l+1:k, :)  = com_list(l:k-1, :)
-                   com_list(l, :)      = com_list_elem
-                   ! end loop
-                   k         = n_com + 1
+                   k = k + 1
                end if
-           else
-               k = k + 1
-           end if
-       end do
-       com_count2 = 1
+           end do
+           com_count2 = 1
 
-       ! sort next elements in list
-       k = i + com_count + 1
-       l = 0
-       do while ( k <= n_com )
+           ! sort next elements in list
+           k = i + com_count + 1
+           l = 0
+           do while ( k <= n_com )
 
-          if ( (com_list(k,2) == com_list(i,3)) .and. (com_list(k,3) == com_list(i,2)) ) then
+              if ( (com_list(k,2) == com_list(i,3)) .and. (com_list(k,3) == com_list(i,2)) ) then
 
-              if ( l /= 0 ) then
+                  if ( l /= 0 ) then
 
-              ! there are non allowed communciations before
-              ! sort list
-              com_list_elem       = com_list(k,:)
-              com_list(l+1:k, :)  = com_list(l:k-1, :)
-              com_list(l, :)      = com_list_elem
-              ! increase number of communications
-              com_count2          = com_count2 + 1
-              k                   = l + 1
-              ! reset l
-              l                   = 0
+                  ! there are non allowed communciations before
+                  ! sort list
+                  com_list_elem       = com_list(k,:)
+                  com_list(l+1:k, :)  = com_list(l:k-1, :)
+                  com_list(l, :)      = com_list_elem
+                  ! increase number of communications
+                  com_count2          = com_count2 + 1
+                  k                   = l + 1
+                  ! reset l
+                  l                   = 0
+
+                  else
+
+                  ! increase number of communications
+                  com_count2 = com_count2 + 1
+                  k          = k + 1
+
+                  end if
 
               else
-
-              ! increase number of communications
-              com_count2 = com_count2 + 1
-              k          = k + 1
+                  ! save list number
+                  if ( l == 0 ) then
+                      l = k
+                  end if
+                  ! increase k
+                  k = k + 1
 
               end if
+           end do
 
-          else
-              ! save list number
-              if ( l == 0 ) then
-                  l = k
-              end if
-              ! increase k
-              k = k + 1
+        end if
 
-          end if
-       end do
-
-
-       ! error case
-       if ( com_count /= com_count2 ) then
-
-           ! test output
-    i = 1
-        if (rank == 0) then
-            do while ( com_list(i,1) /= -1 )
-                write(*,'(a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1,a,i3.1)', advance='yes') "com-id: ", com_list(i,1), ", rank: ", com_list(i,2), ", neighbor-rank: ", com_list(i,3), ", block: ", com_list(i,4), ", neighbor-block: ", com_list(i,5), ", dirs: ", com_list(i,6), ", ", com_list(i,7)
-                i = i + 1
-            end do
+        ! error case
+        if ( com_count /= com_count2 ) then
             write(*,'(80("#"))')
-                      print*, "ERROR: communication list error"
-          stop
-    end if
-
-              end if
+            print*, "ERROR: communication list error"
+            stop
+        end if
 
 
         ! move list index

@@ -182,6 +182,7 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     end do
     com_list = my_com_list
 
+
     ! number of communications
     n_com = k - 1
 

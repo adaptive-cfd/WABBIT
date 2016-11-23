@@ -142,7 +142,7 @@ contains
       IMPLICIT  NONE
       INTEGER, DIMENSION(:,:), INTENT(INOUT) :: x
       INTEGER                               :: sze, ndata
-      INTEGER                               :: i,j
+      INTEGER                               :: i
       INTEGER                               :: Location
 
       sze = size(x,1)

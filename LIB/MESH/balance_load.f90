@@ -54,7 +54,7 @@ subroutine balance_load( params, block_list, block_data, neighbor_list )
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
-    integer(kind=ik)                    :: rank, proc_id
+    integer(kind=ik)                    :: rank
     ! number of processes
     integer(kind=ik)                    :: number_procs
     ! MPI message tag
@@ -66,15 +66,14 @@ subroutine balance_load( params, block_list, block_data, neighbor_list )
     character(len=80)                   :: distribution
 
     ! block distribution lists
-    integer(kind=ik), allocatable       :: opt_dist_list(:), dist_list(:), friends_loc(:,:), friends(:,:), affinity(:)
+    integer(kind=ik), allocatable       :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
 
     ! allocation error variable
     integer(kind=ik)                    :: allocate_error
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, num_blocks, l, com_i, com_N, excess_blocks, avg_blocks, &
-                                           id_send, id_recv, send_deficit, recv_deficit, tmp(1), q, r, light_id, heavy_id, &
-                                           direc_id
+    integer(kind=ik)                    :: k, N, num_blocks, l, com_i, com_N, &
+                                           id_send, id_recv, send_deficit, recv_deficit, tmp(1), light_id, heavy_id
 
     ! com plan
     integer(kind=ik), allocatable       :: com_plan(:,:)
@@ -88,15 +87,15 @@ subroutine balance_load( params, block_list, block_data, neighbor_list )
 !---------------------------------------------------------------------------------------------
 ! interfaces
 interface
-  subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank, rank_partner, affinity)
+  subroutine compute_affinity(params, block_list, neighbor_list, rank, rank_partner, affinity)
     use mpi
     use module_params
     implicit none
 
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(inout)     :: block_list(:, :)
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    integer(kind=ik), intent(out)       :: neighbor_list(:), affinity(:)
+    integer(kind=ik), intent(out)       :: affinity(:)
+    integer(kind=ik), intent(in)        :: neighbor_list(:)
     integer(kind=ik), intent(in) :: rank, rank_partner
   end subroutine
   subroutine set_desired_num_blocks_per_rank(params, block_list, dist_list, opt_dist_list)
@@ -243,7 +242,7 @@ end interface
                     ! yes, and I'll send "com_plan(k, 3)" blocks to proc "com_plan(k, 2)"
                     !---------------------------------------------------------------------------------------
                     ! affinity list, HEAVY DATA ARRAY
-                    call compute_affinity(params, my_block_list, block_data, neighbor_list, rank, com_plan(k, 2), affinity)
+                    call compute_affinity(params, my_block_list, neighbor_list, rank, com_plan(k, 2), affinity)
 
                     com_N = 1
                     do while ( com_N <= com_plan(k, 3) )
@@ -341,7 +340,7 @@ end subroutine balance_load
 ! This list is at the core of heuristic load balancing: we know whom to send to, and using this list
 ! we decide which blocks will be sent.
 !-------------------------------------------------------------------------------
-subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank, rank_partner, affinity)
+subroutine compute_affinity(params, block_list, neighbor_list, rank, rank_partner, affinity)
   use mpi
   use module_params
   implicit none
@@ -349,10 +348,9 @@ subroutine compute_affinity(params, block_list, block_data, neighbor_list, rank,
   type (type_params), intent(in)      :: params
   ! light data array
   integer(kind=ik), intent(inout)     :: block_list(:, :)
-  ! heavy data array - block data
-  real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
   ! heavy data array - neifghbor data
-  integer(kind=ik), intent(out)       :: neighbor_list(:), affinity(:)
+  integer(kind=ik), intent(out)       :: affinity(:)
+  integer(kind=ik), intent(in)        :: neighbor_list(:)
   integer(kind=ik), intent(in)        :: rank, rank_partner
   integer :: heavy_id, light_id,direc_id, proc_id, q
 

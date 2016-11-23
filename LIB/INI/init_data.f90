@@ -12,6 +12,7 @@
 !           - light data array
 !           - heavy data array
 !           - neighbor data array
+!           - debug data array
 ! output:   - filled user defined data structure for global params
 !           - initialized light and heavy data arrays
 !
@@ -21,7 +22,7 @@
 !            initialized block data to main program
 ! ********************************************************************************************
 
-subroutine init_data(params, block_list, block_data, neighbor_list)
+subroutine init_data(params, block_list, block_data, neighbor_list, debug)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -40,6 +41,9 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
     ! user defined parameter structure
     type (type_params), intent(out)                 :: params
 
+    ! user defined parameter structure
+    type (type_debug), intent(out)                  :: debug
+
     ! light data array
     integer(kind=ik), allocatable, intent(out)      :: block_list(:, :)
     ! heavy data array - block data
@@ -54,6 +58,8 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
     integer(kind=ik)                                :: ierr
     ! process rank
     integer(kind=ik)                                :: rank
+    ! number of processes
+    integer(kind=ik)                                :: number_procs
 
     ! inifile name
     character(len=80)                               :: filename
@@ -113,6 +119,8 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
 
     ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! determinate process number
+    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
     ! get the first command line argument
     call get_command_argument(1, filename)
@@ -192,6 +200,17 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
     call read_param(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
     !***************************************************************************
+    ! read DEBUG parameters
+    !
+    ! discretization order
+    call read_param(FILE, 'Debug', 'debug', read_logical, 1 )
+    if ( read_logical == 1 ) then
+        params%debug = .true.
+    else
+        params%debug = .false.
+    end if
+
+    !***************************************************************************
     ! allocate light/heavy data, initialize start field and write block data
     !
     ! allocate block_list
@@ -228,10 +247,16 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
     neighbor_list = -1
 
     ! ------------------------------------------------------------------------------------------------------
-    ! init computing time array
-    ! note: number of lines fixed, todo: better implementation with variable array length?
-    allocate( params%comp_time( 30 ), stat=allocate_error )
-    params%comp_time = 0.0_rk
+    ! init debug data
+    ! note: fix size of time measurements array
+    if ( params%debug ) then
+        ! allocate array for time measurements - data
+        allocate( debug%comp_time( number_procs, 40 ), stat=allocate_error )
+        debug%comp_time = 0.0_rk
+        ! allocate array for time measurements - names
+        allocate( debug%name_comp_time( 40 ), stat=allocate_error )
+        debug%name_comp_time = "---"
+    end if
 
     ! clean up
     call clean_ini_file(FILE)

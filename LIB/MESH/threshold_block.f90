@@ -15,7 +15,7 @@
 ! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine threshold_block( params, block_list, block_data, neighbor_list )
+subroutine threshold_block( params, block_list, block_data, neighbor_list, debug, adapt_count )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -32,13 +32,19 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list )
     implicit none
 
     ! user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(inout)   :: params
+    ! user defined parameter structure
+    type (type_debug), intent(inout)    :: debug
+
     ! light data array
     integer(kind=ik), intent(inout)     :: block_list(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
     ! neighbor list
     integer(kind=ik), intent(in)        :: neighbor_list(:)
+
+    ! performance test variable
+    integer(kind=ik), intent(in)        :: adapt_count
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -62,6 +68,9 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list )
 
     ! light data list for working
     integer(kind=ik)                    :: my_block_list( size(block_list, 1), params%max_treelevel+2)
+
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -110,8 +119,19 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list )
 
     ! ------------------------------------------------------------------------------------
     ! first: synchronize ghost nodes - thresholding on block with ghost nodes
+    ! start time
+    sub_t0 = MPI_Wtime()
     ! synchronize ghostnodes
     call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+    ! end time
+    sub_t1 = MPI_Wtime()
+    if ( params%debug ) then
+        debug%name_comp_time(6 + (adapt_count-1)* 6) = "synchronize_ghosts"
+        debug%comp_time(rank+1, 6 + (adapt_count-1)* 6) = sub_t1 - sub_t0
+    end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! ------------------------------------------------------------------------------------
     ! second: clear old refinement status
@@ -171,6 +191,13 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list )
     ! ------------------------------------------------------------------------------------
     ! fifth: check if block has reached maximal level
     call respect_min_max_treelevel( block_list, params%max_treelevel, params%min_treelevel )
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    if ( params%debug ) then
+        debug%name_comp_time(7 + (adapt_count-1)* 6) = "treshold_block"
+        debug%comp_time(rank+1, 7 + (adapt_count-1)* 6) = sub_t1 - sub_t0
+    end if
 
     ! clean up
     deallocate( u1, stat=allocate_error )

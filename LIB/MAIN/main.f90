@@ -40,6 +40,9 @@ program main
     ! user defined parameter structure
     type (type_params)                  :: params
 
+    ! user defined debug structure
+    type (type_debug)                   :: debug
+
     ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
     !                   -> column(max_treelevel+1): treecode length = mesh level
@@ -71,19 +74,17 @@ program main
     ! number of active blocks
     integer(kind=ik)                    :: block_number
 
-    ! computing time array names, note: list is used for output, names should correspond to real measurements
-    character(len=30)                   :: comp_time_names(30)
-
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
     interface
-        subroutine init_data(params, block_list, block_data, neighbor_list)
+        subroutine init_data(params, block_list, block_data, neighbor_list, debug)
             use module_params
             type (type_params), intent(out)             :: params
             integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
             real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
             integer(kind=ik), allocatable, intent(out)  :: neighbor_list(:)
+            type (type_debug), intent(out)              :: debug
         end subroutine init_data
 
         subroutine save_data(iteration, time, params, block_list, block_data, neighbor_list)
@@ -126,12 +127,13 @@ program main
             integer(kind=ik), intent(in)                :: neighbor_list(:)
         end subroutine time_step_RK4
 
-        subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
+        subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
             use module_params
             type (type_params), intent(inout)           :: params
             integer(kind=ik), intent(inout)             :: block_list(:, :)
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
             integer(kind=ik), intent(inout)             :: neighbor_list(:)
+            type (type_debug), intent(inout)            :: debug
         end subroutine adapt_mesh
 
     end interface
@@ -143,43 +145,6 @@ program main
     time          = 0.0_rk
     iteration     = 0
     block_number  = 0
-
-    ! set computing time names for output
-    comp_time_names     = "---"
-    comp_time_names(1)  = "refine_everywhere"
-    comp_time_names(2)  = "update_neighbors (main)"
-    comp_time_names(3)  = "RK4"
-    ! adapat mesh subroutines
-    comp_time_names(4)  = "1:threshold_block"
-    comp_time_names(5)  = "1:ensure_gradedness"
-    comp_time_names(6)  = "1:ensure_completeness"
-    comp_time_names(7)  = "1:coarse_mesh"
-    comp_time_names(8)  = "1:update_neighbors (adapt_mesh)"
-    comp_time_names(9)  = "1:lgt_active_list (adapt_mesh)"
-
-    comp_time_names(10) = "2:threshold_block"
-    comp_time_names(11) = "2:ensure_gradedness"
-    comp_time_names(12) = "2:ensure_completeness"
-    comp_time_names(13) = "2:coarse_mesh"
-    comp_time_names(14) = "2:update_neighbors (adapt_mesh)"
-    comp_time_names(15) = "2:lgt_active_list (adapt_mesh)"
-
-    comp_time_names(16) = "3:threshold_block"
-    comp_time_names(17) = "3:ensure_gradedness"
-    comp_time_names(18) = "3:ensure_completeness"
-    comp_time_names(19) = "3:coarse_mesh"
-    comp_time_names(20) = "3:update_neighbors (adapt_mesh)"
-    comp_time_names(21) = "3:lgt_active_list (adapt_mesh)"
-
-    comp_time_names(22) = "4:threshold_block"
-    comp_time_names(23) = "4:ensure_gradedness"
-    comp_time_names(24) = "4:ensure_completeness"
-    comp_time_names(25) = "4:coarse_mesh"
-    comp_time_names(26) = "4:update_neighbors (adapt_mesh)"
-    comp_time_names(27) = "4:lgt_active_list (adapt_mesh)"
-
-    comp_time_names(28) = "balance_load"
-    comp_time_names(29) = "update_neighbors (adapt_mesh)"
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -204,8 +169,16 @@ program main
         close(15)
     end if
 
+    ! start time
+    sub_t0 = MPI_Wtime()
     ! initializing data
-    call init_data( params, block_list, block_data, neighbor_list )
+    call init_data( params, block_list, block_data, neighbor_list, debug )
+    ! end time
+    sub_t1 = MPI_Wtime()
+    if ( params%debug ) then
+        debug%name_comp_time(1) = "init_data"
+        debug%comp_time(rank+1, 1) = sub_t1 - sub_t0
+    end if
 
     ! update neighbor relations
     call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
@@ -224,8 +197,10 @@ program main
         if ( params%adapt_mesh ) call refine_everywhere( params, block_list, block_data )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(1) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(2) = "refine_everywhere"
+            debug%comp_time(rank+1, 2) = sub_t1 - sub_t0
+        end if
 
         ! start time
         sub_t0 = MPI_Wtime()
@@ -233,8 +208,10 @@ program main
         call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(2) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(3) = "update_neighbors"
+            debug%comp_time(rank+1, 3) = sub_t1 - sub_t0
+        end if
 
         ! start time
         sub_t0 = MPI_Wtime()
@@ -242,11 +219,13 @@ program main
         call time_step_RK4( time, params, block_list, block_data, neighbor_list )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(3) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(4) = "time_step_RK4"
+            debug%comp_time(rank+1, 4) = sub_t1 - sub_t0
+        end if
 
         ! adapt the mesh
-        if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list )
+        if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
         ! output on screen
         if (rank==0) then
@@ -262,20 +241,22 @@ program main
         endif
 
         ! output computing time for every proc
-        do k = 1, number_procs
-            if ( k-1 == rank ) then
-                write(*,'(80("."))')
-                write(*,'("RUN: computing time details for rank = ",i3)')  rank
-                l = 1
-                ! time array is used
-                do while ( comp_time_names(l) /= "---" )
-                    write(*,'(a, " : ", f10.6, " s")')  comp_time_names(l), params%comp_time(l)
-                    l = l + 1
-                end do
+        if ( params%debug ) then
+            do k = 1, number_procs
+                if ( k-1 == rank ) then
+                    write(*,'(80("."))')
+                    write(*,'("RUN: computing time details for rank = ",i3)')  rank
+                    l = 1
+                    ! time array is used
+                    do while ( debug%name_comp_time(l) /= "---" )
+                        write(*,'(a, " : ", f10.6, " s")')  debug%name_comp_time(l), debug%comp_time(k, l)
+                        l = l + 1
+                    end do
 
-            end if
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        end do
+                end if
+                call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            end do
+        end if
 
     end do
 

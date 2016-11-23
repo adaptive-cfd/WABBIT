@@ -15,7 +15,7 @@
 ! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
+subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,6 +31,9 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
 
     ! user defined parameter structure
     type (type_params), intent(inout)   :: params
+    ! user defined parameter structure
+    type (type_debug), intent(inout)    :: debug
+
     ! light data array
     integer(kind=ik), intent(inout)     :: block_list(:, :)
     ! heavy data array - block data
@@ -49,16 +52,24 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
     ! number of active blocks (light data)
     integer(kind=ik)                    :: n_lgt
 
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
+    ! process rank
+    integer(kind=ik)                    :: rank
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
     interface
-        subroutine threshold_block( params, block_list, block_data, neighbor_list )
+        subroutine threshold_block( params, block_list, block_data, neighbor_list, debug, adapt_count )
             use module_params
-            type (type_params), intent(in)              :: params
+            type (type_params), intent(inout)           :: params
             integer(kind=ik), intent(inout)             :: block_list(:, :)
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
             integer(kind=ik), intent(in)                :: neighbor_list(:)
+            type (type_debug), intent(inout)            :: debug
+            integer(kind=ik), intent(in)                :: adapt_count
+
         end subroutine threshold_block
 
         subroutine ensure_gradedness( block_list, neighbor_list, N, max_treelevel, lgt_active, n_lgt )
@@ -111,6 +122,9 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -123,17 +137,13 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
         call create_lgt_active_list( block_list, lgt_active, n_lgt )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(9 + (k-1)*6) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(5 + (k-1)* 6) = "lgt_active_list"
+            debug%comp_time(rank+1, 5 + (k-1)* 6) = sub_t1 - sub_t0
+        end if
 
-        ! start time
-        sub_t0 = MPI_Wtime()
         ! check where to coarsen (refinement done with safety zone)
-        call threshold_block( params, block_list, block_data, neighbor_list )
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(4 + (k-1)*6) = sub_t1 - sub_t0
+        call threshold_block( params, block_list, block_data, neighbor_list, debug, k )
 
         ! start time
         sub_t0 = MPI_Wtime()
@@ -141,8 +151,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
         call ensure_gradedness( block_list, neighbor_list, params%number_blocks, params%max_treelevel, lgt_active, n_lgt )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(5 + (k-1)*6) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(8 + (k-1)* 6) = "ensure_gradedness"
+            debug%comp_time(rank+1, 8 + (k-1)* 6) = sub_t1 - sub_t0
+        end if
 
         ! start time
         sub_t0 = MPI_Wtime()
@@ -150,8 +162,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
         call ensure_completeness( block_list, params%max_treelevel )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(6 + (k-1)*6) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(9 + (k-1)* 6) = "ensure_completeness"
+            debug%comp_time(rank+1, 9 + (k-1)* 6) = sub_t1 - sub_t0
+        end if
 
         ! start time
         sub_t0 = MPI_Wtime()
@@ -159,36 +173,21 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
         call coarse_mesh( params, block_list, block_data )
         ! end time
         sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(7 + (k-1)*6) = sub_t1 - sub_t0
+        if ( params%debug ) then
+            debug%name_comp_time(10 + (k-1)* 6) = "coarse_mesh"
+            debug%comp_time(rank+1, 10 + (k-1)* 6) = sub_t1 - sub_t0
+        end if
 
-        ! start time
-        sub_t0 = MPI_Wtime()
         ! update neighbor relations
         call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! save time diff
-        params%comp_time(8 + (k-1)*6) = sub_t1 - sub_t0
 
     end do
 
-    ! start time
-    sub_t0 = MPI_Wtime()
     ! balance load
     call balance_load( params, block_list, block_data, neighbor_list )
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! save time diff
-    params%comp_time(28) = sub_t1 - sub_t0
 
-    ! start time
-    sub_t0 = MPI_Wtime()
     ! update neighbor relations
     call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
     ! end time
-    sub_t1 = MPI_Wtime()
-    ! save time diff
-    params%comp_time(29) = sub_t1 - sub_t0
 
 end subroutine adapt_mesh

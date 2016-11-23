@@ -133,8 +133,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
         ! start time
         sub_t0 = MPI_Wtime()
+
         ! new light active list
         call create_lgt_active_list( block_list, lgt_active, n_lgt )
+
         ! end time
         sub_t1 = MPI_Wtime()
         if ( params%debug ) then
@@ -147,8 +149,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
         ! start time
         sub_t0 = MPI_Wtime()
+
         ! unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( block_list, neighbor_list, params%number_blocks, params%max_treelevel, lgt_active, n_lgt )
+
         ! end time
         sub_t1 = MPI_Wtime()
         if ( params%debug ) then
@@ -158,8 +162,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
         ! start time
         sub_t0 = MPI_Wtime()
+
         ! ensure completeness
         call ensure_completeness( block_list, params%max_treelevel )
+
         ! end time
         sub_t1 = MPI_Wtime()
         if ( params%debug ) then
@@ -169,8 +175,10 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
         ! start time
         sub_t0 = MPI_Wtime()
+
         ! adapt the mesh
         call coarse_mesh( params, block_list, block_data )
+
         ! end time
         sub_t1 = MPI_Wtime()
         if ( params%debug ) then
@@ -183,11 +191,30 @@ subroutine adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 
     end do
 
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! balance load
     call balance_load( params, block_list, block_data, neighbor_list )
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    if ( params%debug ) then
+        debug%name_comp_time(29) = "balance_load"
+        debug%comp_time(rank+1, 29) = sub_t1 - sub_t0
+    end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! update neighbor relations
     call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
+
     ! end time
+    sub_t1 = MPI_Wtime()
+    if ( params%debug ) then
+        debug%name_comp_time(30) = "update_neighbors"
+        debug%comp_time(rank+1, 30) = sub_t1 - sub_t0
+    end if
 
 end subroutine adapt_mesh

@@ -121,8 +121,10 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list, debug
     ! first: synchronize ghost nodes - thresholding on block with ghost nodes
     ! start time
     sub_t0 = MPI_Wtime()
+
     ! synchronize ghostnodes
     call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+
     ! end time
     sub_t1 = MPI_Wtime()
     if ( params%debug ) then

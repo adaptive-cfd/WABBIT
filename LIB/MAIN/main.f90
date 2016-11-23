@@ -10,6 +10,7 @@
 ! = log ======================================================================================
 !
 ! 04/11/16 - switch to v0.4
+! 23/11/16 - use computing time array for simple performance tests
 ! ********************************************************************************************
 
 program main
@@ -34,7 +35,7 @@ program main
     integer(kind=ik)                    :: number_procs
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1
+    real(kind=rk)                       :: t0, t1, sub_t0, sub_t1
 
     ! user defined parameter structure
     type (type_params)                  :: params
@@ -64,8 +65,14 @@ program main
     real(kind=rk)                       :: time
     integer(kind=ik)                    :: iteration
 
+    ! loop variable
+    integer(kind=ik)                    :: k, l
+
     ! number of active blocks
     integer(kind=ik)                    :: block_number
+
+    ! computing time array names, note: list is used for output, names should correspond to real measurements
+    character(len=30)                   :: comp_time_names(30)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -121,7 +128,7 @@ program main
 
         subroutine adapt_mesh( params, block_list, block_data, neighbor_list )
             use module_params
-            type (type_params), intent(in)              :: params
+            type (type_params), intent(inout)           :: params
             integer(kind=ik), intent(inout)             :: block_list(:, :)
             real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
             integer(kind=ik), intent(inout)             :: neighbor_list(:)
@@ -136,6 +143,35 @@ program main
     time          = 0.0_rk
     iteration     = 0
     block_number  = 0
+
+    ! set computing time names for output
+    comp_time_names     = "---"
+    comp_time_names(1)  = "refine_everywhere"
+    comp_time_names(2)  = "update_neighbors (main)"
+    comp_time_names(3)  = "RK4"
+    ! adapat mesh subroutines
+    comp_time_names(4)  = "1:threshold_block"
+    comp_time_names(5)  = "1:ensure_gradedness"
+    comp_time_names(6)  = "1:ensure_completeness"
+    comp_time_names(7)  = "1:coarse_mesh"
+    comp_time_names(8)  = "1:update_neighbors (adapt_mesh)"
+    comp_time_names(9)  = "2:threshold_block"
+    comp_time_names(10) = "2:ensure_gradedness"
+    comp_time_names(11) = "2:ensure_completeness"
+    comp_time_names(12) = "2:coarse_mesh"
+    comp_time_names(13) = "2:update_neighbors (adapt_mesh)"
+    comp_time_names(14) = "3:threshold_block"
+    comp_time_names(15) = "3:ensure_gradedness"
+    comp_time_names(16) = "3:ensure_completeness"
+    comp_time_names(17) = "3:coarse_mesh"
+    comp_time_names(18) = "3:update_neighbors (adapt_mesh)"
+    comp_time_names(19) = "4:threshold_block"
+    comp_time_names(20) = "4:ensure_gradedness"
+    comp_time_names(21) = "4:ensure_completeness"
+    comp_time_names(22) = "4:coarse_mesh"
+    comp_time_names(23) = "4:update_neighbors (adapt_mesh)"
+    comp_time_names(24) = "balance_load"
+    comp_time_names(25) = "update_neighbors (adapt_mesh)"
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -174,14 +210,32 @@ program main
 
         iteration = iteration + 1
 
+        ! start time
+        sub_t0 = MPI_Wtime()
         ! refine every block to create the safety zone
         if ( params%adapt_mesh ) call refine_everywhere( params, block_list, block_data )
+        ! end time
+        sub_t1 = MPI_Wtime()
+        ! save time diff
+        params%comp_time(1) = sub_t1 - sub_t0
 
+        ! start time
+        sub_t0 = MPI_Wtime()
         ! update neighbor relations
         call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
+        ! end time
+        sub_t1 = MPI_Wtime()
+        ! save time diff
+        params%comp_time(2) = sub_t1 - sub_t0
 
+        ! start time
+        sub_t0 = MPI_Wtime()
         ! advance in time
         call time_step_RK4( time, params, block_list, block_data, neighbor_list )
+        ! end time
+        sub_t1 = MPI_Wtime()
+        ! save time diff
+        params%comp_time(3) = sub_t1 - sub_t0
 
         ! adapt the mesh
         if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list )
@@ -199,12 +253,28 @@ program main
           call save_data( iteration, time, params, block_list, block_data, neighbor_list )
         endif
 
+        ! output computing time for every proc
+        do k = 1, number_procs
+            if ( k-1 == rank ) then
+                write(*,'(80("."))')
+                write(*,'("RUN: computing time details for rank = ",i3)')  rank
+                l = 1
+                ! time array is used
+                do while ( comp_time_names(l) /= "---" )
+                    write(*,'(a, " : ", f10.6, " s")')  comp_time_names(l), params%comp_time(l)
+                    l = l + 1
+                end do
+
+            end if
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        end do
+
     end do
 
     ! save end field to disk
     call save_data( iteration, time, params, block_list, block_data, neighbor_list )
 
-    ! cpu end time and output on screen
+    ! computing time output on screen
     call cpu_time(t1)
     if (rank==0) then
         write(*,'(80("_"))')

@@ -84,6 +84,10 @@ module module_params
         ! block distribution for load balancing (also used for start distribution)
         character(len=80)                           :: block_distribution
 
+        ! computing time measurement array
+        ! dim: number of measured subroutines
+        real(kind=rk), dimension(:), allocatable    :: comp_time
+
     end type type_params
 
 !---------------------------------------------------------------------------------------------

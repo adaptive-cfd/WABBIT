@@ -227,6 +227,12 @@ subroutine init_data(params, block_list, block_data, neighbor_list)
     allocate( neighbor_list( params%number_blocks*16 ), stat=allocate_error )
     neighbor_list = -1
 
+    ! ------------------------------------------------------------------------------------------------------
+    ! init computing time array
+    ! note: number of lines fixed, todo: better implementation with variable array length?
+    allocate( params%comp_time( 30 ), stat=allocate_error )
+    params%comp_time = 0.0_rk
+
     ! clean up
     call clean_ini_file(FILE)
     deallocate( phi, stat=allocate_error )

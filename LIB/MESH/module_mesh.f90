@@ -24,6 +24,8 @@ module module_mesh
     use module_debug
     ! interpolation routines
     use module_interpolation
+    ! time step module
+    use module_time_step
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -64,5 +66,20 @@ contains
 
     ! check treelevel restrictions
     include "refine_mesh.f90"
+
+    ! adapt the mesh
+    include "adapt_mesh.f90"
+
+    ! threshold the blocks
+    include "threshold_block.f90"
+
+    ! gradedness check
+    include "ensure_gradedness.f90"
+
+    ! completeness check
+    include "ensure_completeness.f90"
+
+    ! coarse meshk
+    include "coarse_mesh.f90"
 
 end module module_mesh

@@ -141,7 +141,8 @@ program main
         iteration = iteration + 1
 
         ! turn off debugging after 2 time steps
-        if ( iteration == 3) params%debug = .false.
+        if ( iteration == 2) params%debug = .false.
+
 
         ! refine everywhere
         if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
@@ -156,10 +157,9 @@ program main
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-!
-!        ! adapt the mesh
-!        if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list, debug )
-!
+        ! adapt the mesh
+        if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+
         ! output on screen
         if (rank==0) then
             write(*,'(80("-"))')

@@ -17,16 +17,10 @@
 !            subroutines
 ! ********************************************************************************************
 
-subroutine coarse_mesh( params, block_list, block_data )
+subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    use mpi
-    ! global parameters
-    use module_params
-    ! interpolation routines
-    use module_interpolation
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -36,12 +30,17 @@ subroutine coarse_mesh( params, block_list, block_data )
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(inout)     :: block_list(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+
+    ! list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, dF, i, l, j
+    integer(kind=ik)                    :: k, dF, i, l, N, lgt_id, hvy_id, sister_rank
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -75,11 +74,14 @@ subroutine coarse_mesh( params, block_list, block_data )
     ! sister ids
     integer(kind=ik)                    :: id(3)
 
-    ! function to compare treecodes
-    logical                             :: array_compare
+    ! variable for block existence
+    logical                             :: exists
 
     ! rank of proc to keep the coarsen data
     integer(kind=ik)                    :: data_rank
+
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -87,7 +89,13 @@ subroutine coarse_mesh( params, block_list, block_data )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N = size(block_list, 1)
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
+    N = params%number_blocks
 
     maxtL = params%max_treelevel
 
@@ -115,57 +123,82 @@ subroutine coarse_mesh( params, block_list, block_data )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all light data
-    do k = 1, N
+    ! loop over all active light data
+    do k = 1, lgt_n
 
         ! rank of proc to keep the data
-        data_rank = (k-1) / params%number_blocks
+        call lgt_id_to_proc_rank( data_rank, lgt_active(k), N )
 
-        ! block is active and wants to coarsen
-        if ( (block_list(k, 1) /= -1) .and. (block_list(k, params%max_treelevel+2) == -2) ) then
+        ! block wants to coarsen
+        if ( lgt_block( lgt_active(k), params%max_treelevel+2) == -2 ) then
 
             ! get treecodes for current block and sister-blocks
-            me                                              = block_list(k, 1:maxtL)
-            light_ids( me( block_list(k, maxtL+1) ) + 1 )   = k
-            heavy_ids( me( block_list(k, maxtL+1) ) + 1 )   = k - ((k-1) / params%number_blocks) * params%number_blocks
-            proc_rank( me( block_list(k, maxtL+1) ) + 1 )   = (k-1) / params%number_blocks
+            me                                              = lgt_block( lgt_active(k), 1:maxtL)
+            light_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = lgt_active(k)
+
+            ! heavy id
+            call lgt_id_to_hvy_id( hvy_id, lgt_active(k), data_rank, N )
+
+            heavy_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = hvy_id
+            proc_rank( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = data_rank
 
             ! get sister ids
-            level    = block_list( k, maxtL+1 )
+            level    = lgt_block( lgt_active(k), maxtL+1 )
 
             i = 0
             do l = 1, 4
                 ! sister treecode differs only on last element
-                if ( block_list( k, level ) /= l-1) then
+                if ( lgt_block( lgt_active(k), level ) /= l-1) then
 
                     i         = i + 1
                     me(level) = l-1
                     ! find block id
-                    do j = 1, N
-                        if ( block_list( j, 1 ) /= -1 ) then
-                            if (array_compare( block_list( j, 1:maxtL ), me, maxtL)) then
-                                id(i) = j
-                            end if
-                        end if
-                    end do
+                    call does_block_exist(me, lgt_block, maxtL, exists, lgt_id, lgt_active, lgt_n)
+                    ! block exists
+                    if (exists) then
+                        id(i) = lgt_id
+                    else
+                        ! error case
+                        print*, me
+                        print*, "ERROR: can not find sister id"
+                        stop
+                    end if
 
                 end if
             end do
 
-            s1                                                  = block_list(id(1), 1:maxtL)
-            light_ids( s1( block_list(id(1), maxtL+1) ) + 1 )   = id(1)
-            heavy_ids( s1( block_list(id(1), maxtL+1) ) + 1 )   = id(1) - ((id(1)-1) / params%number_blocks) * params%number_blocks
-            proc_rank( s1( block_list(id(1), maxtL+1) ) + 1 )   = (id(1)-1) / params%number_blocks
+            s1                                                 = lgt_block(id(1), 1:maxtL)
+            light_ids( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = id(1)
 
-            s2                                                  = block_list(id(2), 1:maxtL)
-            light_ids( s2( block_list(id(2), maxtL+1) ) + 1 )   = id(2)
-            heavy_ids( s2( block_list(id(2), maxtL+1) ) + 1 )   = id(2) - ((id(2)-1) / params%number_blocks) * params%number_blocks
-            proc_rank( s2( block_list(id(2), maxtL+1) ) + 1 )   = (id(2)-1) / params%number_blocks
+            ! rank of proc to keep the data
+            call lgt_id_to_proc_rank( sister_rank, id(1), N )
+            ! heavy id
+            call lgt_id_to_hvy_id( hvy_id, id(1), sister_rank, N )
 
-            s3                                                  = block_list(id(3), 1:maxtL)
-            light_ids( s3( block_list(id(3), maxtL+1) ) + 1 )   = id(3)
-            heavy_ids( s3( block_list(id(3), maxtL+1) ) + 1 )   = id(3) - ((id(3)-1) / params%number_blocks) * params%number_blocks
-            proc_rank( s3( block_list(id(3), maxtL+1) ) + 1 )   = (id(3)-1) / params%number_blocks
+            heavy_ids( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = hvy_id
+            proc_rank( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = sister_rank
+
+            s2                                                 = lgt_block(id(2), 1:maxtL)
+            light_ids( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = id(2)
+
+            ! rank of proc to keep the data
+            call lgt_id_to_proc_rank( sister_rank, id(2), N )
+            ! heavy id
+            call lgt_id_to_hvy_id( hvy_id, id(2), sister_rank, N )
+
+            heavy_ids( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = hvy_id
+            proc_rank( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = sister_rank
+
+            s3                                                 = lgt_block(id(3), 1:maxtL)
+            light_ids( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = id(3)
+
+            ! rank of proc to keep the data
+            call lgt_id_to_proc_rank( sister_rank, id(3), N )
+            ! heavy id
+            call lgt_id_to_hvy_id( hvy_id, id(3), sister_rank, N )
+
+            heavy_ids( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = hvy_id
+            proc_rank( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = sister_rank
 
             ! proc with block k keep the data
             if ( data_rank == rank ) then
@@ -188,14 +221,14 @@ subroutine coarse_mesh( params, block_list, block_data )
                         select case(i)
                             case(1)
                                 ! sister 0
-                                new_coord_x(1:(Bs-1)/2+1)              = block_data( 1, 1:Bs:2, 1, heavy_ids(1) )
-                                new_coord_y(1:(Bs-1)/2+1)              = block_data( 2, 1:Bs:2, 1, heavy_ids(1) )
+                                new_coord_x(1:(Bs-1)/2+1)              = hvy_block( 1, 1:Bs:2, 1, heavy_ids(1) )
+                                new_coord_y(1:(Bs-1)/2+1)              = hvy_block( 2, 1:Bs:2, 1, heavy_ids(1) )
                             case(2)
                                 ! sister 1
-                                new_coord_x((Bs-1)/2+1:Bs)             = block_data( 1, 1:Bs:2, 1, heavy_ids(2) )
+                                new_coord_x((Bs-1)/2+1:Bs)             = hvy_block( 1, 1:Bs:2, 1, heavy_ids(2) )
                             case(3)
                                 ! sister 2
-                                new_coord_y((Bs-1)/2+1:Bs)             = block_data( 2, 1:Bs:2, 1, heavy_ids(3) )
+                                new_coord_y((Bs-1)/2+1:Bs)             = hvy_block( 2, 1:Bs:2, 1, heavy_ids(3) )
                             case(4)
                                 ! sister 3
                                 ! nothing to do
@@ -232,19 +265,19 @@ subroutine coarse_mesh( params, block_list, block_data )
                         case(1)
                             ! sister 0
                             ! send coord
-                            send_receive_coord = block_data( 1, 1:Bs, 1, heavy_ids(1) )
+                            send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(1) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
-                            send_receive_coord = block_data( 2, 1:Bs, 1, heavy_ids(1) )
+                            send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(1) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         case(2)
                             ! sister 1
                             ! send coord
-                            send_receive_coord = block_data( 1, 1:Bs, 1, heavy_ids(2) )
+                            send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(2) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         case(3)
                             ! sister 2
                             ! send coord
-                            send_receive_coord = block_data( 2, 1:Bs, 1, heavy_ids(3) )
+                            send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(3) )
                             call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         case(4)
                             ! sister 3
@@ -263,16 +296,16 @@ subroutine coarse_mesh( params, block_list, block_data )
                             select case(i)
                                 case(1)
                                     ! sister 0
-                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(1) )
+                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(1) )
                                 case(2)
                                     ! sister 1
-                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(2) )
+                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(2) )
                                 case(3)
                                     ! sister 2
-                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(3) )
+                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(3) )
                                 case(4)
                                     ! sister 3
-                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = block_data( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(4) )
+                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(4) )
                             end select
                         else
                             ! receive data from other proc, note: not all blocks have to send coord vectors
@@ -306,22 +339,22 @@ subroutine coarse_mesh( params, block_list, block_data )
                             case(1)
                                 ! sister 0
                                 ! send data
-                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(1) )
+                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(1) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(2)
                                 ! sister 1
                                 ! send data
-                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(2) )
+                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(2) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(3)
                                 ! sister 2
                                 ! send data
-                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(3) )
+                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(3) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(4)
                                 ! sister 3
                                 ! send data
-                                send_receive_data = block_data( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(4) )
+                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(4) )
                                 call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         end select
                     else
@@ -332,38 +365,41 @@ subroutine coarse_mesh( params, block_list, block_data )
             end do
 
             ! delete all heavy data
-            if ( proc_rank(1) == rank ) block_data( :, :, :, heavy_ids(1) ) = 0.0_rk
-            if ( proc_rank(2) == rank ) block_data( :, :, :, heavy_ids(2) ) = 0.0_rk
-            if ( proc_rank(3) == rank ) block_data( :, :, :, heavy_ids(3) ) = 0.0_rk
-            if ( proc_rank(4) == rank ) block_data( :, :, :, heavy_ids(4) ) = 0.0_rk
+            if ( proc_rank(1) == rank ) hvy_block( :, :, :, heavy_ids(1) ) = 0.0_rk
+            if ( proc_rank(2) == rank ) hvy_block( :, :, :, heavy_ids(2) ) = 0.0_rk
+            if ( proc_rank(3) == rank ) hvy_block( :, :, :, heavy_ids(3) ) = 0.0_rk
+            if ( proc_rank(4) == rank ) hvy_block( :, :, :, heavy_ids(4) ) = 0.0_rk
 
             ! delete light data
-            block_list(light_ids(1), : ) = -1
-            block_list(light_ids(2), : ) = -1
-            block_list(light_ids(3), : ) = -1
-            block_list(light_ids(4), : ) = -1
+            lgt_block(light_ids(1), : ) = -1
+            lgt_block(light_ids(2), : ) = -1
+            lgt_block(light_ids(3), : ) = -1
+            lgt_block(light_ids(4), : ) = -1
 
             ! new treecode, one level down (coarsening)
             me(level) = -1
 
             ! write new block on current block
             ! write light data
-            block_list(k, 1:maxtL) = me
-            block_list(k, maxtL+1) = level-1
-            block_list(k, maxtL+2) = 0
+            lgt_block( lgt_active(k), 1:maxtL) = me
+            lgt_block( lgt_active(k), maxtL+1) = level-1
+            lgt_block( lgt_active(k), maxtL+2) = 0
 
             ! final steps
             if ( data_rank == rank ) then
 
+                ! heavy id
+                call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, N )
+
                 ! write coordinates
-                block_data( 1, 1:Bs, 1, k - ((k-1) / params%number_blocks) * params%number_blocks ) = new_coord_x
-                block_data( 2, 1:Bs, 1, k - ((k-1) / params%number_blocks) * params%number_blocks ) = new_coord_y
+                hvy_block( 1, 1:Bs, 1, hvy_id ) = new_coord_x
+                hvy_block( 2, 1:Bs, 1, hvy_id ) = new_coord_y
 
                 ! loop over all dataFields
                 do dF = 2, params%number_data_fields+1
 
                     ! write data
-                    block_data( g+1:Bs+g, g+1:Bs+g, dF, k - ((k-1) / params%number_blocks) * params%number_blocks ) = new_data(:,:,dF-1)
+                    hvy_block( g+1:Bs+g, g+1:Bs+g, dF, hvy_id ) = new_data(:,:,dF-1)
 
                 end do
 
@@ -379,5 +415,19 @@ subroutine coarse_mesh( params, block_list, block_data )
     deallocate( new_coord_y, stat=allocate_error )
     deallocate( send_receive_data, stat=allocate_error )
     deallocate( send_receive_coord, stat=allocate_error )
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find first free line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "coarse_mesh"
+        debug%comp_time(rank+1, k) = sub_t1 - sub_t0
+    end if
 
 end subroutine coarse_mesh

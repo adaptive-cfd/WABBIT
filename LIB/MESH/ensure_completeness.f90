@@ -15,37 +15,51 @@
 ! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine ensure_completeness( block_list, max_treelevel )
+subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
-    ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
 
+    ! user defined parameter structure
+    type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(inout)     :: block_list(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    ! list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
+
+
     ! max treelevel
-    integer(kind=ik), intent(in)        :: max_treelevel
+    integer(kind=ik)                    :: max_treelevel
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, l, i, j
+    integer(kind=ik)                    :: k, l, i, lgt_id
 
     ! sister ids
     integer(kind=ik)                    :: id(3)
 
     ! treecode variable
-    integer(kind=ik)                    :: treecode(max_treelevel)
+    integer(kind=ik)                    :: treecode(params%max_treelevel)
     ! block level
     integer(kind=ik)                    :: level
 
-    ! function to compare treecodes
-    logical                             :: array_compare
+    ! exists variable
+    logical                             :: exists
+
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
+    ! process rank
+    integer(kind=ik)                    :: rank
+
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -53,56 +67,58 @@ subroutine ensure_completeness( block_list, max_treelevel )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N  = size(block_list, 1)
+    max_treelevel = params%max_treelevel
+
     i  = 0
     id = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all blocks
-    do k = 1, N
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
-        ! block is active
-        if ( block_list( k, 1 ) /= -1 ) then
+    ! start time
+    sub_t0 = MPI_Wtime()
 
-            ! if the block want to coarsen, check refinement status of sister blocks
-            if ( block_list( k, max_treelevel+2 ) == -1) then
+    ! loop over all active blocks
+    do k = 1, lgt_n
 
-                ! get sister id's
-                treecode = block_list( k, 1:max_treelevel )
-                level    = block_list( k, max_treelevel+1 )
+        ! if the block want to coarsen, check refinement status of sister blocks
+        if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
 
-                i = 0
-                do l = 1, 4
-                    ! sister treecode differs only on last element
-                    if ( block_list( k, level ) /= l-1) then
+            ! get sister id's
+            treecode = lgt_block( lgt_active(k), 1:max_treelevel )
+            level    = lgt_block( lgt_active(k), max_treelevel+1 )
 
-                        i               = i + 1
-                        treecode(level) = l-1
-                        ! find block id
-                        do j = 1, N
-                            if ( block_list( j, 1 ) /= -1 ) then
-                                if (array_compare( block_list( j, 1:max_treelevel ), treecode, max_treelevel)) then
-                                    id(i) = j
-                                end if
-                            end if
-                        end do
+            i = 0
+            do l = 1, 4
+                ! sister treecode differs only on last element
+                if ( lgt_block( lgt_active(k), level ) /= l-1) then
 
-                    end if
-                end do
-
-                ! if all sisters exists
-                if ( (id(1)>0) .and. (id(2)>0) .and. (id(3)>0) ) then
-
-                    ! if all sister blocks want to coarsen, then coarsening is allowed
-                    if ( ( block_list( id(1), max_treelevel+2 ) == -1) .and. ( block_list( id(2), max_treelevel+2 ) == -1) .and. ( block_list( id(3), max_treelevel+2 ) == -1) ) then
-                        block_list( k, max_treelevel+2 )      = -2
-                        block_list( id(1), max_treelevel+2 )  = -2
-                        block_list( id(2), max_treelevel+2 )  = -2
-                        block_list( id(3), max_treelevel+2 )  = -2
+                    i               = i + 1
+                    treecode(level) = l-1
+                    ! find block id, use exists subroutine
+                    call does_block_exist(treecode, lgt_block, max_treelevel, exists, lgt_id, lgt_active, lgt_n)
+                    ! block exists
+                    if (exists) then
+                        id(i) = lgt_id
+                    else
+                        ! sister does not exists, nothing to do
                     end if
 
+                end if
+            end do
+
+            ! if all sisters exists
+            if ( (id(1)>0) .and. (id(2)>0) .and. (id(3)>0) ) then
+
+                ! if all sister blocks want to coarsen, then coarsening is allowed
+                if ( ( lgt_block( id(1), max_treelevel+2 ) == -1) .and. ( lgt_block( id(2), max_treelevel+2 ) == -1) .and. ( lgt_block( id(3), max_treelevel+2 ) == -1) ) then
+                    lgt_block( lgt_active(k), max_treelevel+2 )      = -2
+                    lgt_block( id(1), max_treelevel+2 )  = -2
+                    lgt_block( id(2), max_treelevel+2 )  = -2
+                    lgt_block( id(3), max_treelevel+2 )  = -2
                 end if
 
             end if
@@ -110,5 +126,19 @@ subroutine ensure_completeness( block_list, max_treelevel )
         end if
 
     end do
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find first free line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "ensure_completeness"
+        debug%comp_time(rank+1, k) = sub_t1 - sub_t0
+    end if
 
 end subroutine ensure_completeness

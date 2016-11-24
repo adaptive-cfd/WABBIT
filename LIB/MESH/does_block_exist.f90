@@ -5,7 +5,7 @@
 ! version: 0.4
 ! author: msr, engels
 !
-! return true, if block exist
+! return true and light id, if block exist
 !
 ! input:    - treecode
 !           - light data array

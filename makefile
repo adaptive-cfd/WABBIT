@@ -5,9 +5,9 @@ lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light
 RHS_2D_convection_diffusion.f90
 #  \
  block_count.f90 \
-  copy_ghost_nodes.f90   \
-  adapt_mesh.f90 threshold_block.f90 ensure_gradedness.f90 ensure_completeness.f90 \
-coarse_mesh.f90 balance_load.f90 get_free_heavy_id.f90
+    \
+     \
+ balance_load.f90 get_free_heavy_id.f90
  
 
 # Object and module directory:
@@ -114,18 +114,21 @@ $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution.f90 new_block_heavy.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
-$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
+$(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
+	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 send_receive_data.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)	
+	
+$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o $(OBJDIR)/module_time_step.o \
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90 find_neighbor_edge.f90 does_block_exist.f90 \
-	find_neighbor_corner.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90
+	find_neighbor_corner.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90 adapt_mesh.f90 threshold_block.f90 \
+	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \
 	save_data.f90 write_field.f90 
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
-$(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 send_receive_data.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)	
+
 	
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)

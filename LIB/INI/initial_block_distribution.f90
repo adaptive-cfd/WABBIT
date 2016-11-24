@@ -20,14 +20,7 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine initial_block_distribution( params, block_list, block_data, phi )
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    use mpi
-    ! global parameters
-    use module_params
+subroutine initial_block_distribution( params, lgt_block, block_data, phi )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -37,7 +30,7 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(inout)     :: block_list(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
     ! initial data field
@@ -74,21 +67,6 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
     ! treecode variable and function to calculate size of treecode
     integer(kind=ik), allocatable       :: treecode(:)
     integer(kind=ik)                    :: treecode_size
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-    interface
-        subroutine new_block_heavy(block_data, heavy_id, data_, coord_x, coord_y, Bs, g, dF)
-            use module_params
-            real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-            integer(kind=ik), intent(in)        :: heavy_id
-            integer(kind=ik), intent(in)        :: Bs, g
-            real(kind=rk), intent(in)           :: data_( Bs, Bs )
-            real(kind=rk), intent(in)           :: coord_x(Bs), coord_y(Bs)
-            integer(kind=ik), intent(in)        :: dF
-        end subroutine new_block_heavy
-    end interface
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -170,7 +148,7 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
 
                     ! find and set free heavy data id, note: look for free id in light data
                     ! search routine only on corresponding light data -> so, returned id works directly on heavy data
-                    call get_free_light_id( heavy_id, block_list( (k-1)*params%number_blocks + 1 : ((k-1)+1)*params%number_blocks, 1 ), params%number_blocks )
+                    call get_free_light_id( heavy_id, lgt_block( (k-1)*params%number_blocks + 1 : ((k-1)+1)*params%number_blocks, 1 ), params%number_blocks )
 
                     ! save data, write start field phi in first datafield
                     if (rank == (k-1)) then
@@ -193,9 +171,9 @@ subroutine initial_block_distribution( params, block_list, block_data, phi )
                     ! light data id is calculated from proc rank and heavy_id
                     light_id = (k-1)*params%number_blocks + heavy_id
                     ! write treecode
-                    block_list( light_id, 1 : params%max_treelevel ) = treecode
+                    lgt_block( light_id, 1 : params%max_treelevel ) = treecode
                     ! treecode level (size)
-                    block_list( light_id, params%max_treelevel + 1 ) = treecode_size( treecode, params%max_treelevel )
+                    lgt_block( light_id, params%max_treelevel + 1 ) = treecode_size( treecode, params%max_treelevel )
 
                 end do
             end do

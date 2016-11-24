@@ -21,14 +21,7 @@
 ! 04/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine  allocate_block_list(block_list, number_blocks, max_treelevel)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    use mpi
-    ! global parameters
-    use module_params
+subroutine  allocate_block_list(lgt_block, number_blocks, max_treelevel)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -36,7 +29,7 @@ subroutine  allocate_block_list(block_list, number_blocks, max_treelevel)
     implicit none
 
     ! light data array
-    integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
+    integer(kind=ik), allocatable, intent(out)  :: lgt_block(:, :)
     ! number of light and heavy data
     integer(kind=ik), intent(in)                :: number_blocks
     ! maximal treelevel = maximal length of treecode
@@ -64,16 +57,16 @@ subroutine  allocate_block_list(block_list, number_blocks, max_treelevel)
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! allocate memory
-    allocate( block_list( number_procs*number_blocks, max_treelevel+2), stat=allocate_error )
+    allocate( lgt_block( number_procs*number_blocks, max_treelevel+2), stat=allocate_error )
 
     ! reset data
     !
     ! all blocks are inactive, reset treecode
-    block_list(:, 1:max_treelevel) = -1
+    lgt_block(:, 1:max_treelevel) = -1
     ! all blocks are inactive, reset treelevel
-    block_list(:, max_treelevel+1) = -1
+    lgt_block(:, max_treelevel+1) = -1
     ! set refinement to 0
-    block_list(:, max_treelevel+2) = 0
+    lgt_block(:, max_treelevel+2) = 0
 
     ! output
     if (rank==0) then

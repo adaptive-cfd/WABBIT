@@ -89,19 +89,6 @@ module module_params
 
     end type type_params
 
-    ! global user defined debug structure
-    type type_debug
-
-        ! computing time measurement array
-        ! dim 1: proc rank
-        ! dim 2: number of measured subroutines
-        real(kind=rk), dimension(:,:), allocatable      :: comp_time
-
-        ! names of time measurements
-        character(len=40), dimension(:), allocatable    :: name_comp_time
-
-    end type type_debug
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 

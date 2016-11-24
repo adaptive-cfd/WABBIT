@@ -1,23 +1,23 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: create_lgt_active_list.f90
+! name: create_hvy_active_list.f90
 ! version: 0.4
 ! author: msr
 !
-! create a list of all active blocks (light data)
-! dim 1: light data id
+! create a list of all active blocks (heavy data)
+! dim 1: heavy data id
 !
 ! input:    - light data
-! output:   - list of active blocks, light data id
+! output:   - list of active blocks, heavy data id
 !           - number of active blocks
 !
 ! = log ======================================================================================
 !
-! 23/11/16 - create subroutine
+! 24/11/16 - create subroutine
 ! ********************************************************************************************
 
-subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+subroutine create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -28,13 +28,18 @@ subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
 
     ! list of active blocks (light data)
-    integer(kind=ik), intent(out)       :: lgt_active(:)
+    integer(kind=ik), intent(out)       :: hvy_active(:)
 
     ! number of active blocks (light data)
-    integer(kind=ik), intent(out)       :: lgt_n
+    integer(kind=ik), intent(out)       :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: k
+    integer(kind=ik)                    :: k, lgt_start, N, heavy_id
+
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
+    ! process rank
+    integer(kind=ik)                    :: rank
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -43,23 +48,35 @@ subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
 ! variables initialization
 
     ! reset active list
-    lgt_active = -1
+    hvy_active = -1
 
     ! list index
-    lgt_n = 0
+    hvy_n = 0
+
+    ! number of blocks per proc
+    N = size(hvy_active, 1)
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+    ! start index on light data
+    call proc_to_lgt_data_start_id( lgt_start, rank, N )
+
     ! loop over all light data
-    do k = 1, size(lgt_block, 1)
+    ! every proc loops only over the data corresponding to his rank
+    do k = lgt_start, lgt_start + N - 1
 
         ! block is active
         if ( lgt_block(k, 1) /= -1 ) then
-            lgt_active( lgt_n + 1 ) = k
-            lgt_n                   = lgt_n + 1
+            ! convert light data id into heavy data id
+            call lgt_id_to_hvy_id( heavy_id, k, rank, N)
+            hvy_active( hvy_n + 1 ) = heavy_id
+            hvy_n = hvy_n + 1
         end if
 
     end do
 
-end subroutine create_lgt_active_list
+end subroutine create_hvy_active_list

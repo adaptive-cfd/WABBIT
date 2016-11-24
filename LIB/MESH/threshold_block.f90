@@ -15,7 +15,7 @@
 ! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine threshold_block( params, block_list, block_data, neighbor_list, debug, adapt_count )
+subroutine threshold_block( params, block_list, block_data, neighbor_list, adapt_count )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -33,8 +33,6 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list, debug
 
     ! user defined parameter structure
     type (type_params), intent(inout)   :: params
-    ! user defined parameter structure
-    type (type_debug), intent(inout)    :: debug
 
     ! light data array
     integer(kind=ik), intent(inout)     :: block_list(:, :)
@@ -117,93 +115,93 @@ subroutine threshold_block( params, block_list, block_data, neighbor_list, debug
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! ------------------------------------------------------------------------------------
-    ! first: synchronize ghost nodes - thresholding on block with ghost nodes
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    ! synchronize ghostnodes
-    call synchronize_ghosts( params, block_list, block_data, neighbor_list )
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    if ( params%debug ) then
-        debug%name_comp_time(6 + (adapt_count-1)* 6) = "synchronize_ghosts"
-        debug%comp_time(rank+1, 6 + (adapt_count-1)* 6) = sub_t1 - sub_t0
-    end if
-
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    ! ------------------------------------------------------------------------------------
-    ! second: clear old refinement status
-    ! set status "no refine/coarse" for all active blocks
-    do k = 1, size(block_list, 1)
-        if ( block_list(k, 1) /= -1 ) then
-            block_list(k, params%max_treelevel+2 ) = 0
-        end if
-    end do
-
-    ! ------------------------------------------------------------------------------------
-    ! third: calculate detail and set new refinement status
-    ! loop over all heavy data, note: light data need to synchronize after this step
-    do k = 1, N
-
-        ! reset detail
-        detail = 0.0_rk
-
-        ! block is active
-        if ( block_list(rank*N + k , 1) /= -1 ) then
-
-            ! loop over all datafields
-            do dF = 2, params%number_data_fields+1
-
-                ! reset interpolation fields
-                u1        = block_data( :, :, dF, k)
-                u2        = 0.0_rk
-                u3        = 0.0_rk
-
-                ! wavelet indicator
-                call restriction_2D( u1, u3 )  ! fine, coarse
-                call prediction_2D ( u3, u2, params%order_predictor )  ! coarse, fine
-                ! calculate deatil
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
-                        detail = max( detail, sqrt( (u1(i,j)-u2(i,j)) * ( u1(i,j)-u2(i,j)) ) )
-                    end do
-                end do
-
-            end do
-
-            ! threshold
-            if (detail < params%eps) then
-                ! coarsen block, -1
-                my_block_list( rank*N + k, params%max_treelevel+2 ) = -1
-            end if
-
-        end if
-
-    end do
-
-    ! ------------------------------------------------------------------------------------
-    ! fourth: synchronize light data
-    block_list = 0
-    call MPI_Allreduce(my_block_list, block_list, size(block_list,1)*size(block_list,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-    ! ------------------------------------------------------------------------------------
-    ! fifth: check if block has reached maximal level
-    call respect_min_max_treelevel( block_list, params%max_treelevel, params%min_treelevel )
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    if ( params%debug ) then
-        debug%name_comp_time(7 + (adapt_count-1)* 6) = "treshold_block"
-        debug%comp_time(rank+1, 7 + (adapt_count-1)* 6) = sub_t1 - sub_t0
-    end if
-
-    ! clean up
-    deallocate( u1, stat=allocate_error )
-    deallocate( u2, stat=allocate_error )
-    deallocate( u3, stat=allocate_error )
+!    ! ------------------------------------------------------------------------------------
+!    ! first: synchronize ghost nodes - thresholding on block with ghost nodes
+!    ! start time
+!    sub_t0 = MPI_Wtime()
+!
+!    ! synchronize ghostnodes
+!    call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+!
+!    ! end time
+!    sub_t1 = MPI_Wtime()
+!    if ( params%debug ) then
+!        debug%name_comp_time(6 + (adapt_count-1)* 6) = "synchronize_ghosts"
+!        debug%comp_time(rank+1, 6 + (adapt_count-1)* 6) = sub_t1 - sub_t0
+!    end if
+!
+!    ! start time
+!    sub_t0 = MPI_Wtime()
+!
+!    ! ------------------------------------------------------------------------------------
+!    ! second: clear old refinement status
+!    ! set status "no refine/coarse" for all active blocks
+!    do k = 1, size(block_list, 1)
+!        if ( block_list(k, 1) /= -1 ) then
+!            block_list(k, params%max_treelevel+2 ) = 0
+!        end if
+!    end do
+!
+!    ! ------------------------------------------------------------------------------------
+!    ! third: calculate detail and set new refinement status
+!    ! loop over all heavy data, note: light data need to synchronize after this step
+!    do k = 1, N
+!
+!        ! reset detail
+!        detail = 0.0_rk
+!
+!        ! block is active
+!        if ( block_list(rank*N + k , 1) /= -1 ) then
+!
+!            ! loop over all datafields
+!            do dF = 2, params%number_data_fields+1
+!
+!                ! reset interpolation fields
+!                u1        = block_data( :, :, dF, k)
+!                u2        = 0.0_rk
+!                u3        = 0.0_rk
+!
+!                ! wavelet indicator
+!                call restriction_2D( u1, u3 )  ! fine, coarse
+!                call prediction_2D ( u3, u2, params%order_predictor )  ! coarse, fine
+!                ! calculate deatil
+!                do i = 1, Bs+2*g
+!                    do j = 1, Bs+2*g
+!                        detail = max( detail, sqrt( (u1(i,j)-u2(i,j)) * ( u1(i,j)-u2(i,j)) ) )
+!                    end do
+!                end do
+!
+!            end do
+!
+!            ! threshold
+!            if (detail < params%eps) then
+!                ! coarsen block, -1
+!                my_block_list( rank*N + k, params%max_treelevel+2 ) = -1
+!            end if
+!
+!        end if
+!
+!    end do
+!
+!    ! ------------------------------------------------------------------------------------
+!    ! fourth: synchronize light data
+!    block_list = 0
+!    call MPI_Allreduce(my_block_list, block_list, size(block_list,1)*size(block_list,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+!
+!    ! ------------------------------------------------------------------------------------
+!    ! fifth: check if block has reached maximal level
+!    call respect_min_max_treelevel( block_list, params%max_treelevel, params%min_treelevel )
+!
+!    ! end time
+!    sub_t1 = MPI_Wtime()
+!    if ( params%debug ) then
+!        debug%name_comp_time(7 + (adapt_count-1)* 6) = "treshold_block"
+!        debug%comp_time(rank+1, 7 + (adapt_count-1)* 6) = sub_t1 - sub_t0
+!    end if
+!
+!    ! clean up
+!    deallocate( u1, stat=allocate_error )
+!    deallocate( u2, stat=allocate_error )
+!    deallocate( u3, stat=allocate_error )
 
 end subroutine threshold_block

@@ -25,14 +25,7 @@
 ! 04/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    use mpi
-    ! global parameters
-    use module_params
+subroutine  allocate_block_data(hvy_block, number_blocks, Bs, g, dF)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -40,7 +33,7 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     implicit none
 
     ! heavy data array
-    real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
+    real(kind=rk), allocatable, intent(out)     :: hvy_block(:, :, :, :)
     ! number of heavy data
     integer(kind=ik), intent(in)                :: number_blocks
     ! grid parameter, blocksize (Bs), ghostnodes (g), number of fields (F)
@@ -64,11 +57,11 @@ subroutine  allocate_block_data(block_data, number_blocks, Bs, g, dF)
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! allocate memory
-    allocate( block_data( Bs+2*g, Bs+2*g, dF, number_blocks ), stat=allocate_error )
+    allocate( hvy_block( Bs+2*g, Bs+2*g, dF, number_blocks ), stat=allocate_error )
 
     ! reset data
     !
-    block_data(:, :, :, :) = 0.0_rk
+    hvy_block(:, :, :, :) = 0.0_rk
 
     ! output
     if (rank==0) then

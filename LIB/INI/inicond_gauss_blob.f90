@@ -18,13 +18,6 @@
 subroutine inicond_gauss_blob(phi, Ds, Lx, Ly)
 
 !---------------------------------------------------------------------------------------------
-! modules
-
-    use mpi
-    ! global parameters
-    use module_params
-
-!---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none

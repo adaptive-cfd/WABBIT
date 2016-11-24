@@ -1,12 +1,11 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: create_lgt_active_list.f90
+! name: proc_to_lgt_data_start_id.f90
 ! version: 0.4
 ! author: msr
 !
-! create a list of all active blocks (light data)
-! dim 1: light data id
+! return start index on light data corresponding to proc rank
 !
 ! input:    - light data
 ! output:   - list of active blocks, light data id
@@ -14,27 +13,30 @@
 !
 ! = log ======================================================================================
 !
-! 23/11/16 - create subroutine
+! 23/11/16 - create
 ! ********************************************************************************************
 
-subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+    ! global parameters
+    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
 
-    ! light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    ! light data start index
+    integer(kind=ik), intent(out)       :: lgt_start
 
-    ! list of active blocks (light data)
-    integer(kind=ik), intent(out)       :: lgt_active(:)
+    ! rank of proc
+    integer(kind=ik), intent(in)        :: rank
 
-    ! number of active blocks (light data)
-    integer(kind=ik), intent(out)       :: lgt_n
-
-    ! loop variables
-    integer(kind=ik)                    :: k
+    ! number of blocks per proc
+    integer(kind=ik), intent(in)        :: N
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -42,24 +44,9 @@ subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! reset active list
-    lgt_active = -1
-
-    ! list index
-    lgt_n = 0
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all light data
-    do k = 1, size(lgt_block, 1)
+    lgt_start = rank*N + 1
 
-        ! block is active
-        if ( lgt_block(k, 1) /= -1 ) then
-            lgt_active( lgt_n + 1 ) = k
-            lgt_n                   = lgt_n + 1
-        end if
-
-    end do
-
-end subroutine create_lgt_active_list
+end subroutine proc_to_lgt_data_start_id

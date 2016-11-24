@@ -12,7 +12,7 @@
 !           - light data array
 !           - heavy data array
 !           - neighbor data array
-!           - debug data array
+!           - light and heavy active block list
 ! output:   - filled user defined data structure for global params
 !           - initialized light and heavy data arrays
 !
@@ -21,17 +21,7 @@
 ! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
 !            initialized block data to main program
 ! ********************************************************************************************
-
-subroutine init_data(params, block_list, block_data, neighbor_list, debug)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    use mpi
-    ! global parameters
-    use module_params
-    ! ini file parser module
-    use module_ini_files_parser
+subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -41,18 +31,19 @@ subroutine init_data(params, block_list, block_data, neighbor_list, debug)
     ! user defined parameter structure
     type (type_params), intent(out)                 :: params
 
-    ! user defined parameter structure
-    type (type_debug), intent(out)                  :: debug
-
     ! light data array
-    integer(kind=ik), allocatable, intent(out)      :: block_list(:, :)
+    integer(kind=ik), allocatable, intent(out)      :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), allocatable, intent(out)         :: block_data(:, :, :, :)
+    real(kind=rk), allocatable, intent(out)         :: hvy_block(:, :, :, :)
     ! neighbor array (heavy data) -> number_lines = number_blocks * 16 (...different neighbor relations:
     ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
     !         saved data -> -1 ... no neighbor
     !                    -> light data line number (id)
-    integer(kind=ik), allocatable, intent(out)      :: neighbor_list(:)
+    integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:)
+    ! list of active blocks (light data)
+    integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
+    ! list of active blocks (light data)
+    integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
 
     ! MPI error variable
     integer(kind=ik)                                :: ierr
@@ -77,45 +68,20 @@ subroutine init_data(params, block_list, block_data, neighbor_list, debug)
     ! loop variable
     integer(kind=ik)                                :: k
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                                   :: sub_t0, sub_t1
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
-
-    interface
-        subroutine allocate_block_list(block_list, number_blocks, max_treelevel)
-            use module_params
-            integer(kind=ik), allocatable, intent(out)  :: block_list(:, :)
-            integer(kind=ik), intent(in)                :: number_blocks
-            integer(kind=ik), intent(in)                :: max_treelevel
-        end subroutine allocate_block_list
-
-        subroutine allocate_block_data(block_data, number_blocks, Bs, g, dF)
-            use module_params
-            real(kind=rk), allocatable, intent(out)     :: block_data(:, :, :, :)
-            integer(kind=ik), intent(in)                :: number_blocks
-            integer(kind=ik), intent(in)                :: Bs, g, dF
-        end subroutine allocate_block_data
-
-        subroutine inicond_gauss_blob(phi, Ds, Lx, Ly)
-            use module_params
-            real(kind=rk), allocatable, intent(out)     :: phi(:, :)
-            integer(kind=ik), intent(in)                :: Ds
-            real(kind=rk), intent(in)                   :: Lx, Ly
-        end subroutine inicond_gauss_blob
-
-        subroutine initial_block_distribution(params, block_list, block_data, phi)
-            use module_params
-            type (type_params), intent(in)              :: params
-            integer(kind=ik), intent(inout)             :: block_list(:, :)
-            real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
-            real(kind=rk), intent(in)                   :: phi(:, :)
-        end subroutine initial_block_distribution
-    end interface
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
 !---------------------------------------------------------------------------------------------
 ! main body
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -214,9 +180,9 @@ subroutine init_data(params, block_list, block_data, neighbor_list, debug)
     ! allocate light/heavy data, initialize start field and write block data
     !
     ! allocate block_list
-    call allocate_block_list( block_list, params%number_blocks, params%max_treelevel )
+    call allocate_block_list( lgt_block, params%number_blocks, params%max_treelevel )
     ! allocate heavy data
-    call allocate_block_data( block_data, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_fields )
+    call allocate_block_data( hvy_block, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_fields )
 
     ! initial data field
     select case( params%initial_cond )
@@ -233,33 +199,51 @@ subroutine init_data(params, block_list, block_data, neighbor_list, debug)
 
     ! decompose init field phi to block data
     ! first: init light and heavy data for datafield 1, create starting block distribution
-    call initial_block_distribution( params, block_list, block_data, phi )
+    call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! second: write heavy data for other datafields
     do k = 3, params%number_fields
         !block_data( :, :, k, : ) = 0.0_rk
-        block_data( :, :, k, : ) = block_data( :, :, 2, : )
+        hvy_block( :, :, k, : ) = hvy_block( :, :, 2, : )
     end do
+
+    ! allocate active list
+    allocate( lgt_active( size(lgt_block, 1) ), stat=allocate_error )
+    allocate( hvy_active( size(hvy_block, 4) ), stat=allocate_error )
 
     ! ------------------------------------------------------------------------------------------------------
     ! init neighbor data array
-    allocate( neighbor_list( params%number_blocks*16 ), stat=allocate_error )
-    neighbor_list = -1
+    allocate( hvy_neighbor( params%number_blocks*16 ), stat=allocate_error )
+    hvy_neighbor = -1
 
     ! ------------------------------------------------------------------------------------------------------
     ! init debug data
     ! note: fix size of time measurements array
     if ( params%debug ) then
         ! allocate array for time measurements - data
-        allocate( debug%comp_time( number_procs, 40 ), stat=allocate_error )
+        allocate( debug%comp_time( number_procs, 50 ), stat=allocate_error )
         debug%comp_time = 0.0_rk
         ! allocate array for time measurements - names
-        allocate( debug%name_comp_time( 40 ), stat=allocate_error )
+        allocate( debug%name_comp_time( 50 ), stat=allocate_error )
         debug%name_comp_time = "---"
     end if
 
     ! clean up
     call clean_ini_file(FILE)
     deallocate( phi, stat=allocate_error )
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find first free line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "init_data"
+        debug%comp_time(rank+1, k) = sub_t1 - sub_t0
+    end if
 
 end subroutine init_data

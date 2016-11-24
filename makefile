@@ -1,18 +1,19 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution.f90 \
-encoding.f90 int_to_binary.f90 treecode_size.f90 new_block_heavy.f90 save_data.f90 write_field.f90 update_neighbors.f90 find_neighbor_edge.f90 \
+FFILES = encoding.f90 int_to_binary.f90 treecode_size.f90 save_data.f90 write_field.f90 find_neighbor_edge.f90 \
 adjacent_block.f90 does_block_exist.f90 array_compare.f90 find_neighbor_corner.f90 block_count.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 \
 refine_mesh.f90 get_free_light_id.f90 time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 sort_com_list.f90 com_allowed.f90 \
 send_receive_data.f90 RHS_2D_convection_diffusion.f90 adapt_mesh.f90 threshold_block.f90 ensure_gradedness.f90 ensure_completeness.f90 \
-coarse_mesh.f90 balance_load.f90 create_lgt_active_list.f90 
+coarse_mesh.f90 balance_load.f90 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90
+# 
 
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_params.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 module_interpolation.f90   
+MFILES = module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 module_interpolation.f90 module_init.f90 \
+	module_mesh.f90  
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -93,12 +94,27 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 # Fortran). Objects are specified in MOBJS (module objects).
 $(OBJDIR)/module_params.o: module_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-$(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_ini_files_parser.o \
+	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution.f90 new_block_heavy.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
+	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

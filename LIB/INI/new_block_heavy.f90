@@ -22,12 +22,6 @@
 subroutine new_block_heavy(block_data, heavy_id, data_, coord_x, coord_y, Bs, g, dF)
 
 !---------------------------------------------------------------------------------------------
-! modules
-
-    ! global parameters
-    use module_params
-
-!---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none

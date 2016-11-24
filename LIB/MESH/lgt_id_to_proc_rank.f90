@@ -1,21 +1,21 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: proc_to_lgt_data_start_id.f90
+! name: lgt_id_to_proc_rank.f90
 ! version: 0.4
 ! author: msr
 !
-! return start index on light data corresponding to proc rank
+! return proc rank corresponding to given light id
 !
-! input:    - rank, number of blocks
-! output:   - start of light data
+! input:    - light id, number of blocks
+! output:   - rank
 !
 ! = log ======================================================================================
 !
 ! 23/11/16 - create
 ! ********************************************************************************************
 
-subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
+subroutine lgt_id_to_proc_rank( rank, lgt_id, N )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -29,10 +29,10 @@ subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
     implicit none
 
     ! light data start index
-    integer(kind=ik), intent(out)       :: lgt_start
+    integer(kind=ik), intent(out)       :: rank
 
     ! rank of proc
-    integer(kind=ik), intent(in)        :: rank
+    integer(kind=ik), intent(in)        :: lgt_id
 
     ! number of blocks per proc
     integer(kind=ik), intent(in)        :: N
@@ -46,6 +46,6 @@ subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    lgt_start = rank*N + 1
+    rank = (lgt_id-1) / N
 
-end subroutine proc_to_lgt_data_start_id
+end subroutine lgt_id_to_proc_rank

@@ -27,6 +27,8 @@ program main
     use module_init
     ! mesh manipulation subroutines
     use module_mesh
+    ! IO module
+    use module_IO
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -112,10 +114,10 @@ program main
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') number_procs
-        open (15, file='load_balancing.t', status='replace')
-        close(15)
-        open (15, file='blocks_per_rank.t', status='replace')
-        close(15)
+!        open (15, file='load_balancing.t', status='replace')
+!        close(15)
+!        open (15, file='blocks_per_rank.t', status='replace')
+!        close(15)
     end if
 
     ! initializing data
@@ -128,9 +130,9 @@ program main
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
-!    ! save start data
-!    call save_data( iteration, time, params, block_list, block_data, neighbor_list )
-!
+    ! save start data
+    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+
 !    ! main time loop
 !    do while ( time < params%time_max )
 !

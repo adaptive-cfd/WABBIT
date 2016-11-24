@@ -19,16 +19,10 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine write_field(time, iteration, dF, params, block_list, block_data, neighbor_list)
+subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    use mpi
-    ! global parameters
-    use module_params
-    ! hdf5 file wrapper
-    use module_hdf5_wrapper
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -45,11 +39,15 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data, neig
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(in)           :: block_data(:, :, :, :)
+    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :)
     ! heavy data array - neifghbor data
-    integer(kind=ik), intent(in)        :: neighbor_list(:)
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+    ! list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
 
     ! file name
     character(len=80)                   :: fname
@@ -61,10 +59,10 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data, neig
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
-    integer(kind=ik)                    :: rank
+    integer(kind=ik)                    :: rank, lgt_rank
 
     ! loop variable
-    integer(kind=ik)                    :: k, l, i
+    integer(kind=ik)                    :: k, l, i, hvy_id
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
@@ -96,41 +94,42 @@ subroutine write_field(time, iteration, dF, params, block_list, block_data, neig
     end if
 
     l = 1
-    ! save block data, loop over all light data
-    do k = 1, size(block_list, 1)
+    ! save block data, loop over all active light data
+    do k = 1, lgt_n
 
         ! calculate proc rank from light data line number
-        if (k > l*params%number_blocks) then
-            l = l + 1
-        end if
+        call lgt_id_to_proc_rank( lgt_rank, lgt_active(k), params%number_blocks )
 
-        ! block is active, only corresponding proc can work with heavy data
-        if ( (block_list(k, 1) /= -1) .and. ( (l-1) == rank) ) then
+        ! calculate heavy block id corresponding to light id
+        call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, params%number_blocks )
+
+        ! only proc corresponding to block writes data
+        if ( lgt_rank == rank ) then
 
             ! the name of the block within th hdf5 file
             write(dsetname,'("block_",i8.8)') k
 
             ! write data field
-            call write_field_hdf5( fname, dsetname, block_data( g+1:Bs+g, g+1:Bs+g, dF, k - (l-1)*params%number_blocks), .false.)
+            call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, dF, hvy_id), .false.)
 
             ! add useful attributes to the block:
             ! write treecode
-            call write_attribute( fname, dsetname, "treecode", block_list(k, 1:block_list(k, params%max_treelevel+1) ) )
+            call write_attribute( fname, dsetname, "treecode", lgt_block(lgt_active(k), 1:lgt_block(lgt_active(k), params%max_treelevel+1) ) )
 
             call write_attribute( fname, dsetname, "time", (/time/))
             call write_attribute( fname, dsetname, "iteration", (/iteration/))
             call write_attribute( fname, dsetname, "rank", (/rank/))
 
             ! save coordinates
-            call write_attribute( fname, dsetname, "coord_x", block_data( 1, 1:Bs, 1, k - (l-1)*params%number_blocks))
-            call write_attribute( fname, dsetname, "coord_y", block_data( 2, 1:Bs, 1, k - (l-1)*params%number_blocks))
+            call write_attribute( fname, dsetname, "coord_x", hvy_block( 1, 1:Bs, 1, hvy_id) )
+            call write_attribute( fname, dsetname, "coord_y", hvy_block( 2, 1:Bs, 1, hvy_id) )
 
             ! save neighbors
             ! loop over all neighbors
             do i = 1, 16
                 ! neighbor exists
-                if ( neighbor_list( (k - (l-1)*params%number_blocks - 1)*16 + i ) /= -1 ) then
-                    call write_attribute( fname, dsetname, dirs(i),  block_list(neighbor_list( (k - (l-1)*params%number_blocks - 1)*16 + i ), 1:block_list(neighbor_list( (k - (l-1)*params%number_blocks - 1)*16 + i ), params%max_treelevel+1) ) )
+                if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
+                    call write_attribute( fname, dsetname, dirs(i),  lgt_block( hvy_neighbor( hvy_id, i ), 1:lgt_block( hvy_neighbor( hvy_id, i ), params%max_treelevel+1) ) )
                 end if
             end do
 

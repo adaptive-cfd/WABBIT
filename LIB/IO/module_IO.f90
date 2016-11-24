@@ -1,44 +1,34 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: proc_to_lgt_data_start_id.f90
+! name: module_IO.f90
 ! version: 0.4
 ! author: msr
 !
-! return start index on light data corresponding to proc rank
-!
-! input:    - rank, number of blocks
-! output:   - start of light data
+! module for all IO routines
 !
 ! = log ======================================================================================
 !
-! 23/11/16 - create
+! 24/11/16 - create
 ! ********************************************************************************************
 
-subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
+module module_IO
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
+    use mpi
     ! global parameters
     use module_params
+    ! debug module
+    use module_debug
+    ! hdf5 file wrapper
+    use module_hdf5_wrapper
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
-
-    ! light data start index
-    integer(kind=ik), intent(out)       :: lgt_start
-
-    ! rank of proc
-    integer(kind=ik), intent(in)        :: rank
-
-    ! number of blocks per proc
-    integer(kind=ik), intent(in)        :: N
-
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -46,6 +36,12 @@ subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    lgt_start = rank*N + 1
+contains
 
-end subroutine proc_to_lgt_data_start_id
+    ! create list of active blocks (light data)
+    include "save_data.f90"
+
+    ! create list of active blocks (heavy data)
+    include "write_field.f90"
+
+end module module_IO

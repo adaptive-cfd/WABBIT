@@ -1,11 +1,12 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
 FFILES = encoding.f90 int_to_binary.f90 treecode_size.f90 adjacent_block.f90 array_compare.f90 proc_to_lgt_data_start_id.f90 \
-lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 
+lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 sort_com_list.f90 com_allowed.f90 \
+RHS_2D_convection_diffusion.f90
 #  \
  block_count.f90 \
-time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 sort_com_list.f90 com_allowed.f90 \
-send_receive_data.f90 RHS_2D_convection_diffusion.f90 adapt_mesh.f90 threshold_block.f90 ensure_gradedness.f90 ensure_completeness.f90 \
+  copy_ghost_nodes.f90   \
+  adapt_mesh.f90 threshold_block.f90 ensure_gradedness.f90 ensure_completeness.f90 \
 coarse_mesh.f90 balance_load.f90 get_free_heavy_id.f90
  
 
@@ -15,7 +16,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 module_interpolation.f90 module_init.f90 \
-	module_mesh.f90 module_IO.f90
+	module_mesh.f90 module_IO.f90 module_time_step.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -121,6 +122,10 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \
 	save_data.f90 write_field.f90 
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
+	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 send_receive_data.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)	
 	
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)

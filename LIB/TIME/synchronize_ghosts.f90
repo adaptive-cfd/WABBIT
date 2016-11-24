@@ -21,14 +21,10 @@
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
+subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    use mpi
-    ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -38,14 +34,19 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    ! neighbor list
-    integer(kind=ik), intent(in)        :: neighbor_list(:)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    ! heavy data array - neifghbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+
+    ! list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    ! number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, i, dF
+    integer(kind=ik)                    :: k, N, i, dF, lgt_id, hvy_id
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -79,28 +80,11 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     ! number of communications
     integer(kind=ik)                    :: n_com
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
-
-    interface
-        subroutine copy_ghost_nodes( params, block_data, sender_id, receiver_id, neighborhood, level_diff )
-            use module_params
-            type (type_params), intent(in)      :: params
-            real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-            integer(kind=ik), intent(in)        :: sender_id, receiver_id
-            integer(kind=ik), intent(in)        :: neighborhood
-            integer(kind=ik), intent(in)        :: level_diff
-        end subroutine copy_ghost_nodes
-
-        subroutine send_receive_data( params, block_data, com_id, com_list, com_number, dF )
-            use module_params
-            type (type_params), intent(in)      :: params
-            real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-            integer(kind=ik), intent(in)        :: com_list(:, :)
-            integer(kind=ik), intent(in)        :: com_id, com_number, dF
-        end subroutine send_receive_data
-
-    end interface
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -128,43 +112,49 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! ----------------------------------------------------------------------------------------
     ! first: synchronize internal ghost nodes, create com_list for external communications
 
-    ! loop over heavy data
-    do k = 1, N
-        ! block is active
-        if ( block_list(rank*N + k , 1) /= -1 ) then
-            ! loop over all neighbors
-            do i = 1, 16
-                ! neighbor exists
-                if ( neighbor_list( (k - 1)*16 + i ) /= -1 ) then
+    ! loop over active heavy data
+    do k = 1, hvy_n
 
-                    ! neighbor light data id
-                    neighbor_light_id = neighbor_list( (k - 1)*16 + i )
-                    ! calculate the difference between block levels
-                    level_diff = block_list( rank*N + k, params%max_treelevel+1 ) - block_list( neighbor_light_id, params%max_treelevel+1 )
+        ! loop over all neighbors
+        do i = 1, 16
+            ! neighbor exists
+            if ( hvy_neighbor( hvy_active(k), i ) /= -1 ) then
 
-                    ! proof if neighbor internal or external
-                    if ( ( neighbor_light_id > rank*N ) .and. ( neighbor_light_id < (rank+1)*N+1 ) ) then
-                        ! internal neighbor -> copy ghost nodes
-                        call copy_ghost_nodes( params, block_data, k, neighbor_light_id-rank*N, i, level_diff )
-                    else
-                        ! external neighbor -> new com_list entry
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 1)  = k+i
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 2)  = rank
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 3)  = (neighbor_light_id - 1) / N
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 4)  = k
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 5)  = neighbor_light_id - ( (neighbor_light_id - 1) / N )*N
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 6)  = i
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 7)  = i
-                        my_com_list( rank*N*16 + (k-1)*16 + i , 8)  = level_diff
+                ! neighbor light data id
+                neighbor_light_id = hvy_neighbor( hvy_active(k), i )
+                ! calculate light id
+                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                ! calculate the difference between block levels
+                level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
 
-                    end if
+                ! proof if neighbor internal or external
+                if ( ( neighbor_light_id > rank*N ) .and. ( neighbor_light_id < (rank+1)*N+1 ) ) then
+                    ! calculate internal heavy id
+                    call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
+                    ! internal neighbor -> copy ghost nodes
+                    call copy_ghost_nodes( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+                else
+                    ! external neighbor -> new com_list entry
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 1)  = k+i
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 2)  = rank
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 3)  = (neighbor_light_id - 1) / N
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 4)  = k
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 5)  = neighbor_light_id - ( (neighbor_light_id - 1) / N )*N
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 6)  = i
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 7)  = i
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 8)  = level_diff
 
                 end if
-            end do
-        end if
+
+            end if
+        end do
+
     end do
 
     ! synchronize com_list
@@ -202,7 +192,7 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
 
             ! proc has to send/receive data, loop over all data fields
             do dF = 2, params%number_data_fields+1
-                call send_receive_data( params, block_data, k, com_list, com_plan(i), dF)
+                call send_receive_data( params, hvy_block, k, com_list, com_plan(i), dF)
             end do
 
             ! next step in com_plan
@@ -223,5 +213,19 @@ subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
     deallocate( com_list, stat=allocate_error )
     deallocate( my_com_list, stat=allocate_error )
     deallocate( com_plan, stat=allocate_error )
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find first free line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "synchronize_ghosts"
+        debug%comp_time(rank+1, k) = sub_t1 - sub_t0
+    end if
 
 end subroutine synchronize_ghosts

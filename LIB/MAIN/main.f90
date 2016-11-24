@@ -29,6 +29,8 @@ program main
     use module_mesh
     ! IO module
     use module_IO
+    ! time step module
+    use module_time_step
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -138,46 +140,32 @@ program main
 
         iteration = iteration + 1
 
+        ! turn off debugging after 2 time steps
+        if ( iteration == 3) params%debug = .false.
+
+        ! refine everywhere
         if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
-time=1.0_rk
+        ! update neighbor relations
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
-!        ! start time
-!        sub_t0 = MPI_Wtime()
-!        ! update neighbor relations
-!        call update_neighbors( block_list, neighbor_list, params%number_blocks, params%max_treelevel )
-!        ! end time
-!        sub_t1 = MPI_Wtime()
-!        if ( params%debug ) then
-!            debug%name_comp_time(3) = "update_neighbors"
-!            debug%comp_time(rank+1, 3) = sub_t1 - sub_t0
-!        end if
-!
-!        ! start time
-!        sub_t0 = MPI_Wtime()
-!        ! advance in time
-!        call time_step_RK4( time, params, block_list, block_data, neighbor_list )
-!        ! end time
-!        sub_t1 = MPI_Wtime()
-!        if ( params%debug ) then
-!            debug%name_comp_time(4) = "time_step_RK4"
-!            debug%comp_time(rank+1, 4) = sub_t1 - sub_t0
-!        end if
+        ! advance in time
+        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
 !
 !        ! adapt the mesh
 !        if ( params%adapt_mesh ) call adapt_mesh( params, block_list, block_data, neighbor_list, debug )
 !
-!        ! output on screen
-!        if (rank==0) then
-!            write(*,'(80("-"))')
-!            call block_count(block_list, block_number)
-!            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, block_number
-!
-!        end if
+        ! output on screen
+        if (rank==0) then
+            write(*,'(80("-"))')
+            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, lgt_n
+
+        end if
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then

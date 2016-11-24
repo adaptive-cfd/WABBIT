@@ -15,14 +15,10 @@
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
+subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    use mpi
-    ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -35,16 +31,21 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    ! neighbor list
-    integer(kind=ik), intent(in)        :: neighbor_list(:)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    ! heavy data array - neifghbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+
+    ! list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    ! number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
     ! loop variables
-    integer(kind=ik)                    :: k, N, dF, N_dF
+    integer(kind=ik)                    :: k, dF, N_dF
 
     ! time step, dx
     real(kind=rk)                       :: dt, dx, my_dx
@@ -54,24 +55,15 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
     ! process rank
     integer(kind=ik)                    :: rank
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
-
-    interface
-        subroutine synchronize_ghosts( params, block_list, block_data, neighbor_list )
-            use module_params
-            type (type_params), intent(in)              :: params
-            integer(kind=ik), intent(in)                :: block_list(:, :)
-            real(kind=rk), intent(inout)                :: block_data(:, :, :, :)
-            integer(kind=ik), intent(in)                :: neighbor_list(:)
-        end subroutine synchronize_ghosts
-
-    end interface
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N     = params%number_blocks
     N_dF  = params%number_data_fields
 
     ! grid parameter
@@ -87,17 +79,17 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
-    ! loop over all blocks (heavy data)
-    do k = 1, N
-        ! block is active
-        if ( block_list(rank*N + k , 1) /= -1 ) then
-            my_dx = min(my_dx, block_data(1, 2, 1, k ) - block_data(1, 1, 1, k ) )
-        end if
+    ! loop over all active blocks (heavy data)
+    do k = 1, hvy_n
+        my_dx = min(my_dx, hvy_block(1, 2, 1, hvy_active(k) ) - hvy_block(1, 1, 1, hvy_active(k) ) )
     end do
 
     ! synchronize dx
@@ -122,126 +114,132 @@ subroutine time_step_RK4( time, params, block_list, block_data, neighbor_list )
         !------------------------------
         ! first stage
         ! synchronize ghostnodes
-        call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-        ! loop over all heavy data blocks
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! save old data
-                block_data( :, :, N_dF+2, k ) = block_data( :, :, dF, k )
-                ! set k1 step
-                block_data( :, :, N_dF+3, k ) = block_data( :, :, dF, k )
-                ! RHS
-                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+3, k ), &
-                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
-                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
-                                                  g, Bs, &
-                                                  params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
-                                                  params%order_discretization  )
-            end if
+        ! loop over all active heavy data blocks
+        do k = 1, hvy_n
+
+            ! save old data
+            hvy_block( :, :, N_dF+2, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+            ! set k1 step
+            hvy_block( :, :, N_dF+3, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+            ! RHS
+            call RHS_2D_convection_diffusion( hvy_block( :, :, N_dF+3, hvy_active(k) ), &
+                                              abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
+                                              abs(hvy_block( 2, 2, 1, hvy_active(k)) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                              g, Bs, &
+                                              params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
+                                              params%order_discretization  )
+
         end do
 
         !------------------------------
         ! second stage
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! save old data
-                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) + (0.5_rk * dt) * block_data( :, :, N_dF+3, k )
-            end if
+        do k = 1, hvy_n
+
+            ! save old data
+            hvy_block( :, :, dF, hvy_active(k) ) = hvy_block( :, :, N_dF+2, hvy_active(k) ) + (0.5_rk * dt) * hvy_block( :, :, N_dF+3, hvy_active(k) )
+
         end do
 
         ! synchronize ghostnodes
-        call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
 
 
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! set k2 step
-                block_data( :, :, N_dF+4, k ) = block_data( :, :, dF, k )
-                ! RHS
-                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+4, k ), &
-                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
-                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
-                                                  g, Bs, &
-                                                  params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
-                                                  params%order_discretization  )
-            end if
+        do k = 1, hvy_n
+
+            ! set k2 step
+            hvy_block( :, :, N_dF+4, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+            ! RHS
+            call RHS_2D_convection_diffusion( hvy_block( :, :, N_dF+4, hvy_active(k) ), &
+                                              abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
+                                              abs(hvy_block( 2, 2, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                              g, Bs, &
+                                              params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
+                                              params%order_discretization  )
+
         end do
 
         !------------------------------
         ! third stage
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! save old data
-                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) + (0.5_rk * dt) * block_data( :, :, N_dF+4, k )
-            end if
+        do k = 1, hvy_n
+
+            ! save old data
+            hvy_block( :, :, dF, hvy_active(k) ) = hvy_block( :, :, N_dF+2, hvy_active(k) ) + (0.5_rk * dt) * hvy_block( :, :, N_dF+4, hvy_active(k) )
+
         end do
 
         ! synchronize ghostnodes
-        call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! set k3 step
-                block_data( :, :, N_dF+5, k ) = block_data( :, :, dF, k )
-                ! RHS
-                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+5, k ), &
-                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
-                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
-                                                  g, Bs, &
-                                                  params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
-                                                  params%order_discretization  )
-            end if
+        do k = 1, hvy_n
+
+            ! set k3 step
+            hvy_block( :, :, N_dF+5, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+            ! RHS
+            call RHS_2D_convection_diffusion( hvy_block( :, :, N_dF+5, hvy_active(k) ), &
+                                              abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
+                                              abs(hvy_block( 2, 2, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                              g, Bs, &
+                                              params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
+                                              params%order_discretization  )
+
         end do
 
         !------------------------------
         ! fourth stage
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! save old data
-                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) + (0.5_rk * dt) * block_data( :, :, N_dF+5, k )
-            end if
+        do k = 1, hvy_n
+
+            ! save old data
+            hvy_block( :, :, dF, hvy_active(k) ) = hvy_block( :, :, N_dF+2, hvy_active(k) ) + (0.5_rk * dt) * hvy_block( :, :, N_dF+5, hvy_active(k) )
+
         end do
 
         ! synchronize ghostnodes
-        call synchronize_ghosts( params, block_list, block_data, neighbor_list )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! set k4 step
-                block_data( :, :, N_dF+6, k ) = block_data( :, :, dF, k )
-                ! RHS
-                call RHS_2D_convection_diffusion( block_data( :, :, N_dF+6, k ), &
-                                                  abs(block_data( 1, 2, 1, k ) - block_data( 1, 1, 1, k )), &
-                                                  abs(block_data( 2, 2, 1, k ) - block_data( 2, 1, 1, k )), &
-                                                  g, Bs, &
-                                                  params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
-                                                  params%order_discretization  )
-            end if
+        do k = 1, hvy_n
+
+            ! set k4 step
+            hvy_block( :, :, N_dF+6, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+            ! RHS
+            call RHS_2D_convection_diffusion( hvy_block( :, :, N_dF+6, hvy_active(k) ), &
+                                              abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
+                                              abs(hvy_block( 2, 2, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                              g, Bs, &
+                                              params%u0( (dF-2)*2 + 1 ), params%u0( (dF-2)*2 + 2 ), params%nu( (dF-1) ), &
+                                              params%order_discretization  )
+
         end do
 
         !------------------------------
         ! final stage
-        do k = 1, N
-            ! block is active
-            if ( block_list( rank*N + k , 1) /= -1 ) then
-                ! final step
-                block_data( :, :, dF, k ) = block_data( :, :, N_dF+2, k ) &
-                                          + (dt/6.0_rk) * ( block_data( :, :, N_dF+3, k ) &
-                                          + 2.0_rk * block_data( :, :, N_dF+4, k ) &
-                                          + 2.0_rk * block_data( :, :, N_dF+5, k ) &
-                                          + block_data( :, :, N_dF+6, k ) )
-            end if
+        do k = 1, hvy_n
+
+            ! final step
+            hvy_block( :, :, dF, hvy_active(k) ) = hvy_block( :, :, N_dF+2, hvy_active(k) ) &
+                                                + (dt/6.0_rk) * ( hvy_block( :, :, N_dF+3, hvy_active(k) ) &
+                                                + 2.0_rk * hvy_block( :, :, N_dF+4, hvy_active(k) ) &
+                                                + 2.0_rk * hvy_block( :, :, N_dF+5, hvy_active(k) ) &
+                                                + hvy_block( :, :, N_dF+6, hvy_active(k) ) )
+
         end do
 
     end do
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find first free line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "time_step"
+        debug%comp_time(rank+1, k) = sub_t1 - sub_t0
+    end if
 
 end subroutine time_step_RK4

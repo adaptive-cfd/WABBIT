@@ -18,16 +18,10 @@
 !            subroutines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, block_list, block_data )
+subroutine refine_mesh( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    use mpi
-    ! global parameters
-    use module_params
-    ! interpolation routines
-    use module_interpolation
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -37,12 +31,17 @@ subroutine refine_mesh( params, block_list, block_data )
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(inout)     :: block_list(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+
+    ! list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    ! number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, dF, i
+    integer(kind=ik)                    :: k, N, dF, i, lgt_id
     ! light id start
     integer(kind=ik)                    :: my_light_start
 
@@ -70,7 +69,7 @@ subroutine refine_mesh( params, block_list, block_data )
     integer(kind=ik)                    :: level
 
     ! light data list for working
-    integer(kind=ik)                    :: my_block_list( size(block_list, 1), params%max_treelevel+2)
+    integer(kind=ik)                    :: my_lgt_block( size(lgt_block, 1), params%max_treelevel+2)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -101,28 +100,31 @@ subroutine refine_mesh( params, block_list, block_data )
     allocate( new_coord_y(Bs), stat=allocate_error )
 
     ! set light data list for working, only light data coresponding to proc are not zero
-    my_block_list = 0
-    my_block_list( my_light_start+1: my_light_start+N, :) = block_list( my_light_start+1: my_light_start+N, :)
+    my_lgt_block = 0
+    my_lgt_block( my_light_start+1: my_light_start+N, :) = lgt_block( my_light_start+1: my_light_start+N, :)
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! every proc loop over the light data array corresponding to his heavy data
-    do k = 1, N
+    ! every proc loop over his active heavy data array
+    do k = 1, hvy_n
 
-        ! block is active and wants to refine
-        if ( (my_block_list( my_light_start + k, 1) /= -1) .and. (my_block_list( my_light_start + k, params%max_treelevel+2) == 1) ) then
+        ! light data id
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+
+        ! block wants to refine
+        if ( (my_lgt_block( lgt_id, params%max_treelevel+2) == 1) ) then
 
             ! treecode and mesh level
-            treecode = my_block_list( my_light_start + k, 1:params%max_treelevel )
-            level    = my_block_list( my_light_start + k, params%max_treelevel+1 )
+            treecode = my_lgt_block( lgt_id, 1:params%max_treelevel )
+            level    = my_lgt_block( lgt_id, params%max_treelevel+1 )
 
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
             ! loop over all data fields
             do dF = 2, params%number_data_fields+1
                 ! reset data
-                data_predict_coarse = block_data(g+1:Bs+g, g+1:Bs+g, dF, k )
+                data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
                 data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
@@ -134,138 +136,138 @@ subroutine refine_mesh( params, block_list, block_data )
             ! second: split new data and write into new blocks
             !--------------------------
             ! first new block
-            ! find free light id, work only on corresponding light data, so returned id is the heavy id
-            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+N , 1 ), N )
+            ! find free heavy id, use free light id subroutine with reduced light data list for this
+            call get_free_light_id( free_heavy_id, my_lgt_block( my_light_start+1 : my_light_start+N , 1 ), N )
             ! calculate light id
-            free_light_id = my_light_start + free_heavy_id
+            call hvy_id_to_lgt_id( free_light_id, free_heavy_id, rank, N )
 
             ! write new light data
             ! old treecode
-            my_block_list( free_light_id, 1:params%max_treelevel ) = treecode
+            my_lgt_block( free_light_id, 1:params%max_treelevel ) = treecode
             ! new treecode one level up - "0" block
-            my_block_list( free_light_id, level+1 )                = 0
+            my_lgt_block( free_light_id, level+1 )                = 0
             ! new level + 1
-            my_block_list( free_light_id, params%max_treelevel+1 ) = level+1
+            my_lgt_block( free_light_id, params%max_treelevel+1 ) = level+1
             ! reset refinement status
-            my_block_list( free_light_id, params%max_treelevel+2 ) = 0
+            my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( 1, 1:(Bs-1)/2+1, 1, k )
-            new_coord_y(1:Bs:2) = block_data( 2, 1:(Bs-1)/2+1, 1, k )
+            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, hvy_active(k) )
+            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, hvy_active(k) )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
-            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
+            hvy_block( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            hvy_block( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, dF-1)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, dF-1)
             end do
 
             !--------------------------
             ! second new block
-            ! find free light id, work only on corresponding light data, so returned id is the heavy id
-            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+N , 1 ), N )
+            ! find free heavy id, use free light id subroutine with reduced light data list for this
+            call get_free_light_id( free_heavy_id, my_lgt_block( my_light_start+1 : my_light_start+N , 1 ), N )
             ! calculate light id
-            free_light_id = my_light_start + free_heavy_id
+            call hvy_id_to_lgt_id( free_light_id, free_heavy_id, rank, N )
 
             ! write new light data
             ! old treecode
-            my_block_list( free_light_id, 1:params%max_treelevel ) = treecode
+            my_lgt_block( free_light_id, 1:params%max_treelevel ) = treecode
             ! new treecode one level up - "1" block
-            my_block_list( free_light_id, level+1 )                = 1
+            my_lgt_block( free_light_id, level+1 )                = 1
             ! new level + 1
-            my_block_list( free_light_id, params%max_treelevel+1 ) = level+1
+            my_lgt_block( free_light_id, params%max_treelevel+1 ) = level+1
             ! reset refinement status
-            my_block_list( free_light_id, params%max_treelevel+2 ) = 0
+            my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( 1, (Bs-1)/2+1:Bs, 1, k )
-            new_coord_y(1:Bs:2) = block_data( 2, 1:(Bs-1)/2+1, 1, k )
+            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
+            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, hvy_active(k) )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
-            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
+            hvy_block( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            hvy_block( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, dF-1)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, dF-1)
             end do
 
             !--------------------------
             ! third new block
-            ! find free light id, work only on corresponding light data, so returned id is the heavy id
-            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+N , 1 ), N )
+            ! find free heavy id, use free light id subroutine with reduced light data list for this
+            call get_free_light_id( free_heavy_id, my_lgt_block( my_light_start+1 : my_light_start+N , 1 ), N )
             ! calculate light id
-            free_light_id = my_light_start + free_heavy_id
+            call hvy_id_to_lgt_id( free_light_id, free_heavy_id, rank, N )
 
             ! write new light data
             ! old treecode
-            my_block_list( free_light_id, 1:params%max_treelevel ) = treecode
+            my_lgt_block( free_light_id, 1:params%max_treelevel ) = treecode
             ! new treecode one level up - "1" block
-            my_block_list( free_light_id, level+1 )                = 2
+            my_lgt_block( free_light_id, level+1 )                = 2
             ! new level + 1
-            my_block_list( free_light_id, params%max_treelevel+1 ) = level+1
+            my_lgt_block( free_light_id, params%max_treelevel+1 ) = level+1
             ! reset refinement status
-            my_block_list( free_light_id, params%max_treelevel+2 ) = 0
+            my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( 1, 1:(Bs-1)/2+1, 1, k )
-            new_coord_y(1:Bs:2) = block_data( 2, (Bs-1)/2+1:Bs, 1, k )
+            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, hvy_active(k) )
+            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
-            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
+            hvy_block( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            hvy_block( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, dF-1)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, dF-1)
             end do
 
             !--------------------------
             ! fourth new block
             ! write data on current heavy id
-            free_heavy_id = k
+            free_heavy_id = hvy_active(k)
             ! calculate light id
-            free_light_id = my_light_start + free_heavy_id
+            call hvy_id_to_lgt_id( free_light_id, free_heavy_id, rank, N )
 
             ! write new light data
             ! old treecode
-            my_block_list( free_light_id, 1:params%max_treelevel ) = treecode
+            my_lgt_block( free_light_id, 1:params%max_treelevel ) = treecode
             ! new treecode one level up - "1" block
-            my_block_list( free_light_id, level+1 )                = 3
+            my_lgt_block( free_light_id, level+1 )                = 3
             ! new level + 1
-            my_block_list( free_light_id, params%max_treelevel+1 ) = level+1
+            my_lgt_block( free_light_id, params%max_treelevel+1 ) = level+1
             ! reset refinement status
-            my_block_list( free_light_id, params%max_treelevel+2 ) = 0
+            my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = block_data( 1, (Bs-1)/2+1:Bs, 1, k )
-            new_coord_y(1:Bs:2) = block_data( 2, (Bs-1)/2+1:Bs, 1, k )
+            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
+            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
             end do
 
             ! save coordinates
-            block_data( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
-            block_data( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
+            hvy_block( 1, 1:Bs, 1, free_heavy_id ) = new_coord_x
+            hvy_block( 2, 1:Bs, 1, free_heavy_id ) = new_coord_y
 
             ! save interpolated data, loop over all datafields
             do dF = 2, params%number_data_fields+1
-                block_data( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, dF-1)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, dF-1)
             end do
 
         end if
@@ -273,8 +275,8 @@ subroutine refine_mesh( params, block_list, block_data )
     end do
 
     ! synchronize light data
-    block_list = 0
-    call MPI_Allreduce(my_block_list, block_list, size(block_list,1)*size(block_list,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    lgt_block = 0
+    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! clean up
     deallocate( data_predict_fine, stat=allocate_error )

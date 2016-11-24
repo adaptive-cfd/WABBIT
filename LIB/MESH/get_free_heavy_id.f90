@@ -7,8 +7,8 @@
 !
 ! return heavy free block id
 !
-! input:    - light data list (first column of light data)
-!           - size of light data list
+! input:    - active light data list
+!           - size of active light data list
 ! output:   - free heavy data id
 !
 ! = log ======================================================================================
@@ -16,7 +16,7 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine get_heavy_free_block(id, block_list, N)
+subroutine get_heavy_free_block(hvy_id, lgt_block, N)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -30,11 +30,11 @@ subroutine get_heavy_free_block(id, block_list, N)
     implicit none
 
     ! heavy data id
-    integer(kind=ik), intent(out)   :: id
+    integer(kind=ik), intent(out)   :: hvy_id
     ! block list length
     integer(kind=ik), intent(in)    :: N
     ! heavy data array - block data
-    integer(kind=ik), intent(in)    :: block_list(N)
+    integer(kind=ik), intent(in)    :: lgt_block(N)
 
     ! loop variable, number of blocks (lines) in light data
     integer(kind=ik)                :: k
@@ -42,7 +42,7 @@ subroutine get_heavy_free_block(id, block_list, N)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    id = -1
+    hvy_id = -1
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -51,14 +51,14 @@ subroutine get_heavy_free_block(id, block_list, N)
     do k = 1, N
         ! check if the block is active. if it is not, then we found a free block
         ! to return
-        if (block_list(k) == -1) then
-        id = k
+        if (lgt_block(k) == -1) then
+        hvy_id = k
         exit
         end if
     end do
 
     ! error catching: is there no more free blocks on the list?
-    if (id == -1) then
+    if (hvy_id == -1) then
         write(*,'(80("_"))')
         write(*,*) "ERROR: We try to fetch a heavy free block ID from the list but all blocks are used."
         stop

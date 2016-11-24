@@ -16,50 +16,53 @@
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine respect_min_max_treelevel( block_list, max_level, min_level)
+subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
 
+    ! user defined parameter structure
+    type (type_params), intent(in)      :: params
     ! light data array
-    integer(kind=ik), intent(inout)     :: block_list(:, :)
-    ! heavy data array - block data
-    integer(kind=ik), intent(in)        :: max_level, min_level
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+
+    ! list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
+
+    ! treelevel restrictions
+    integer(kind=ik)                    :: max_level, min_level
 
     ! loop variables
-    integer(kind=ik)                    :: k, N
+    integer(kind=ik)                    :: k
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N = size(block_list, 1)
+    max_level = params%max_treelevel
+    min_level = params%min_treelevel
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all blocks
-    do k = 1, N
+    ! loop over all active blocks
+    do k = 1, lgt_n
 
-        if ( block_list(k, 1) /= -1 ) then
 
-            if ( ( block_list(k, max_level+2 ) ==  1) .and. ( block_list(k, max_level+1 ) >= max_level ) ) then
-                ! can not refine
-                block_list(k, max_level+2 ) = 0
-            end if
+        if ( ( lgt_block( lgt_active(k), max_level+2 ) ==  1) .and. ( lgt_block( lgt_active(k), max_level+1 ) >= max_level ) ) then
+            ! can not refine
+            lgt_block( lgt_active(k), max_level+2 ) = 0
+        end if
 
-            if ( ( block_list(k, max_level+2 ) == -1) .and. ( block_list(k, max_level+1 ) <= min_level ) ) then
-                ! can not coarsen
-                block_list(k, max_level+2 ) = 0
-            end if
-
+        if ( ( lgt_block( lgt_active(k), max_level+2 ) == -1) .and. ( lgt_block( lgt_active(k), max_level+1 ) <= min_level ) ) then
+            ! can not coarsen
+            lgt_block( lgt_active(k), max_level+2 ) = 0
         end if
 
     end do

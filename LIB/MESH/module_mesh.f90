@@ -56,4 +56,13 @@ contains
     ! search routine to find light data id corresponding to treecode
     include "does_block_exist.f90"
 
+    ! block refinement subroutine
+    include "refine_everywhere.f90"
+
+    ! check treelevel restrictions
+    include "respect_min_max_treelevel.f90"
+
+    ! check treelevel restrictions
+    include "refine_mesh.f90"
+
 end module module_mesh

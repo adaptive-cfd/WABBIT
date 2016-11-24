@@ -133,22 +133,19 @@ program main
     ! save start data
     call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
 
-!    ! main time loop
-!    do while ( time < params%time_max )
-!
-!        iteration = iteration + 1
-!
-!        ! start time
-!        sub_t0 = MPI_Wtime()
-!        ! refine every block to create the safety zone
-!        if ( params%adapt_mesh ) call refine_everywhere( params, block_list, block_data )
-!        ! end time
-!        sub_t1 = MPI_Wtime()
-!        if ( params%debug ) then
-!            debug%name_comp_time(2) = "refine_everywhere"
-!            debug%comp_time(rank+1, 2) = sub_t1 - sub_t0
-!        end if
-!
+    ! main time loop
+    do while ( time < params%time_max )
+
+        iteration = iteration + 1
+
+        if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
+
+        ! update lists of active blocks (light and heavy data)
+        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+
+time=1.0_rk
+
 !        ! start time
 !        sub_t0 = MPI_Wtime()
 !        ! update neighbor relations
@@ -181,12 +178,12 @@ program main
 !            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, block_number
 !
 !        end if
-!
-!        ! write data to disk
-!        if (modulo(iteration, params%write_freq) == 0) then
-!          call save_data( iteration, time, params, block_list, block_data, neighbor_list )
-!        endif
-!
+
+        ! write data to disk
+        if (modulo(iteration, params%write_freq) == 0) then
+          call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+        endif
+
         ! output computing time for every proc
         if ( params%debug ) then
             do k = 1, number_procs
@@ -205,10 +202,10 @@ program main
             end do
         end if
 
-!    end do
-!
-!    ! save end field to disk
-!    call save_data( iteration, time, params, block_list, block_data, neighbor_list )
+    end do
+
+    ! save end field to disk
+    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
 
     ! MPI Barrier before program ends
     call MPI_Barrier(MPI_COMM_WORLD, ierr)

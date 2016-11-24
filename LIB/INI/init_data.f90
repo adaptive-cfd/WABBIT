@@ -109,6 +109,11 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
     call read_param(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
     ! read number_blocks
     call read_param(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
+    if (params%number_blocks == -1) then
+      if (rank==0) write(*,*) "blocks-per-rank is -1, so WABBIT decides automatically"
+      params%number_blocks = ( (params%number_domain_nodes-1) / (params%number_block_nodes-1) )**2 / number_procs
+    endif
+
     ! read number_data_fields
     call read_param(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
     ! set number of fields in heavy data

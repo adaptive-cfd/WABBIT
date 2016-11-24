@@ -1,10 +1,10 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = encoding.f90 int_to_binary.f90 treecode_size.f90 save_data.f90 write_field.f90 find_neighbor_edge.f90 \
-adjacent_block.f90 does_block_exist.f90 array_compare.f90 find_neighbor_corner.f90 block_count.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 \
+FFILES = encoding.f90 int_to_binary.f90 treecode_size.f90 save_data.f90 write_field.f90 \
+adjacent_block.f90 array_compare.f90 block_count.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 \
 refine_mesh.f90 get_free_light_id.f90 time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 sort_com_list.f90 com_allowed.f90 \
 send_receive_data.f90 RHS_2D_convection_diffusion.f90 adapt_mesh.f90 threshold_block.f90 ensure_gradedness.f90 ensure_completeness.f90 \
-coarse_mesh.f90 balance_load.f90 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90
+coarse_mesh.f90 balance_load.f90 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 
 # 
 
 # Object and module directory:
@@ -109,7 +109,8 @@ $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
-	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90
+	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90 find_neighbor_edge.f90 does_block_exist.f90 \
+	find_neighbor_corner.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o

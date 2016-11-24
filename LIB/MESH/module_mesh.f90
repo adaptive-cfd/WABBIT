@@ -47,4 +47,13 @@ contains
     ! update neighbors
     include "update_neighbors.f90"
 
+    ! neighbor search, edge
+    include "find_neighbor_edge.f90"
+
+    ! neighbor search, corner
+    include "find_neighbor_corner.f90"
+
+    ! search routine to find light data id corresponding to treecode
+    include "does_block_exist.f90"
+
 end module module_mesh

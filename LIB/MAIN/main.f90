@@ -61,11 +61,12 @@ program main
     !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :)
 
-    ! neighbor array (heavy data) -> number_lines = number_blocks * 16 (...different neighbor relations:
+    ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
+    !                             -> number_columns = 16 (...different neighbor relations:
     ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
     !         saved data -> -1 ... no neighbor
-    !                    -> light data line number (id)
-    integer(kind=ik), allocatable       :: hvy_neighbor(:)
+    !                    -> light data id in corresponding column
+    integer(kind=ik), allocatable       :: hvy_neighbor(:,:)
 
     ! list of active blocks (light data)
     integer(kind=ik), allocatable       :: lgt_active(:)

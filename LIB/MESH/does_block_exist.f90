@@ -18,13 +18,10 @@
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_id, active)
+subroutine does_block_exist(treecode, lgt_block, max_treelevel, exists, light_id, lgt_active, lgt_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -37,8 +34,12 @@ subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_i
     integer(kind=ik), intent(in)        :: treecode(max_treelevel)
 
     ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
-    integer(kind=ik), intent(in)        :: active(:)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+
+    ! list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
 
     ! .true. if block with treecode exists
     logical, intent(out)                :: exists
@@ -49,31 +50,24 @@ subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_i
     logical                             :: array_compare
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, lgtID
+    integer(kind=ik)                    :: k, N
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N        = size( active, 1)
-    ! N        = size( block_list, 1)
+    N        = size( lgt_block, 1)
     exists   = .false.
     light_id = -1
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all blocks
-    do k = 1, N
-        lgtID = active(k)
-        ! lgtID = k
-        ! block is active
-        if ( block_list(lgtID, 1) /= -1 ) then
+    ! loop over all active blocks
+    do k = 1, lgt_n
 
-            if ( array_compare( block_list(lgtID, 1:max_treelevel), treecode, max_treelevel) ) then
-                exists   = .true.
-                light_id = lgtID
-            end if
-
+        if ( array_compare( lgt_block( lgt_active(k) , 1:max_treelevel), treecode, max_treelevel) ) then
+            exists   = .true.
+            light_id = lgt_active(k)
         end if
 
     end do

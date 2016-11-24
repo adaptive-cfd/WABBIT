@@ -28,7 +28,7 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     ! light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - neifghbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:)
+    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
@@ -45,15 +45,16 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     integer(kind=ik)                    :: max_treelevel
 
     ! MPI error variable
-    integer(kind=ik)                    :: ierr,a
+    integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank
 
     ! loop variable
-    integer(kind=ik)                    :: k, block_number
+    integer(kind=ik)                    :: k, lgt_id
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
+
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -64,8 +65,17 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     ! reset neighbor list
     hvy_neighbor = -1
 
+    ! number of blocks per proc
+    N = params%number_blocks
+
+    ! max treelevel
+    max_treelevel = params%max_treelevel
+
 !---------------------------------------------------------------------------------------------
 ! main body
+
+    ! determinate process rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! start time
     sub_t0 = MPI_Wtime()
@@ -77,36 +87,32 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     ! if there is only one block => all neighbors are this block
     ! one block criteria: size of block_list should be one!
     if ( size(lgt_block,1) == 1 ) then
-        hvy_neighbor(1:8) = 1
+        hvy_neighbor(1,1:8) = 1
     end if
 
-    ! loop over all heavy data blocks
-    do k = 1, N
+    ! loop over active heavy data blocks
+    do k = 1, hvy_n
 
-!        ! block is active
-!        if ( block_list( rank*N + k , 1) /= -1 ) then
-!
-!            ! find edge neighbors
-!            ! north
-!            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__N', neighbor_list, active)
-!            ! east
-!            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__E', neighbor_list, active)
-!            ! south
-!            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__S', neighbor_list, active)
-!            ! west
-!            call find_neighbor_edge( k, rank*N + k, block_list, max_treelevel, '__W', neighbor_list, active)
-!
-!            ! find corner neighbor
-!            ! northeast
-!            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_NE', neighbor_list, active)
-!            ! northwest
-!            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_NW', neighbor_list, active)
-!            ! southeast
-!            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_SE', neighbor_list, active)
-!            ! southwest
-!            call find_neighbor_corner( k, rank*N + k, block_list, max_treelevel, '_SW', neighbor_list, active)
-!
-!        end if
+        ! light id
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+
+        ! north
+        call find_neighbor_edge( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_active, lgt_n)
+        ! east
+        call find_neighbor_edge( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_active, lgt_n)
+        ! south
+        call find_neighbor_edge( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_active, lgt_n)
+        ! west
+        call find_neighbor_edge( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_active, lgt_n)
+
+        ! northeast
+        call find_neighbor_corner( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_active, lgt_n)
+        ! northwest
+        call find_neighbor_corner( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_active, lgt_n)
+        ! southeast
+        call find_neighbor_corner( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_active, lgt_n)
+        ! southwest
+        call find_neighbor_corner( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_active, lgt_n)
 
     end do
 

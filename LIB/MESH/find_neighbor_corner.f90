@@ -15,6 +15,7 @@
 ! input:    - heavy and light data id
 !           - light data array and max treelevel
 !           - direction for neighbor search
+!           - list of active blocks
 ! output:   - neighbor list array
 !
 ! -------------------------------------------------------------------------------------------------------------------------
@@ -26,7 +27,7 @@
 ! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine find_neighbor_corner(heavy_id, light_id, block_list, max_treelevel, dir, neighbor_list, active)
+subroutine find_neighbor_corner(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -46,12 +47,16 @@ subroutine find_neighbor_corner(heavy_id, light_id, block_list, max_treelevel, d
     ! max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
     ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! direction for neighbor search
     character(len=3), intent(in)        :: dir
-integer(kind=ik), intent(in)        :: active(:)
+    ! list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
+
     ! heavy data array - neifghbor data
-    integer(kind=ik), intent(out)       :: neighbor_list(:)
+    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! mesh level
     integer(kind=ik)                    :: level
@@ -71,24 +76,11 @@ integer(kind=ik), intent(in)        :: active(:)
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
-    interface
-        subroutine does_block_exist(treecode, block_list, max_treelevel, exists, light_id, active)
-            use module_params
-            integer(kind=ik), intent(in)        :: max_treelevel
-            integer(kind=ik), intent(in)        :: treecode(max_treelevel)
-            integer(kind=ik), intent(in)        :: block_list(:, :)
-            integer(kind=ik), intent(in)        :: active(:)
-            logical, intent(out)                :: exists
-            integer(kind=ik), intent(out)       :: light_id
-        end subroutine does_block_exist
-
-    end interface
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    my_treecode     = block_list( light_id, 1:max_treelevel )
-    level           = block_list( light_id, max_treelevel + 1 )
+    my_treecode     = lgt_block( light_id, 1:max_treelevel )
+    level           = lgt_block( light_id, max_treelevel + 1 )
 
     lvl_down_neighbor = .false.
 
@@ -135,24 +127,25 @@ integer(kind=ik), intent(in)        :: active(:)
     call adjacent_block( my_treecode, neighbor, dir, level, max_treelevel)
 
     ! proof existence of neighbor block
-    call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id,active)
+    call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
+
 
     if (exists) then
 
         ! neighbor on same level
-        ! write light data
-        neighbor_list( (heavy_id-1)*16 + list_id ) = neighbor_light_id
+        ! write data
+        hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
 
     else
 
         ! neighbor could be one level down
         neighbor( level ) = -1
         ! proof existence of neighbor block
-        call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id,active)
+        call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
 
         if ( exists .and. lvl_down_neighbor ) then
             ! neigbor is one level down
-            neighbor_list( (heavy_id-1)*16 + list_id ) = neighbor_light_id
+            hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
 
         elseif ( .not.(exists) ) then
             ! neighbor could be on level up
@@ -163,11 +156,11 @@ integer(kind=ik), intent(in)        :: active(:)
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
-            call does_block_exist(neighbor, block_list, max_treelevel, exists, neighbor_light_id,active)
+            call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
 
             if (exists) then
                 ! neigbor is one level up
-                neighbor_list( (heavy_id-1)*16 + list_id ) = neighbor_light_id
+                hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
 
             else
                 ! error case

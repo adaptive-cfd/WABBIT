@@ -39,7 +39,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
     ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
     !         saved data -> -1 ... no neighbor
     !                    -> light data line number (id)
-    integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:)
+    integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:,:)
     ! list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
     ! list of active blocks (light data)
@@ -213,7 +213,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
 
     ! ------------------------------------------------------------------------------------------------------
     ! init neighbor data array
-    allocate( hvy_neighbor( params%number_blocks*16 ), stat=allocate_error )
+    allocate( hvy_neighbor( params%number_blocks, 16 ), stat=allocate_error )
     hvy_neighbor = -1
 
     ! ------------------------------------------------------------------------------------------------------

@@ -32,9 +32,6 @@ subroutine find_neighbor_corner(heavy_id, light_id, lgt_block, max_treelevel, di
 !---------------------------------------------------------------------------------------------
 ! modules
 
-    ! global parameters
-    use module_params
-
 !---------------------------------------------------------------------------------------------
 ! variables
 

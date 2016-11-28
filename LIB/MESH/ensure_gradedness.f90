@@ -168,9 +168,9 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         do k = 1, lgt_n
 
             ! refinement status changed
-            if ( refine_change(k) > 0 ) then
+            if ( refine_change( lgt_active(k) ) > 0 ) then
                 ! change light data
-                lgt_block( lgt_active(k), max_treelevel+2 ) = lgt_block( lgt_active(k), max_treelevel+2 ) + refine_change(lgt_active(k))
+                lgt_block( lgt_active(k), max_treelevel+2 ) = lgt_block( lgt_active(k), max_treelevel+2 ) + refine_change( lgt_active(k) )
                 ! set grid status
                 grid_changed = .true.
             end if

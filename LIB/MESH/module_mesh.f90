@@ -79,7 +79,19 @@ contains
     ! completeness check
     include "ensure_completeness.f90"
 
-    ! coarse meshk
+    ! coarse mesh
     include "coarse_mesh.f90"
+
+    ! balance the load
+    include "balance_load.f90"
+
+    ! create list with number of blocks per rank
+    include "set_desired_num_blocks_per_rank.f90"
+
+    ! create friends table
+    include "compute_friends_table.f90"
+
+    ! affinity list
+    include "compute_affinity.f90"
 
 end module module_mesh

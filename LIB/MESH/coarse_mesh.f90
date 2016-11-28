@@ -102,7 +102,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
     ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
-    id = 0
+    id = -1
 
     tag = 0
 
@@ -133,7 +133,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
         if ( lgt_block( lgt_active(k), params%max_treelevel+2) == -2 ) then
 
             ! get treecodes for current block and sister-blocks
-            me                                              = lgt_block( lgt_active(k), 1:maxtL)
+            me                                                          = lgt_block( lgt_active(k), 1:maxtL)
             light_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = lgt_active(k)
 
             ! heavy id
@@ -142,9 +142,13 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
             heavy_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = hvy_id
             proc_rank( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = data_rank
 
-            ! get sister ids
+            ! current block level
             level    = lgt_block( lgt_active(k), maxtL+1 )
 
+            ! reset id array
+            id = -1
+
+            ! get sister ids
             i = 0
             do l = 1, 4
                 ! sister treecode differs only on last element
@@ -159,7 +163,6 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
                         id(i) = lgt_id
                     else
                         ! error case
-                        print*, me
                         print*, "ERROR: can not find sister id"
                         stop
                     end if

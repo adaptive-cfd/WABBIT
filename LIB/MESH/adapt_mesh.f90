@@ -52,7 +52,6 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -79,9 +78,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     end do
-!
-!    ! balance load
-!    call balance_load( params, block_list, block_data, neighbor_list )
+
+    ! balance load
+    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )

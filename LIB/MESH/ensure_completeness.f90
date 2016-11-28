@@ -70,7 +70,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
     max_treelevel = params%max_treelevel
 
     i  = 0
-    id = 0
+    id = -1
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -87,10 +87,14 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
         ! if the block want to coarsen, check refinement status of sister blocks
         if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
 
-            ! get sister id's
+            ! data from current block
             treecode = lgt_block( lgt_active(k), 1:max_treelevel )
             level    = lgt_block( lgt_active(k), max_treelevel+1 )
 
+            ! reset id list
+            id = -1
+
+            ! get sister id's
             i = 0
             do l = 1, 4
                 ! sister treecode differs only on last element

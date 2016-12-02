@@ -1,25 +1,25 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: find_neighbor_corner.f90
+! name: module_debug_functions.f90
 ! version: 0.4
 ! author: msr
 !
-! count active blocks
-!
-! input:    - light data array
-! output:   - number of active blocks
+! module for all debug subroutines
 !
 ! = log ======================================================================================
 !
-! 08/11/16 - switch to v0.4
+! 29/11/16 - create
+!
+! TODO: union with debug data structure
 ! ********************************************************************************************
 
-subroutine block_count(block_list, block_number)
+module module_debug_functions
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
+    use mpi
     ! global parameters
     use module_params
 
@@ -28,29 +28,21 @@ subroutine block_count(block_list, block_number)
 
     implicit none
 
-    ! light data array
-    integer(kind=ik), intent(in)        :: block_list(:, :)
-
-    ! number of active blocks
-    integer(kind=ik), intent(out)       :: block_number
-
-    ! loop variables
-    integer(kind=ik)                    :: k, N
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
-    N               = size(block_list, 1)
-    block_number    = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over all blocks
-    do k = 1, N
-        if ( block_list(k, 1) /= -1 ) then
-            block_number = block_number + 1
-        end if
-    end do
+contains
 
-end subroutine block_count
+    ! lgt_block synchronization
+    include "check_lgt_block_synchronization.f90"
+
+    ! check ghost nodes
+    include "check_ghost_nodes.f90"
+
+    ! check future mesh gradedness
+    include "write_future_mesh_lvl.f90"
+
+end module module_debug_functions

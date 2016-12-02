@@ -44,7 +44,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     integer(kind=ik)                    :: rank
 
     ! loop variables
-    integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, counter, hvy_id, neighbor_status, max_treelevel
+    integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, counter, hvy_id, neighbor_status, max_treelevel, proc_id
 
     ! status of grid changing
     logical                             :: grid_changed
@@ -89,8 +89,11 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
         do k = 1, lgt_n
 
+            ! calculate proc rank respondsible for current block
+            call lgt_id_to_proc_rank( proc_id, lgt_active(k), N )
+
             ! proc is responsible for current block
-            if ( ((lgt_active(k)-1) / N) == rank ) then
+            if ( proc_id == rank ) then
 
                 !-----------------------------------------------------------------------
                 ! block wants to coarsen, refinement only in safety zone step
@@ -130,14 +133,12 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                     print*, "ERROR: gradedness, neighbor wants to refine"
                                     stop
 
-                                elseif ( neighbor_status == 0) then
+                                elseif ( neighbor_status <= 0) then
                                     ! neighbor stays on his level,
+                                    ! or want to coarsen
                                     ! so block can not coarsen
                                     ! change refinement with +1
                                     my_refine_change( lgt_active(k) ) = 1
-
-                                else
-                                    ! neighbor want to coarsen -> nothing to do
 
                                 end if
 

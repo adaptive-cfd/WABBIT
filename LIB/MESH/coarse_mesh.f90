@@ -126,172 +126,112 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
     ! loop over all active light data
     do k = 1, lgt_n
 
-        ! rank of proc to keep the data
-        call lgt_id_to_proc_rank( data_rank, lgt_active(k), N )
+        ! only work on light data, if block is active
+        ! note: due to previous loops, some light data id are allready
+        ! coarsen, but are still in active block list
+        ! so: check additional active critiria
+        if ( lgt_block( lgt_active(k), 1 ) /= -1 ) then
 
-        ! block wants to coarsen
-        if ( lgt_block( lgt_active(k), params%max_treelevel+2) == -2 ) then
+            ! rank of proc to keep the data
+            call lgt_id_to_proc_rank( data_rank, lgt_active(k), N )
 
-            ! get treecodes for current block and sister-blocks
-            me                                                          = lgt_block( lgt_active(k), 1:maxtL)
-            light_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = lgt_active(k)
+            ! block wants to coarsen
+            if ( lgt_block( lgt_active(k), params%max_treelevel+2) == -2 ) then
 
-            ! heavy id
-            call lgt_id_to_hvy_id( hvy_id, lgt_active(k), data_rank, N )
+                ! get treecodes for current block and sister-blocks
+                me                                                          = lgt_block( lgt_active(k), 1:maxtL)
+                light_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = lgt_active(k)
 
-            heavy_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = hvy_id
-            proc_rank( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = data_rank
+                ! heavy id
+                call lgt_id_to_hvy_id( hvy_id, lgt_active(k), data_rank, N )
 
-            ! current block level
-            level    = lgt_block( lgt_active(k), maxtL+1 )
+                heavy_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = hvy_id
+                proc_rank( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = data_rank
 
-            ! reset id array
-            id = -1
+                ! current block level
+                level    = lgt_block( lgt_active(k), maxtL+1 )
 
-            ! get sister ids
-            i = 0
-            do l = 1, 4
-                ! sister treecode differs only on last element
-                if ( lgt_block( lgt_active(k), level ) /= l-1) then
+                ! reset id array
+                id = -1
 
-                    i         = i + 1
-                    me(level) = l-1
-                    ! find block id
-                    call does_block_exist(me, lgt_block, maxtL, exists, lgt_id, lgt_active, lgt_n)
-                    ! block exists
-                    if (exists) then
-                        id(i) = lgt_id
-                    else
-                        ! error case
-                        print*, "ERROR: can not find sister id"
-                        stop
+                ! get sister ids
+                i = 0
+                do l = 1, 4
+                    ! sister treecode differs only on last element
+                    if ( lgt_block( lgt_active(k), level ) /= l-1) then
+
+                        i         = i + 1
+                        me(level) = l-1
+                        ! find block id
+                        call does_block_exist(me, lgt_block, maxtL, exists, lgt_id, lgt_active, lgt_n)
+                        ! block exists
+                        if (exists) then
+                            id(i) = lgt_id
+                        else
+                            ! error case
+                            print*, "ERROR: can not find sister id"
+                            stop
+                        end if
+
                     end if
+                end do
 
-                end if
-            end do
+                ! -------------------------------------------------------------------------------------
+                ! id1 data
+                s1                                                 = lgt_block(id(1), 1:maxtL)
+                light_ids( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = id(1)
 
-            s1                                                 = lgt_block(id(1), 1:maxtL)
-            light_ids( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = id(1)
+                ! rank of id1 proc
+                call lgt_id_to_proc_rank( sister_rank, id(1), N )
+                ! heavy id
+                call lgt_id_to_hvy_id( hvy_id, id(1), sister_rank, N )
 
-            ! rank of proc to keep the data
-            call lgt_id_to_proc_rank( sister_rank, id(1), N )
-            ! heavy id
-            call lgt_id_to_hvy_id( hvy_id, id(1), sister_rank, N )
+                heavy_ids( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = hvy_id
+                proc_rank( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = sister_rank
 
-            heavy_ids( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = hvy_id
-            proc_rank( s1( lgt_block(id(1), maxtL+1) ) + 1 )   = sister_rank
+                ! -------------------------------------------------------------------------------------
+                ! id2 data
+                s2                                                 = lgt_block(id(2), 1:maxtL)
+                light_ids( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = id(2)
 
-            s2                                                 = lgt_block(id(2), 1:maxtL)
-            light_ids( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = id(2)
+                ! rank of id2 proc
+                call lgt_id_to_proc_rank( sister_rank, id(2), N )
+                ! heavy id
+                call lgt_id_to_hvy_id( hvy_id, id(2), sister_rank, N )
 
-            ! rank of proc to keep the data
-            call lgt_id_to_proc_rank( sister_rank, id(2), N )
-            ! heavy id
-            call lgt_id_to_hvy_id( hvy_id, id(2), sister_rank, N )
+                heavy_ids( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = hvy_id
+                proc_rank( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = sister_rank
 
-            heavy_ids( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = hvy_id
-            proc_rank( s2( lgt_block(id(2), maxtL+1) ) + 1 )   = sister_rank
+                ! -------------------------------------------------------------------------------------
+                ! id3 data
+                s3                                                 = lgt_block(id(3), 1:maxtL)
+                light_ids( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = id(3)
 
-            s3                                                 = lgt_block(id(3), 1:maxtL)
-            light_ids( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = id(3)
+                ! rank of id3 proc
+                call lgt_id_to_proc_rank( sister_rank, id(3), N )
+                ! heavy id
+                call lgt_id_to_hvy_id( hvy_id, id(3), sister_rank, N )
 
-            ! rank of proc to keep the data
-            call lgt_id_to_proc_rank( sister_rank, id(3), N )
-            ! heavy id
-            call lgt_id_to_hvy_id( hvy_id, id(3), sister_rank, N )
+                heavy_ids( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = hvy_id
+                proc_rank( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = sister_rank
 
-            heavy_ids( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = hvy_id
-            proc_rank( s3( lgt_block(id(3), maxtL+1) ) + 1 )   = sister_rank
-
-            ! proc with block k keep the data
-            if ( data_rank == rank ) then
-                ! creating new block data
-                new_data     = 9.0e9_rk
-                ! coordinates for new block
-                new_coord_x  = 9.0e9_rk
-                new_coord_y  = 9.0e9_rk
-            end if
-
-            ! loop over proc rank list, proc with light id block data collect new data and coarse block
-            ! then save new data on light id, current block_num
-            do i = 1, 4
-
-                ! first: collect coordinates data
+                ! proc with block k keep the data
                 if ( data_rank == rank ) then
-                    ! collect data
-                    if ( proc_rank(i) == rank ) then
-                        ! no communication needed
-                        select case(i)
-                            case(1)
-                                ! sister 0
-                                new_coord_x(1:(Bs-1)/2+1)              = hvy_block( 1, 1:Bs:2, 1, heavy_ids(1) )
-                                new_coord_y(1:(Bs-1)/2+1)              = hvy_block( 2, 1:Bs:2, 1, heavy_ids(1) )
-                            case(2)
-                                ! sister 1
-                                new_coord_x((Bs-1)/2+1:Bs)             = hvy_block( 1, 1:Bs:2, 1, heavy_ids(2) )
-                            case(3)
-                                ! sister 2
-                                new_coord_y((Bs-1)/2+1:Bs)             = hvy_block( 2, 1:Bs:2, 1, heavy_ids(3) )
-                            case(4)
-                                ! sister 3
-                                ! nothing to do
-                        end select
-                    else
-                        ! receive data from other proc, note: not all blocks have to send coord vectors
-                        select case(i)
-                            case(1)
-                                ! sister 0
-                                ! receive coords
-                                call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                new_coord_x(1:(Bs-1)/2+1)              = send_receive_coord(1:Bs:2)
-                                call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                new_coord_y(1:(Bs-1)/2+1)              = send_receive_coord(1:Bs:2)
-                            case(2)
-                                ! sister 1
-                                ! receive coords
-                                call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                new_coord_x((Bs-1)/2+1:Bs)             = send_receive_coord(1:Bs:2)
-                            case(3)
-                                ! sister 2
-                                ! receive coords
-                                call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                new_coord_y((Bs-1)/2+1:Bs)              = send_receive_coord(1:Bs:2)
-                            case(4)
-                                ! sister 3
-                                ! nothing to do
-                        end select
-                    end if
-
-                elseif ( proc_rank(i) == rank ) then
-                    ! send data
-                    select case(i)
-                        case(1)
-                            ! sister 0
-                            ! send coord
-                            send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(1) )
-                            call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
-                            send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(1) )
-                            call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
-                        case(2)
-                            ! sister 1
-                            ! send coord
-                            send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(2) )
-                            call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
-                        case(3)
-                            ! sister 2
-                            ! send coord
-                            send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(3) )
-                            call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
-                        case(4)
-                            ! sister 3
-                            ! nothing to do
-                    end select
-                else
-                    ! nothing to do
+                    ! creating new block data
+                    new_data           = 9.0e9_rk
+                    ! coordinates for new block
+                    new_coord_x        = 9.0e9_rk
+                    new_coord_y        = 9.0e9_rk
+                    ! send_receive buffer
+                    send_receive_coord = 9.0e9_rk
+                    send_receive_data  = 9.0e9_rk
                 end if
 
-                ! second: send data, loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                ! loop over proc rank list, proc with light id block data collect new data and coarse block
+                ! then save new data on light id, current block_num
+                do i = 1, 4
+
+                    ! first: collect coordinates data
                     if ( data_rank == rank ) then
                         ! collect data
                         if ( proc_rank(i) == rank ) then
@@ -299,40 +239,41 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
                             select case(i)
                                 case(1)
                                     ! sister 0
-                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(1) )
+                                    new_coord_x(1:(Bs-1)/2+1)              = hvy_block( 1, 1:Bs:2, 1, heavy_ids(1) )
+                                    new_coord_y(1:(Bs-1)/2+1)              = hvy_block( 2, 1:Bs:2, 1, heavy_ids(1) )
                                 case(2)
                                     ! sister 1
-                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(2) )
+                                    new_coord_x((Bs-1)/2+1:Bs)             = hvy_block( 1, 1:Bs:2, 1, heavy_ids(2) )
                                 case(3)
                                     ! sister 2
-                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(3) )
+                                    new_coord_y((Bs-1)/2+1:Bs)             = hvy_block( 2, 1:Bs:2, 1, heavy_ids(3) )
                                 case(4)
                                     ! sister 3
-                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(4) )
+                                    ! nothing to do
                             end select
                         else
                             ! receive data from other proc, note: not all blocks have to send coord vectors
                             select case(i)
                                 case(1)
                                     ! sister 0
-                                    ! receive data
-                                    call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    ! receive coords
+                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    new_coord_x(1:(Bs-1)/2+1)              = send_receive_coord(1:Bs:2)
+                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    new_coord_y(1:(Bs-1)/2+1)              = send_receive_coord(1:Bs:2)
                                 case(2)
                                     ! sister 1
-                                    ! receive data
-                                    call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    ! receive coords
+                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    new_coord_x((Bs-1)/2+1:Bs)             = send_receive_coord(1:Bs:2)
                                 case(3)
                                     ! sister 2
-                                    ! receive data
-                                    call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    ! receive coords
+                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    new_coord_y((Bs-1)/2+1:Bs)              = send_receive_coord(1:Bs:2)
                                 case(4)
                                     ! sister 3
-                                    ! receive data
-                                    call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    ! nothing to do
                             end select
                         end if
 
@@ -341,70 +282,146 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
                         select case(i)
                             case(1)
                                 ! sister 0
-                                ! send data
-                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(1) )
-                                call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                ! send coord
+                                send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(1) )
+                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(1) )
+                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(2)
                                 ! sister 1
-                                ! send data
-                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(2) )
-                                call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                ! send coord
+                                send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(2) )
+                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(3)
                                 ! sister 2
-                                ! send data
-                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(3) )
-                                call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                ! send coord
+                                send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(3) )
+                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(4)
                                 ! sister 3
-                                ! send data
-                                send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(4) )
-                                call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                ! nothing to do
                         end select
                     else
                         ! nothing to do
                     end if
+
+                    ! second: send data, loop over all datafields
+                    do dF = 2, params%number_data_fields+1
+                        if ( data_rank == rank ) then
+                            ! collect data
+                            if ( proc_rank(i) == rank ) then
+                                ! no communication needed
+                                select case(i)
+                                    case(1)
+                                        ! sister 0
+                                        new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(1) )
+                                    case(2)
+                                        ! sister 1
+                                        new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(2) )
+                                    case(3)
+                                        ! sister 2
+                                        new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(3) )
+                                    case(4)
+                                        ! sister 3
+                                        new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, dF, heavy_ids(4) )
+                                end select
+                            else
+                                ! receive data from other proc, note: not all blocks have to send coord vectors
+                                select case(i)
+                                    case(1)
+                                        ! sister 0
+                                        ! receive data
+                                        call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                        new_data(1:(Bs-1)/2+1, 1:(Bs-1)/2+1, dF-1)   = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    case(2)
+                                        ! sister 1
+                                        ! receive data
+                                        call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                        new_data(1:(Bs-1)/2+1, (Bs-1)/2+1:Bs, dF-1)  = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    case(3)
+                                        ! sister 2
+                                        ! receive data
+                                        call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                        new_data((Bs-1)/2+1:Bs, 1:(Bs-1)/2+1, dF-1)  = send_receive_data(1:Bs:2, 1:Bs:2)
+                                    case(4)
+                                        ! sister 3
+                                        ! receive data
+                                        call MPI_Recv(send_receive_data, Bs*Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                        new_data((Bs-1)/2+1:Bs, (Bs-1)/2+1:Bs, dF-1) = send_receive_data(1:Bs:2, 1:Bs:2)
+                                end select
+                            end if
+
+                        elseif ( proc_rank(i) == rank ) then
+                            ! send data
+                            select case(i)
+                                case(1)
+                                    ! sister 0
+                                    ! send data
+                                    send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(1) )
+                                    call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                case(2)
+                                    ! sister 1
+                                    ! send data
+                                    send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(2) )
+                                    call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                case(3)
+                                    ! sister 2
+                                    ! send data
+                                    send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(3) )
+                                    call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                case(4)
+                                    ! sister 3
+                                    ! send data
+                                    send_receive_data = hvy_block( g+1:Bs+g, g+1:Bs+g, dF, heavy_ids(4) )
+                                    call MPI_Send( send_receive_data, Bs*Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                            end select
+                        else
+                            ! nothing to do
+                        end if
+                    end do
+
                 end do
 
-            end do
+                ! delete all heavy data
+                if ( proc_rank(1) == rank ) hvy_block( :, :, :, heavy_ids(1) ) = 0.0_rk !9.0e9_rk
+                if ( proc_rank(2) == rank ) hvy_block( :, :, :, heavy_ids(2) ) = 0.0_rk !9.0e9_rk
+                if ( proc_rank(3) == rank ) hvy_block( :, :, :, heavy_ids(3) ) = 0.0_rk !9.0e9_rk
+                if ( proc_rank(4) == rank ) hvy_block( :, :, :, heavy_ids(4) ) = 0.0_rk !9.0e9_rk
 
-            ! delete all heavy data
-            if ( proc_rank(1) == rank ) hvy_block( :, :, :, heavy_ids(1) ) = 0.0_rk
-            if ( proc_rank(2) == rank ) hvy_block( :, :, :, heavy_ids(2) ) = 0.0_rk
-            if ( proc_rank(3) == rank ) hvy_block( :, :, :, heavy_ids(3) ) = 0.0_rk
-            if ( proc_rank(4) == rank ) hvy_block( :, :, :, heavy_ids(4) ) = 0.0_rk
+                ! delete light data
+                lgt_block(light_ids(1), : ) = -1
+                lgt_block(light_ids(2), : ) = -1
+                lgt_block(light_ids(3), : ) = -1
+                lgt_block(light_ids(4), : ) = -1
 
-            ! delete light data
-            lgt_block(light_ids(1), : ) = -1
-            lgt_block(light_ids(2), : ) = -1
-            lgt_block(light_ids(3), : ) = -1
-            lgt_block(light_ids(4), : ) = -1
+                ! new treecode, one level down (coarsening)
+                me(level) = -1
 
-            ! new treecode, one level down (coarsening)
-            me(level) = -1
+                ! write new block on current block
+                ! write light data
+                lgt_block( lgt_active(k), 1:maxtL) = me
+                lgt_block( lgt_active(k), maxtL+1) = level-1
+                lgt_block( lgt_active(k), maxtL+2) = 0
 
-            ! write new block on current block
-            ! write light data
-            lgt_block( lgt_active(k), 1:maxtL) = me
-            lgt_block( lgt_active(k), maxtL+1) = level-1
-            lgt_block( lgt_active(k), maxtL+2) = 0
+                ! final steps
+                if ( data_rank == rank ) then
 
-            ! final steps
-            if ( data_rank == rank ) then
+                    ! heavy id
+                    call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, N )
 
-                ! heavy id
-                call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, N )
+                    ! write coordinates
+                    hvy_block( 1, 1:Bs, 1, hvy_id ) = new_coord_x
+                    hvy_block( 2, 1:Bs, 1, hvy_id ) = new_coord_y
 
-                ! write coordinates
-                hvy_block( 1, 1:Bs, 1, hvy_id ) = new_coord_x
-                hvy_block( 2, 1:Bs, 1, hvy_id ) = new_coord_y
+                    ! loop over all dataFields
+                    do dF = 2, params%number_data_fields+1
 
-                ! loop over all dataFields
-                do dF = 2, params%number_data_fields+1
+                        ! write data
+                        hvy_block( g+1:Bs+g, g+1:Bs+g, dF, hvy_id ) = new_data(:,:,dF-1)
 
-                    ! write data
-                    hvy_block( g+1:Bs+g, g+1:Bs+g, dF, hvy_id ) = new_data(:,:,dF-1)
+                    end do
 
-                end do
+                end if
 
             end if
 

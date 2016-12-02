@@ -61,6 +61,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! check where to coarsen (refinement done with safety zone)
         call threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
+        ! update lists of active blocks (light and heavy data)
+        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+
         ! unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
 
@@ -80,7 +84,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     end do
 
     ! balance load
-    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    !call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )

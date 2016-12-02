@@ -31,6 +31,8 @@ program main
     use module_IO
     ! time step module
     use module_time_step
+    ! debug subroutines
+    use module_debug_functions
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -116,10 +118,6 @@ program main
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') number_procs
-!        open (15, file='load_balancing.t', status='replace')
-!        close(15)
-!        open (15, file='blocks_per_rank.t', status='replace')
-!        close(15)
     end if
 
     ! initializing data
@@ -139,10 +137,6 @@ program main
     do while ( time < params%time_max )
 
         iteration = iteration + 1
-
-        ! turn off debugging after 2 time steps
-        if ( iteration == 2) params%debug = .false.
-
 
         ! refine everywhere
         if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )

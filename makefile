@@ -3,12 +3,6 @@
 FFILES = encoding.f90 int_to_binary.f90 treecode_size.f90 adjacent_block.f90 array_compare.f90 proc_to_lgt_data_start_id.f90 \
 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 sort_com_list.f90 com_allowed.f90 \
 RHS_2D_convection_diffusion.f90
-#  \
- block_count.f90 \
-    \
-     \
- balance_load.f90 get_free_heavy_id.f90
- 
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -16,12 +10,12 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 module_interpolation.f90 module_init.f90 \
-	module_mesh.f90 module_IO.f90 module_time_step.f90
+	module_mesh.f90 module_IO.f90 module_time_step.f90 module_debug_functions.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
-VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI
+VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
 
 # Set the default compiler if it's not already set
 FC = mpif90
@@ -118,13 +112,18 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 send_receive_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)	
 	
-$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o $(OBJDIR)/module_time_step.o \
+$(OBJDIR)/module_debug_functions.o: module_debug_functions.f90 $(OBJDIR)/module_params.o \
+	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
+	$(OBJDIR)/module_time_step.o $(OBJDIR)/module_debug_functions.o\
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90 find_neighbor_edge.f90 does_block_exist.f90 \
 	find_neighbor_corner.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 set_desired_num_blocks_per_rank.f90 compute_friends_table.f90 \
-	compute_affinity.f90
+	compute_affinity.f90 
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
+	
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \
 	save_data.f90 write_field.f90 
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

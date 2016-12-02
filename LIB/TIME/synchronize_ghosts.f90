@@ -48,10 +48,13 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! loop variables
     integer(kind=ik)                    :: k, N, i, dF, lgt_id, hvy_id
 
+    ! grid parameter
+    integer(kind=ik)                    :: g, Bs
+
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
-    integer(kind=ik)                    :: rank
+    integer(kind=ik)                    :: rank, neighbor_rank
     ! number of processes
     integer(kind=ik)                    :: number_procs
 
@@ -91,6 +94,10 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
     N = params%number_blocks
 
+    ! grid parameter
+    Bs = params%number_block_nodes
+    g  = params%number_ghost_nodes
+
     ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     ! determinate process number
@@ -108,6 +115,19 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     com_list    = -1
     my_com_list = -1
     com_plan    = -1
+
+    ! reset ghost nodes for all active blocks
+    ! loop over all datafields
+    do dF = 2, params%number_data_fields+1
+        ! loop over all active blocks
+        do k = 1, hvy_n
+            ! reset ghost nodes
+            hvy_block(1:g, :, dF, hvy_active(k) )           = 9.0e9_rk
+            hvy_block(Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 9.0e9_rk
+            hvy_block(:, 1:g, dF, hvy_active(k) )           = 9.0e9_rk
+            hvy_block(:, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 9.0e9_rk
+        end do
+    end do
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -134,18 +154,22 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
 
                 ! proof if neighbor internal or external
-                if ( ( neighbor_light_id > rank*N ) .and. ( neighbor_light_id < (rank+1)*N+1 ) ) then
+                call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+
+                if ( rank == neighbor_rank ) then
                     ! calculate internal heavy id
                     call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
                     ! internal neighbor -> copy ghost nodes
                     call copy_ghost_nodes( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
                 else
+                    ! neighbor heavy id
+                    call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
                     ! external neighbor -> new com_list entry
                     my_com_list( rank*N*16 + (k-1)*16 + i , 1)  = k+i
                     my_com_list( rank*N*16 + (k-1)*16 + i , 2)  = rank
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 3)  = (neighbor_light_id - 1) / N
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 4)  = k
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 5)  = neighbor_light_id - ( (neighbor_light_id - 1) / N )*N
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 3)  = neighbor_rank
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 4)  = hvy_active(k)
+                    my_com_list( rank*N*16 + (k-1)*16 + i , 5)  = hvy_id
                     my_com_list( rank*N*16 + (k-1)*16 + i , 6)  = i
                     my_com_list( rank*N*16 + (k-1)*16 + i , 7)  = i
                     my_com_list( rank*N*16 + (k-1)*16 + i , 8)  = level_diff

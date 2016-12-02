@@ -181,7 +181,9 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
 
             else
                 ! error case
-                print*, 'ERROR: can not find edge neighbor)'
+                print*, my_treecode
+                print*, neighbor
+                print*, 'ERROR: can not find edge neighbor'
                 stop
             end if
 
@@ -201,7 +203,9 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
 
             else
                 ! error case
-                print*, 'ERROR: can not find edge neighbor)'
+                print*, my_treecode
+                print*, neighbor
+                print*, 'ERROR: can not find edge neighbor'
                 stop
             end if
 

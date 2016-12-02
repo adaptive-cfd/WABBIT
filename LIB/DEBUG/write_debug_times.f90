@@ -5,16 +5,14 @@
 ! version: 0.4
 ! author: msr
 !
-! debug planned mesh changes
-! write file with future mesh level for all blocks
-! write also future mesh level for all known neighbor blocks
+! write time measurements
 !
-! input:    - params, light data
-! output:   - status of lgt_block synchronzation
+! input:    - current iteration
+! output:   -
 !
 ! = log ======================================================================================
 !
-! 29/11/16 - create
+! 02/12/16 - create
 ! ********************************************************************************************
 
 subroutine write_debug_times( iteration )

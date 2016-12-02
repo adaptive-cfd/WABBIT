@@ -31,8 +31,6 @@ program main
     use module_IO
     ! time step module
     use module_time_step
-    ! debug subroutines
-    use module_debug_functions
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -87,9 +85,6 @@ program main
     ! time loop variables
     real(kind=rk)                       :: time
     integer(kind=ik)                    :: iteration
-
-    ! loop variable
-    integer(kind=ik)                    :: k, l
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -166,23 +161,11 @@ program main
           call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
         endif
 
-        ! output computing time for every proc
-        if ( params%debug ) then
-            do k = 1, number_procs
-                if ( k-1 == rank ) then
-                    write(*,'(80("."))')
-                    write(*,'("RUN: computing time details for rank = ",i3)')  rank
-                    l = 1
-                    ! time array is used
-                    do while ( debug%name_comp_time(l) /= "---" )
-                        write(*,'(a, " : ", f10.6, " s")')  debug%name_comp_time(l), debug%comp_time(k, l)
-                        l = l + 1
-                    end do
-
-                end if
-                call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            end do
-        end if
+        ! debug info
+        call write_debug_times( iteration )
+        ! sum and reset times
+        debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,2)
+        debug%comp_time(:,2) = 0.0_rk
 
     end do
 

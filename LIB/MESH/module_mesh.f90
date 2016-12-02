@@ -26,8 +26,6 @@ module module_mesh
     use module_interpolation
     ! time step module
     use module_time_step
-    ! debug subroutines
-    use module_debug_functions
 
 !---------------------------------------------------------------------------------------------
 ! variables

@@ -192,14 +192,17 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     sub_t1 = MPI_Wtime()
     ! write time
     if ( params%debug ) then
-        ! find first free line
+        ! find free or corresponding line
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "ensure_gradedness" ) exit
             k = k + 1
         end do
         ! write time
         debug%name_comp_time(k) = "ensure_gradedness"
-        debug%comp_time(rank+1, k) = sub_t1 - sub_t0
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if
 
 end subroutine ensure_gradedness

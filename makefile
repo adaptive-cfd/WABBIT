@@ -10,7 +10,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 module_interpolation.f90 module_init.f90 \
-	module_mesh.f90 module_IO.f90 module_time_step.f90 module_debug_functions.f90
+	module_mesh.f90 module_IO.f90 module_time_step.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -92,7 +92,8 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_params.o: module_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
-$(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o
+$(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
+	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90 write_debug_times.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_params.o
@@ -112,12 +113,8 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 send_receive_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)	
 	
-$(OBJDIR)/module_debug_functions.o: module_debug_functions.f90 $(OBJDIR)/module_params.o \
-	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-	
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
-	$(OBJDIR)/module_time_step.o $(OBJDIR)/module_debug_functions.o\
+	$(OBJDIR)/module_time_step.o\
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90 find_neighbor_edge.f90 does_block_exist.f90 \
 	find_neighbor_corner.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 set_desired_num_blocks_per_rank.f90 compute_friends_table.f90 \

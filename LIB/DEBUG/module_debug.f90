@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_debug_functions.f90
+! name: module_debug.f90
 ! version: 0.4
 ! author: msr
 !
@@ -14,7 +14,7 @@
 ! TODO: union with debug data structure
 ! ********************************************************************************************
 
-module module_debug_functions
+module module_debug
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -27,6 +27,27 @@ module module_debug_functions
 ! variables
 
     implicit none
+
+    ! global user defined debug structure
+    type type_debug
+
+        ! computing time measurement array
+        ! row number: id corresponding to names list
+        ! column 1: number of subroutine calls for one time loop
+        ! column 2: sum (time) of all subroutine calls for one time loop
+        ! column 3: sum (time) of all subroutine calls over complete program
+        real(kind=rk), dimension(:,:), allocatable          :: comp_time
+
+        ! names of time measurements
+        ! row number: id
+        ! column: name
+        character(len=40), dimension(:), allocatable        :: name_comp_time
+
+    end type type_debug
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    type (type_debug), save                                 :: debug
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -45,4 +66,7 @@ contains
     ! check future mesh gradedness
     include "write_future_mesh_lvl.f90"
 
-end module module_debug_functions
+    ! write time measurements
+    include "write_debug_times.f90"
+
+end module module_debug

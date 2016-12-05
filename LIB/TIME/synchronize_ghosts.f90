@@ -204,6 +204,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! second: sort com_list, create com_plan
     call sort_com_list(com_list, size(com_list,1), com_plan, size(com_plan,1), number_procs, n_com)
 
+    ! debug writing
+    if ( params%debug ) then
+        call write_com_list( com_list )
+    end if
+
     ! ----------------------------------------------------------------------------------------
     ! third: start external communications
     ! synchronize ghost nodes

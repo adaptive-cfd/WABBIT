@@ -162,10 +162,17 @@ program main
         endif
 
         ! debug info
-        call write_debug_times( iteration )
-        ! sum and reset times
-        debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,2)
-        debug%comp_time(:,2) = 0.0_rk
+        if ( params%debug ) then
+            ! sum and reset times and calls
+            debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
+            debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
+            ! write debug infos to file
+            call write_debug_times( iteration )
+            ! reset loop values
+            debug%comp_time(:,1) = 0.0_rk
+            debug%comp_time(:,2) = 0.0_rk
+
+        end if
 
     end do
 

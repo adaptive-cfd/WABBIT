@@ -1,13 +1,14 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_debug_times.f90
+! name: write_com_list.f90
 ! version: 0.4
 ! author: msr
 !
-! write time measurements
+! write communication list to file
+! note: existing file will be overridden
 !
-! input:    - current iteration
+! input:    - current com list
 ! output:   -
 !
 ! = log ======================================================================================
@@ -15,7 +16,7 @@
 ! 02/12/16 - create
 ! ********************************************************************************************
 
-subroutine write_debug_times( iteration )
+subroutine write_com_list( com_list )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -26,7 +27,7 @@ subroutine write_debug_times( iteration )
     implicit none
 
     ! iteration
-    integer(kind=ik), intent(in)        :: iteration
+    integer(kind=ik), intent(in)        :: com_list(:, :)
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -54,54 +55,38 @@ subroutine write_debug_times( iteration )
 ! main body
 
     ! check file existence, if not create file
-    inquire(file="times.dat", exist=file_exists)
+    inquire(file="com_list.dat", exist=file_exists)
 
     if ( rank == 0 ) then
         if (file_exists) then
-            ! open for append
-            open(unit=99,file="times.dat",status='old', position="append", action='write', iostat=io_error)
+            ! open and overwrite
+            open(unit=99,file="com_list.dat",status='old', action='write', iostat=io_error)
         else
             ! first opening
-            open(unit=99,file="times.dat",status='new',action='write', iostat=io_error)
+            open(unit=99,file="com_list.dat",status='new',action='write', iostat=io_error)
         end if
     end if
 
     ! write data
+    k = 1
     if (rank == 0) then
 
         ! write file header
-        write(99,'(80("_"))')
-        write(99, '(42x, "calls", 2x, "sum", 5x, "time", 6x, "sum")', advance='no')
+        write(99, '("rank", 1x, "neighbor-rank", 1x, "block", 1x, "neighbor-block", 1x, "direction")', advance='no')
         write(99,*)
 
-        ! write times
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
+        do while ( com_list(k,1) /= -1 )
 
-            ! write name
-            write(99, '(a)', advance='no') debug%name_comp_time(k)
-            ! write number of calls
-            write(99, '(2x,i3)', advance='no') int(debug%comp_time(k,1))
-            ! write global number of calls
-            write(99, '(2x,i5)', advance='no') int(debug%comp_time(k,3))
-            ! write time
-            write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,2)
-            ! write global time
-            write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,4)
+            write(99, '(i3, 7x, i3, 8x, i3, 7x, i3, 7x, i3)', advance='no') com_list(k,2), com_list(k,3), com_list(k,4), com_list(k,5), com_list(k,6)
+            k = k + 1
             ! next line
             write(99,*)
-            ! loop variable
-            k = k + 1
 
         end do
-
-        write(99,'(80("-"))')
-        write(99, '("iteration: ", i6)', advance='no') iteration
-        write(99,*)
 
         ! close file
         close(unit=99)
 
     end if
 
-end subroutine write_debug_times
+end subroutine write_com_list

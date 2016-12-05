@@ -56,7 +56,7 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik)                    :: rank
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -75,6 +75,8 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
     dx    = 9.0e9_rk
     ! reset dt
     dt    = 9.0e9_rk
+
+    time_sum = 0.0_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -111,10 +113,17 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! loop over all datafields
     do dF = 2, N_dF+1
 
+        ! time measurement without ghost nodes synchronization
+        sub_t1   = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+
         !------------------------------
         ! first stage
         ! synchronize ghostnodes
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+        ! restart time
+        sub_t0 = MPI_Wtime()
 
         ! loop over all active heavy data blocks
         do k = 1, hvy_n
@@ -142,10 +151,15 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         end do
 
+        ! time measurement without ghost nodes synchronization
+        sub_t1   = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+
         ! synchronize ghostnodes
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-
+        ! restart time
+        sub_t0 = MPI_Wtime()
 
         do k = 1, hvy_n
 
@@ -170,8 +184,15 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         end do
 
+        ! time measurement without ghost nodes synchronization
+        sub_t1   = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+
         ! synchronize ghostnodes
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+        ! restart time
+        sub_t0 = MPI_Wtime()
 
         do k = 1, hvy_n
 
@@ -196,8 +217,15 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         end do
 
+        ! time measurement without ghost nodes synchronization
+        sub_t1   = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+
         ! synchronize ghostnodes
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+        ! restart time
+        sub_t0 = MPI_Wtime()
 
         do k = 1, hvy_n
 
@@ -229,20 +257,21 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_
     end do
 
     ! end time
-    sub_t1 = MPI_Wtime()
+    sub_t1   = MPI_Wtime()
+    time_sum = time_sum + (sub_t1 - sub_t0)
     ! write time
     if ( params%debug ) then
         ! find free or corresponding line
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "time_step" ) exit
+            if ( debug%name_comp_time(k) == "time_step (w/o ghost synch.)" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "time_step"
+        debug%name_comp_time(k) = "time_step (w/o ghost synch.)"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
     end if
 
 end subroutine time_step_RK4

@@ -226,7 +226,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
     ! note: fix size of time measurements array
     if ( params%debug ) then
         ! allocate array for time measurements - data
-        allocate( debug%comp_time( 20, 3 ), stat=allocate_error )
+        allocate( debug%comp_time( 20, 4 ), stat=allocate_error )
         debug%comp_time = 0.0_rk
         ! allocate array for time measurements - names
         allocate( debug%name_comp_time( 20 ), stat=allocate_error )

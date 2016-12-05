@@ -35,7 +35,8 @@ module module_debug
         ! row number: id corresponding to names list
         ! column 1: number of subroutine calls for one time loop
         ! column 2: sum (time) of all subroutine calls for one time loop
-        ! column 3: sum (time) of all subroutine calls over complete program
+        ! column 3: number of subroutine calls over complete program
+        ! column 4: sum (time) of all subroutine calls over complete program
         real(kind=rk), dimension(:,:), allocatable          :: comp_time
 
         ! names of time measurements
@@ -68,5 +69,11 @@ contains
 
     ! write time measurements
     include "write_debug_times.f90"
+
+    ! write block distribution
+    include "write_block_distribution.f90"
+
+    ! write communciations list
+    include "write_com_list.f90"
 
 end module module_debug

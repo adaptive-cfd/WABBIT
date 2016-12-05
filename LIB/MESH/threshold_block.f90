@@ -102,11 +102,11 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! ------------------------------------------------------------------------------------
     ! first: synchronize ghost nodes - thresholding on block with ghost nodes
 
-    ! start time
-    sub_t0 = MPI_Wtime()
-
     ! synchronize ghostnodes
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! ------------------------------------------------------------------------------------
     ! second: clear old refinement status
@@ -171,11 +171,11 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "treshold_block" ) exit
+            if ( debug%name_comp_time(k) == "treshold_block (w/o ghost synch.)" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "treshold_block"
+        debug%name_comp_time(k) = "treshold_block (w/o ghost synch.)"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if

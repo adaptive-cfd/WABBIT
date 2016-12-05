@@ -89,11 +89,17 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! free light/heavy data id
     integer(kind=ik)                    :: free_light_id, free_heavy_id
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     tag = 0
 
@@ -137,17 +143,25 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 ! main body
 
     select case(distribution)
-    case("equal")! simple uniformly distribution
+
+        case("equal")! simple uniformly distribution
             !---------------------------------------------------------------------------------
             ! First step: define how many blocks each mpirank should have.
             !---------------------------------------------------------------------------------
             call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
+
+            ! write debug infos: distribution list
+            !if ( params%debug ) then
+                call write_block_distribution( dist_list )
+            !end if
+
             ! at this point, we know how many blocks a mpirank has: "dist_list(myrank)"
             ! and how many it should have, if equally distributed: "opt_dist_list(myrank)"
             if (maxval(abs(dist_list-opt_dist_list))==0) then
                 ! the distribution is fine, nothing to do.
                 return
             endif
+
             ! determine matrix of number of neighbor relations between mpiranks
             call compute_friends_table(params, hvy_neighbor, friends, hvy_active, hvy_n)
 
@@ -293,5 +307,22 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     deallocate( opt_dist_list, stat=allocate_error )
     deallocate( dist_list, stat=allocate_error )
     deallocate( com_plan, stat=allocate_error )
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "balance_load" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "balance_load"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
 
 end subroutine balance_load

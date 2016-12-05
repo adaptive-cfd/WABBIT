@@ -1,21 +1,21 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_debug_times.f90
+! name: write_block_distribution.f90
 ! version: 0.4
 ! author: msr
 !
-! write time measurements
+! write current block distribution to file
 !
-! input:    - current iteration
+! input:    - current distribution list
 ! output:   -
 !
 ! = log ======================================================================================
 !
-! 02/12/16 - create
+! 05/12/16 - create
 ! ********************************************************************************************
 
-subroutine write_debug_times( iteration )
+subroutine write_block_distribution( dist_list )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -26,7 +26,7 @@ subroutine write_debug_times( iteration )
     implicit none
 
     ! iteration
-    integer(kind=ik), intent(in)        :: iteration
+    integer(kind=ik), intent(in)        :: dist_list(:)
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -54,49 +54,28 @@ subroutine write_debug_times( iteration )
 ! main body
 
     ! check file existence, if not create file
-    inquire(file="times.dat", exist=file_exists)
+    inquire(file="block_dist.dat", exist=file_exists)
 
     if ( rank == 0 ) then
         if (file_exists) then
             ! open for append
-            open(unit=99,file="times.dat",status='old', position="append", action='write', iostat=io_error)
+            open(unit=99,file="block_dist.dat",status='old', position="append", action='write', iostat=io_error)
         else
             ! first opening
-            open(unit=99,file="times.dat",status='new',action='write', iostat=io_error)
+            open(unit=99,file="block_dist.dat",status='new',action='write', iostat=io_error)
         end if
     end if
 
     ! write data
     if (rank == 0) then
 
-        ! write file header
-        write(99,'(80("_"))')
-        write(99, '(42x, "calls", 2x, "sum", 5x, "time", 6x, "sum")', advance='no')
-        write(99,*)
+        do k = 1, size(dist_list)
 
-        ! write times
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-
-            ! write name
-            write(99, '(a)', advance='no') debug%name_comp_time(k)
-            ! write number of calls
-            write(99, '(2x,i3)', advance='no') int(debug%comp_time(k,1))
-            ! write global number of calls
-            write(99, '(2x,i5)', advance='no') int(debug%comp_time(k,3))
-            ! write time
-            write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,2)
-            ! write global time
-            write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,4)
-            ! next line
-            write(99,*)
-            ! loop variable
-            k = k + 1
+            write(99, '(i3,1x)', advance='no') dist_list(k)
 
         end do
 
-        write(99,'(80("-"))')
-        write(99, '("iteration: ", i6)', advance='no') iteration
+        ! next line
         write(99,*)
 
         ! close file
@@ -104,4 +83,4 @@ subroutine write_debug_times( iteration )
 
     end if
 
-end subroutine write_debug_times
+end subroutine write_block_distribution

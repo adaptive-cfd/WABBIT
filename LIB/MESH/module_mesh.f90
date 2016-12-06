@@ -94,4 +94,7 @@ contains
     ! affinity list
     include "compute_affinity.f90"
 
+    ! treecode to sfc position
+    include "treecode_to_sfc_id.f90"
+
 end module module_mesh

@@ -87,7 +87,7 @@ subroutine write_debug_times( iteration )
             ! write time
             write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,2)
             ! write global time
-            write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,4)
+            write(99, '(2x,f12.6)', advance='no') debug%comp_time(k,4)
             ! next line
             write(99,*)
             ! loop variable

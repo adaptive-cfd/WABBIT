@@ -303,7 +303,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             lgt_block = 0
             call MPI_Allreduce(my_block_list, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
-        case("sfc1")
+        case("sfc_z")
 
             !---------------------------------------------------------------------------------
             ! first: calculate space filling curve

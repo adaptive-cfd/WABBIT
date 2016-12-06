@@ -180,7 +180,7 @@ subroutine initial_block_distribution( params, lgt_block, block_data, phi )
                 end do
             end do
 
-        case("sfc1")
+        case("sfc_z")
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! TODO: real sfc distribution needed, actually simple uniformly distribution is used
 

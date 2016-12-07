@@ -21,7 +21,7 @@
 ! 07/12/16 - create
 ! ********************************************************************************************
 
-subroutine  allocate_work_data(hvy_work, number_blocks, Bs, g)
+subroutine  allocate_work_data(hvy_work, number_blocks, Bs, g, dF)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -32,8 +32,8 @@ subroutine  allocate_work_data(hvy_work, number_blocks, Bs, g)
     real(kind=rk), allocatable, intent(out)     :: hvy_work(:, :, :, :)
     ! number of heavy data
     integer(kind=ik), intent(in)                :: number_blocks
-    ! grid parameter, blocksize (Bs), ghostnodes (g)
-    integer(kind=ik), intent(in)                :: Bs, g
+    ! grid parameter, blocksize (Bs), ghostnodes (g), number of datafields (F)
+    integer(kind=ik), intent(in)                :: Bs, g, dF
 
     ! allocation error variable
     integer(kind=ik)                            :: allocate_error
@@ -53,7 +53,7 @@ subroutine  allocate_work_data(hvy_work, number_blocks, Bs, g)
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! allocate memory
-    allocate( hvy_work( Bs+2*g, Bs+2*g, 5, number_blocks ), stat=allocate_error )
+    allocate( hvy_work( Bs+2*g, Bs+2*g, dF*5, number_blocks ), stat=allocate_error )
 
     ! reset data
     !

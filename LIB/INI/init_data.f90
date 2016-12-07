@@ -242,7 +242,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! allocate heavy data
     call allocate_block_data( hvy_block, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_data_fields )
     ! allocate heavy work data
-    call allocate_work_data( hvy_work, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes )
+    call allocate_work_data( hvy_work, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_data_fields )
 
     ! initial data field
     select case( params%initial_cond )

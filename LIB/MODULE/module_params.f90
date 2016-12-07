@@ -72,7 +72,7 @@ module module_params
 
         ! number of allocated heavy data fields per process
         integer(kind=ik)                            :: number_blocks
-        ! number of allocated data fields in heavy data array, number of fields in heavy data (depend from time step scheme, ...)
+        ! number of allocated data fields in heavy data array, number of fields in heavy work data (depend from time step scheme, ...)
         integer(kind=ik)                            :: number_data_fields
         integer(kind=ik)                            :: number_fields
 

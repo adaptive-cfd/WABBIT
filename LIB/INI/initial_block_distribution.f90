@@ -161,7 +161,7 @@ subroutine initial_block_distribution( params, lgt_block, block_data, phi )
                                             coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
                                             Bs, &
                                             g, &
-                                            params%number_fields)
+                                            params%number_data_fields)
                     end if
 
                     ! ------------------------------------------------------------------------------------------------------
@@ -244,7 +244,7 @@ subroutine initial_block_distribution( params, lgt_block, block_data, phi )
                                             coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
                                             Bs, &
                                             g, &
-                                            params%number_fields)
+                                            params%number_data_fields)
                     end if
 
                     ! ------------------------------------------------------------------------------------------------------

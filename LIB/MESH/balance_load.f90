@@ -305,6 +305,13 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
         case("sfc_z")
 
+            ! current block distribution
+            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
+            ! write debug infos: current distribution list
+            !if ( params%debug ) then
+                call write_block_distribution( dist_list )
+            !end if
+
             !---------------------------------------------------------------------------------
             ! first: calculate space filling curve
             !---------------------------------------------------------------------------------
@@ -328,11 +335,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             do k = 1, mod(lgt_n, number_procs)
                 dist_list( k ) = dist_list( k ) + 1
             end do
-
-            ! write debug infos: distribution list
-            !if ( params%debug ) then
-                call write_block_distribution( dist_list )
-            !end if
 
             !---------------------------------------------------------------------------------
             ! third: create com list

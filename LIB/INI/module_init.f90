@@ -47,6 +47,9 @@ contains
     ! block data allocation
     include "allocate_block_data.f90"
 
+    ! block work data allocation
+    include "allocate_work_data.f90"
+
     ! start field, gauss blob
     include "inicond_gauss_blob.f90"
 

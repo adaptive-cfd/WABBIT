@@ -20,8 +20,9 @@
 !
 ! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
 !            initialized block data to main program
+! 07/12/16 - now uses heavy work data array
 ! ********************************************************************************************
-subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active)
+subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -33,13 +34,16 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
 
     ! light data array
     integer(kind=ik), allocatable, intent(out)      :: lgt_block(:, :)
+
     ! heavy data array - block data
     real(kind=rk), allocatable, intent(out)         :: hvy_block(:, :, :, :)
-    ! neighbor array (heavy data) -> number_lines = number_blocks * 16 (...different neighbor relations:
-    ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
-    !         saved data -> -1 ... no neighbor
-    !                    -> light data line number (id)
+
+    ! heavy work array  )
+    real(kind=rk), allocatable, intent(out)         :: hvy_work(:, :, :, :)
+
+    ! neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:,:)
+
     ! list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
     ! list of active blocks (light data)
@@ -116,8 +120,9 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
 
     ! read number_data_fields
     call read_param(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
-    ! set number of fields in heavy data
-    params%number_fields = params%number_data_fields + 6
+    ! set number of fields in heavy work data
+    ! every datafield has 5 additional fields: old, k1, k2, k3, k4
+    params%number_fields = params%number_data_fields*5
     ! read threshold value
     call read_param(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     ! read treelevel bounds
@@ -187,7 +192,9 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
     ! allocate block_list
     call allocate_block_list( lgt_block, params%number_blocks, params%max_treelevel )
     ! allocate heavy data
-    call allocate_block_data( hvy_block, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_fields )
+    call allocate_block_data( hvy_block, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes, params%number_data_fields )
+    ! allocate heavy work data
+    call allocate_work_data( hvy_work, params%number_blocks, params%number_block_nodes, params%number_ghost_nodes )
 
     ! initial data field
     select case( params%initial_cond )
@@ -207,7 +214,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy
     call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! second: write heavy data for other datafields
-    do k = 3, params%number_fields
+    do k = 3, params%number_data_fields
         !block_data( :, :, k, : ) = 0.0_rk
         hvy_block( :, :, k, : ) = hvy_block( :, :, 2, : )
     end do

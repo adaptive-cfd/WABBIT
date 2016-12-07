@@ -11,6 +11,7 @@
 !
 ! 04/11/16 - switch to v0.4
 ! 23/11/16 - use computing time array for simple performance tests
+! 07/12/16 - now uses heavy work data array
 ! ********************************************************************************************
 
 program main
@@ -58,12 +59,17 @@ program main
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: data type ( field_1, 2:number_data_fields+1, data_old, k1, k2, k3,
-    !                                       k4 [for runge kutta] )
+    !                   -> dim 3: data type ( field_1, 2:number_data_fields+1)
     ! heavy data array  -> dim 4: block id  ( 1:number_blocks )
     !           field_1 (to save mixed data):   line 1: x coordinates
     !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :)
+
+    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 3: data type ( old data, k1, k2, k3, k4 )
+    ! heavy work array  -> dim 4: block id  ( 1:number_blocks )
+    real(kind=rk), allocatable          :: hvy_work(:, :, :, :)
 
     ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
     !                             -> number_columns = 16 (...different neighbor relations:
@@ -116,7 +122,7 @@ program main
     end if
 
     ! initializing data
-    call init_data( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active )
+    call init_data( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 
     ! create lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
@@ -144,7 +150,8 @@ program main
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! advance in time
-        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+        !call time_step_RK4_2( time, params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         ! adapt the mesh
         if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )

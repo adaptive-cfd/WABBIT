@@ -1,0 +1,61 @@
+! ********************************************************************************************
+! WABBIT
+! ============================================================================================
+! name: module_2D_navier_stokes.f90
+! version: 0.4
+! author: msr
+!
+! module for 2D navier stokes physics
+!
+! = log ======================================================================================
+!
+! 06/12/16 - create
+! ********************************************************************************************
+
+module module_2D_navier_stokes
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+    use module_precision
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    ! user defined data structure for time independent variables
+    type type_params_physics_navier_stokes
+
+        ! adiabatic coefficient
+        real(kind=rk)                               :: gamma_
+
+        ! specific gas constant
+        real(kind=rk)                               :: Rs
+
+        ! isochoric heat capacity
+        real(kind=rk)                               :: Cv
+
+        ! isobaric heat capacity
+        real(kind=rk)                               :: Cp
+
+        ! prandtl number
+        real(kind=rk)                               :: Pr
+
+        ! dynamic viscosity
+        real(kind=rk)                               :: mu0
+
+        ! dissipation switch
+        logical                                     :: dissipation
+
+    end type type_params_physics_navier_stokes
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+contains
+
+end module module_2D_navier_stokes

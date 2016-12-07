@@ -20,19 +20,14 @@ module module_params
 !---------------------------------------------------------------------------------------------
 ! modules
 
+    ! use physics module
+    use module_2D_convection_diffusion
+    use module_2D_navier_stokes
+
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
-
-    ! define data precision parameters
-    integer, parameter, public   :: sngl_prec=selected_real_kind(4)
-    integer, parameter, public   :: dble_prec=selected_real_kind(8)
-
-    integer, parameter, public   :: int_prec=selected_int_kind(8)
-
-    integer, parameter, public   :: rk=dble_prec
-    integer, parameter, public   :: ik=int_prec
 
     ! global user defined data structure for time independent variables
     type type_params
@@ -60,8 +55,6 @@ module module_params
         ! initial condition
         character(len=80)                           :: initial_cond
 
-        ! domain length
-        real(kind=rk)                               :: Lx, Ly
         ! grid parameter
         integer(kind=ik)                            :: number_domain_nodes
         integer(kind=ik)                            :: number_block_nodes
@@ -76,16 +69,24 @@ module module_params
         integer(kind=ik)                            :: number_data_fields
         integer(kind=ik)                            :: number_fields
 
-        ! each data field can use separat velocity and diffusion coefficient (in 2D convection-diffusion RHS)
-        ! stored all velocity components in one 1D vector, same with the diffusion coefficients
-        real(kind=rk), dimension(:), allocatable    :: u0
-        real(kind=rk), dimension(:), allocatable    :: nu
-
         ! block distribution for load balancing (also used for start distribution)
         character(len=80)                           :: block_distribution
 
         ! debug flag
         logical                                     :: debug
+
+        ! -------------------------------------------------------------------------------------
+        ! physics
+        ! -------------------------------------------------------------------------------------
+        ! physics type
+        character(len=80)                           :: physics_type
+
+        ! domain length
+        real(kind=rk)                               :: Lx, Ly
+
+        ! physics substructure
+        type(type_params_convection_diffusion_physics) :: physics
+        type(type_params_physics_navier_stokes)     :: physics_ns
 
     end type type_params
 

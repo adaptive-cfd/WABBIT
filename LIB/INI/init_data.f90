@@ -151,17 +151,65 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     !***************************************************************************
     ! read PHYSICS parameters
     !
-    ! first: allocate memory in params structure (need 2*data_fields for velocity
-    ! and 1*data_fields for diffusion coefficient)
-    allocate( params%u0( 2*params%number_data_fields ), stat=allocate_error )
-    allocate( params%nu( params%number_data_fields ), stat=allocate_error )
-    ! read velocity
-    call read_param(FILE, 'Physics', 'u0', params%u0, params%u0 )
-    ! read diffusion
-    call read_param(FILE, 'Physics', 'nu', params%nu, params%nu )
-    ! domain size
-    call read_param(FILE, 'Physics', 'Lx', params%Lx, 256.0_rk )
-    call read_param(FILE, 'Physics', 'Ly', params%Ly, 256.0_rk )
+    ! first: read physics type
+    call read_param(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
+
+    select case(params%physics_type)
+
+        case('2D_convection_diffusion')
+
+            ! domain size
+            call read_param(FILE, 'Physics', 'Lx', params%Lx, 256.0_rk )
+            call read_param(FILE, 'Physics', 'Ly', params%Ly, 256.0_rk )
+
+            ! allocate memory in params structure (need 2*data_fields for velocity
+            ! and 1*data_fields for diffusion coefficient)
+            allocate( params%physics%u0( 2*params%number_data_fields ), stat=allocate_error )
+            allocate( params%physics%nu( params%number_data_fields ), stat=allocate_error )
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            params%physics%nu = 0.0_rk
+            ! read velocity
+            call read_param(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+            ! read diffusion
+            call read_param(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
+
+        case('2D_navier_stokes')
+
+            ! domain size
+            call read_param(FILE, 'Physics', 'Lx', params%Lx, 256.0_rk )
+            call read_param(FILE, 'Physics', 'Ly', params%Ly, 256.0_rk )
+
+            ! physics parameter
+            ! read adiabatic coefficient
+            call read_param(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
+            ! read specific gas constant
+            call read_param(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
+            ! calculate isochoric heat capacity
+            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
+            ! calculate isobaric heat capacity
+            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
+            ! read prandtl number
+            call read_param(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
+            ! read dynamic viscosity
+            call read_param(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
+            ! read switch to turn on|off dissipation
+            call read_param(FILE, 'Blocks', 'dissipation', read_logical, 1 )
+            if ( read_logical == 1 ) then
+                params%physics_ns%dissipation = .true.
+            else
+                params%physics_ns%dissipation = .false.
+            end if
+
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
+
+    end select
+
     ! initial condition
     call read_param(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 

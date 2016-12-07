@@ -1,34 +1,35 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_time_step.f90
+! name: module_precision.f90
 ! version: 0.4
 ! author: msr
 !
-! time step module
+! module for data precision
 !
 ! = log ======================================================================================
 !
-! 24/11/16 - create
+! 06/12/16 - create
 ! ********************************************************************************************
 
-module module_time_step
+module module_precision
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
-    use mpi
-    ! global parameters
-    use module_params
-    ! debug module
-    use module_debug
-    ! interpolation routines
-    use module_interpolation
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
+
+    ! define data precision parameters
+    integer, parameter, public   :: sngl_prec=selected_real_kind(4)
+    integer, parameter, public   :: dble_prec=selected_real_kind(8)
+
+    integer, parameter, public   :: int_prec=selected_int_kind(8)
+
+    integer, parameter, public   :: rk=dble_prec
+    integer, parameter, public   :: ik=int_prec
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -38,16 +39,4 @@ module module_time_step
 
 contains
 
-    ! time step
-    include "time_step_RK4.f90"
-
-    ! ghost nodes synchronization
-    include "synchronize_ghosts.f90"
-
-    ! coyp internal ghost nodes
-    include "copy_ghost_nodes.f90"
-
-    ! send/receive external ghost nodes
-    include "send_receive_data.f90"
-
-end module module_time_step
+end module module_precision

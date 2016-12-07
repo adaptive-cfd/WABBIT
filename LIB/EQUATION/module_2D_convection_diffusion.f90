@@ -1,34 +1,38 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_time_step.f90
+! name: module_2D_convection_diffusion.f90
 ! version: 0.4
 ! author: msr
 !
-! time step module
+! module for 2D convection diffusion physics
 !
 ! = log ======================================================================================
 !
-! 24/11/16 - create
+! 06/12/16 - create
 ! ********************************************************************************************
 
-module module_time_step
+module module_2D_convection_diffusion
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
-    use mpi
-    ! global parameters
-    use module_params
-    ! debug module
-    use module_debug
-    ! interpolation routines
-    use module_interpolation
+    use module_precision
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
+
+    ! user defined data structure for time independent variables
+    type type_params_convection_diffusion_physics
+
+        ! each data field can use separat velocity and diffusion coefficient (in 2D convection-diffusion RHS)
+        ! stored all velocity components in one 1D vector, same with the diffusion coefficients
+        real(kind=rk), dimension(:), allocatable    :: u0
+        real(kind=rk), dimension(:), allocatable    :: nu
+
+    end type type_params_convection_diffusion_physics
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -38,16 +42,4 @@ module module_time_step
 
 contains
 
-    ! time step
-    include "time_step_RK4.f90"
-
-    ! ghost nodes synchronization
-    include "synchronize_ghosts.f90"
-
-    ! coyp internal ghost nodes
-    include "copy_ghost_nodes.f90"
-
-    ! send/receive external ghost nodes
-    include "send_receive_data.f90"
-
-end module module_time_step
+end module module_2D_convection_diffusion

@@ -176,6 +176,13 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
 
         case('2D_navier_stokes')
 
+            ! error case: try to solve navier stokes equation with less or more than 3 datafields
+            if ( params%number_data_fields /= 4) then
+                write(*,'(80("_"))')
+                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
+                stop
+            end if
+
             ! domain size
             call read_param(FILE, 'Physics', 'Lx', params%Lx, 256.0_rk )
             call read_param(FILE, 'Physics', 'Ly', params%Ly, 256.0_rk )
@@ -262,10 +269,17 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! second: write heavy data for other datafields
-    do k = 3, params%number_data_fields
-        !block_data( :, :, k, : ) = 0.0_rk
+    do k = 3, params%number_data_fields+1
         hvy_block( :, :, k, : ) = hvy_block( :, :, 2, : )
     end do
+
+    ! navier stokes case, todo: better implementation!
+    ! set all fields except pressure (field 5)
+    if ( params%physics_type == '2D_navier_stokes' ) then
+        hvy_block( :, :, 2, : ) = 1.0_rk
+        hvy_block( :, :, 3, : ) = 10.0_rk
+        hvy_block( :, :, 4, : ) = 0.0_rk
+    end if
 
     ! allocate active list
     allocate( lgt_active( size(lgt_block, 1) ), stat=allocate_error )

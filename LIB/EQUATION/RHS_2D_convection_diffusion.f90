@@ -5,7 +5,7 @@
 ! version: 0.4
 ! author: msr, engels
 !
-! refine every block to create the wavelet safety zone
+! rhs for 2D convection diffusion equation
 !
 ! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order
 ! output:   - RHS(datafield)

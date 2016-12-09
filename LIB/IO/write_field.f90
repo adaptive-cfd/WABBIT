@@ -80,8 +80,17 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
     ! determinate process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
-    ! fiel name
-    write( fname,'("data_",i8.8,"_field_",i2.2,".h5")') nint(time * 1.0e4_rk), dF
+    ! file name depends on variable names
+    select case(params%physics_type)
+        case('2D_convection_diffusion')
+            ! select corresponding datafield name
+            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(dF-1))), nint(time * 1.0e6_rk)
+
+        case('2D_navier_stokes')
+            ! select corresponding datafield name
+            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(dF-1))), nint(time * 1.0e6_rk)
+
+    end select
 
     ! create the filename, dF == 2 is the first real datafield
     if ( (rank == 0) .and. (dF == 2) ) then
@@ -91,6 +100,10 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
 
         ! overwrite the file, if it already exists
         call init_empty_file( fname )
+    elseif (rank == 0) then
+        ! write output
+        write(*,'("IO: writing data for time = ", f15.8," file = ",A)') time, trim(adjustl(fname))
+
     end if
 
     l = 1

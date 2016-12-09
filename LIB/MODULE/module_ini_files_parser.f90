@@ -63,7 +63,7 @@ module module_ini_files_parser
     ! the generic call "read_param" redirects to these routines, depending on the data
     ! type and the dimensionality. vectors can be read without setting a default.
     interface read_param
-        module procedure param_int, param_dbl, param_vct, param_str
+        module procedure param_int, param_dbl, param_vct, param_str, param_vct_str
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -221,6 +221,59 @@ contains
       write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
     endif
   end subroutine param_str
+
+  !-------------------------------------------------------------------------------
+  ! Fetches a STRING VALUED vector parameter from the PARAMS.ini file.
+  ! Displays what it does on stdout (so you can see whats going on)
+  ! Input:
+  !       PARAMS: the complete *.ini file
+  !       section: the section we're looking for
+  !       keyword: the keyword we're looking for
+  !       defaultvalue: if the we can't find the parameter, we return this and warn
+  ! Output:
+  !       params_string: this is the parameter you were looking for
+  !-------------------------------------------------------------------------------
+  subroutine param_vct_str (PARAMS, section, keyword, params_vector, defaultvalue)
+    implicit none
+    ! Contains the ascii-params file
+    type(inifile), intent(inout)    :: PARAMS
+    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+    character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
+    character(len=*), intent (inout) :: params_vector(1:)
+    character(len=*), intent (in) :: defaultvalue(1:)
+
+    integer :: n,m
+    character(len=maxcolumns) :: value
+    character(len=14)::formatstring
+
+    n = size(params_vector,1)
+    m = size(defaultvalue,1)
+    if (n==0) return
+
+    if (n/=m) then
+      write(*,*) "error: vector and default value are not of the same length"
+    endif
+
+    write(formatstring,'("(",i2.2,"(g10.3,1x))")') n
+
+    call GetValue(PARAMS, section, keyword, value)
+
+    if (value .ne. '') then
+      ! read the three values from the vector string
+      read (value, *) params_vector
+      write (value,formatstring) params_vector
+      !params_vector = value
+    else
+      write (value,formatstring) defaultvalue
+      value = trim(adjustl(value))//" (THIS IS THE DEFAULT VALUE!)"
+      params_vector = defaultvalue
+    endif
+
+    ! in verbose mode, inform about what we did
+    if (verbosity) then
+      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+    endif
+  end subroutine param_vct_str
 
   !-------------------------------------------------------------------------------
   ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.

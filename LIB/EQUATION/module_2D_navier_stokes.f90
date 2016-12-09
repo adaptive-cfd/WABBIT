@@ -48,6 +48,9 @@ module module_2D_navier_stokes
         ! dissipation switch
         logical                                     :: dissipation
 
+        ! variable names
+        character(len=80), allocatable              :: names(:)
+
     end type type_params_physics_navier_stokes
 
 !---------------------------------------------------------------------------------------------

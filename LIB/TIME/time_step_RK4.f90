@@ -53,10 +53,10 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
     ! loop variables
-    integer(kind=ik)                    :: k, dF, N_dF
+    integer(kind=ik)                    :: k, dF, N_dF, i, j
 
     ! time step, dx
-    real(kind=rk)                       :: dt, dx, my_dx
+    real(kind=rk)                       :: dt, dx, my_dx, max_velocity(2), my_max_u, my_max_v
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -114,8 +114,41 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             end do
 
         case('2D_navier_stokes')
-            ! to do
-            dt = 0.001_rk
+
+            max_velocity = 0.0_rk
+
+            ! maximal u value
+            my_max_u = 0.0_rk
+            ! loop over all active blocks (heavy data)
+            do k = 1, hvy_n
+                do i = 1, Bs+2*g
+                    do j = 1, Bs+2*g
+                        my_max_u = max( my_max_u, sqrt( (hvy_block(i, j, 3, hvy_active(k) ))**2 ) )
+                    end do
+                end do
+            end do
+            ! synchronize max_u
+            call MPI_Allreduce(my_max_u, max_velocity(1), 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
+
+            ! maximal v value
+            my_max_v = 0.0_rk
+            ! loop over all active blocks (heavy data)
+            do k = 1, hvy_n
+                do i = 1, Bs+2*g
+                    do j = 1, Bs+2*g
+                        my_max_v = max( my_max_v, sqrt( (hvy_block(i, j, 4, hvy_active(k) ))**2 ) )
+                    end do
+                end do
+            end do
+            ! synchronize max_v
+            call MPI_Allreduce(my_max_v, max_velocity(2), 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
+
+            if ( (norm2( max_velocity ) == 0) ) then
+                ! zero velocity, choose fixed time step
+                dt = 0.000001_rk
+            else
+                dt = 0.000001_rk !params%CFL * dx / norm2( max_velocity )
+            end if
 
     end select
 

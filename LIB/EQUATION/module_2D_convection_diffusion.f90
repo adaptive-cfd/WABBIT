@@ -32,6 +32,9 @@ module module_2D_convection_diffusion
         real(kind=rk), dimension(:), allocatable    :: u0
         real(kind=rk), dimension(:), allocatable    :: nu
 
+        ! variable names
+        character(len=80), allocatable              :: names(:)
+
     end type type_params_convection_diffusion_physics
 
 !---------------------------------------------------------------------------------------------

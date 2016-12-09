@@ -173,6 +173,12 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
             call read_param(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
             ! read diffusion
             call read_param(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics%names( params%number_data_fields ), stat=allocate_error )
+            params%physics%names = "---"
+            ! read file
+            call read_param(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
         case('2D_navier_stokes')
 
@@ -207,7 +213,12 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
             else
                 params%physics_ns%dissipation = .false.
             end if
-
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics_ns%names( params%number_data_fields ), stat=allocate_error )
+            params%physics_ns%names = "---"
+            ! read file
+            call read_param(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
 
         case default
             write(*,'(80("_"))')
@@ -277,8 +288,9 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! set all fields except pressure (field 5)
     if ( params%physics_type == '2D_navier_stokes' ) then
         hvy_block( :, :, 2, : ) = 1.0_rk
-        hvy_block( :, :, 3, : ) = 10.0_rk
+        hvy_block( :, :, 3, : ) = 0.0_rk
         hvy_block( :, :, 4, : ) = 0.0_rk
+        hvy_block( :, :, 5, : ) = hvy_block( :, :, 5, : ) + 1e5_rk
     end if
 
     ! allocate active list

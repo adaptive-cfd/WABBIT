@@ -121,7 +121,7 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 	
 $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_ini_files_parser.o \
 	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution.f90 new_block_heavy.f90 \
-	allocate_work_data.f90
+	allocate_work_data.f90 inicond_vorticity_filaments.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \

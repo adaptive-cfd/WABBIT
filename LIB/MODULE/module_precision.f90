@@ -23,13 +23,15 @@ module module_precision
     implicit none
 
     ! define data precision parameters
-    integer, parameter, public   :: sngl_prec=selected_real_kind(4)
-    integer, parameter, public   :: dble_prec=selected_real_kind(8)
+    integer, parameter, public      :: sngl_prec=selected_real_kind(4)
+    integer, parameter, public      :: dble_prec=selected_real_kind(8)
 
-    integer, parameter, public   :: int_prec=selected_int_kind(8)
+    integer, parameter, public      :: int_prec=selected_int_kind(8)
 
-    integer, parameter, public   :: rk=dble_prec
-    integer, parameter, public   :: ik=int_prec
+    integer, parameter, public      :: rk=dble_prec
+    integer, parameter, public      :: ik=int_prec
+
+    real(kind=rk),parameter, public :: pi  = 4 * atan(1.0_rk)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

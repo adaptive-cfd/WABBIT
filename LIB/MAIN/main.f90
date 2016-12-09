@@ -89,7 +89,7 @@ program main
     integer(kind=ik)                    :: hvy_n
 
     ! time loop variables
-    real(kind=rk)                       :: time
+    real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
 
 !---------------------------------------------------------------------------------------------
@@ -165,6 +165,7 @@ program main
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
           call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+          output_time = time
         endif
 
         ! debug info
@@ -182,8 +183,8 @@ program main
 
     end do
 
-    ! save end field to disk
-    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+    ! save end field to disk, only if timestep is not saved allready
+    if ( output_time /= time ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
 
     ! MPI Barrier before program ends
     call MPI_Barrier(MPI_COMM_WORLD, ierr)

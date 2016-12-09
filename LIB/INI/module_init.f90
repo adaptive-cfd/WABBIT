@@ -59,4 +59,7 @@ contains
     ! subroutine to write new heavy block data
     include "new_block_heavy.f90"
 
+    ! vorticity filaments testcase
+    include "inicond_vorticity_filaments.f90"
+
 end module module_init

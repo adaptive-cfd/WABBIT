@@ -265,7 +265,31 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! initial data field
     select case( params%initial_cond )
         case ("gauss-blob","gauss_blob")
-              call inicond_gauss_blob(phi, params%number_domain_nodes, params%Lx, params%Ly)
+            call inicond_gauss_blob(phi, params%number_domain_nodes, params%Lx, params%Ly)
+
+            ! decompose init field phi to block data
+            ! first: init light and heavy data for datafield 1, create starting block distribution
+            call initial_block_distribution( params, lgt_block, hvy_block, phi )
+
+            ! second: write heavy data for other datafields
+            do k = 3, params%number_data_fields+1
+                hvy_block( :, :, k, : ) = hvy_block( :, :, 2, : )
+            end do
+
+            ! navier stokes case, todo: better implementation!
+            ! set all fields except pressure (field 5)
+            if ( params%physics_type == '2D_navier_stokes' ) then
+                hvy_block( :, :, 2, : ) = 1.0_rk
+                hvy_block( :, :, 3, : ) = 0.0_rk
+                hvy_block( :, :, 4, : ) = 0.0_rk
+                hvy_block( :, :, 5, : ) = hvy_block( :, :, 5, : ) + 1e5_rk
+            end if
+
+        case ("vorticity_filaments")
+            call inicond_vorticity_filaments(params, lgt_block, hvy_block)
+            ! set density and pressure
+            hvy_block( :, :, 2, : ) = 1.0_rk
+            hvy_block( :, :, 5, : ) = 1e5_rk
 
         case default
             write(*,'(80("_"))')
@@ -274,24 +298,6 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
             stop
 
     end select
-
-    ! decompose init field phi to block data
-    ! first: init light and heavy data for datafield 1, create starting block distribution
-    call initial_block_distribution( params, lgt_block, hvy_block, phi )
-
-    ! second: write heavy data for other datafields
-    do k = 3, params%number_data_fields+1
-        hvy_block( :, :, k, : ) = hvy_block( :, :, 2, : )
-    end do
-
-    ! navier stokes case, todo: better implementation!
-    ! set all fields except pressure (field 5)
-    if ( params%physics_type == '2D_navier_stokes' ) then
-        hvy_block( :, :, 2, : ) = 1.0_rk
-        hvy_block( :, :, 3, : ) = 0.0_rk
-        hvy_block( :, :, 4, : ) = 0.0_rk
-        hvy_block( :, :, 5, : ) = hvy_block( :, :, 5, : ) + 1e5_rk
-    end if
 
     ! allocate active list
     allocate( lgt_active( size(lgt_block, 1) ), stat=allocate_error )

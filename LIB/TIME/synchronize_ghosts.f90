@@ -181,6 +181,26 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
     end do
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "synch. ghosts - internal" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "synch. ghosts - internal"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! synchronize com_list
     call MPI_Allreduce(my_com_list, com_list, N*16*number_procs*8, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
@@ -209,6 +229,26 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         call write_com_list( com_list )
     end if
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "synch. ghosts - com. list" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "synch. ghosts - com. list"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! ----------------------------------------------------------------------------------------
     ! third: start external communications
     ! synchronize ghost nodes
@@ -219,10 +259,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         if ( (com_list(k, 2) == rank) .or. (com_list(k, 3) == rank) ) then
 
-            ! proc has to send/receive data, loop over all data fields
-            do dF = 2, params%number_data_fields+1
-                call send_receive_data( params, hvy_block, k, com_list, com_plan(i), dF)
-            end do
+            ! proc has to send/receive data, send all datafields
+            call send_receive_data( params, hvy_block, k, com_list, com_plan(i))
 
             ! next step in com_plan
             k = k + 2*com_plan(i)
@@ -251,11 +289,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "synchronize_ghosts" ) exit
+            if ( debug%name_comp_time(k) == "synch. ghosts - external" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "synchronize_ghosts"
+        debug%name_comp_time(k) = "synch. ghosts - external"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if

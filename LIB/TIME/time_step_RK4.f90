@@ -448,7 +448,7 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
                 ! final step
                 hvy_block( :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, 1:N_dF, hvy_active(k) ) &
-                                                           + (dt/6.0_rk) * ( hvy_work( :, :, N_dF+1:1*N_dF, hvy_active(k) ) &
+                                                           + (dt/6.0_rk) * ( hvy_work( :, :, N_dF+1:2*N_dF, hvy_active(k) ) &
                                                            + 2.0_rk * hvy_work( :, :, 2*N_dF+1:3*N_dF, hvy_active(k) ) &
                                                            + 2.0_rk * hvy_work( :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) &
                                                            + hvy_work( :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) )

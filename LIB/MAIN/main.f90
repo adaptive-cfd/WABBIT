@@ -183,6 +183,9 @@ program main
 
     end do
 
+    ! last timestep is very small
+    if ( abs(output_time-time) < 1e-10 ) output_time = time
+
     ! save end field to disk, only if timestep is not saved allready
     if ( output_time /= time ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
 
@@ -193,7 +196,7 @@ program main
     call cpu_time(t1)
     if (rank==0) then
         write(*,'(80("_"))')
-        write(*,'("END: cpu-time = ",f10.6, " s")')  t1-t0
+        write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 
     ! end mpi

@@ -73,11 +73,17 @@ subroutine send_receive_data(params, hvy_block, com_id, com_list, com_number)
     ! loop variable
     integer(kind=ik)                                :: k, l, k_shift, k_start, k_end, dF
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                                   :: sub_t0, sub_t1
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! grid parameter
     Bs    = params%number_block_nodes
@@ -91,16 +97,31 @@ subroutine send_receive_data(params, hvy_block, com_id, com_list, com_number)
     allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
     allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
 
-    send_buff = 9.0e9_rk
-    recv_buff = 9.0e9_rk
-    buffer_i  = 1
+    buffer_i         = 1
 
-    tag = 0
+    tag              = 0
 
     data_corner      = 9.0e9_rk
     data_corner_fine = 9.0e9_rk
     data_edge        = 9.0e9_rk
     data_edge_fine   = 9.0e9_rk
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "init send/receive" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "init send/receive"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -118,6 +139,9 @@ subroutine send_receive_data(params, hvy_block, com_id, com_list, com_number)
         ! destination
         my_dest = com_list( com_id, 2 )
     end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! fill send buffer
     do k = 1 + k_shift, com_number + k_shift
@@ -556,8 +580,45 @@ subroutine send_receive_data(params, hvy_block, com_id, com_list, com_number)
         end select
     end do
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "fill send buffer" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "fill send buffer"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! send/receive data
     call MPI_Sendrecv( send_buff, params%number_data_fields*(Bs+g)*g*com_number, MPI_REAL8, my_dest, tag, recv_buff, params%number_data_fields*(Bs+g)*g*com_number, MPI_REAL8, my_dest, tag, MPI_COMM_WORLD, status, ierr)
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "send/receive" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "send/receive"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
 
     k_start = 1+com_number-k_shift
     k_end   = com_number+com_number-k_shift
@@ -570,6 +631,9 @@ subroutine send_receive_data(params, hvy_block, com_id, com_list, com_number)
     data_corner_fine = 9.0e9_rk
     data_edge        = 9.0e9_rk
     data_edge_fine   = 9.0e9_rk
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! write received data in block data
     do k = k_start, k_end
@@ -900,6 +964,23 @@ subroutine send_receive_data(params, hvy_block, com_id, com_list, com_number)
         end select
 
     end do
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "read receive buffer" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "read receive buffer"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
 
     ! clean up
     deallocate( data_corner, stat=allocate_error )

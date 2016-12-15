@@ -252,6 +252,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! ----------------------------------------------------------------------------------------
     ! third: start external communications
     ! synchronize ghost nodes
+
     i       = 1
     k       = i
     ! loop over com_plan

@@ -59,7 +59,8 @@ subroutine inicond_gauss_blob(phi, Ds, Lx, Ly)
     muy = 0.5_rk * Ly;
 
     ! pulse width
-    sigma     = 0.00001e2_rk
+    !sigma     = 0.00001e2_rk
+    sigma     = 0.1e2_rk
 
     ! create gauss pulse
     do i = 1, Ds

@@ -76,4 +76,7 @@ contains
     ! write communciations list
     include "write_com_list.f90"
 
+    ! com matrix
+    include "write_com_matrix.f90"
+
 end module module_debug

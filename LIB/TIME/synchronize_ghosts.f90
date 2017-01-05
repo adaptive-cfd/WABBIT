@@ -86,6 +86,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
 
+    ! communications matrix:
+    ! count the number of communications between procs
+    ! row/column number encodes process rank + 1
+    integer(kind=ik), allocatable       :: com_matrix(:,:), my_com_matrix(:,:)
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -111,10 +116,16 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     !                                       * 2 (sender + receiver proc creates entry)
     allocate( com_plan( number_procs*number_procs*2), stat=allocate_error )
 
-    ! reset com-list, com_plan
-    com_list    = -1
-    my_com_list = -1
-    com_plan    = -1
+    ! allocate com matrix
+    allocate( com_matrix(number_procs, number_procs), stat=allocate_error )
+    allocate( my_com_matrix(number_procs, number_procs), stat=allocate_error )
+
+    ! reset com-list, com_plan, com matrix
+    com_list        = -1
+    my_com_list     = -1
+    com_plan        = -1
+    com_matrix      =  0
+    my_com_matrix   =  0
 
     ! reset ghost nodes for all active blocks
     ! loop over all datafields
@@ -159,8 +170,13 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 if ( rank == neighbor_rank ) then
                     ! calculate internal heavy id
                     call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
+
                     ! internal neighbor -> copy ghost nodes
                     call copy_ghost_nodes( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+
+                    ! write communications matrix
+                    my_com_matrix(rank+1, rank+1) = my_com_matrix(rank+1, rank+1) + 1
+
                 else
                     ! neighbor heavy id
                     call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
@@ -174,12 +190,23 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                     my_com_list( rank*N*16 + (k-1)*16 + i , 7)  = i
                     my_com_list( rank*N*16 + (k-1)*16 + i , 8)  = level_diff
 
+                    ! write communications matrix
+                    my_com_matrix(rank+1, neighbor_rank+1) = my_com_matrix(rank+1, neighbor_rank+1) + 1
+
                 end if
 
             end if
         end do
 
     end do
+
+    ! synchronize com matrix
+    call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+
+    ! save com matrix
+    if ( params%debug ) then
+        call write_com_matrix( com_matrix )
+    end if
 
     ! end time
     sub_t1 = MPI_Wtime()
@@ -281,6 +308,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     deallocate( com_list, stat=allocate_error )
     deallocate( my_com_list, stat=allocate_error )
     deallocate( com_plan, stat=allocate_error )
+    deallocate( com_matrix, stat=allocate_error )
+    deallocate( my_com_matrix, stat=allocate_error )
 
     ! end time
     sub_t1 = MPI_Wtime()

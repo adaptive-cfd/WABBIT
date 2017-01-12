@@ -19,6 +19,7 @@
 ! = log ======================================================================================
 !
 ! 08/11/16 - switch to v0.4
+! 06/01/17 - use RMA to synchronize data
 ! ********************************************************************************************
 
 subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
@@ -63,19 +64,34 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! difference between current block and neighbor block level
     integer(kind=ik)                    :: level_diff
 
-    ! communication list: column
-    !                       1   com_list id /= -1 => non empty line
-    !                       2   rank of sender process
-    !                       3   rank of receiver process
-    !                       4   sender block heavy data id
-    !                       5   receiver block heavy data id
-    !                       6   sender block neighborhood to receiver (dirs id)
-    !                       7   receiver block neighborhood to sender (dirs id)
-    !                       8   difference between sender-receiver level
-    integer(kind=ik), allocatable       :: com_list(:, :), my_com_list(:, :)
+    ! communication lists:
+    ! dim 1: list elements
+    ! dim 2: columns
+    !                       1   rank of sender process
+    !                       2   rank of receiver process
+    !                       3   sender block heavy data id
+    !                       4   receiver block heavy data id
+    !                       5   sender block neighborhood to receiver (dirs id)
+    !                       6   difference between sender-receiver level
+    ! dim 3: receiver proc rank
+    integer(kind=ik), allocatable       :: com_lists(:, :, :)
 
-    ! communications plan: entrys are the number of com_list lines to fill send/receive buffer
-    integer(kind=ik), allocatable       :: com_plan(:)
+    ! receiver lists: receiver_pos [position in rank and count list],
+    ! receiver_rank [proc rank list], receiver_count [number of communications to receiver]
+    ! receiver_N [number of neighbor procs]
+    integer(kind=ik), allocatable       :: receiver_pos(:), receiver_rank(:), receiver_count(:)
+    integer(kind=ik)                    :: receiver_N
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), allocatable       :: int_send_buffer(:), int_receive_buffer(:)
+    real(kind=rk), allocatable          :: real_send_buffer(:), real_receive_buffer(:), proc_send_buffer(:)
+    ! index of send buffer, return from proc to proc send buffer subroutine
+    integer(kind=ik)                    :: buffer_i
+
+    ! position marker in buffer arrays, length of buffer array part
+    ! note: use standard integers for position variables to use them later for RMA subroutines
+    integer                             :: int_pos, real_pos, int_N, real_N
+
 
     ! allocation error variable
     integer(kind=ik)                    :: allocate_error
@@ -90,6 +106,16 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! count the number of communications between procs
     ! row/column number encodes process rank + 1
     integer(kind=ik), allocatable       :: com_matrix(:,:), my_com_matrix(:,:)
+
+    ! RMA variables: windows, size variables
+    integer(kind=ik)                    :: int_win, real_win
+    integer(kind=MPI_ADDRESS_KIND)      :: int_length, real_length
+    integer(kind=ik)                    :: int_win_start, int_win_end, real_win_start, real_win_end
+
+    ! RMA win loop switch
+    logical                             :: win_loop
+    ! dummy displacement variable
+    integer(kind=MPI_ADDRESS_KIND)      :: displacement
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -108,24 +134,28 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! determinate process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
-    ! allocate com_list: max linenumber -> max number of blocks * max number of neighbors * number of procs
-    allocate( com_list( N*16*number_procs , 8), stat=allocate_error )
-    ! allocate local com_list
-    allocate( my_com_list( N*16*number_procs , 8), stat=allocate_error )
-    ! allocate com_plan: max linenumber -> every proc has a neighborhood with every other proc
-    !                                       * 2 (sender + receiver proc creates entry)
-    allocate( com_plan( number_procs*number_procs*2), stat=allocate_error )
+    ! allocate local com_lists
+    allocate( com_lists( N*16, 6, number_procs), stat=allocate_error )
+
+    ! receiver lists
+    allocate( receiver_pos( number_procs), stat=allocate_error )
+    allocate( receiver_rank( number_procs), stat=allocate_error )
+    allocate( receiver_count( number_procs), stat=allocate_error )
 
     ! allocate com matrix
     allocate( com_matrix(number_procs, number_procs), stat=allocate_error )
     allocate( my_com_matrix(number_procs, number_procs), stat=allocate_error )
 
-    ! reset com-list, com_plan, com matrix
-    com_list        = -1
-    my_com_list     = -1
-    com_plan        = -1
+    ! reset com-list, com_plan, com matrix, receiver lists
+    com_lists       = -1
+
     com_matrix      =  0
     my_com_matrix   =  0
+
+    receiver_pos    =  0
+    receiver_rank   = -1
+    receiver_count  =  0
+    receiver_N      =  0
 
     ! reset ghost nodes for all active blocks
     ! loop over all datafields
@@ -180,24 +210,61 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 else
                     ! neighbor heavy id
                     call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
-                    ! external neighbor -> new com_list entry
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 1)  = k+i
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 2)  = rank
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 3)  = neighbor_rank
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 4)  = hvy_active(k)
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 5)  = hvy_id
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 6)  = i
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 7)  = i
-                    my_com_list( rank*N*16 + (k-1)*16 + i , 8)  = level_diff
 
-                    ! write communications matrix
-                    my_com_matrix(rank+1, neighbor_rank+1) = my_com_matrix(rank+1, neighbor_rank+1) + 1
+                    ! check neighbor proc rank
+                    if ( receiver_pos(neighbor_rank+1) == 0 ) then
+
+                        ! first communication with neighbor proc
+                        ! -------------------------------------------
+                        ! set list position, increase number of neighbor procs by 1
+                        receiver_N                      = receiver_N + 1
+                        ! save list pos
+                        receiver_pos(neighbor_rank+1)   = receiver_N
+                        ! save neighbor rank
+                        receiver_rank(receiver_N)       = neighbor_rank
+                        ! count communications - here: first one
+                        receiver_count(receiver_N)      = 1
+
+                        ! external neighbor -> new com_lists entry (first entry)
+                        com_lists( 1 , 1, neighbor_rank+1)  = rank
+                        com_lists( 1 , 2, neighbor_rank+1)  = neighbor_rank
+                        com_lists( 1 , 3, neighbor_rank+1)  = hvy_active(k)
+                        com_lists( 1 , 4, neighbor_rank+1)  = hvy_id
+                        com_lists( 1 , 5, neighbor_rank+1)  = i
+                        com_lists( 1 , 6, neighbor_rank+1)  = level_diff
+
+                    else
+
+                        ! additional communication with neighbor proc
+                        ! -------------------------------------------
+                        ! count communications - +1
+                        receiver_count( receiver_pos(neighbor_rank+1) )  = receiver_count( receiver_pos(neighbor_rank+1) ) + 1
+
+                        ! external neighbor -> new com_lists entry
+                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 1, neighbor_rank+1)  = rank
+                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 2, neighbor_rank+1)  = neighbor_rank
+                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 3, neighbor_rank+1)  = hvy_active(k)
+                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 4, neighbor_rank+1)  = hvy_id
+                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 5, neighbor_rank+1)  = i
+                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 6, neighbor_rank+1)  = level_diff
+
+                    end if
 
                 end if
 
             end if
         end do
 
+    end do
+
+    ! write my com matrix, loop over number of receiver procs, write counted communications
+    ! additional: sum communcitions
+    n_com = 0
+    do k = 1, receiver_N
+        ! write matrix
+        my_com_matrix( rank+1, receiver_rank(k)+1 ) = receiver_count( receiver_pos( receiver_rank(k)+1 ) )
+        ! sum communications
+        n_com = n_com + receiver_count( receiver_pos( receiver_rank(k)+1 ) )
     end do
 
     ! synchronize com matrix
@@ -216,11 +283,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "synch. ghosts - internal" ) exit
+            if ( debug%name_comp_time(k) == "synch. ghosts - internal and com_matrix" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "synch. ghosts - internal"
+        debug%name_comp_time(k) = "synch. ghosts - internal and com_matrix"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if
@@ -228,89 +295,277 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! start time
     sub_t0 = MPI_Wtime()
 
-    ! synchronize com_list
-    call MPI_Allreduce(my_com_list, com_list, N*16*number_procs*8, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+    ! next steps only for more than two procs
+    if ( number_procs > 1 ) then
 
-    k = 1
-    my_com_list = -1
-    ! loop over com_list
-    do i = 1, size(com_list, 1)
-       if ( com_list(i,1) /= -1 ) then
-           ! non empty element
-           my_com_list(k,:) = com_list(i,:)
-           k = k + 1
-       end if
-    end do
-    com_list = my_com_list
+        ! ----------------------------------------------------------------------------------------
+        ! second: allocate memory for send/receive buffer
+        ! buffer length:
+        !                   int buffer  - number of receiver procs * sum of communications * 3
+        !                   real buffer - number of receiver procs * sum of communications * (Bs+g) * g
+        !                   proc buffer - number of receiver procs * sum of communications * (Bs+g) * g
 
+        allocate( int_send_buffer( receiver_N * (n_com+1) * 3 + 1), stat=allocate_error )
+        allocate( int_receive_buffer( receiver_N * (n_com+1) * 3 + 1), stat=allocate_error )
 
-    ! number of communications
-    n_com = k - 1
+        allocate( real_send_buffer( receiver_N * params%number_data_fields *  n_com * (Bs+g) * g + 1), stat=allocate_error )
+        allocate( real_receive_buffer( receiver_N * params%number_data_fields * n_com * (Bs+g) * g + 1), stat=allocate_error )
 
-    ! ----------------------------------------------------------------------------------------
-    ! second: sort com_list, create com_plan
-    call sort_com_list(com_list, size(com_list,1), com_plan, size(com_plan,1), number_procs, n_com)
+        allocate( proc_send_buffer( params%number_data_fields * n_com * (Bs+g) * g + 1), stat=allocate_error )
 
-    ! debug writing
-    if ( params%debug ) then
-        call write_com_list( com_list )
-    end if
+        real_send_buffer        = 7.0e9_rk
+        real_receive_buffer     = 5.0e9_rk
 
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "synch. ghosts - com. list" ) exit
-            k = k + 1
+        ! ----------------------------------------------------------------------------------------
+        ! third: fill send buffer
+        ! int buffer:  store receiver block id, neighborhood and level difference (in order of neighbor proc rank, use com matrix)
+        ! real buffer: store block data (in order of neighbor proc rank, use com matrix)
+
+        ! reset int and real buffer positions
+        int_pos  = 1
+        real_pos = 1
+
+        ! loop over corresponding com matrix line
+        do k = 1, number_procs
+
+            ! other proc has to receive data
+            if ( ( com_matrix(rank+1, k) > 0 ) .and. ( (rank+1) /= k ) ) then
+
+                ! first: real data
+                ! ----------------
+                ! number of communications: com_matrix(rank+1, k)
+                i = com_matrix(rank+1, k)
+
+                ! write real send buffer for proc k
+                call create_send_buffer(params, hvy_block, com_lists( 1:i, :, k), i, proc_send_buffer, buffer_i)
+
+                ! real buffer entry
+                ! note: buffer_i - 1 => last data in buffer array
+                real_send_buffer( real_pos : real_pos + buffer_i-2 ) = proc_send_buffer( 1 : buffer_i-1 )
+
+                ! second: integer data
+                ! --------------------
+                ! loop over all communications to this proc
+                do i = 1, com_matrix(rank+1, k)
+
+                    ! int buffer entry: neighbor block id, neighborhood, level difference
+                    int_send_buffer(int_pos)   = com_lists( i, 4, k)
+                    int_send_buffer(int_pos+1) = com_lists( i, 5, k)
+                    int_send_buffer(int_pos+2) = com_lists( i, 6, k)
+                    ! increase int buffer position
+                    int_pos = int_pos + 3
+
+                end do
+
+                ! third: save real buffer position
+                ! ------------------------------------
+                int_send_buffer(int_pos)   = real_pos
+                int_send_buffer(int_pos+1) = real_pos + buffer_i-2
+                int_pos = int_pos + 2
+
+                ! fourth: increase real buffer position
+                ! ------------------------------------
+                real_pos = real_pos + buffer_i-1
+
+            end if
+
         end do
+
+        ! end time
+        sub_t1 = MPI_Wtime()
         ! write time
-        debug%name_comp_time(k) = "synch. ghosts - com. list"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
-
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    ! ----------------------------------------------------------------------------------------
-    ! third: start external communications
-    ! synchronize ghost nodes
-
-    i       = 1
-    k       = i
-    ! loop over com_plan
-    do while ( com_plan(i) /= -1 )
-
-        if ( (com_list(k, 2) == rank) .or. (com_list(k, 3) == rank) ) then
-
-            ! proc has to send/receive data, send all datafields
-            call send_receive_data( params, hvy_block, k, com_list, com_plan(i))
-
-            ! next step in com_plan
-            k = k + 2*com_plan(i)
-            i = i + 2
-
-        else
-
-            ! nothing to do, go to next communication
-            k = k + 2*com_plan(i)
-            i = i + 2
-
+        if ( params%debug ) then
+            ! find free or corresponding line
+            k = 1
+            do while ( debug%name_comp_time(k) /= "---" )
+                ! entry for current subroutine exists
+                if ( debug%name_comp_time(k) == "synch. ghosts - fill send buffer" ) exit
+                k = k + 1
+            end do
+            ! write time
+            debug%name_comp_time(k) = "synch. ghosts - fill send buffer"
+            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
         end if
 
-    end do
+        ! start time
+        sub_t0 = MPI_Wtime()
+
+        ! ----------------------------------------------------------------------------------------
+        ! fourth: open RMA window for int and real buffer
+
+        ! integer window
+        int_length = (int_pos-1)*ik
+        call MPI_Win_create( int_send_buffer(1), int_length, ik, MPI_INFO_NULL, MPI_COMM_WORLD, int_win, ierr )
+
+        ! real window
+        real_length = (real_pos-1)*rk
+        call MPI_Win_create( real_send_buffer(1), real_length, rk, MPI_INFO_NULL, MPI_COMM_WORLD, real_win, ierr )
+
+        ! ----------------------------------------------------------------------------------------
+        ! fifth: get data
+
+        ! integer data
+        ! ------------
+
+        ! reset int_receive_buffer position
+        int_pos  = 1
+        real_pos = 1
+
+        ! loop over corresponding com matrix line
+        do k = 1, number_procs
+
+            ! proc k-1 has to receive data -> so current proc also receive data from proc k-1
+            if ( ( com_matrix(rank+1, k) > 0 ) .and. ( (rank+1) /= k ) ) then
+
+                ! reset int window start/end index
+                int_win_start = 0
+                int_win_end   = 0
+
+                ! loop over com matrix line of sender proc to calculate start/end id in integer window
+                i        = 1
+                win_loop = .true.
+
+                do while (win_loop)
+                    ! proc k-1 send data
+                    if ( ( com_matrix(k, i) > 0 ) .and. ( i /= k ) ) then
+
+                        if ( (rank+1) == i ) then
+                            ! entry in com matrix correspond to current proc
+                            int_win_start = int_win_end + 1
+                            int_win_end   = int_win_start + com_matrix(k, i) * 3 + 1
+                            ! end loop
+                            win_loop = .false.
+
+                        else
+                            ! other proc receive data
+                            int_win_start = int_win_end + 1
+                            int_win_end   = int_win_start + com_matrix(k, i) * 3 + 1
+
+                        end if
+
+                        ! next com matrix element
+                        i = i + 1
+
+                    else
+                        ! next com matrix element
+                        i = i + 1
+
+                    end if
+                end do
+
+                ! calculate displacement
+                ! displace first integers, note: displacement is special MPI integer kind, so we cant use int_win_start directly
+                displacement = int_win_start-1
+
+                ! get integer data
+                !-----------------
+                ! synchronize RMA
+                call MPI_Win_lock(MPI_LOCK_SHARED, k-1, 0, int_win, ierr)
+                ! get data
+                call MPI_Get( int_receive_buffer(int_pos), (int_win_end-int_win_start)+1, MPI_INTEGER4, k-1, displacement, (int_win_end-int_win_start)+1, MPI_INTEGER4, int_win, ierr)
+                ! synchronize RMA
+                call MPI_Win_unlock(k-1, int_win, ierr)
+
+                ! new integer position
+                int_pos = int_pos + (int_win_end-int_win_start) + 1
+
+                ! start and end of real data in buffer
+                real_win_start = int_receive_buffer(int_pos-2)
+                real_win_end   = int_receive_buffer(int_pos-1)
+
+                ! calculate displacement
+                ! displace first integers, note: displacement is special MPI integer kind, so we cant use real_win_start directly
+                displacement = real_win_start-1
+
+                ! get real data
+                ! -------------
+                ! synchronize RMA
+                call MPI_Win_lock(MPI_LOCK_SHARED, k-1, 0, real_win, ierr)
+                ! get real data
+                call MPI_Get( real_receive_buffer(real_pos), (real_win_end-real_win_start)+1, MPI_REAL8, k-1, displacement, (real_win_end-real_win_start)+1, MPI_REAL8, real_win, ierr)
+                ! synchronize RMA
+                call MPI_Win_unlock(k-1, real_win, ierr)
+
+                ! new real position
+                real_pos = real_pos + (real_win_end-real_win_start) + 1
+
+            end if
+
+        end do
+
+        ! barrier
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
+        ! free windows
+        call MPI_Win_free( int_win, ierr)
+        call MPI_Win_free( real_win, ierr)
+
+        ! end time
+        sub_t1 = MPI_Wtime()
+        ! write time
+        if ( params%debug ) then
+            ! find free or corresponding line
+            k = 1
+            do while ( debug%name_comp_time(k) /= "---" )
+                ! entry for current subroutine exists
+                if ( debug%name_comp_time(k) == "synch. ghosts - RMA" ) exit
+                k = k + 1
+            end do
+            ! write time
+            debug%name_comp_time(k) = "synch. ghosts - RMA"
+            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+        end if
+
+        ! start time
+        sub_t0 = MPI_Wtime()
+
+        ! ----------------------------------------------------------------------------------------
+        ! sixth: write receive buffer to heavy data
+
+        ! reset int and real position integers
+        int_pos  = 1
+        real_pos = 1
+
+        ! loop over corresponding com matrix line
+        do k = 1, number_procs
+
+            ! received data from proc k-1
+            if ( ( com_matrix(rank+1, k) > 0 ) .and. ( (rank+1) /= k ) ) then
+
+                ! calculate integer length
+                int_N  = com_matrix(rank+1, k) * 3
+                real_N = int_receive_buffer(int_pos + int_N + 1) - int_receive_buffer(int_pos + int_N) + 1
+
+                ! read received data
+                call write_receive_buffer(params, int_receive_buffer(int_pos:int_pos+int_N-1), real_receive_buffer(real_pos:real_pos+real_N-1), hvy_block)
+
+                ! new int and real positions
+                int_pos  = int_pos + int_N + 2
+                real_pos = real_pos + real_N
+
+            end if
+
+        end do
+
+    end if
 
     ! clean up
-    deallocate( com_list, stat=allocate_error )
-    deallocate( my_com_list, stat=allocate_error )
-    deallocate( com_plan, stat=allocate_error )
+    deallocate( com_lists, stat=allocate_error )
+    deallocate( receiver_pos, stat=allocate_error )
+    deallocate( receiver_rank, stat=allocate_error )
+    deallocate( receiver_count, stat=allocate_error )
+
     deallocate( com_matrix, stat=allocate_error )
     deallocate( my_com_matrix, stat=allocate_error )
 
+    deallocate( int_send_buffer, stat=allocate_error )
+    deallocate( int_receive_buffer, stat=allocate_error )
+    deallocate( real_send_buffer, stat=allocate_error )
+    deallocate( real_receive_buffer, stat=allocate_error )
+    deallocate( proc_send_buffer, stat=allocate_error )
+
     ! end time
     sub_t1 = MPI_Wtime()
     ! write time
@@ -319,11 +574,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "synch. ghosts - external" ) exit
+            if ( debug%name_comp_time(k) == "synch. ghosts - write external" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "synch. ghosts - external"
+        debug%name_comp_time(k) = "synch. ghosts - write external"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if

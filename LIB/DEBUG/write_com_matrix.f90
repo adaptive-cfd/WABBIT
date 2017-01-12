@@ -73,7 +73,7 @@ subroutine write_com_matrix( com_matrix )
 
             do l = 1, size(com_matrix,1)
 
-                write(99, '(i3, 2x)', advance='no') com_matrix(k,l)
+                write(99, '(i5, 2x)', advance='no') com_matrix(k,l)
 
             end do
 

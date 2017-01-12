@@ -126,7 +126,7 @@ $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 send_receive_data.f90
+	time_step_RK4.f90 synchronize_ghosts.f90 copy_ghost_nodes.f90 create_send_buffer.f90 write_receive_buffer.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)	
 	
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \

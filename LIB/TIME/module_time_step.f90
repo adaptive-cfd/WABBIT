@@ -47,7 +47,10 @@ contains
     ! coyp internal ghost nodes
     include "copy_ghost_nodes.f90"
 
-    ! send/receive external ghost nodes
-    include "send_receive_data.f90"
+    ! write send buffer
+    include "create_send_buffer.f90"
+
+    ! write received buffer
+    include "write_receive_buffer.f90"
 
 end module module_time_step

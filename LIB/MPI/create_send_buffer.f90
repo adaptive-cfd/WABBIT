@@ -527,6 +527,9 @@ subroutine create_send_buffer(params, hvy_block, com_list, com_number, send_buff
         end select
     end do
 
+    ! decrease buffer index (for using in other subroutines)
+    buffer_i = buffer_i - 1
+
     ! clean up
     deallocate( data_corner, stat=allocate_error )
     deallocate( data_corner_fine, stat=allocate_error )

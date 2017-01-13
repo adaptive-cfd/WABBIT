@@ -41,6 +41,9 @@ contains
     ! ghost nodes synchronization
     include "synchronize_ghosts.f90"
 
+    ! ghost nodes synchronization
+    include "synchronize_internal_nodes.f90"
+
     ! coyp internal ghost nodes
     include "copy_ghost_nodes.f90"
 
@@ -49,5 +52,17 @@ contains
 
     ! write received buffer
     include "write_receive_buffer.f90"
+
+    ! maximal number of communications
+    include "max_com_num.f90"
+
+    ! fill send buffer
+    include "fill_send_buffer.f90"
+
+    ! fill receive buffer
+    include "fill_receive_buffer.f90"
+
+    ! soubroutine for get data with lock/unlock synchronization
+    include "RMA_lock_unlock_get_data.f90"
 
 end module module_MPI

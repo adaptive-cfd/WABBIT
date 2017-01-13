@@ -126,7 +126,8 @@ $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
-	synchronize_ghosts.f90 copy_ghost_nodes.f90 create_send_buffer.f90 write_receive_buffer.f90
+	synchronize_ghosts.f90 copy_ghost_nodes.f90 create_send_buffer.f90 write_receive_buffer.f90 synchronize_internal_nodes.f90 \
+	max_com_num.f90 fill_send_buffer.f90 fill_receive_buffer.f90 RMA_lock_unlock_get_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o\

@@ -42,8 +42,8 @@ subroutine RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_rece
     ! number of processes
     integer(kind=ik)                    :: number_procs
 
-    ! column number of send buffer, column number of receive buffer
-    integer(kind=ik)                    :: send_pos, receive_pos
+    ! column number of send buffer, column number of receive buffer, real data buffer length
+    integer(kind=ik)                    :: send_pos, receive_pos, real_pos
 
     ! RMA variables: windows, size variables
     integer(kind=ik)                    :: int_win, real_win
@@ -114,12 +114,15 @@ subroutine RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_rece
             ! note: displacement is special MPI integer kind, displace (column_pos-1) columns
             displacement = (send_pos-1)*size(real_receive_buffer,1)
 
+            ! real buffer length
+            real_pos = int_receive_buffer(1, receive_pos)
+
             ! get real data
             ! -------------
             ! synchronize RMA
             call MPI_Win_lock(MPI_LOCK_SHARED, k-1, 0, real_win, ierr)
             ! get real data
-            call MPI_Get( real_receive_buffer(1, receive_pos), size(real_receive_buffer,1), MPI_REAL8, k-1, displacement, size(real_receive_buffer,1), MPI_REAL8, real_win, ierr)
+            call MPI_Get( real_receive_buffer(1, receive_pos), real_pos, MPI_REAL8, k-1, displacement, real_pos, MPI_REAL8, real_win, ierr)
             ! synchronize RMA
             call MPI_Win_unlock(k-1, real_win, ierr)
 

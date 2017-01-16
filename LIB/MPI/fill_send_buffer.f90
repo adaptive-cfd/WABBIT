@@ -18,7 +18,7 @@
 ! 13/01/17 - create for v0.4
 ! ********************************************************************************************
 
-subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, com_matrix_pos_line, rank, int_send_buffer, real_send_buffer )
+subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank, int_send_buffer, real_send_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -39,9 +39,6 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, com_
 
     ! com matrix line
     integer(kind=ik), intent(in)                    :: com_matrix_line(:)
-
-    ! line from com matrix for column positions
-    integer(kind=ik), intent(inout)                 :: com_matrix_pos_line(:)
 
     ! proc rank
     integer(kind=ik), intent(in)                    :: rank
@@ -95,9 +92,6 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, com_
 
             ! real buffer entry
             real_send_buffer( 1 : buffer_i, column_pos ) = proc_send_buffer( 1 : buffer_i )
-
-            ! save column number
-            com_matrix_pos_line(k) = column_pos
 
             ! second: integer data
             ! --------------------

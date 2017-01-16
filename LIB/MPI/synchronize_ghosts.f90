@@ -47,7 +47,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, dF
+    integer(kind=ik)                    :: k, N, dF, i, j
 
     ! grid parameter
     integer(kind=ik)                    :: g, Bs
@@ -221,10 +221,25 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         my_com_matrix   =  0
 
         ! fill send buffer and position communication matrix
-        call fill_send_buffer( params, hvy_block, com_lists, com_matrix(rank+1,:), my_com_matrix(rank+1,:), rank, int_send_buffer, real_send_buffer )
+        call fill_send_buffer( params, hvy_block, com_lists, com_matrix(rank+1,:), rank, int_send_buffer, real_send_buffer )
 
-        ! synchronize com position matrix
-        call MPI_Allreduce(my_com_matrix, com_matrix_pos, number_procs*number_procs, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+        ! calculate position matrix: position is column in send buffer, so simply count the number of communications
+        ! loop over all com_matrix elements
+        do i = 1, size(com_matrix_pos,1)
+            ! new line, means new proc: reset counter
+            k = 1
+            ! loop over communications
+            do j = 1, size(com_matrix_pos,1)
+                ! found external communication
+                if ( (com_matrix(i,j) /= 0) .and. (i /= j) ) then
+                    ! save com position
+                    com_matrix_pos(i,j) = k
+                    ! increase counter
+                    k = k + 1
+
+                end if
+            end do
+        end do
 
         ! end time
         sub_t1 = MPI_Wtime()

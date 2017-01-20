@@ -108,7 +108,7 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_2D_convection_diff
 	
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
 	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90 write_debug_times.f90 write_block_distribution.f90 write_com_list.f90 \
-	write_com_matrix.f90
+	write_com_matrix.f90 write_com_matrix_pos.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_params.o
@@ -127,7 +127,8 @@ $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
 	synchronize_ghosts.f90 copy_ghost_nodes.f90 create_send_buffer.f90 write_receive_buffer.f90 synchronize_internal_nodes.f90 \
-	max_com_num.f90 fill_send_buffer.f90 fill_receive_buffer.f90 RMA_lock_unlock_get_data.f90
+	max_com_num.f90 fill_send_buffer.f90 fill_receive_buffer.f90 RMA_lock_unlock_get_data.f90 RMA_lock_unlock_put_data.f90 \
+	isend_irecv_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o\

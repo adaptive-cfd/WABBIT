@@ -241,6 +241,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             end do
         end do
 
+        ! save position com matrix
+        if ( params%debug ) then
+            call write_com_matrix_pos( com_matrix_pos )
+        end if
+
         ! end time
         sub_t1 = MPI_Wtime()
         ! write time

@@ -79,4 +79,7 @@ contains
     ! com matrix
     include "write_com_matrix.f90"
 
+    ! position com matrix
+    include "write_com_matrix_pos.f90"
+
 end module module_debug

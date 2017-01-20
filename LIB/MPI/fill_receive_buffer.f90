@@ -27,8 +27,11 @@ subroutine fill_receive_buffer( int_send_buffer, real_send_buffer, int_receive_b
     implicit none
 
     ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
+    integer(kind=ik), intent(out)       :: int_receive_buffer(:,:)
+
+    real(kind=rk), intent(in)           :: real_send_buffer(:,:)
+    real(kind=rk), intent(out)          :: real_receive_buffer(:,:)
 
     ! communications matrix: neighboring proc rank
     ! com matrix pos: position in send buffer
@@ -52,7 +55,9 @@ subroutine fill_receive_buffer( int_send_buffer, real_send_buffer, int_receive_b
 
         ! use RMA with lock/unlock synchronization, use MPI_Get
         case('RMA_lock_unlock')
-            call RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            !call RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            !call RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            call isend_irecv_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
         case default
             write(*,'(80("_"))')

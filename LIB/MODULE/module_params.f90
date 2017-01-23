@@ -88,6 +88,12 @@ module module_params
         type(type_params_convection_diffusion_physics) :: physics
         type(type_params_physics_navier_stokes)     :: physics_ns
 
+        ! -------------------------------------------------------------------------------------
+        ! MPI
+        ! -------------------------------------------------------------------------------------
+        ! data exchange method
+        character(len=80)                           :: mpi_data_exchange
+
     end type type_params
 
 !---------------------------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 ! TODO: choose method with ini file
 ! ********************************************************************************************
 
-subroutine fill_receive_buffer( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -25,6 +25,9 @@ subroutine fill_receive_buffer( int_send_buffer, real_send_buffer, int_receive_b
 ! variables
 
     implicit none
+
+    ! user defined parameter structure
+    type (type_params), intent(in)      :: params
 
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
@@ -37,32 +40,33 @@ subroutine fill_receive_buffer( int_send_buffer, real_send_buffer, int_receive_b
     ! com matrix pos: position in send buffer
     integer(kind=ik), intent(in)        :: com_matrix(:,:), com_matrix_pos(:,:)
 
-    ! fill method, dummy variable
-    character(len=80)                   :: data_synchronization
-
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    data_synchronization = "RMA_lock_unlock"
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    select case(data_synchronization)
+    select case(params%mpi_data_exchange)
 
         ! use RMA with lock/unlock synchronization, use MPI_Get
-        case('RMA_lock_unlock')
-            !call RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
-            !call RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+        case('RMA_lock_unlock_get')
+            call RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+
+        ! use RMA with lock/unlock synchronization, use MPI_Put
+        case('RMA_lock_unlock_put')
+            call RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+
+        ! use non-blocking isend/irecv
+        case('Non_blocking_Isend_Irecv')
             call isend_irecv_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
         case default
             write(*,'(80("_"))')
-            write(*,*) "ERROR: synchronization method is unknown"
-            write(*,*) data_synchronization
+            write(*,*) "ERROR: data exchange method is unknown"
+            write(*,*) params%mpi_data_exchange
             stop
 
     end select

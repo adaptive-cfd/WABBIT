@@ -242,6 +242,12 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     call read_param(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
     !***************************************************************************
+    ! read MPI parameters
+    !
+    ! data exchange method
+    call read_param(FILE, 'MPI', 'mpi_data_exchange', params%mpi_data_exchange, "---" )
+
+    !***************************************************************************
     ! read DEBUG parameters
     !
     ! discretization order

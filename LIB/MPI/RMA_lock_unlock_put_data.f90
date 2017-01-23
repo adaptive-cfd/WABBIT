@@ -28,8 +28,11 @@ subroutine RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_rece
     implicit none
 
     ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
+    integer(kind=ik), intent(out)       :: int_receive_buffer(:,:)
+
+    real(kind=rk), intent(in)           :: real_send_buffer(:,:)
+    real(kind=rk), intent(out)          :: real_receive_buffer(:,:)
 
     ! communications matrix: neighboring proc rank
     ! com matrix pos: position in send buffer

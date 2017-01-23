@@ -270,7 +270,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! fourth: get data for receive buffer
 
         ! communicate, fill receive buffer
-        call fill_receive_buffer( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos  )
+        call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos  )
 
         ! end time
         sub_t1 = MPI_Wtime()

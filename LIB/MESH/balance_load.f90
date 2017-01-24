@@ -95,6 +95,9 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! space filling curve list
     integer(kind=ik), allocatable       :: sfc_list(:), sfc_com_list(:,:)
 
+    ! hilbert code
+    integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -308,9 +311,9 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             ! current block distribution
             call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
             ! write debug infos: current distribution list
-            !if ( params%debug ) then
+            if ( params%debug ) then
                 call write_block_distribution( dist_list )
-            !end if
+            end if
 
             !---------------------------------------------------------------------------------
             ! first: calculate space filling curve
@@ -323,6 +326,197 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             do k = 1, lgt_n
                 ! calculate sfc position
                 call treecode_to_sfc_id( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                ! fill sfc list with light data id
+                sfc_list(sfc_id+1) = lgt_active(k)
+            end do
+
+            !---------------------------------------------------------------------------------
+            ! second: distribute all blocks
+            !---------------------------------------------------------------------------------
+            ! equal distribution
+            dist_list = lgt_n / number_procs
+            do k = 1, mod(lgt_n, number_procs)
+                dist_list( k ) = dist_list( k ) + 1
+            end do
+
+            !---------------------------------------------------------------------------------
+            ! third: create com list
+            !---------------------------------------------------------------------------------
+            ! column
+            !    1     sender proc
+            !    2     receiver proc
+            !    3     block light data id
+
+            ! proc_dist_id: process responsible for current part of sfc
+            ! proc_data_id: process who stores data of sfc element
+            proc_dist_id = 0
+
+            com_i = 1
+            ! loop over sfc_list
+            do k = 1, size(sfc_list,1)
+                ! sfc element is active
+                if ( sfc_list(k) /= -1 ) then
+
+                    ! process with heavy data
+                    call lgt_id_to_proc_rank( proc_data_id, sfc_list(k), params%number_blocks )
+
+                    ! data has to send
+                    if ( proc_dist_id /= proc_data_id ) then
+                        ! create com plan
+                        sfc_com_list(com_i, 1) = proc_data_id
+                        sfc_com_list(com_i, 2) = proc_dist_id
+                        sfc_com_list(com_i, 3) = sfc_list(k)
+                        com_i = com_i + 1
+
+                    else
+                        ! nothing to do, block is allready on correct proc
+
+                    end if
+
+                    ! next scf element, so check proc id, switch if last block is distributed
+                    dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
+                    if ( dist_list( proc_dist_id+1 ) == 0 ) then
+                        proc_dist_id = proc_dist_id + 1
+                    end if
+
+                end if
+            end do
+
+            ! stop load balancing, if nothing to do
+            if ( com_i == 1 ) then
+                ! the distribution is fine, nothing to do.
+                return
+            endif
+
+            !---------------------------------------------------------------------------------
+            ! fourth: communicate
+            !---------------------------------------------------------------------------------
+            ! loop over com list, create send buffer and send/receive data
+            ! note: delete com list elements after send/receive and if proc not
+            ! responsible for com list entry -> this means: no extra com plan needed
+            do k = 1, com_i
+                ! com list element is active
+                if ( sfc_com_list(k, 1) /= -1 ) then
+
+                    ! proc send data
+                    if ( sfc_com_list(k, 1) == rank ) then
+
+                        ! create send buffer, search list
+                        l = 0
+                        do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
+
+                            ! calculate heavy id from light id
+                            call lgt_id_to_hvy_id( heavy_id, sfc_com_list(k+l, 3), rank, params%number_blocks )
+
+                            ! send buffer: fill buffer, heavy data
+                            buffer_data(:, :, :, l+1 ) = hvy_block(:, :, :, heavy_id )
+                            ! ... light data
+                            buffer_light( l+1 ) = sfc_com_list(k+l, 3)
+
+                            ! delete heavy data
+                            hvy_block(:, :, :, heavy_id) = 0.0_rk
+                            ! delete light data
+                            my_block_list( sfc_com_list(k+l, 3) , : ) = -1
+
+                            ! go to next element
+                            l = l + 1
+
+                        end do
+
+                        ! send data
+                        call MPI_Send( buffer_light, (l), MPI_INTEGER4, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
+                        call MPI_Send( buffer_data, data_size*(l), MPI_REAL8, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
+
+                        ! delete all com list elements
+                        sfc_com_list(k:k+l-1, :) = -1
+
+                    ! proc receive data
+                    elseif ( sfc_com_list(k, 2) == rank ) then
+
+                        ! count received data sets
+                        l = 1
+                        do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
+
+                            ! delete element
+                            sfc_com_list(k+l, :) = -1
+
+                            ! go to next element
+                            l = l + 1
+
+                        end do
+
+                        ! receive data
+                        call MPI_Recv( buffer_light, (l), MPI_INTEGER4, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
+                        call MPI_Recv( buffer_data, data_size*(l), MPI_REAL8, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
+
+                        ! delete first com list element after receiving data
+                        sfc_com_list(k, :) = -1
+
+                        ! save comm count
+                        com_N = l
+
+                        ! loop over all received blocks
+                        do l = 1,  com_N
+
+                            ! find free "light id", work on reduced light data, so free id is heavy id
+                            call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+params%number_blocks , 1 ), params%number_blocks )
+                            ! calculate light id
+                            free_light_id = my_light_start + free_heavy_id
+
+                            ! write light data
+                            my_block_list( free_light_id, :) = lgt_block( buffer_light(l), : )
+
+                            ! write heavy data
+                            hvy_block(:, :, :, free_heavy_id) = buffer_data(:, :, :, l)
+
+                            ! error case
+                            if (my_block_list(free_light_id, 1)<0 .or. my_block_list(free_light_id, 1)>3) then
+                              write(*,*) "For some reason, someone sent me an empty block (code: 7712345)"
+                              stop
+                            endif
+
+                        end do
+
+
+                    ! nothing to do
+                    else
+                        ! delete com list element
+                        ! note: only to have a clean list
+                        sfc_com_list(k, :) = -1
+
+                    end if
+
+                end if
+            end do
+
+            !---------------------------------------------------------------------------------
+            ! sixth: synchronize light data
+            !---------------------------------------------------------------------------------
+            lgt_block = 0
+            call MPI_Allreduce(my_block_list, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+        case("sfc_hilbert")
+
+            ! current block distribution
+            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
+            ! write debug infos: current distribution list
+            if ( params%debug ) then
+                call write_block_distribution( dist_list )
+            end if
+
+            !---------------------------------------------------------------------------------
+            ! first: calculate space filling curve
+            !---------------------------------------------------------------------------------
+            ! reset old lists
+            sfc_list  = -1
+            dist_list = 0
+
+            ! loop over active blocks
+            do k = 1, lgt_n
+                ! transfer treecode to hilbertcode
+                call treecode_to_hilbercode( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                ! calculate sfc position from hilbertcode
+                call treecode_to_sfc_id( sfc_id, hilbertcode, params%max_treelevel )
                 ! fill sfc list with light data id
                 sfc_list(sfc_id+1) = lgt_active(k)
             end do

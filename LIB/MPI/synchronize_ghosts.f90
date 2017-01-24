@@ -150,13 +150,28 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! copy internal nodes and create com_matrix/com_lists for external communications
     call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists )
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "synch. ghosts - internal" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "synch. ghosts - internal"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     ! synchronize com matrix
     call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
-
-    ! save com matrix
-    if ( params%debug ) then
-        call write_com_matrix( com_matrix )
-    end if
 
     ! end time
     sub_t1 = MPI_Wtime()
@@ -166,13 +181,18 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "synch. ghosts - internal and com_matrix" ) exit
+            if ( debug%name_comp_time(k) == "synch. ghosts - com_matrix" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "synch. ghosts - internal and com_matrix"
+        debug%name_comp_time(k) = "synch. ghosts - com_matrix"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
+
+    ! save com matrix
+    if ( params%debug ) then
+        call write_com_matrix( com_matrix )
     end if
 
     ! start time

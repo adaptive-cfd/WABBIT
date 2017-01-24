@@ -97,4 +97,7 @@ contains
     ! treecode to sfc position
     include "treecode_to_sfc_id.f90"
 
+    ! transfer treecode to hilbert code
+    include "treecode_to_hilbercode.f90"
+
 end module module_mesh

@@ -140,7 +140,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90 find_neighbor_edge.f90 does_block_exist.f90 \
 	find_neighbor_corner.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \
-	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90
+	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \

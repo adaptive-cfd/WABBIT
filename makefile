@@ -45,28 +45,6 @@ FFLAGS += -I$(HDF_INC)
 endif
 
 # Intel compiler
-#ifort:=$(shell $(FC) --version | head -c 5)
-#ifeq ($(ifort),ifort)
-#PPFLAG= -fpp #preprocessor flag
-#FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
-#FFLAGS = -FR -O3 -warn all -traceback -check bounds
-#FFLAGS += -module $(OBJDIR) # specify directory for modules.
-#LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
-# HDF_ROOT is set in environment.
-#HDF_LIB = $(HDF_ROOT)/lib
-#HDF_INC = $(HDF_ROOT)/include
-#LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
-#FFLAGS += -I$(HDF_INC)
-#endif
-
-#IBM compiler
-#ifeq ($(shell $(FC) -qversion 2>&1 | head -c 3),IBM)
-#FFLAGS += -qmoddir=$(OBJDIR)
-#FFLAGS += -I$(OBJDIR)
-#PPFLAG=-qsuffix=cpp=f90  #preprocessor flag
-#endif
-
-# MPI compiler
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG= -fpp
@@ -81,13 +59,11 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
-PROGRAMS = wabbit
-
-# Both programs are compiled by default.
-all: directories $(PROGRAMS)
-
 # Compile main programs, with dependencies.
-wabbit: main.f90 $(MOBJS) $(OBJS)
+wabbit_2D: 2D_main.f90 $(MOBJS) $(OBJS)
+	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
+	
+wabbit_3D: 3D_main.f90 $(MOBJS) $(OBJS)
 	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compile modules (module dependency must be specified by hand in

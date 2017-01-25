@@ -32,7 +32,7 @@ ifeq ($(shell $(FC) --version 2>&1 | head -n 1 | head -c 3),GNU)
 FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -O3 -ffree-line-length-none
 PPFLAG= -cpp #preprocessor flag
-LDFLAGS = -llapack
+#LDFLAGS = -llapack
 # Debug flags for gfortran:
 #FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
 #FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
@@ -73,7 +73,7 @@ PPFLAG= -fpp
 FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays 
 
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
-LDFLAGS = -L/usr/X11/lib/ -lX11 -L/usr/lib64/lapack -llapack
+LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include

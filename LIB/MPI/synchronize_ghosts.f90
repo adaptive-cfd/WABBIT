@@ -171,7 +171,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     sub_t0 = MPI_Wtime()
 
     ! synchronize com matrix
-    call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! end time
     sub_t1 = MPI_Wtime()

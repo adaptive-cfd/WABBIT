@@ -35,6 +35,12 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
     ! number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
+    ! light data array for blocks with coarsening status
+    ! max size: number of active blocks
+    integer(kind=ik)                    :: coarse_blocks(lgt_n, size(lgt_block,1))
+    ! number of blocks with coarsening status, loop variable
+    integer(kind=ik)                    :: n_coarse_blocks
+
 
     ! max treelevel
     integer(kind=ik)                    :: max_treelevel
@@ -80,6 +86,55 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
 
     ! start time
     sub_t0 = MPI_Wtime()
+
+!    ! first: create list of blocks with refinement status -1
+!    !-----------------------------------------------------------------------------------------
+!    ! reset counter for blocks with coarsening status
+!    n_coarse_blocks = 0
+!    ! loop over all active blocks
+!    do k = 1, lgt_n
+!        ! block want to coarsen
+!        if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
+!
+!            ! increase counter
+!            n_coarse_blocks = n_coarse_blocks + 1
+!
+!            ! save light data
+!            ! light data id
+!            coarse_blocks( n_coarse_blocks, 1) = lgt_active(k)
+!            ! treecode
+!            coarse_blocks( n_coarse_blocks, 2:max_treelevel+1) = lgt_block( lgt_active(k), 1:max_treelevel )
+!
+!        end if
+!    end do
+!
+!    ! second: search sister blocks in coarse block list, if all 4 sister blocks are present,
+!    ! set status in light data array
+!    !-----------------------------------------------------------------------------------------
+!
+!    ! loop over blocks with coarsening status
+!    do k = 1, n_coarse_blocks
+!
+!        ! check light data id
+!        ! note: id -1 means, blocks was deleted in previous loop
+!        if ( coarse_blocks( k, 1) /= -1 ) then
+!
+!            ! search sister blocks
+!            !---------------------
+!            ! reset id list
+!            id = -1
+!            ! reset sister count
+!            i = 0
+!            ! loop over remaining coarse block list
+!            do l = k, n_coarse_blocks
+!
+!
+!
+!            end do
+!
+!        end if
+!
+!    end do
 
     ! loop over all active blocks
     do k = 1, lgt_n

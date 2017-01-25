@@ -60,10 +60,7 @@ FFLAGS += -I$(HDF_INC)
 endif
 
 # Compile main programs, with dependencies.
-wabbit_2D: 2D_main.f90 $(MOBJS) $(OBJS)
-	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
-	
-wabbit_3D: 3D_main.f90 $(MOBJS) $(OBJS)
+wabbit: main.f90 $(MOBJS) $(OBJS)
 	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compile modules (module dependency must be specified by hand in

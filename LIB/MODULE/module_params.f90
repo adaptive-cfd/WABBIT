@@ -82,7 +82,7 @@ module module_params
         character(len=80)                           :: physics_type
 
         ! domain length
-        real(kind=rk)                               :: Lx, Ly
+        real(kind=rk)                               :: Lx, Ly, Lz
 
         ! physics substructure
         type(type_params_convection_diffusion_physics) :: physics

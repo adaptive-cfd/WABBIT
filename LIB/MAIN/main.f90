@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: main.f90
-! version: 0.4
+! version: 0.5
 ! author: msr
 !
 ! main program, init all data, start time loop, output on screen during program run
@@ -12,6 +12,7 @@
 ! 04/11/16 - switch to v0.4
 ! 23/11/16 - use computing time array for simple performance tests
 ! 07/12/16 - now uses heavy work data array
+! 25/01/17 - switch to 3D, v0.5
 ! ********************************************************************************************
 
 program main
@@ -115,12 +116,12 @@ program main
     ! cpu start time
     call cpu_time(t0)
 
-!    ! output MPI status
-!    if (rank==0) then
-!        write(*,'(80("_"))')
-!        write(*, '("MPI: using ", i5, " processes")') number_procs
-!    end if
-!
+    ! output MPI status
+    if (rank==0) then
+        write(*,'(80("_"))')
+        write(*, '("MPI: using ", i5, " processes")') number_procs
+    end if
+
 !    ! initializing data
 !    call init_data( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !

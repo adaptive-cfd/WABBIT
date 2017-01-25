@@ -25,18 +25,12 @@ choose compiler with FC option (from v0.3)
 make FC=[mpif90]
 ```
 
-choose makefile target - 2D/3D version (from v0.5) 
-
-```
-make [wabbit_2D|wabbit_3D] FC=...
-```
-
 ### run WABBIT
 
 customize .ini-file and rename file to [your_filename.ini], run WABBIT
 
 ```
-wabbit_[2D|3D] [your_filename.ini]
+wabbit [your_filename.ini]
 ```
 
 ## History

@@ -53,13 +53,22 @@ contains
     ! start field, gauss blob
     include "inicond_gauss_blob.f90"
 
-    ! initial block distribution
-    include "initial_block_distribution.f90"
+    ! initial block distribution - 2D case
+    include "initial_block_distribution_2D.f90"
 
     ! subroutine to write new heavy block data
     include "new_block_heavy.f90"
 
     ! vorticity filaments testcase
     include "inicond_vorticity_filaments.f90"
+
+    ! read ini file
+    include "ini_file_to_params.f90"
+
+    ! initial zeros for all fields
+    include "inicond_zeros.f90"
+
+    ! initial block distribution - 3D case
+    include "initial_block_distribution_3D.f90"
 
 end module module_init

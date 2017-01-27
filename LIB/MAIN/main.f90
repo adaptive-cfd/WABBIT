@@ -60,17 +60,19 @@ program main
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: data type ( field_1, 2:number_data_fields+1)
-    ! heavy data array  -> dim 4: block id  ( 1:number_blocks )
+    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 4: data type ( field_1, 2:number_data_fields+1)
+    ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
     !           field_1 (to save mixed data):   line 1: x coordinates
     !                                           line 2: y coordinates
-    real(kind=rk), allocatable          :: hvy_block(:, :, :, :)
+    real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: data type ( old data, k1, k2, k3, k4 )
-    ! heavy work array  -> dim 4: block id  ( 1:number_blocks )
-    real(kind=rk), allocatable          :: hvy_work(:, :, :, :)
+    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 4: data type ( old data, k1, k2, k3, k4 )
+    ! heavy work array  -> dim 5: block id  ( 1:number_blocks )
+    real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :)
 
     ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
     !                             -> number_columns = 16 (...different neighbor relations:
@@ -82,16 +84,19 @@ program main
     ! list of active blocks (light data)
     integer(kind=ik), allocatable       :: lgt_active(:)
     ! number of active blocks (light data)
-    integer(kind=ik)                    :: lgt_n
+    !integer(kind=ik)                    :: lgt_n
 
     ! list of active blocks (heavy data)
     integer(kind=ik), allocatable       :: hvy_active(:)
     ! number of active blocks (heavy data)
-    integer(kind=ik)                    :: hvy_n
+    !integer(kind=ik)                    :: hvy_n
 
     ! time loop variables
-    real(kind=rk)                       :: time, output_time
+    real(kind=rk)                       :: time!, output_time
     integer(kind=ik)                    :: iteration
+
+    ! number of dimensions
+    character(len=80)                   :: dim_number
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -113,18 +118,52 @@ program main
     ! determinate process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
+    ! save MPI data in params struct
+    params%rank         = rank
+    params%number_procs = number_procs
+
     ! cpu start time
     call cpu_time(t0)
+
+    ! read number of dimensions from command line
+    call get_command_argument(1, dim_number)
+
+    ! output dimension number
+    if (rank==0) then
+        write(*,'(80("_"))')
+        write(*, '("INIT: run ", a3, " case")') dim_number
+    end if
+
+    ! save case dimension in params struct
+    select case(dim_number)
+        case('2D')
+            params%threeD_case = .false.
+        case('3D')
+            params%threeD_case = .true.
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: case dimension is wrong"
+            stop
+
+    end select
 
     ! output MPI status
     if (rank==0) then
         write(*,'(80("_"))')
-        write(*, '("MPI: using ", i5, " processes")') number_procs
+        write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
 
-!    ! initializing data
-!    call init_data( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-!
+    ! initializing data
+    call init_data( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+
+if (rank==0) then
+do iteration = 1, size(lgt_block,1)
+if (lgt_block(iteration,1)/=-1) then
+print*, lgt_block(iteration,1:5)
+end if
+end do
+end if
+
 !    ! create lists of active blocks (light and heavy data)
 !    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
 !    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
@@ -133,7 +172,7 @@ program main
 !    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 !
 !    ! save start data
-!    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+!    call save_data( iteration, time, params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n )
 !
 !    ! main time loop
 !    do while ( time < params%time_max )
@@ -189,6 +228,15 @@ program main
 !
 !    ! save end field to disk, only if timestep is not saved allready
 !    if ( output_time /= time ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+
+    ! debug info
+    if ( params%debug ) then
+        ! sum times and calls
+        debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
+        debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
+        ! write debug infos to file
+        call write_debug_times( iteration )
+    end if
 
     ! MPI Barrier before program ends
     call MPI_Barrier(MPI_COMM_WORLD, ierr)

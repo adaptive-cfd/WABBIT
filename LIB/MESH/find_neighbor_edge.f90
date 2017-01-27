@@ -76,6 +76,13 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
     my_treecode     = lgt_block( light_id, 1:max_treelevel )
     level           = lgt_block( light_id, max_treelevel + 1 )
 
+    list_id         = -1
+    virt_code1      = -1
+    virt_list_id1   = -1
+    virt_code2      = -1
+    virt_list_id2   = -1
+    list_id2        = -1
+
 !---------------------------------------------------------------------------------------------
 ! main body
 

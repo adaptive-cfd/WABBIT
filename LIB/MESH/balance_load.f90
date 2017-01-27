@@ -118,19 +118,36 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! allocate block to proc lists
     allocate( opt_dist_list(1:number_procs), dist_list(1:number_procs))
+
     allocate( affinity(1:params%number_blocks) )
+
     allocate( friends( 1:number_procs, 1:number_procs ))
 
     ! allocate com plan, maximal number of communications: every proc send every other proc something
     allocate( com_plan( number_procs*(number_procs-1), 3 ), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
     com_plan = -1
 
     ! allocate sfc com list, maximal number of communications: every proc send all of his blocks
     allocate( sfc_com_list( number_procs*params%number_blocks, 3 ), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
     sfc_com_list = -1
 
     ! allocate space filling curve list, maximal number of elements = max number of blocks
     allocate( sfc_list( 4**params%max_treelevel ), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! number of light data (since the light data is redunantly stored on all CPU,
     ! this number corresponds usually to the maximum number of blocks possible in

@@ -59,6 +59,9 @@ subroutine treecode_to_hilbercode(treecode, hilbertcode, n)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    prev_tree_i          = 0
+    prev_hilbert_pattern = 0
+    hilbert_pattern      = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body

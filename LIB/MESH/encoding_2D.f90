@@ -1,11 +1,11 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: encoding.f90
+! name: encoding_2D.f90
 ! version: 0.4
 ! author: msr
 !
-! encoding treecode
+! encoding 2D treecode
 !
 ! input:    - block position varaibles i, j
 !           - number of blocks
@@ -15,9 +15,11 @@
 ! = log ======================================================================================
 !
 ! 07/11/16 - switch to v0.4
+! 26/01/17 - rename to encoding 2D
+!
 ! ********************************************************************************************
 
-subroutine encoding(treecode, i, j, nx, ny, treeN)
+subroutine encoding_2D(treecode, i, j, nx, ny, treeN)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -69,7 +71,20 @@ subroutine encoding(treecode, i, j, nx, ny, treeN)
 
     ! allocate auxiliary vectors
     allocate( c(N), stat=allocate_error)
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( d(N), stat=allocate_error)
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! convert block coordinates into binary numbers
     call int_to_binary(i-1, N, c)
@@ -95,4 +110,4 @@ subroutine encoding(treecode, i, j, nx, ny, treeN)
     deallocate( c, stat=allocate_error)
     deallocate( d, stat=allocate_error)
 
-end subroutine encoding
+end subroutine encoding_2D

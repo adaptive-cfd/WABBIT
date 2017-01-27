@@ -81,6 +81,10 @@ subroutine find_neighbor_corner(heavy_id, light_id, lgt_block, max_treelevel, di
 
     lvl_down_neighbor = .false.
 
+    virt_code = -1
+    list_id   = -1
+
+
 !---------------------------------------------------------------------------------------------
 ! main body
 

@@ -68,7 +68,7 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
 
     ! decompose init field phi to block data
     ! first: init light and heavy data for datafield 1, create starting block distribution
-    call initial_block_distribution( params, lgt_block, hvy_block, phi )
+    !call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! phi is on first datafield, save heavy data
     Ux = hvy_block( :, :, 2, : )
@@ -90,7 +90,7 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
 
     ! decompose init field phi to block data
     ! first: init light and heavy data for datafield 1, create starting block distribution
-    call initial_block_distribution( params, lgt_block, hvy_block, phi )
+    !call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! phi is now on first field, write to right position
     hvy_block( :, :, 4, : ) = hvy_block( :, :, 2, : )

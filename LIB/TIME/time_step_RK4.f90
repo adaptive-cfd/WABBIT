@@ -143,12 +143,12 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             ! synchronize max_v
             call MPI_Allreduce(my_max_v, max_velocity(2), 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
 
-            if ( (norm2( max_velocity ) == 0) ) then
+            !if ( (norm2( max_velocity ) == 0.0_rk) ) then
                 ! zero velocity, choose fixed time step
                 dt = 0.000001_rk
-            else
-                dt = 0.000001_rk !params%CFL * dx / norm2( max_velocity )
-            end if
+            !else
+                !dt = 0.000001_rk !params%CFL * dx / norm2( max_velocity )
+            !end if
 
     end select
 

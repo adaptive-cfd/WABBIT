@@ -105,7 +105,7 @@ subroutine write_field_hdf5( filename, dsetname, field, overwrite)
   integer :: nx, ny
 
   ! HDF attribute variables
-  integer, parameter :: arank = 1
+  !integer, parameter :: arank = 1
   !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
   !integer :: i, mindim, maxdim, mpicode

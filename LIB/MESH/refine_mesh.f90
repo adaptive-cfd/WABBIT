@@ -92,12 +92,40 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_active, hvy_n )
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
     allocate( data_predict_fine(2*Bs-1, 2*Bs-1), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( data_predict_coarse(Bs, Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! new coordinates vectors
     allocate( new_coord_x(Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( new_coord_y(Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! set light data list for working, only light data coresponding to proc are not zero
     my_lgt_block = 0

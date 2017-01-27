@@ -12,34 +12,37 @@
 !                   -> column(max_treelevel+1): treecode length = mesh level
 !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
 !
-! input:    - maximal number of blocks per process
-!           - maximal treelevel
+! input:    - params
 ! output:   - empty light data array
 !
 ! = log ======================================================================================
 !
 ! 04/11/16 - switch to v0.4
+! 26/01/17 - use process rank and number of procs from params struct
+!
 ! ********************************************************************************************
 
-subroutine  allocate_block_list(lgt_block, number_blocks, max_treelevel)
+subroutine  allocate_block_list( params, lgt_block )
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
 
+    ! user defined parameter structure
+    type (type_params), intent(in)              :: params
+
     ! light data array
     integer(kind=ik), allocatable, intent(out)  :: lgt_block(:, :)
+
     ! number of light and heavy data
-    integer(kind=ik), intent(in)                :: number_blocks
+    integer(kind=ik)                            :: number_blocks
     ! maximal treelevel = maximal length of treecode
-    integer(kind=ik), intent(in)                :: max_treelevel
+    integer(kind=ik)                            :: max_treelevel
 
     ! allocation error variable
     integer(kind=ik)                            :: allocate_error
 
-    ! MPI error variable
-    integer(kind=ik)                            :: ierr
     ! process rank
     integer(kind=ik)                            :: rank
     ! number of processes
@@ -48,19 +51,22 @@ subroutine  allocate_block_list(lgt_block, number_blocks, max_treelevel)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    ! set MPI parameters
+    rank         = params%rank
+    number_procs = params%number_procs
+
+    ! set parameters for readability
+    number_blocks = params%number_blocks
+    max_treelevel = params%max_treelevel
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! determinate process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-
     ! allocate memory
     allocate( lgt_block( number_procs*number_blocks, max_treelevel+2), stat=allocate_error )
+    call check_allocation(allocate_error)
 
-    ! reset data
-    !
+    ! reset data:
     ! all blocks are inactive, reset treecode
     lgt_block(:, 1:max_treelevel) = -1
     ! all blocks are inactive, reset treelevel

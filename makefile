@@ -1,8 +1,8 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = encoding.f90 int_to_binary.f90 treecode_size.f90 adjacent_block.f90 array_compare.f90 proc_to_lgt_data_start_id.f90 \
-lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 RHS_2D_convection_diffusion.f90 \
-RHS_2D_navier_stokes.f90
+FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block.f90 array_compare.f90 \
+proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
+RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -35,8 +35,8 @@ PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
 #FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-#FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
-FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+#FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
 # HDF_ROOT is set in environment.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
@@ -94,8 +94,8 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_ini_files_parser.o \
-	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution.f90 new_block_heavy.f90 \
-	allocate_work_data.f90 inicond_vorticity_filaments.f90
+	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
+	allocate_work_data.f90 inicond_vorticity_filaments.f90 ini_file_to_params.f90 inicond_zeros.f90 initial_block_distribution_3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\

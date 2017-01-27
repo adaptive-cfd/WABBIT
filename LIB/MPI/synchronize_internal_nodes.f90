@@ -110,8 +110,25 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
 
     ! receiver lists
     allocate( receiver_pos( number_procs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( receiver_rank( number_procs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( receiver_count( number_procs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! reset
     receiver_pos    =  0

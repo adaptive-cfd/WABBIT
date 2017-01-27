@@ -37,9 +37,9 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
 
     ! light data array for blocks with coarsening status
     ! max size: number of active blocks
-    integer(kind=ik)                    :: coarse_blocks(lgt_n, size(lgt_block,1))
+    !integer(kind=ik)                    :: coarse_blocks(lgt_n, size(lgt_block,1))
     ! number of blocks with coarsening status, loop variable
-    integer(kind=ik)                    :: n_coarse_blocks
+    !integer(kind=ik)                    :: n_coarse_blocks
 
 
     ! max treelevel

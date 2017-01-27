@@ -69,9 +69,32 @@ subroutine write_receive_buffer(params, int_buffer, recv_buff, hvy_block)
     g     = params%number_ghost_nodes
 
     allocate( data_corner( g, g), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     buffer_i         = 1
 

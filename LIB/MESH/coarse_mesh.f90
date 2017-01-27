@@ -112,13 +112,41 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
 
     ! allocate data array
     allocate( new_data(Bs, Bs, params%number_data_fields), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     ! new coordinates vectors
     allocate( new_coord_x(Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( new_coord_y(Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! send/receive data and coordinates
     allocate( send_receive_data(Bs, Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( send_receive_coord(Bs), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body

@@ -27,10 +27,10 @@ make FC=[mpif90]
 
 ### run WABBIT
 
-customize .ini-file and rename file to [your_filename.ini], run WABBIT
+customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name
 
 ```
-wabbit [your_filename.ini]
+wabbit [2D|3D] [your_filename.ini]
 ```
 
 ## History

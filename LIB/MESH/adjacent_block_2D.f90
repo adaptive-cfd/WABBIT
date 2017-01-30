@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: adjacent_block.f90
+! name: adjacent_block_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -18,7 +18,7 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-recursive subroutine adjacent_block(me, neighbor, direction, level, max_treelevel)
+recursive subroutine adjacent_block_2D(me, neighbor, direction, level, max_treelevel)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -138,24 +138,24 @@ recursive subroutine adjacent_block(me, neighbor, direction, level, max_treeleve
 
         case('_NE')
         ! northeast
-            call adjacent_block(me, neighbor2, '__N', level, max_treelevel)
-            call adjacent_block(neighbor2, neighbor, '__E', level, max_treelevel)
+            call adjacent_block_2D(me, neighbor2, '__N', level, max_treelevel)
+            call adjacent_block_2D(neighbor2, neighbor, '__E', level, max_treelevel)
 
         case('_NW')
         ! northwest
-            call adjacent_block(me, neighbor2, '__N', level, max_treelevel)
-            call adjacent_block(neighbor2, neighbor, '__W', level, max_treelevel)
+            call adjacent_block_2D(me, neighbor2, '__N', level, max_treelevel)
+            call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
 
         case('_SE')
         ! southeast
-            call adjacent_block(me, neighbor2, '__S', level, max_treelevel)
-            call adjacent_block(neighbor2, neighbor, '__E', level, max_treelevel)
+            call adjacent_block_2D(me, neighbor2, '__S', level, max_treelevel)
+            call adjacent_block_2D(neighbor2, neighbor, '__E', level, max_treelevel)
 
         case('_SW')
         ! southwest
-            call adjacent_block(me, neighbor2, '__S', level, max_treelevel)
-            call adjacent_block(neighbor2, neighbor, '__W', level, max_treelevel)
+            call adjacent_block_2D(me, neighbor2, '__S', level, max_treelevel)
+            call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
 
     end select
 
-end subroutine adjacent_block
+end subroutine adjacent_block_2D

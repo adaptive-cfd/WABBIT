@@ -51,25 +51,11 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
 
-    ! MPI error variable
-    !integer(kind=ik)                                :: ierr
-    ! process rank
-    !integer(kind=ik)                                :: rank
-    ! number of processes
-    !integer(kind=ik)                                :: number_procs
-
     ! inifile name
     character(len=80)                               :: filename
-    ! inifile structure
-    !type(inifile)                                   :: FILE
 
-    ! auxiliary variable for reading logicals
-    !integer(kind=ik)                                :: read_logical
     ! allocation error variabel
     integer(kind=ik)                                :: allocate_error
-
-    ! initial data field
-    !real(kind=rk), allocatable                      :: phi(:, :)
 
     ! loop variable
     integer(kind=ik)                                :: k
@@ -115,8 +101,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
                 call inicond_zeros( params, lgt_block, hvy_block )
             else
                 ! 2D:
-                !call inicond_gauss_blob( params, lgt_block, hvy_block )
-                call inicond_zeros( params, lgt_block, hvy_block )
+                call inicond_gauss_blob( params, lgt_block, hvy_block )
             end if
 
         case ("vorticity_filaments")
@@ -147,7 +132,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! 3D: maximal 56 neighbors per block
     if ( params%threeD_case ) then
         ! 3D:
-        allocate( hvy_neighbor( params%number_blocks, 56 ), stat=allocate_error )
+        allocate( hvy_neighbor( params%number_blocks, 74 ), stat=allocate_error )
         call check_allocation(allocate_error)
 
     else
@@ -180,8 +165,6 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
         debug%name_comp_time = "---"
 
     end if
-
-!    deallocate( phi, stat=allocate_error )
 
     ! end time
     sub_t1 = MPI_Wtime()

@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: save_data.f90
-! version: 0.4
+! version: 0.5
 ! author: msr
 !
 ! save data main function, call write data routine
@@ -16,6 +16,8 @@
 ! = log ======================================================================================
 !
 ! 07/11/16 - switch to v0.4
+! 26/01/17 - switch to 3D, v0.5
+!
 ! ********************************************************************************************
 
 subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n)
@@ -37,7 +39,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
     ! light data array
     integer(kind=ik), intent(in)                    :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
     ! heavy data array - neifghbor data
     integer(kind=ik), intent(in)                    :: hvy_neighbor(:,:)
     ! list of active blocks (light data)
@@ -51,11 +53,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: sub_t0, sub_t1
 
-    ! MPI error variable
-    integer(kind=ik)                                :: ierr
-    ! process rank
-    integer(kind=ik)                                :: rank
-
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -67,9 +64,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
 
     ! start time
     sub_t0 = MPI_Wtime()
-
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! real datafields start at datafield 2
     do k = 2, params%number_data_fields+1

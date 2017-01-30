@@ -1,8 +1,8 @@
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
-FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block.f90 array_compare.f90 \
+FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block_2D.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
-RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90
+RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90 adjacent_block_3D.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -110,10 +110,11 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
 	$(OBJDIR)/module_time_step.o\
-	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors.f90 find_neighbor_edge.f90 does_block_exist.f90 \
-	find_neighbor_corner.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90 adapt_mesh.f90 threshold_block.f90 \
+	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
+	find_neighbor_corner_2D.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \
-	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90
+	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90 update_neighbors_3D.f90 \
+	find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \

@@ -201,7 +201,7 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
                                          phi( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 , (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1, (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ), &
                                          coord_x( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
                                          coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
-                                         coord_z( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ) )
+                                         coord_z( (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ) )
 
                 end if
 

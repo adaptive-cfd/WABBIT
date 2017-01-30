@@ -84,12 +84,12 @@ program main
     ! list of active blocks (light data)
     integer(kind=ik), allocatable       :: lgt_active(:)
     ! number of active blocks (light data)
-    !integer(kind=ik)                    :: lgt_n
+    integer(kind=ik)                    :: lgt_n
 
     ! list of active blocks (heavy data)
     integer(kind=ik), allocatable       :: hvy_active(:)
     ! number of active blocks (heavy data)
-    !integer(kind=ik)                    :: hvy_n
+    integer(kind=ik)                    :: hvy_n
 
     ! time loop variables
     real(kind=rk)                       :: time!, output_time
@@ -156,23 +156,29 @@ program main
     ! initializing data
     call init_data( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 
-if (rank==0) then
-do iteration = 1, size(lgt_block,1)
-if (lgt_block(iteration,1)/=-1) then
-print*, lgt_block(iteration,1:5)
-end if
-end do
-end if
+    ! create lists of active blocks (light and heavy data)
+    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
-!    ! create lists of active blocks (light and heavy data)
-!    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-!    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-!
-!    ! update neighbor relations
-!    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-!
-!    ! save start data
-!    call save_data( iteration, time, params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n )
+    ! update neighbor relations
+    if ( params%threeD_case ) then
+        ! 3D:
+        call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    else
+        ! 2D:
+        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    end if
+
+    ! save start data
+    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+
+!if (rank==0) then
+!do iteration = 1, lgt_n
+!print*, lgt_block( lgt_active(iteration), 1:5)
+!end do
+!end if
+
+
 !
 !    ! main time loop
 !    do while ( time < params%time_max )
@@ -187,7 +193,7 @@ end if
 !        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 !
 !        ! update neighbor relations
-!        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+!        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 !
 !        ! advance in time
 !        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )

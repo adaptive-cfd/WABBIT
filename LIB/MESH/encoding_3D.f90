@@ -90,6 +90,8 @@ subroutine encoding_3D(treecode, i, j, k, block_num, treeN)
         stop
     end if
 
+
+
     ! convert block coordinates into binary numbers
     call int_to_binary(i-1, N, c)
     call int_to_binary(j-1, N, d)

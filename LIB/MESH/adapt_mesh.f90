@@ -79,7 +79,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
         ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     end do
 
@@ -91,6 +91,6 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
 end subroutine adapt_mesh

@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: write_field.f90
-! version: 0.4
+! version: 0.5
 ! author: engels, msr
 !
 ! write data of a single datafield dF at timestep iteration and time t
@@ -17,6 +17,9 @@
 ! = log ======================================================================================
 !
 ! 07/11/16 - switch to v0.4
+! 26/01/17 - switch to 3D, v0.5
+!          - add dirs_3D array for 3D neighbor codes
+!
 ! ********************************************************************************************
 
 subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n)
@@ -41,7 +44,7 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
     ! light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
     ! heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
     ! list of active blocks (light data)
@@ -54,7 +57,8 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
     ! set name
     character(len=80)                   :: dsetname
     ! neighbor name list
-    character(len=3)                    :: dirs(16)
+    character(len=3)                    :: dirs_2D(16)
+    character(len=7)                    :: dirs_3D(74)
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -69,16 +73,25 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    ! set MPI parameters
+    rank            = params%rank
+
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+    dirs_2D = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+
+    dirs_3D = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___', &
+               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___', &
+               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152', &
+               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634', &
+               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652', &
+               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652', &
+               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652', &
+               '_43/134', '_43/634', '_45/145', '_45/645' /)
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! file name depends on variable names
     select case(params%physics_type)
@@ -123,7 +136,14 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
             write(dsetname,'("block_",i8.8)') k
 
             ! write data field
-            call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, dF, hvy_id), .false.)
+            if ( params%threeD_case ) then
+                ! 3D: TODO real 3D data writing
+                call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id), .false.)
+            else
+                ! 2D:
+                call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id), .false.)
+            end if
+
 
             ! add useful attributes to the block:
             ! write treecode
@@ -134,17 +154,32 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
             call write_attribute( fname, dsetname, "rank", (/rank/))
 
             ! save coordinates
-            call write_attribute( fname, dsetname, "coord_x", hvy_block( 1, 1:Bs, 1, hvy_id) )
-            call write_attribute( fname, dsetname, "coord_y", hvy_block( 2, 1:Bs, 1, hvy_id) )
+            call write_attribute( fname, dsetname, "coord_x", hvy_block( 1, 1:Bs, 1, 1, hvy_id) )
+            call write_attribute( fname, dsetname, "coord_y", hvy_block( 2, 1:Bs, 1, 1, hvy_id) )
+            call write_attribute( fname, dsetname, "coord_z", hvy_block( 3, 1:Bs, 1, 1, hvy_id) )
 
             ! save neighbors
-            ! loop over all neighbors
-            do i = 1, 16
-                ! neighbor exists
-                if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
-                    call write_attribute( fname, dsetname, dirs(i),  lgt_block( hvy_neighbor( hvy_id, i ), 1:lgt_block( hvy_neighbor( hvy_id, i ), params%max_treelevel+1) ) )
-                end if
-            end do
+            if ( params%threeD_case ) then
+                ! 3D:
+                ! loop over all neighbors
+                do i = 1, 74
+                    ! neighbor exists
+                    if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
+                        call write_attribute( fname, dsetname, dirs_3D(i),  lgt_block( hvy_neighbor( hvy_id, i ), 1:lgt_block( hvy_neighbor( hvy_id, i ), params%max_treelevel+1) ) )
+                    end if
+                end do
+
+            else
+                ! 2D:
+                ! loop over all neighbors
+                do i = 1, 16
+                    ! neighbor exists
+                    if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
+                        call write_attribute( fname, dsetname, dirs_2D(i),  lgt_block( hvy_neighbor( hvy_id, i ), 1:lgt_block( hvy_neighbor( hvy_id, i ), params%max_treelevel+1) ) )
+                    end if
+                end do
+
+            end if
 
         end if
 

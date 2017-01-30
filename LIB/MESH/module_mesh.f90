@@ -46,14 +46,20 @@ contains
     ! create list of active blocks (heavy data)
     include "create_hvy_active_list.f90"
 
-    ! update neighbors
-    include "update_neighbors.f90"
+    ! update neighbors, 2D/3D
+    include "update_neighbors_2D.f90"
+    include "update_neighbors_3D.f90"
 
     ! neighbor search, edge
-    include "find_neighbor_edge.f90"
+    include "find_neighbor_edge_2D.f90"
+    include "find_neighbor_edge_3D.f90"
 
     ! neighbor search, corner
-    include "find_neighbor_corner.f90"
+    include "find_neighbor_corner_2D.f90"
+    include "find_neighbor_corner_3D.f90"
+
+    ! neighbor search, face
+    include "find_neighbor_face_3D.f90"
 
     ! search routine to find light data id corresponding to treecode
     include "does_block_exist.f90"

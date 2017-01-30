@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: find_neighbor_edge.f90
+! name: find_neighbor_edge_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -27,7 +27,7 @@
 ! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
+subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -147,7 +147,7 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
     end select
 
     ! calculate treecode for neighbor on same level
-    call adjacent_block( my_treecode, neighbor, dir, level, max_treelevel)
+    call adjacent_block_2D( my_treecode, neighbor, dir, level, max_treelevel)
 
     ! proof existence of neighbor block and find light data id
     call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
@@ -177,7 +177,7 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
             virt_treecode( level+1 ) = virt_code1
 
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block( virt_treecode, neighbor, dir, level+1, max_treelevel)
+            call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
             call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
 
@@ -199,7 +199,7 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
             virt_treecode( level+1 ) = virt_code2
 
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_block( virt_treecode, neighbor, dir, level+1, max_treelevel)
+            call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
             call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
 
@@ -220,4 +220,4 @@ subroutine find_neighbor_edge(heavy_id, light_id, lgt_block, max_treelevel, dir,
 
     end if
 
-end subroutine find_neighbor_edge
+end subroutine find_neighbor_edge_2D

@@ -158,7 +158,7 @@ subroutine initial_block_distribution_2D( params, lgt_block, hvy_block, phi )
     ! calculate domain coordinate vectors
     do i = 1, Ds
         coord_x(i) = (i-1) * Lx / (Ds-1)
-        coord_y(i) = Lx - (i-1) * Ly / (Ds-1)
+        coord_y(i) = (i-1) * Ly / (Ds-1) !Lx - (i-1) * Ly / (Ds-1)
     end do
 
     ! create block-tree

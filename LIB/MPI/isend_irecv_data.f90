@@ -16,7 +16,7 @@
 ! 16/01/17 - create for v0.4
 ! ********************************************************************************************
 
-subroutine isend_irecv_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -25,6 +25,9 @@ subroutine isend_irecv_data( int_send_buffer, real_send_buffer, int_receive_buff
 ! variables
 
     implicit none
+
+    ! user defined parameter structure
+    type (type_params), intent(in)      :: params
 
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
@@ -63,10 +66,9 @@ subroutine isend_irecv_data( int_send_buffer, real_send_buffer, int_receive_buff
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! determinate process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    ! set MPI parameters
+    rank            = params%rank
+    number_procs    = params%number_procs
 
     ! set message tag
     tag = 0

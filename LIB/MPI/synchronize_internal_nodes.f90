@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: synchronize_internal_nodes.f90
-! version: 0.4
+! version: 0.5
 ! author: msr
 !
 ! synchronize internal ghosts nodes, create com matrix and com list for external communication
@@ -12,15 +12,11 @@
 !           - com matrix
 !           - com lists for external synchronization
 !
-! todo: change soubroutine, to work only on one datafield, not on all to the same time
-!
-! -------------------------------------------------------------------------------------------------------------------------
-! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
-! -------------------------------------------------------------------------------------------------------------------------
-!
 ! = log ======================================================================================
 !
 ! 12/01/17 - create from old synchronize ghost routine
+! 31/01/17 - switch to 3D, v0.5
+!
 ! ********************************************************************************************
 
 subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_matrix, com_lists )
@@ -38,7 +34,7 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     ! light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     ! heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -65,13 +61,11 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     integer(kind=ik), intent(inout)     :: com_matrix(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, i, lgt_id, hvy_id
+    integer(kind=ik)                    :: k, N, i, lgt_id, hvy_id, neighbor_num
 
     ! grid parameter
     integer(kind=ik)                    :: g, Bs
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank, neighbor_rank
     ! number of processes
@@ -103,10 +97,9 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! determinate process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    ! set MPI parameter
+    rank            = params%rank
+    number_procs    = params%number_procs
 
     ! receiver lists
     allocate( receiver_pos( number_procs), stat=allocate_error )
@@ -139,11 +132,14 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! set loop number for 2D/3D case
+    neighbor_num = size(hvy_neighbor, 2)
+
     ! loop over active heavy data
     do k = 1, hvy_n
 
         ! loop over all neighbors
-        do i = 1, 16
+        do i = 1, neighbor_num
             ! neighbor exists
             if ( hvy_neighbor( hvy_active(k), i ) /= -1 ) then
 
@@ -162,7 +158,13 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
                     call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
 
                     ! internal neighbor -> copy ghost nodes
-                    call copy_ghost_nodes( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+                    if ( params%threeD_case ) then
+                        ! 3D:
+                        call copy_ghost_nodes_3D( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+                    else
+                        ! 2D:
+                        call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_active(k), hvy_id, i, level_diff )
+                    end if
 
                     ! write communications matrix
                     com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1

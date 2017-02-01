@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: time_step_RK4.f90
-! version: 0.4
+! version: 0.5
 ! author: msr
 !
 ! time step main function, RK4
@@ -18,6 +18,7 @@
 !
 ! 08/11/16 - switch to v0.4
 ! 07/12/16 - now uses heavy work data array and work for different physics
+! 31/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
 
@@ -39,9 +40,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     ! heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
     ! heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -53,10 +54,10 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
     ! loop variables
-    integer(kind=ik)                    :: k, dF, N_dF, i, j
+    integer(kind=ik)                    :: k, dF, N_dF
 
     ! time step, dx
-    real(kind=rk)                       :: dt, dx, my_dx, max_velocity(2), my_max_u, my_max_v
+    real(kind=rk)                       :: dt, dx, my_dx
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -86,20 +87,20 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     time_sum = 0.0_rk
 
+    ! set MPI parameter
+    rank         = params%rank
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
     ! start time
     sub_t0 = MPI_Wtime()
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
     ! loop over all active blocks (heavy data)
     do k = 1, hvy_n
-        my_dx = min(my_dx, hvy_block(1, 2, 1, hvy_active(k) ) - hvy_block(1, 1, 1, hvy_active(k) ) )
+        my_dx = min(my_dx, hvy_block(1, 2, 1, 1, hvy_active(k) ) - hvy_block(1, 1, 1, 1, hvy_active(k) ) )
     end do
 
     ! synchronize dx
@@ -114,41 +115,10 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             end do
 
         case('2D_navier_stokes')
+            dt = 0.000001_rk
 
-            max_velocity = 0.0_rk
-
-            ! maximal u value
-            my_max_u = 0.0_rk
-            ! loop over all active blocks (heavy data)
-            do k = 1, hvy_n
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
-                        my_max_u = max( my_max_u, sqrt( (hvy_block(i, j, 3, hvy_active(k) ))**2 ) )
-                    end do
-                end do
-            end do
-            ! synchronize max_u
-            call MPI_Allreduce(my_max_u, max_velocity(1), 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
-
-            ! maximal v value
-            my_max_v = 0.0_rk
-            ! loop over all active blocks (heavy data)
-            do k = 1, hvy_n
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
-                        my_max_v = max( my_max_v, sqrt( (hvy_block(i, j, 4, hvy_active(k) ))**2 ) )
-                    end do
-                end do
-            end do
-            ! synchronize max_v
-            call MPI_Allreduce(my_max_v, max_velocity(2), 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
-
-            !if ( (norm2( max_velocity ) == 0.0_rk) ) then
-                ! zero velocity, choose fixed time step
-                dt = 0.000001_rk
-            !else
-                !dt = 0.000001_rk !params%CFL * dx / norm2( max_velocity )
-            !end if
+        case('3D_convection_diffusion')
+            dt = 0.1_rk
 
     end select
 
@@ -182,13 +152,13 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 do k = 1, hvy_n
 
                     ! save old data
-                    hvy_work( :, :, (dF-2)*5+1, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! set k1 step
-                    hvy_work( :, :, (dF-2)*5+2, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
-                    call RHS_2D_convection_diffusion( hvy_work( :, :, (dF-2)*5+2, hvy_active(k) ), &
-                                                      abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                                      abs(hvy_block( 2, 2, 1, hvy_active(k)) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                    call RHS_2D_convection_diffusion( hvy_work( :, :, 1, (dF-2)*5+2, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k)) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                                       g, Bs, &
                                                       params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%nu( (dF-1) ), &
                                                       params%order_discretization  )
@@ -201,15 +171,15 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
 
                 ! save old data
-                hvy_work( :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, 2:N_dF+1, hvy_active(k) )
+                hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) )
                 ! set k1 step
-                hvy_work( :, :, N_dF+1:2*N_dF, hvy_active(k) ) = hvy_block( :, :, 2:N_dF+1, hvy_active(k) )
+                hvy_work( :, :, :, N_dF+1:2*N_dF, hvy_active(k) ) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) )
                 ! RHS
                 call RHS_2D_navier_stokes( params%physics_ns, g, Bs, &
-                                           abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                           abs(hvy_block( 2, 2, 1, hvy_active(k)) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 2, 2, 1, 1, hvy_active(k)) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                            N_dF, &
-                                           hvy_work( :, :, N_dF+1:2*N_dF, hvy_active(k) ) )
+                                           hvy_work( :, :, 1, N_dF+1:2*N_dF, hvy_active(k) ) )
 
             end do
 
@@ -224,14 +194,14 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do dF = 2, N_dF+1
                 do k = 1, hvy_n
                     ! save old data
-                    hvy_block( :, :, dF, hvy_active(k) ) = hvy_work( :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, (dF-2)*5+2, hvy_active(k) )
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) )
                 end do
             end do
 
         case('2D_navier_stokes')
             do k = 1, hvy_n
                 ! save old data
-                hvy_block( :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, N_dF+1:2*N_dF, hvy_active(k) )
+                hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, N_dF+1:2*N_dF, hvy_active(k) )
             end do
 
     end select
@@ -255,11 +225,11 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 do k = 1, hvy_n
 
                     ! set k2 step
-                    hvy_work( :, :, (dF-2)*5+3, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
-                    call RHS_2D_convection_diffusion( hvy_work( :, :, (dF-2)*5+3, hvy_active(k) ), &
-                                                      abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                                      abs(hvy_block( 2, 2, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                    call RHS_2D_convection_diffusion( hvy_work( :, :, 1, (dF-2)*5+3, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                                       g, Bs, &
                                                       params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%nu( (dF-1) ), &
                                                       params%order_discretization  )
@@ -272,13 +242,13 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
 
                 ! set k2 step
-                hvy_work( :, :, 2*N_dF+1:3*N_dF, hvy_active(k) ) = hvy_block( :, :, 2:N_dF+1, hvy_active(k) )
+                hvy_work( :, :, :, 2*N_dF+1:3*N_dF, hvy_active(k) ) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) )
                 ! RHS
                 call RHS_2D_navier_stokes( params%physics_ns, g, Bs, &
-                                           abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                           abs(hvy_block( 2, 2, 1, hvy_active(k)) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 2, 2, 1, 1, hvy_active(k)) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                            N_dF, &
-                                           hvy_work( :, :, 2*N_dF+1:3*N_dF, hvy_active(k) ) )
+                                           hvy_work( :, :, 1, 2*N_dF+1:3*N_dF, hvy_active(k) ) )
 
             end do
 
@@ -293,14 +263,14 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do dF = 2, N_dF+1
                 do k = 1, hvy_n
                     ! save old data
-                    hvy_block( :, :, dF, hvy_active(k) ) = hvy_work( :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, (dF-2)*5+3, hvy_active(k) )
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) )
                 end do
             end do
 
         case('2D_navier_stokes')
             do k = 1, hvy_n
                 ! save old data
-                hvy_block( :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, 2*N_dF+1:3*N_dF, hvy_active(k) )
+                hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, 2*N_dF+1:3*N_dF, hvy_active(k) )
             end do
 
     end select
@@ -324,11 +294,11 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 do k = 1, hvy_n
 
                     ! set k3 step
-                    hvy_work( :, :, (dF-2)*5+4, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
-                    call RHS_2D_convection_diffusion( hvy_work( :, :, (dF-2)*5+4, hvy_active(k) ), &
-                                                      abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                                      abs(hvy_block( 2, 2, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                    call RHS_2D_convection_diffusion( hvy_work( :, :, 1, (dF-2)*5+4, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                                       g, Bs, &
                                                       params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%nu( (dF-1) ), &
                                                       params%order_discretization  )
@@ -341,13 +311,13 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
 
                 ! set k3 step
-                hvy_work( :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) = hvy_block( :, :, 2:N_dF+1, hvy_active(k) )
+                hvy_work( :, :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) )
                 ! RHS
                 call RHS_2D_navier_stokes( params%physics_ns, g, Bs, &
-                                           abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                           abs(hvy_block( 2, 2, 1, hvy_active(k)) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 2, 2, 1, 1, hvy_active(k)) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                            N_dF, &
-                                           hvy_work( :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) )
+                                           hvy_work( :, :, 1, 3*N_dF+1:4*N_dF, hvy_active(k) ) )
 
             end do
 
@@ -362,14 +332,14 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do dF = 2, N_dF+1
                 do k = 1, hvy_n
                     ! save old data
-                    hvy_block( :, :, dF, hvy_active(k) ) = hvy_work( :, :, (dF-2)*5+1, hvy_active(k) ) + dt * hvy_work( :, :, (dF-2)*5+4, hvy_active(k) )
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + dt * hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) )
                 end do
             end do
 
         case('2D_navier_stokes')
             do k = 1, hvy_n
                 ! save old data
-                hvy_block( :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, 1:N_dF, hvy_active(k) ) + dt * hvy_work( :, :, 3*N_dF+1:4*N_dF, hvy_active(k) )
+                hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + dt * hvy_work( :, :, :, 3*N_dF+1:4*N_dF, hvy_active(k) )
             end do
 
     end select
@@ -393,11 +363,11 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 do k = 1, hvy_n
 
                     ! set k4 step
-                    hvy_work( :, :, (dF-2)*5+5, hvy_active(k) ) = hvy_block( :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
-                    call RHS_2D_convection_diffusion( hvy_work( :, :, (dF-2)*5+5, hvy_active(k) ), &
-                                                      abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                                      abs(hvy_block( 2, 2, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                    call RHS_2D_convection_diffusion( hvy_work( :, :, 1, (dF-2)*5+5, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                                       g, Bs, &
                                                       params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%nu( (dF-1) ), &
                                                       params%order_discretization  )
@@ -410,13 +380,13 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
 
                 ! set k4 step
-                hvy_work( :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) = hvy_block( :, :, 2:N_dF+1, hvy_active(k) )
+                hvy_work( :, :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) )
                 ! RHS
                 call RHS_2D_navier_stokes( params%physics_ns, g, Bs, &
-                                           abs(hvy_block( 1, 2, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, hvy_active(k) )), &
-                                           abs(hvy_block( 2, 2, 1, hvy_active(k)) - hvy_block( 2, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                           abs(hvy_block( 2, 2, 1, 1, hvy_active(k)) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
                                            N_dF, &
-                                           hvy_work( :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) )
+                                           hvy_work( :, :, 1, 4*N_dF+1:5*N_dF, hvy_active(k) ) )
 
             end do
 
@@ -433,11 +403,11 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 do k = 1, hvy_n
 
                     ! final step
-                    hvy_block( :, :, dF, hvy_active(k) ) = hvy_work( :, :, (dF-2)*5+1, hvy_active(k) ) &
-                                                        + (dt/6.0_rk) * ( hvy_work( :, :, (dF-2)*5+2, hvy_active(k) ) &
-                                                        + 2.0_rk * hvy_work( :, :, (dF-2)*5+3, hvy_active(k) ) &
-                                                        + 2.0_rk * hvy_work( :, :, (dF-2)*5+4, hvy_active(k) ) &
-                                                        + hvy_work( :, :, (dF-2)*5+5, hvy_active(k) ) )
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) &
+                                                            + (dt/6.0_rk) * ( hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ) &
+                                                            + 2.0_rk * hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) &
+                                                            + 2.0_rk * hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) &
+                                                            + hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) )
 
                 end do
             end do
@@ -447,11 +417,11 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
 
                 ! final step
-                hvy_block( :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, 1:N_dF, hvy_active(k) ) &
-                                                           + (dt/6.0_rk) * ( hvy_work( :, :, N_dF+1:2*N_dF, hvy_active(k) ) &
-                                                           + 2.0_rk * hvy_work( :, :, 2*N_dF+1:3*N_dF, hvy_active(k) ) &
-                                                           + 2.0_rk * hvy_work( :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) &
-                                                           + hvy_work( :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) )
+                hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) )   = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) &
+                                                                + (dt/6.0_rk) * ( hvy_work( :, :, :, N_dF+1:2*N_dF, hvy_active(k) ) &
+                                                                + 2.0_rk * hvy_work( :, :, :, 2*N_dF+1:3*N_dF, hvy_active(k) ) &
+                                                                + 2.0_rk * hvy_work( :, :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) &
+                                                                + hvy_work( :, :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) )
 
             end do
 

@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: create_send_buffer.f90
+! name: create_send_buffer_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -22,7 +22,7 @@
 ! 06/01/17 - create for v0.4
 ! ********************************************************************************************
 
-subroutine create_send_buffer(params, hvy_block, com_list, com_number, send_buff, buffer_i)
+subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_buff, buffer_i)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -74,9 +74,13 @@ subroutine create_send_buffer(params, hvy_block, com_list, com_number, send_buff
     g     = params%number_ghost_nodes
 
     allocate( data_corner( g, g), stat=allocate_error )
+    call check_allocation(allocate_error)
     allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )
+    call check_allocation(allocate_error)
     allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    call check_allocation(allocate_error)
     allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    call check_allocation(allocate_error)
 
     buffer_i         = 1
 
@@ -536,4 +540,4 @@ subroutine create_send_buffer(params, hvy_block, com_list, com_number, send_buff
     deallocate( data_edge, stat=allocate_error )
     deallocate( data_edge_fine, stat=allocate_error )
 
-end subroutine create_send_buffer
+end subroutine create_send_buffer_2D

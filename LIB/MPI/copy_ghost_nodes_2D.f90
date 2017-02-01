@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: copy_ghost_nodes.f90
+! name: copy_ghost_nodes_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -24,7 +24,7 @@
 ! 09/11/16 - create for v0.4
 ! ********************************************************************************************
 
-subroutine copy_ghost_nodes( params, hvy_block, sender_id, receiver_id, neighborhood, level_diff)
+subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neighborhood, level_diff)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -67,9 +67,13 @@ subroutine copy_ghost_nodes( params, hvy_block, sender_id, receiver_id, neighbor
 ! variables initialization
 
     allocate( data_corner( g, g), stat=allocate_error )
+    call check_allocation(allocate_error)
     allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )
+    call check_allocation(allocate_error)
     allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    call check_allocation(allocate_error)
     allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    call check_allocation(allocate_error)
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -519,4 +523,4 @@ subroutine copy_ghost_nodes( params, hvy_block, sender_id, receiver_id, neighbor
     deallocate( data_edge, stat=allocate_error )
     deallocate( data_edge_fine, stat=allocate_error )
 
-end subroutine copy_ghost_nodes
+end subroutine copy_ghost_nodes_2D

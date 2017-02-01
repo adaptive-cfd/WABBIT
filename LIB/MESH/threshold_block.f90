@@ -31,7 +31,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     ! neighbor list
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
 
@@ -130,7 +130,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         do dF = 2, params%number_data_fields+1
 
             ! reset interpolation fields
-            u1        = hvy_block( :, :, dF, hvy_active(k) )
+            !u1        = hvy_block( :, :, dF, hvy_active(k) )
+            u1        = hvy_block( :, :, 1, dF, hvy_active(k) )
             u2        = 0.0_rk
             u3        = 0.0_rk
 

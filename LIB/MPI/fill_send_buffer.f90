@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: fill_send_buffer.f90
-! version: 0.4
+! version: 0.5
 ! author: msr
 !
 ! fill send buffer
@@ -13,9 +13,38 @@
 ! output:   - filled send buffer
 !           - second com matrix line with receiver data position (column number) in send buffer
 !
+! --------------------------------------------------------------------------------------------
+! neighbor codes:
+! ---------------
+! for imagination:  - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
+!                   - edge: boundary between two sides - use sides numbers for coding
+!                   - corner: between three sides - so use all three sides numbers
+!                   - block on higher/lower level: block shares face/edge and one unique corner,
+!                     so use this corner code in second part of neighbor code
+!
+! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
+! edges:  '_12/___', '_13/___', '_14/___', '_15/___'
+!         '_62/___', '_63/___', '_64/___', '_65/___'
+!         '_23/___', '_25/___', '_43/___', '_45/___'
+! corner: '123/___', '134/___', '145/___', '152/___'
+!         '623/___', '634/___', '645/___', '652/___'
+!
+! complete neighbor code array, 74 possible neighbor relations
+! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
+!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
+!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
+!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
+!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
+!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
+!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
+!               '_43/134', '_43/634', '_45/145', '_45/645' /)
+! --------------------------------------------------------------------------------------------
+!
 ! = log ======================================================================================
 !
 ! 13/01/17 - create for v0.4
+! 01/02/17 - switch to 3D, v0.5
+!
 ! ********************************************************************************************
 
 subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank, int_send_buffer, real_send_buffer )
@@ -32,7 +61,7 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
     type (type_params), intent(in)                  :: params
 
     ! heavy data array - block data
-    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
 
     ! communication lists:
     integer(kind=ik), intent(in)                    :: com_lists(:, :, :)
@@ -74,6 +103,12 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
 
     ! allocate proc send buffer, size = line size of real send buffer
     allocate( proc_send_buffer( size(real_send_buffer,1) ), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -88,7 +123,13 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
             ! ----------------
 
             ! write real send buffer for proc k
-            call create_send_buffer(params, hvy_block, com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), proc_send_buffer, buffer_i)
+            if ( params%threeD_case ) then
+                ! 3D:
+                call create_send_buffer_3D(params, hvy_block, com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), proc_send_buffer, buffer_i)
+            else
+                ! 2D:
+                call create_send_buffer_2D(params, hvy_block(:, :, 1, :, :), com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), proc_send_buffer, buffer_i)
+            end if
 
             ! real buffer entry
             real_send_buffer( 1 : buffer_i, column_pos ) = proc_send_buffer( 1 : buffer_i )

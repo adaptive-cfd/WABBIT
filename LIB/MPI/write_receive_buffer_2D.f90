@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_receive_buffer.f90
+! name: write_receive_buffer_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -20,7 +20,7 @@
 ! 09/01/17 - create for v0.4
 ! ********************************************************************************************
 
-subroutine write_receive_buffer(params, int_buffer, recv_buff, hvy_block)
+subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -441,4 +441,4 @@ subroutine write_receive_buffer(params, int_buffer, recv_buff, hvy_block)
     deallocate( data_edge, stat=allocate_error )
     deallocate( data_edge_fine, stat=allocate_error )
 
-end subroutine write_receive_buffer
+end subroutine write_receive_buffer_2D

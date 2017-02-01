@@ -13,7 +13,7 @@
 ! = log ======================================================================================
 !
 ! 13/01/17 - create for v0.4
-! TODO: choose method with ini file
+!
 ! ********************************************************************************************
 
 subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
@@ -53,15 +53,15 @@ subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_r
 
         ! use RMA with lock/unlock synchronization, use MPI_Get
         case('RMA_lock_unlock_get')
-            call RMA_lock_unlock_get_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            call RMA_lock_unlock_get_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
         ! use RMA with lock/unlock synchronization, use MPI_Put
         case('RMA_lock_unlock_put')
-            call RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            call RMA_lock_unlock_put_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
         ! use non-blocking isend/irecv
         case('Non_blocking_Isend_Irecv')
-            call isend_irecv_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            call isend_irecv_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
         case default
             write(*,'(80("_"))')

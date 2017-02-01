@@ -45,13 +45,16 @@ contains
     include "synchronize_internal_nodes.f90"
 
     ! coyp internal ghost nodes
-    include "copy_ghost_nodes.f90"
+    include "copy_ghost_nodes_2D.f90"
+    include "copy_ghost_nodes_3D.f90"
 
     ! write send buffer
-    include "create_send_buffer.f90"
+    include "create_send_buffer_2D.f90"
+    include "create_send_buffer_3D.f90"
 
     ! write received buffer
-    include "write_receive_buffer.f90"
+    include "write_receive_buffer_2D.f90"
+    include "write_receive_buffer_3D.f90"
 
     ! maximal number of communications
     include "max_com_num.f90"

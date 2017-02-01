@@ -30,7 +30,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     ! light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     ! heavy data array - neifghbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
 
@@ -72,7 +72,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n )
 
         ! adapt the mesh
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n )
+        call coarse_mesh( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n )
 
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
@@ -84,7 +84,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     end do
 
     ! balance load
-    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call balance_load( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )

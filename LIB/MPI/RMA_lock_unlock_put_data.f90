@@ -17,7 +17,7 @@
 ! 16/01/17 - create for v0.4
 ! ********************************************************************************************
 
-subroutine RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+subroutine RMA_lock_unlock_put_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -26,6 +26,9 @@ subroutine RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_rece
 ! variables
 
     implicit none
+
+    ! user defined parameter structure
+    type (type_params), intent(in)      :: params
 
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
@@ -63,10 +66,9 @@ subroutine RMA_lock_unlock_put_data( int_send_buffer, real_send_buffer, int_rece
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! determinate process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    ! set MPI parameters
+    rank            = params%rank
+    number_procs    = params%number_procs
 
 !---------------------------------------------------------------------------------------------
 ! main body

@@ -70,6 +70,9 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
+    ! array for coordinate values, need 6 values for 3D (4 for 2D)
+    real(kind=rk)                       :: coords_origin(3), coords_spacing(3)
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -102,6 +105,10 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
         case('2D_navier_stokes')
             ! select corresponding datafield name
             write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(dF-1))), nint(time * 1.0e6_rk)
+
+        case('3D_convection_diffusion')
+            ! select corresponding datafield name
+            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(dF-1))), nint(time * 1.0e6_rk)
 
     end select
 
@@ -137,8 +144,8 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
 
             ! write data field
             if ( params%threeD_case ) then
-                ! 3D: TODO real 3D data writing
-                call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id), .false.)
+                ! 3D:
+                call write_field_hdf5_3D( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id), .false.)
             else
                 ! 2D:
                 call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id), .false.)
@@ -179,6 +186,36 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
                     end if
                 end do
 
+            end if
+
+            ! write coordinates (origin and spacing) in new dataset
+            ! dataset name
+            write(dsetname,'("block_",i8.8,"_origin")') k
+            ! coordinate values
+            coords_origin(1) = hvy_block( 1, 1, 1, 1, hvy_id)
+            coords_origin(2) = hvy_block( 2, 1, 1, 1, hvy_id)
+            coords_origin(3) = hvy_block( 3, 1, 1, 1, hvy_id)
+            ! write data
+            if ( params%threeD_case ) then
+                ! 3D:
+                call write_field_hdf5_1D( fname, dsetname, coords_origin(:), .false.)
+            else
+                ! 2D:
+                call write_field_hdf5_1D( fname, dsetname, coords_origin(1:2), .false.)
+            end if
+
+            write(dsetname,'("block_",i8.8,"_spacing")') k
+            ! coordinate values
+            coords_spacing(1) = abs(hvy_block( 1, 1, 1, 1, hvy_id) - hvy_block( 1, 2, 1, 1, hvy_id) )
+            coords_spacing(2) = abs(hvy_block( 2, 1, 1, 1, hvy_id) - hvy_block( 2, 2, 1, 1, hvy_id) )
+            coords_spacing(3) = abs(hvy_block( 3, 1, 1, 1, hvy_id) - hvy_block( 3, 2, 1, 1, hvy_id) )
+            ! write data
+            if ( params%threeD_case ) then
+                ! 3D:
+                call write_field_hdf5_1D( fname, dsetname, coords_spacing(:), .false.)
+            else
+                ! 2D:
+                call write_field_hdf5_1D( fname, dsetname, coords_spacing(1:2), .false.)
             end if
 
         end if

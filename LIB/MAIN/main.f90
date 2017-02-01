@@ -92,7 +92,7 @@ program main
     integer(kind=ik)                    :: hvy_n
 
     ! time loop variables
-    real(kind=rk)                       :: time!, output_time
+    real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
 
     ! number of dimensions
@@ -106,6 +106,7 @@ program main
 
     ! init time loop
     time          = 0.0_rk
+    output_time   = 0.0_rk
     iteration     = 0
 
 !---------------------------------------------------------------------------------------------
@@ -172,68 +173,70 @@ program main
     ! save start data
     call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
 
-!if (rank==0) then
-!do iteration = 1, lgt_n
-!print*, lgt_block( lgt_active(iteration), 1:5)
-!end do
-!end if
+    ! main time loop
+    do while ( time < params%time_max )
 
+        iteration = iteration + 1
 
-!
-!    ! main time loop
-!    do while ( time < params%time_max )
-!
-!        iteration = iteration + 1
-!
-!        ! refine everywhere
-!        if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
-!
-!        ! update lists of active blocks (light and heavy data)
-!        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-!        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-!
-!        ! update neighbor relations
-!        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-!
-!        ! advance in time
-!        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
-!
-!        ! adapt the mesh
-!        if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
-!
-!        ! output on screen
-!        if (rank==0) then
-!            write(*,'(80("-"))')
-!            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, lgt_n
-!
-!        end if
-!
-!        ! write data to disk
-!        if (modulo(iteration, params%write_freq) == 0) then
-!          call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
-!          output_time = time
-!        endif
-!
-!        ! debug info
-!        if ( params%debug ) then
-!            ! sum and reset times and calls
-!            debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
-!            debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
-!            ! write debug infos to file
-!            call write_debug_times( iteration )
-!            ! reset loop values
-!            debug%comp_time(:,1) = 0.0_rk
-!            debug%comp_time(:,2) = 0.0_rk
-!
-!        end if
-!
-!    end do
-!
-!    ! last timestep is very small
-!    if ( abs(output_time-time) < 1e-10 ) output_time = time
-!
-!    ! save end field to disk, only if timestep is not saved allready
-!    if ( output_time /= time ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+        ! refine everywhere
+        !if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
+        if ( params%threeD_case ) then
+            ! 3D:
+            !call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        else
+            ! 2D:
+            if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n, hvy_active, hvy_n )
+        end if
+
+        ! update lists of active blocks (light and heavy data)
+        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+
+        ! update neighbor relations
+        if ( params%threeD_case ) then
+            ! 3D:
+            call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        else
+            ! 2D:
+            call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        end if
+
+        ! advance in time
+        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+
+        ! adapt the mesh
+        if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+
+        ! output on screen
+        if (rank==0) then
+            write(*,'(80("-"))')
+            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, lgt_n
+
+        end if
+
+        ! write data to disk
+        if (modulo(iteration, params%write_freq) == 0) then
+          call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+          output_time = time
+        endif
+
+        ! debug info
+        if ( params%debug ) then
+            ! sum and reset times and calls
+            debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
+            debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
+            ! write debug infos to file
+            call write_debug_times( iteration )
+            ! reset loop values
+            debug%comp_time(:,1) = 0.0_rk
+            debug%comp_time(:,2) = 0.0_rk
+
+        end if
+
+    end do
+
+    ! save end field to disk, only if timestep is not saved allready
+    if ( abs(output_time-time) > 1e-10_rk ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
 
     ! debug info
     if ( params%debug ) then

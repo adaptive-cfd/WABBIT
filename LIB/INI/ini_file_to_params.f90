@@ -198,6 +198,43 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
 
+        case('3D_convection_diffusion')
+
+            ! domain size
+            call read_param(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            ! read third dimension only for 3D cases
+            if ( params%threeD_case ) then
+                call read_param(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
+            else
+                params%Lz = 0.0_rk
+            end if
+
+            ! allocate memory in params structure (need 2*data_fields for velocity
+            ! and 1*data_fields for diffusion coefficient)
+            allocate( params%physics%u0( 2*params%number_data_fields ), stat=allocate_error )
+            call check_allocation(allocate_error)
+            allocate( params%physics%nu( params%number_data_fields ), stat=allocate_error )
+            call check_allocation(allocate_error)
+
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            params%physics%nu = 0.0_rk
+
+            ! read velocity
+            call read_param(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+            ! read diffusion
+            call read_param(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
+
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics%names( params%number_data_fields ), stat=allocate_error )
+            call check_allocation(allocate_error)
+
+            params%physics%names = "---"
+            ! read file
+            call read_param(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: physics type is unknown"

@@ -192,8 +192,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
                 call get_free_light_id( heavy_id, lgt_block( (k-1)*max_blocks + 1 : ((k-1)+1)*max_blocks, 1 ), max_blocks )
 
                 ! save data, write start field phi in first datafield
-                ! note: third dimension of phi has size 1
-                ! note: coordinates for z-dim are set to zero
                 if (rank == (k-1)) then
                     call new_block_heavy(params, &
                                          hvy_block, &

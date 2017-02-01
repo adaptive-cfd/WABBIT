@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: synchronize_ghosts.f90
-! version: 0.4
+! version: 0.5
 ! author: msr
 !
 ! synchronize ghosts nodes
@@ -20,6 +20,8 @@
 !
 ! 08/11/16 - switch to v0.4
 ! 06/01/17 - use RMA to synchronize data
+! 31/01/17 - switch to 3D, v0.5
+!
 ! ********************************************************************************************
 
 subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
@@ -37,7 +39,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     ! heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -105,18 +107,41 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! determinate process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    ! set MPI parameter
+    rank         = params%rank
+    number_procs = params%number_procs
 
     ! allocate local com_lists
     allocate( com_lists( N*16, 6, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! allocate com matrix
     allocate( com_matrix(number_procs, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
     allocate( com_matrix_pos(number_procs, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
     allocate( my_com_matrix(number_procs, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     ! reset com-list, com_plan, com matrix, receiver lists
     com_lists       = -1
@@ -131,10 +156,21 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! loop over all active blocks
         do k = 1, hvy_n
             ! reset ghost nodes
-            hvy_block(1:g, :, dF, hvy_active(k) )           = 9.0e9_rk
-            hvy_block(Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 9.0e9_rk
-            hvy_block(:, 1:g, dF, hvy_active(k) )           = 9.0e9_rk
-            hvy_block(:, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 9.0e9_rk
+            if ( params%threeD_case ) then
+                ! 3D:
+                hvy_block(1:g, :, :, dF, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(Bs+g+1:Bs+2*g, :, :, dF, hvy_active(k) ) = 9.0e9_rk
+                hvy_block(:, 1:g, :, dF, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(:, Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 9.0e9_rk
+                hvy_block(:, :, 1:g, dF, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 9.0e9_rk
+            else
+                ! 2D:
+                hvy_block(1:g, :, 1, dF, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(Bs+g+1:Bs+2*g, :, 1, dF, hvy_active(k) ) = 9.0e9_rk
+                hvy_block(:, 1:g, 1, dF, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(:, Bs+g+1:Bs+2*g, 1, dF, hvy_active(k) ) = 9.0e9_rk
+            end if
         end do
     end do
 
@@ -207,6 +243,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
     ! for proc without neighbors: set n_procs to 1
+    ! so we allocate arrays with second dimension=1
     if (n_procs==0) n_procs = 1
 
     ! next steps only for more than two procs
@@ -219,11 +256,55 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         !               number of lines:
         !                   int buffer  - max number of communications  * 3 + 1 (length of real buffer)
         !                   real buffer - max number of communications * (Bs+g) * g * number of datafields
+        !                   for 3D: real_buffer * Bs
         allocate( int_send_buffer( n_com * 3 + 1, n_procs ), stat=allocate_error )
+        !call check_allocation(allocate_error)
+        if ( allocate_error /= 0 ) then
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: memory allocation fails"
+            stop
+        end if
         allocate( int_receive_buffer( n_com * 3 + 1, n_procs ), stat=allocate_error )
+        !call check_allocation(allocate_error)
+        if ( allocate_error /= 0 ) then
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: memory allocation fails"
+            stop
+        end if
 
-        allocate( real_send_buffer( n_com * (Bs+g) * g * params%number_data_fields, n_procs ), stat=allocate_error )
-        allocate( real_receive_buffer( n_com * (Bs+g) * g * params%number_data_fields, n_procs ), stat=allocate_error )
+        if ( params%threeD_case ) then
+            ! 3D:
+            allocate( real_receive_buffer( n_com * (Bs+g) * g * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
+            !call check_allocation(allocate_error)
+            if ( allocate_error /= 0 ) then
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: memory allocation fails"
+                stop
+            end if
+            allocate( real_send_buffer( n_com * (Bs+g) * g * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
+            !call check_allocation(allocate_error)
+            if ( allocate_error /= 0 ) then
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: memory allocation fails"
+                stop
+            end if
+        else
+            ! 2D:
+            allocate( real_receive_buffer( n_com * (Bs+g) * g * params%number_data_fields, n_procs ), stat=allocate_error )
+            !call check_allocation(allocate_error)
+            if ( allocate_error /= 0 ) then
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: memory allocation fails"
+                stop
+            end if
+            allocate( real_send_buffer( n_com * (Bs+g) * g * params%number_data_fields, n_procs ), stat=allocate_error )
+            !call check_allocation(allocate_error)
+            if ( allocate_error /= 0 ) then
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: memory allocation fails"
+                stop
+            end if
+        end if
 
         ! reset buffer for debuggung
         if ( params%debug ) then
@@ -327,7 +408,13 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 real_N = int_receive_buffer( 1, buffer_pos )
 
                 ! read received data
-                call write_receive_buffer(params, int_receive_buffer(2:int_N, buffer_pos), real_receive_buffer(1:real_N, buffer_pos), hvy_block)
+                if ( params%threeD_case ) then
+                    ! 3D:
+                    call write_receive_buffer_3D(params, int_receive_buffer(2:int_N, buffer_pos), real_receive_buffer(1:real_N, buffer_pos), hvy_block )
+                else
+                    ! 2D:
+                    call write_receive_buffer_2D(params, int_receive_buffer(2:int_N, buffer_pos), real_receive_buffer(1:real_N, buffer_pos), hvy_block(:, :, 1, :, :) )
+                end if
 
             end if
 

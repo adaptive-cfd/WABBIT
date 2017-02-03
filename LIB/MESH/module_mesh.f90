@@ -71,7 +71,8 @@ contains
     include "respect_min_max_treelevel.f90"
 
     ! check treelevel restrictions
-    include "refine_mesh.f90"
+    include "refine_mesh_2D.f90"
+    include "refine_mesh_3D.f90"
 
     ! adapt the mesh
     include "adapt_mesh.f90"

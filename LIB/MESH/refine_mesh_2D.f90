@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: refine_mesh.f90
+! name: refine_mesh_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -18,7 +18,7 @@
 !            subroutines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_active, hvy_n )
+subroutine refine_mesh_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -79,8 +79,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
     N = params%number_blocks
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! set MPI parameter
+    rank         = params%rank
 
     ! light data start line
     my_light_start = rank*N
@@ -313,4 +313,4 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_active, hvy_n )
     deallocate( new_coord_x, stat=allocate_error )
     deallocate( new_coord_y, stat=allocate_error )
 
-end subroutine refine_mesh
+end subroutine refine_mesh_2D

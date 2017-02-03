@@ -181,14 +181,7 @@ program main
         if (iteration==150) params%adapt_mesh = .false.
 
         ! refine everywhere
-        !if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
-        if ( params%threeD_case ) then
-            ! 3D:
-            !call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        else
-            ! 2D:
-            if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n, hvy_active, hvy_n )
-        end if
+        if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
@@ -207,7 +200,7 @@ program main
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
         ! adapt the mesh
-        if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+        !if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
 
         ! output on screen
         if (rank==0) then

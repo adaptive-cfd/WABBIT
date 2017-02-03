@@ -13,6 +13,8 @@
 ! = log ======================================================================================
 !
 ! 08/11/16 - switch to v0.4
+! 03/02/17 - 3D heavy data
+!
 ! ********************************************************************************************
 
 subroutine refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
@@ -30,7 +32,7 @@ subroutine refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, h
     ! light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
 
     ! list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
@@ -77,7 +79,13 @@ subroutine refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, h
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
 
     ! interpolate the new mesh
-    call refine_mesh( params, lgt_block, hvy_block, hvy_active, hvy_n )
+    if ( params%threeD_case ) then
+        ! 3D:
+        call refine_mesh_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+    else
+        ! 2D:
+        call refine_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
+    end if
 
     ! end time
     sub_t1 = MPI_Wtime()

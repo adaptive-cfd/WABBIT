@@ -71,4 +71,7 @@ contains
     ! initial block distribution - 3D case
     include "initial_block_distribution_3D.f90"
 
+    ! start field, 3D sphere
+    include "inicond_sphere.f90"
+
 end module module_init

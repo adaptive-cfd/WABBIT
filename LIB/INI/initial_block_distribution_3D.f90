@@ -197,15 +197,26 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
                                          hvy_block, &
                                          heavy_id, &
                                          phi( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 , (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1, (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ), &
-                                         coord_x( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
-                                         coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
+                                         coord_x( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
+                                         coord_y( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
                                          coord_z( (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ) )
 
                 end if
 
                 ! ------------------------------------------------------------------------------------------------------
                 ! encoding treecode
-                call encoding_3D(treecode, i, j, l, num_blocks, max_treelevel )
+                call encoding_3D(treecode, j, i, l, num_blocks, max_treelevel )
+!                if (rank==0) then
+!                call encoding_3D(treecode, 1, 1, 1, num_blocks, max_treelevel )
+!                print*, treecode
+!                call encoding_3D(treecode, 1, 1, 2, num_blocks, max_treelevel )
+!                print*, treecode
+!                call encoding_3D(treecode, 1, 1, 3, num_blocks, max_treelevel )
+!                print*, treecode
+!                call encoding_3D(treecode, 1, 1, 4, num_blocks, max_treelevel )
+!                print*, treecode
+!                stop
+!                end if
 
                 ! ------------------------------------------------------------------------------------------------------
                 ! write light data

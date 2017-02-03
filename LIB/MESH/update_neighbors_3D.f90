@@ -109,8 +109,8 @@ subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     ! special case:
     ! if there is only one block => all neighbors are this block
     ! one block criteria: size of block_list should be one!
-    if ( size(lgt_block,1) == 1 ) then
-        hvy_neighbor(1,1:26) = 1
+    if ( lgt_n == 1 ) then
+        hvy_neighbor(1,1:26) = lgt_active(1)
     end if
 
     ! loop over active heavy data blocks

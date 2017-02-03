@@ -178,6 +178,8 @@ program main
 
         iteration = iteration + 1
 
+        if (iteration==150) params%adapt_mesh = .false.
+
         ! refine everywhere
         !if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
         if ( params%threeD_case ) then

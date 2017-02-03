@@ -2,7 +2,7 @@
 # Non-module Fortran files to be compiled:
 FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block_2D.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
-RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90 adjacent_block_3D.f90
+RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90 adjacent_block_3D.f90 RHS_3D_convection_diffusion.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -12,7 +12,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_init.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90
 # physics modules
-MFILED += module_2D_convection_diffusion.f90
+MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
@@ -71,12 +71,12 @@ $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 #compile physics modules	
-$(OBJDIR)/module_2D_convection_diffusion.o: module_2D_convection_diffusion.f90 $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_convection_diffusion.o: module_convection_diffusion.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 $(OBJDIR)/module_2D_navier_stokes.o: module_2D_navier_stokes.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_2D_convection_diffusion.o $(OBJDIR)/module_2D_navier_stokes.o
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_2D_navier_stokes.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \

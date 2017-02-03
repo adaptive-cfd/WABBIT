@@ -1,18 +1,19 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_2D_convection_diffusion.f90
+! name: module_convection_diffusion.f90
 ! version: 0.4
 ! author: msr
 !
-! module for 2D convection diffusion physics
+! module for 2D/3D convection diffusion physics
 !
 ! = log ======================================================================================
 !
 ! 06/12/16 - create
+!
 ! ********************************************************************************************
 
-module module_2D_convection_diffusion
+module module_convection_diffusion
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -45,4 +46,4 @@ module module_2D_convection_diffusion
 
 contains
 
-end module module_2D_convection_diffusion
+end module module_convection_diffusion

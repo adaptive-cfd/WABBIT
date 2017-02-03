@@ -98,7 +98,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
             ! 2D: gaussblob, 3D: zero fields
             if ( params%threeD_case ) then
                 ! 3D:
-                call inicond_zeros( params, lgt_block, hvy_block )
+                call inicond_sphere( params, lgt_block, hvy_block )
             else
                 ! 2D:
                 call inicond_gauss_blob( params, lgt_block, hvy_block )
@@ -129,7 +129,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! ------------------------------------------------------------------------------------------------------
     ! init neighbor data array
     ! 2D: maximal 16 neighbors per block
-    ! 3D: maximal 56 neighbors per block
+    ! 3D: maximal 74 neighbors per block
     if ( params%threeD_case ) then
         ! 3D:
         allocate( hvy_neighbor( params%number_blocks, 74 ), stat=allocate_error )

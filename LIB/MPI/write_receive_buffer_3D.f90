@@ -145,7 +145,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, Bs
-                            hvy_block( g+j, g+1:Bs+g, Bs+g+i, dF, my_block )    = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+j, g+1:Bs+g, g+1-i, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                            = buffer_i + Bs
                         end do
                     end do
@@ -157,7 +157,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, Bs
-                            hvy_block( g+j, g+1-i, g+1:Bs+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+j, Bs+g+i, g+1:Bs+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                            = buffer_i + Bs
                         end do
                     end do
@@ -169,7 +169,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, Bs
-                            hvy_block( Bs+g+i, g+j, g+1:Bs+g, dF, my_block )    = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1-i, g+j, g+1:Bs+g, dF, my_block )    = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                            = buffer_i + Bs
                         end do
                     end do
@@ -181,7 +181,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, Bs
-                            hvy_block( g+j, Bs+g+i, g+1:Bs+g, dF, my_block )    = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+j, g+1-i, g+1:Bs+g, dF, my_block )    = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                            = buffer_i + Bs
                         end do
                     end do
@@ -193,7 +193,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, Bs
-                            hvy_block( g+1-i, g+j, g+1:Bs+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( Bs+g+i, g+j, g+1:Bs+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                            = buffer_i + Bs
                         end do
                     end do
@@ -205,7 +205,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, Bs
-                            hvy_block( g+j, g+1:Bs+g, g+1-i, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+j, g+1:Bs+g, Bs+g+i, dF, my_block )    = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                            = buffer_i + Bs
                         end do
                     end do
@@ -217,7 +217,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1:Bs+g, Bs+g+i, Bs+g+j, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1:Bs+g, Bs+g+i, g+1-j, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -229,7 +229,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1-i, g+1:Bs+g, Bs+g+j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1-i, g+1:Bs+g, g+1-j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -241,7 +241,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1:Bs+g, g+1-i, Bs+g+j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1:Bs+g, g+1-i, g+1-j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -253,7 +253,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( Bs+g+i, g+1:Bs+g, Bs+g+j, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( Bs+g+i, g+1:Bs+g, g+1-j, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -265,7 +265,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1:Bs+g, Bs+g+i, g+1-j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1:Bs+g, Bs+g+i, Bs+g+j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -277,7 +277,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1-i, g+1:Bs+g, g+1-j, dF, my_block )       = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1-i, g+1:Bs+g, Bs+g+j, dF, my_block )       = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -289,7 +289,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1:Bs+g, g+1-i, g+1-j, dF, my_block )       = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( g+1:Bs+g, g+1-i, Bs+g+j, dF, my_block )       = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -301,7 +301,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( Bs+g+i, g+1:Bs+g, g+1-j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
+                            hvy_block( Bs+g+i, g+1:Bs+g, Bs+g+j, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
                             buffer_i                                                = buffer_i + Bs
                         end do
                     end do
@@ -361,7 +361,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1-i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( g+1-i, Bs+g+j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -373,7 +373,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1-i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( g+1-i, g+1-j, 1:g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -385,7 +385,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( Bs+g+i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( Bs+g+i, g+1-j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -397,7 +397,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( Bs+g+i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )    = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( Bs+g+i, Bs+g+j, 1:g, dF, my_block )    = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -409,7 +409,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1-i, Bs+g+j, 1:g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( g+1-i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -421,7 +421,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( g+1-i, g+1-j, 1:g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( g+1-i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -433,7 +433,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( Bs+g+i, g+1-j, 1:g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( Bs+g+i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do
@@ -445,7 +445,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
                     do i = 1, g
                         do j = 1, g
-                            hvy_block( Bs+g+i, Bs+g+j, 1:g, dF, my_block )              = recv_buff(buffer_i:buffer_i+g-1)
+                            hvy_block( Bs+g+i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )              = recv_buff(buffer_i:buffer_i+g-1)
                             buffer_i                                                    = buffer_i + g
                         end do
                     end do

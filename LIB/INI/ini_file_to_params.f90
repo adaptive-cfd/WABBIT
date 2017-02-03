@@ -119,12 +119,8 @@ subroutine ini_file_to_params( params, filename )
             ! domain size
             call read_param(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
             call read_param(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! read third dimension only for 3D cases
-            if ( params%threeD_case ) then
-                call read_param(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-            else
-                params%Lz = 0.0_rk
-            end if
+            ! set third dimension to zero
+            params%Lz = 0.0_rk
 
             ! allocate memory in params structure (need 2*data_fields for velocity
             ! and 1*data_fields for diffusion coefficient)
@@ -163,12 +159,8 @@ subroutine ini_file_to_params( params, filename )
             ! domain size
             call read_param(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
             call read_param(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! read third dimension only for 3D cases
-            if ( params%threeD_case ) then
-                call read_param(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-            else
-                params%Lz = 0.0_rk
-            end if
+            ! set third dimension to zero
+            params%Lz = 0.0_rk
 
             ! physics parameter
             ! read adiabatic coefficient
@@ -203,16 +195,11 @@ subroutine ini_file_to_params( params, filename )
             ! domain size
             call read_param(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
             call read_param(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! read third dimension only for 3D cases
-            if ( params%threeD_case ) then
-                call read_param(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-            else
-                params%Lz = 0.0_rk
-            end if
+            call read_param(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
 
-            ! allocate memory in params structure (need 2*data_fields for velocity
+            ! allocate memory in params structure (need 3*data_fields for velocity
             ! and 1*data_fields for diffusion coefficient)
-            allocate( params%physics%u0( 2*params%number_data_fields ), stat=allocate_error )
+            allocate( params%physics%u0( 3*params%number_data_fields ), stat=allocate_error )
             call check_allocation(allocate_error)
             allocate( params%physics%nu( params%number_data_fields ), stat=allocate_error )
             call check_allocation(allocate_error)

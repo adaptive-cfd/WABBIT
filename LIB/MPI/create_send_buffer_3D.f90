@@ -130,7 +130,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, Bs
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1:Bs+g, g+1+i, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1:Bs+g, Bs+g-i, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -142,7 +142,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, Bs
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, Bs+g-i, g+1:Bs+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1+i, g+1:Bs+g, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -154,7 +154,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, Bs
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+j, g+1:Bs+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+j, g+1:Bs+g, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -166,7 +166,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, Bs
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1+i, g+1:Bs+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, Bs+g-i, g+1:Bs+g, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -178,7 +178,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, Bs
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+j, g+1:Bs+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+j, g+1:Bs+g, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -190,7 +190,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, Bs
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1:Bs+g, Bs+g-i, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1:Bs+g, g+1+i, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -202,7 +202,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1+i, g+1+j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1+i, Bs+g-j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -214,7 +214,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1:Bs+g, g+1+j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1:Bs+g, Bs+g-j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -226,7 +226,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-i, g+1+j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-i, Bs+g-j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -238,7 +238,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1:Bs+g, g+1+j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1:Bs+g, Bs+g-j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -250,7 +250,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1+i, Bs+g-j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1+i, g+1+j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -262,7 +262,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1:Bs+g, Bs+g-j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1:Bs+g, g+1+j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -274,7 +274,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-i, Bs+g-j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-i, g+1+j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -286,7 +286,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1:Bs+g, Bs+g-j, dF, my_block )
+                            send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1:Bs+g, g+1+j, dF, my_block )
                             buffer_i                            = buffer_i + Bs
                         end do
                     end do
@@ -346,7 +346,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, g+1+j, g+2:g+1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, g+1+j, Bs:Bs-1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -358,7 +358,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, Bs+g-j, g+2:g+1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, Bs+g-j, Bs:Bs-1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -370,7 +370,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, Bs+g-j, g+2:g+1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, Bs+g-j, Bs:Bs-1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -382,7 +382,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, g+1+j, g+2:g+1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, g+1+j, Bs:Bs-1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -394,7 +394,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, g+1+j, Bs:Bs-1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, g+1+j, g+2:g+1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -406,7 +406,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, Bs+g-j, Bs:Bs-1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( Bs+g-i, Bs+g-j, g+2:g+1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -418,7 +418,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, Bs+g-j, Bs:Bs-1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, Bs+g-j, g+2:g+1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do
@@ -430,7 +430,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
                     do i = 1, g
                         do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, g+1+j, Bs:Bs-1+g, dF, my_block )
+                            send_buff(buffer_i:buffer_i+g-1)    = hvy_block( g+1+i, g+1+j, g+2:g+1+g, dF, my_block )
                             buffer_i                            = buffer_i + g
                         end do
                     end do

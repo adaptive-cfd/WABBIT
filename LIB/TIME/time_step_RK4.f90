@@ -12,7 +12,7 @@
 !
 ! physics:
 ! --------
-! - convection/diffusion: works only for one datafield, more than one datafield needs
+! - convection/diffusion: works only for one datafield
 !
 ! = log ======================================================================================
 !
@@ -118,7 +118,10 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             dt = 0.000001_rk
 
         case('3D_convection_diffusion')
-            dt = 0.1_rk
+            ! calculate time step, loop over all data fields
+            do dF = 2, N_dF+1
+                dt = min(dt, params%CFL * dx / norm2( params%physics%u0( (dF-2)*2 + 1 : (dF-2)*2 + 3 ) ) )
+            end do
 
     end select
 
@@ -183,6 +186,28 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('3D_convection_diffusion')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! save old data
+                    hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! set k1 step
+                    hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_3D_convection_diffusion( hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k)) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 3, 2, 1, 1, hvy_active(k)) - hvy_block( 3, 1, 1, 1, hvy_active(k) )), &
+                                                      g, Bs, &
+                                                      params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%u0( (dF-2)*2 + 3 ), params%physics%nu( (dF-1) ), &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
     end select
 
     !------------------------------
@@ -202,6 +227,14 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
                 ! save old data
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, N_dF+1:2*N_dF, hvy_active(k) )
+            end do
+
+        case('3D_convection_diffusion')
+            do dF = 2, N_dF+1
+                do k = 1, hvy_n
+                    ! save old data
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) )
+                end do
             end do
 
     end select
@@ -252,6 +285,26 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('3D_convection_diffusion')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! set k2 step
+                    hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_3D_convection_diffusion( hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 3, 2, 1, 1, hvy_active(k) ) - hvy_block( 3, 1, 1, 1, hvy_active(k) )), &
+                                                      g, Bs, &
+                                                      params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%u0( (dF-2)*2 + 3 ), params%physics%nu( (dF-1) ), &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
     end select
 
     !------------------------------
@@ -271,6 +324,14 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
                 ! save old data
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, 2*N_dF+1:3*N_dF, hvy_active(k) )
+            end do
+
+        case('3D_convection_diffusion')
+            do dF = 2, N_dF+1
+                do k = 1, hvy_n
+                    ! save old data
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) )
+                end do
             end do
 
     end select
@@ -321,6 +382,26 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('3D_convection_diffusion')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! set k3 step
+                    hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_3D_convection_diffusion( hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 3, 2, 1, 1, hvy_active(k) ) - hvy_block( 3, 1, 1, 1, hvy_active(k) )), &
+                                                      g, Bs, &
+                                                      params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%u0( (dF-2)*2 + 3 ), params%physics%nu( (dF-1) ), &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
     end select
 
     !------------------------------
@@ -340,6 +421,14 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             do k = 1, hvy_n
                 ! save old data
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + dt * hvy_work( :, :, :, 3*N_dF+1:4*N_dF, hvy_active(k) )
+            end do
+
+        case('3D_convection_diffusion')
+            do dF = 2, N_dF+1
+                do k = 1, hvy_n
+                    ! save old data
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + dt * hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) )
+                end do
             end do
 
     end select
@@ -390,6 +479,26 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('3D_convection_diffusion')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! set k4 step
+                    hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_3D_convection_diffusion( hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ), &
+                                                      abs(hvy_block( 1, 2, 1, 1, hvy_active(k) ) - hvy_block( 1, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 2, 2, 1, 1, hvy_active(k) ) - hvy_block( 2, 1, 1, 1, hvy_active(k) )), &
+                                                      abs(hvy_block( 3, 2, 1, 1, hvy_active(k) ) - hvy_block( 3, 1, 1, 1, hvy_active(k) )), &
+                                                      g, Bs, &
+                                                      params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), params%physics%u0( (dF-2)*2 + 3 ), params%physics%nu( (dF-1) ), &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
     end select
 
     !------------------------------
@@ -423,6 +532,22 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                                                                 + 2.0_rk * hvy_work( :, :, :, 3*N_dF+1:4*N_dF, hvy_active(k) ) &
                                                                 + hvy_work( :, :, :, 4*N_dF+1:5*N_dF, hvy_active(k) ) )
 
+            end do
+
+        case('3D_convection_diffusion')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! final step
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) &
+                                                            + (dt/6.0_rk) * ( hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ) &
+                                                            + 2.0_rk * hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) &
+                                                            + 2.0_rk * hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) &
+                                                            + hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) )
+
+                end do
             end do
 
     end select

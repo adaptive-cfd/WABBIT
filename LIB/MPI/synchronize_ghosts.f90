@@ -158,12 +158,12 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! reset ghost nodes
             if ( params%threeD_case ) then
                 ! 3D:
-                hvy_block(1:g, :, :, dF, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(Bs+g+1:Bs+2*g, :, :, dF, hvy_active(k) ) = 9.0e9_rk
-                hvy_block(:, 1:g, :, dF, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(:, Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 9.0e9_rk
-                hvy_block(:, :, 1:g, dF, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 9.0e9_rk
+                hvy_block(1:g, :, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
+                hvy_block(Bs+g+1:Bs+2*g, :, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
+                hvy_block(:, 1:g, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
+                hvy_block(:, Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
+                hvy_block(:, :, 1:g, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
+                hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
             else
                 ! 2D:
                 hvy_block(1:g, :, 1, dF, hvy_active(k) )           = 9.0e9_rk

@@ -206,17 +206,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
                 ! ------------------------------------------------------------------------------------------------------
                 ! encoding treecode
                 call encoding_3D(treecode, j, i, l, num_blocks, max_treelevel )
-!                if (rank==0) then
-!                call encoding_3D(treecode, 1, 1, 1, num_blocks, max_treelevel )
-!                print*, treecode
-!                call encoding_3D(treecode, 1, 1, 2, num_blocks, max_treelevel )
-!                print*, treecode
-!                call encoding_3D(treecode, 1, 1, 3, num_blocks, max_treelevel )
-!                print*, treecode
-!                call encoding_3D(treecode, 1, 1, 4, num_blocks, max_treelevel )
-!                print*, treecode
-!                stop
-!                end if
 
                 ! ------------------------------------------------------------------------------------------------------
                 ! write light data

@@ -50,7 +50,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: rank
 
     ! loop parameter
-    integer(kind=ik)                    :: k, dF, i, j, N, lgt_id
+    integer(kind=ik)                    :: k, dF, i, j, l, N, lgt_id
 
     ! detail
     real(kind=rk)                       :: detail
@@ -62,7 +62,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: allocate_error
 
     ! interpolation fields
-    real(kind=rk), allocatable          :: u1(:,:), u2(:,:), u3(:,:)
+    real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
 
     ! light data list for working
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block, 1), params%max_treelevel+2)
@@ -83,14 +83,17 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! set MPI parameter
+    rank         = params%rank
 
     ! allocate interpolation fields
-    allocate( u1(1:Bs+2*g,1:Bs+2*g), stat=allocate_error )
-    allocate( u2(1:Bs+2*g,1:Bs+2*g), stat=allocate_error )
+    allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ), stat=allocate_error )
+    call check_allocation(allocate_error)
+    allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ), stat=allocate_error )
+    call check_allocation(allocate_error)
     ! coarsen field are half block size + 1/2
-    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g), stat=allocate_error )
+    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g), stat=allocate_error )
+    call check_allocation(allocate_error)
 
     ! set light data list for working, only light data coresponding to proc are not zero
     my_lgt_block = 0
@@ -130,20 +133,40 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         do dF = 2, params%number_data_fields+1
 
             ! reset interpolation fields
-            !u1        = hvy_block( :, :, dF, hvy_active(k) )
-            u1        = hvy_block( :, :, 1, dF, hvy_active(k) )
+            u1        = hvy_block( :, :, :, dF, hvy_active(k) )
             u2        = 0.0_rk
             u3        = 0.0_rk
 
             ! wavelet indicator
-            call restriction_2D( u1, u3 )  ! fine, coarse
-            call prediction_2D ( u3, u2, params%order_predictor )  ! coarse, fine
-            ! calculate deatil
-            do i = 1, Bs+2*g
-                do j = 1, Bs+2*g
-                    detail = max( detail, sqrt( (u1(i,j)-u2(i,j)) * ( u1(i,j)-u2(i,j)) ) )
+            if ( params%threeD_case ) then
+
+                ! 3D:
+                call restriction_3D( u1, u3 )  ! fine, coarse
+                call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
+
+                ! calculate deatil
+                do i = 1, Bs+2*g
+                    do j = 1, Bs+2*g
+                        do l = 1, Bs+2*g
+                            detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
+                        end do
+                    end do
                 end do
-            end do
+
+            else
+
+                ! 2D:
+                call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
+                call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+
+                ! calculate deatil
+                do i = 1, Bs+2*g
+                    do j = 1, Bs+2*g
+                        detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
+                    end do
+                end do
+
+            end if
 
         end do
 

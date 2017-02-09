@@ -69,28 +69,48 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
 
         ! ensure completeness
-        call ensure_completeness( params, lgt_block, lgt_active, lgt_n )
-
         ! adapt the mesh
-        call coarse_mesh( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n )
+        if ( params%threeD_case ) then
+            ! 3D:
+            call ensure_completeness_3D( params, lgt_block, lgt_active, lgt_n )
+            call coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+
+        else
+            ! 2D:
+            call ensure_completeness_2D( params, lgt_block, lgt_active, lgt_n )
+            call coarse_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n )
+
+        end if
 
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
         ! update neighbor relations
-        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        if ( params%threeD_case ) then
+            ! 3D:
+            call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        else
+            ! 2D:
+            call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        end if
 
     end do
 
     ! balance load
-    call balance_load( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    !call balance_load( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
     ! update neighbor relations
-    call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    if ( params%threeD_case ) then
+        ! 3D:
+        call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    else
+        ! 2D:
+        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    end if
 
 end subroutine adapt_mesh

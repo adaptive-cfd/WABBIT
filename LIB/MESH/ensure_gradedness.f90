@@ -2,7 +2,7 @@
 ! WABBIT
 ! ============================================================================================
 ! name: ensure_gradedness.f90
-! version: 0.4
+! version: 0.5
 ! author: msr, engels
 !
 ! check the gradedness after new refinement status
@@ -14,6 +14,8 @@
 !
 ! 10/11/16 - switch to v0.4
 ! 23/11/16 - rework complete subroutine: use list of active blocks, procs works now on light data
+! 03/02/17 - insert neighbor_num variable to use subroutine for 2D and 3D data
+!
 ! ********************************************************************************************
 
 subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
@@ -55,6 +57,10 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
 
+    ! number of neighbor relations
+    ! 2D: 16, 3D: 74
+    integer(kind=ik)                    :: neighbor_num
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -64,8 +70,16 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     N = params%number_blocks
     max_treelevel = params%max_treelevel
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! set MPI parameter
+    rank         = params%rank
+
+    if ( params%threeD_case ) then
+        ! 3D:
+        neighbor_num = 74
+    else
+        ! 2D:
+        neighbor_num = 16
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -104,7 +118,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                     call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, N )
 
                     ! loop over all neighbors
-                    do i = 1, 16
+                    do i = 1, neighbor_num
                         ! neighbor exists
                         if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
 

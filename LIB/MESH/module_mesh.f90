@@ -84,10 +84,12 @@ contains
     include "ensure_gradedness.f90"
 
     ! completeness check
-    include "ensure_completeness.f90"
+    include "ensure_completeness_2D.f90"
+    include "ensure_completeness_3D.f90"
 
     ! coarse mesh
-    include "coarse_mesh.f90"
+    include "coarse_mesh_2D.f90"
+    include "coarse_mesh_3D.f90"
 
     ! balance the load
     include "balance_load.f90"

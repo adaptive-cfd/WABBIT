@@ -112,10 +112,10 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(OBJDIR)/module_time_step.o\
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh_2D.f90 adapt_mesh.f90 threshold_block.f90 \
-	ensure_gradedness.f90 ensure_completeness_2D.f90 coarse_mesh_2D.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \
+	ensure_gradedness.f90 ensure_completeness_2D.f90 coarse_mesh_2D.f90 balance_load_2D.f90 set_desired_num_blocks_per_rank.f90 \
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90 update_neighbors_3D.f90 \
 	find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 refine_mesh_3D.f90 ensure_completeness_3D.f90 \
-	coarse_mesh_3D.f90
+	coarse_mesh_3D.f90 balance_load_3D.f90 treecode_to_3D_z_curve.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \

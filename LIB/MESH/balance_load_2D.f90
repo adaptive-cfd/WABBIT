@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: balance_load.f90
+! name: balance_load_2D.f90
 ! version: 0.4
 ! author: msr
 !
@@ -18,7 +18,7 @@
 !
 ! ********************************************************************************************
 
-subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -736,4 +736,4 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if
 
-end subroutine balance_load
+end subroutine balance_load_2D

@@ -92,7 +92,8 @@ contains
     include "coarse_mesh_3D.f90"
 
     ! balance the load
-    include "balance_load.f90"
+    include "balance_load_2D.f90"
+    include "balance_load_3D.f90"
 
     ! create list with number of blocks per rank
     include "set_desired_num_blocks_per_rank.f90"
@@ -103,10 +104,13 @@ contains
     ! affinity list
     include "compute_affinity.f90"
 
-    ! treecode to sfc position
+    ! treecode to 2D z-sfc position
     include "treecode_to_sfc_id.f90"
 
-    ! transfer treecode to hilbert code
+    ! transfer treecode to 2D hilbert code
     include "treecode_to_hilbercode.f90"
+
+    ! transfer treecode to 3D z-curve code
+    include "treecode_to_3D_z_curve.f90"
 
 end module module_mesh

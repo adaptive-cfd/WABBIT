@@ -98,7 +98,13 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     end do
 
     ! balance load
-    !call balance_load( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    if ( params%threeD_case ) then
+        ! 3D:
+        call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+    else
+        ! 2D:
+        call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    end if
 
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )

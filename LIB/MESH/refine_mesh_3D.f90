@@ -160,7 +160,7 @@ subroutine refine_mesh_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
             do dF = 2, params%number_data_fields+1
                 ! reset data
                 data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
-                data_predict_fine   = 9.0e9_rk
+                !data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_3D(data_predict_coarse, data_predict_fine, params%order_predictor)
                 ! save new data

@@ -74,7 +74,7 @@ contains
           stop
         endif
 
-        coarse          = 0.0_rk
+        !coarse          = 0.0_rk
         coarse(:, :, :) = fine(1:nfine:2,1:nfine:2,1:nfine:2)
 
     end subroutine restriction_3D
@@ -177,7 +177,7 @@ contains
         endif
 
         ! inititalize fine field (actually not necessary)
-        fine = 7.0e7_rk
+        !fine = 7.0e7_rk
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point)
         fine(1:nfine:2, 1:nfine:2, 1:nfine:2) = coarse(:,:,:)

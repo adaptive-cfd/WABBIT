@@ -109,7 +109,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
     buffer_i         = 1
 
-    send_buff        = 9.0e9_rk
+    !send_buff        = 9.0e9_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body

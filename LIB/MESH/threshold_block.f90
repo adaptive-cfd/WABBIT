@@ -134,8 +134,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
             ! reset interpolation fields
             u1        = hvy_block( :, :, :, dF, hvy_active(k) )
-            u2        = 0.0_rk
-            u3        = 0.0_rk
+            !u2        = 0.0_rk
+            !u3        = 0.0_rk
 
             ! wavelet indicator
             if ( params%threeD_case ) then

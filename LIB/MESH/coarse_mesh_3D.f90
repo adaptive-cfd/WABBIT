@@ -302,17 +302,17 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
 
                 ! -------------------------------------------------------------------------------------
                 ! proc with block k keep the data
-                if ( data_rank == rank ) then
-                    ! creating new block data
-                    new_data           = 9.0e9_rk
-                    ! coordinates for new block
-                    new_coord_x        = 9.0e9_rk
-                    new_coord_y        = 9.0e9_rk
-                    new_coord_z        = 9.0e9_rk
-                    ! send_receive buffer
-                    send_receive_coord = 7.0e9_rk
-                    send_receive_data  = 7.0e9_rk
-                end if
+!                if ( data_rank == rank ) then
+!                    ! creating new block data
+!                    new_data           = 9.0e9_rk
+!                    ! coordinates for new block
+!                    new_coord_x        = 9.0e9_rk
+!                    new_coord_y        = 9.0e9_rk
+!                    new_coord_z        = 9.0e9_rk
+!                    ! send_receive buffer
+!                    send_receive_coord = 7.0e9_rk
+!                    send_receive_data  = 7.0e9_rk
+!                end if
 
                 ! loop over proc rank list, proc with light id block data collect new data and coarse block
                 ! then save new data on light id, current block_num

@@ -32,7 +32,7 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     implicit none
 
     ! user defined parameter structure
-    type (type_params), intent(out)                 :: params
+    type (type_params), intent(inout)                 :: params
 
     ! light data array
     integer(kind=ik), allocatable, intent(out)      :: lgt_block(:, :)

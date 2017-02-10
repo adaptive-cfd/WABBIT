@@ -243,6 +243,17 @@ program main
     ! MPI Barrier before program ends
     call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
+    ! debug info output
+    if ( params%debug ) then
+        ! sum times
+        debug%comp_time(:,2) = 0.0_rk
+        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        ! average times
+        debug%comp_time(:,4) = debug%comp_time(:,4) / params%number_procs
+        ! standard d
+
+    end if
+
     ! computing time output on screen
     call cpu_time(t1)
     if (rank==0) then

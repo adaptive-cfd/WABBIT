@@ -22,7 +22,7 @@ module module_params
 
     ! use physics module
     use module_convection_diffusion
-    use module_2D_navier_stokes
+    use module_navier_stokes
 
 !---------------------------------------------------------------------------------------------
 ! variables

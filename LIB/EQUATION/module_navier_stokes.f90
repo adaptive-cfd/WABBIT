@@ -1,18 +1,18 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_2D_navier_stokes.f90
+! name: module_navier_stokes.f90
 ! version: 0.4
 ! author: msr
 !
-! module for 2D navier stokes physics
+! module for 2D/3D navier stokes physics
 !
 ! = log ======================================================================================
 !
 ! 06/12/16 - create
 ! ********************************************************************************************
 
-module module_2D_navier_stokes
+module module_navier_stokes
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -61,4 +61,4 @@ module module_2D_navier_stokes
 
 contains
 
-end module module_2D_navier_stokes
+end module module_navier_stokes

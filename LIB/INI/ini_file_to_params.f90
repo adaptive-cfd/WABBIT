@@ -222,6 +222,48 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
+        case('3D_navier_stokes')
+
+            ! error case: try to solve navier stokes equation with less or more than 5 datafields
+            if ( params%number_data_fields /= 5) then
+                write(*,'(80("_"))')
+                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
+                stop
+            end if
+
+            ! domain size
+            call read_param(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            call read_param(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
+
+            ! physics parameter
+            ! read adiabatic coefficient
+            call read_param(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
+            ! read specific gas constant
+            call read_param(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
+            ! calculate isochoric heat capacity
+            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
+            ! calculate isobaric heat capacity
+            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
+            ! read prandtl number
+            call read_param(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
+            ! read dynamic viscosity
+            call read_param(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
+            ! read switch to turn on|off dissipation
+            call read_param(FILE, 'Blocks', 'dissipation', read_logical, 1 )
+            if ( read_logical == 1 ) then
+                params%physics_ns%dissipation = .true.
+            else
+                params%physics_ns%dissipation = .false.
+            end if
+
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics_ns%names( params%number_data_fields ), stat=allocate_error )
+            params%physics_ns%names = "---"
+            ! read file
+            call read_param(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: physics type is unknown"

@@ -110,6 +110,10 @@ subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_ne
             ! select corresponding datafield name
             write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(dF-1))), nint(time * 1.0e6_rk)
 
+        case('3D_navier_stokes')
+            ! select corresponding datafield name
+            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(dF-1))), nint(time * 1.0e6_rk)
+
     end select
 
     ! create the filename, dF == 2 is the first real datafield

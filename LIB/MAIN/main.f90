@@ -251,27 +251,33 @@ program main
         ! sum times
         debug%comp_time(:,2) = 0.0_rk
         call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        ! MPI Barrier before program ends
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
         ! average times
         debug%comp_time(:,2) = debug%comp_time(:,2) / params%number_procs
         ! standard deviation
         debug%comp_time(:,3) = 0.0_rk
         debug%comp_time(:,4) = (debug%comp_time(:,4) - debug%comp_time(:,2))**2.0_rk
         call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        ! MPI Barrier before program ends
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
         debug%comp_time(:,3) = debug%comp_time(:,3) / ( params%number_procs - 1 )
 
         ! output
         if (rank==0) then
             write(*,'(80("_"))')
-            write(*, '("debug times (average value +- standard deviation :")')
+            write(*, '("debug times (average value +- standard deviation) :")')
             k = 1
             do while ( debug%name_comp_time(k) /= "---" )
 
                 ! write name
                 write(*, '(a)', advance='no') debug%name_comp_time(k)
                 ! write average time
-                write(*, '(2x,f9.6)', advance='no') debug%comp_time(k,2)
+                write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,2)
                 ! write standard deviation
-                write(*, '(2x,f12.6)', advance='no') debug%comp_time(k,3)
+                write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,3)
                 ! next line
                 write(*,*)
                 ! loop variable

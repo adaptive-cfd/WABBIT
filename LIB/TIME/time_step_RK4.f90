@@ -124,7 +124,7 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
             end do
 
         case('3D_navier_stokes')
-            dt = 0.000001_rk
+            dt = 0.00001_rk
 
     end select
 

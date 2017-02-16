@@ -96,7 +96,8 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
     rho         = phi(:,:,:,1)**2
     u           = phi(:,:,:,2)/rho
     v           = phi(:,:,:,3)/rho
-    p           = phi(:,:,:,4)
+    w           = phi(:,:,:,4)/rho
+    p           = phi(:,:,:,5)
 
     ! rhs
     rhs         = 0.0_rk
@@ -242,17 +243,17 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
 
     ! RHS of energy equation:  p_t = -gamma*div(U_tilde p) + gamm1 *U x grad(p)
     call diff1x_zentral_3D( Bs, g, dx, (u * p), dummy)
-    rhs(:,:,:,4) = - dummy
+    rhs(:,:,:,5) = - dummy
     call diff1y_zentral_3D( Bs, g, dy, (v * p), dummy)
-    rhs(:,:,:,4) = rhs(:,:,:,4) - dummy
+    rhs(:,:,:,5) = rhs(:,:,:,5) - dummy
     call diff1z_zentral_3D( Bs, g, dz, (w * p), dummy)
-    rhs(:,:,:,4) = rhs(:,:,:,4) - dummy
+    rhs(:,:,:,5) = rhs(:,:,:,5) - dummy
 
-    rhs(:,:,:,4) = rhs(:,:,:,4) * gamma_
+    rhs(:,:,:,5) = rhs(:,:,:,5) * gamma_
 
-    rhs(:,:,:,4) = rhs(:,:,:,4) + (gamma_ - 1.0_rk) * (u*p_x + v*p_y + w*p_z)
+    rhs(:,:,:,5) = rhs(:,:,:,5) + (gamma_ - 1.0_rk) * (u*p_x + v*p_y + w*p_z)
 
-    rhs(:,:,:,4) = rhs(:,:,:,4) + fric_p
+    rhs(:,:,:,5) = rhs(:,:,:,5) + fric_p
 
     ! RHS of  momentum equation for u: sru_t = -1/2 * div(rho U_tilde u ) - 1/2 * (rho*U_tilde)*Du - Dp
     call diff1x_zentral_3D( Bs, g, dx, (u * rho * u), dummy)

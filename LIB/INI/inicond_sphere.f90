@@ -85,11 +85,15 @@ subroutine inicond_sphere( params, lgt_block, hvy_block )
 
     ! sphere boundary (layer) width
     !sigma = 1.0e2_rk
-    sigma = 0.2_rk
+    !sigma = 0.2_rk
+    sigma = 20.0_rk / Lx
+    !sigma = 0.2_rk / Lx
 
     ! sphere width
     !w = 0.1_rk
-    w = 4.0_rk
+    !w = 4.0_rk
+    !w = 0.04_rk * Lx
+    w = 0.0004_rk * Lx
 
     ! create sphere
     do i = 1, Ds
@@ -152,7 +156,7 @@ subroutine inicond_sphere( params, lgt_block, hvy_block )
         hvy_block( :, :, :, 3, : ) = 0.0_rk
         hvy_block( :, :, :, 4, : ) = 0.0_rk
         hvy_block( :, :, :, 5, : ) = 0.0_rk
-        hvy_block( :, :, :, 6, : ) = hvy_block( :, :, :, 6, : ) + 1e5_rk
+        hvy_block( :, :, :, 6, : ) = 100.0_rk * hvy_block( :, :, :, 6, : ) + 1e5_rk
     end if
 
     ! clean up

@@ -197,6 +197,28 @@ program main
             call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
         end if
 
+        ! balance load
+        if ( params%threeD_case ) then
+            ! 3D:
+            call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+        else
+            ! 2D:
+            call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        end if
+
+        ! update lists of active blocks (light and heavy data)
+        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+
+        ! update neighbor relations
+        if ( params%threeD_case ) then
+            ! 3D:
+            call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        else
+            ! 2D:
+            call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        end if
+
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
@@ -263,7 +285,7 @@ program main
         ! MPI Barrier before program ends
         call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-        debug%comp_time(:,3) = debug%comp_time(:,3) / ( params%number_procs - 1 )
+        debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
 
         ! output
         if (rank==0) then

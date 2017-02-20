@@ -74,4 +74,10 @@ contains
     ! start field, 3D sphere
     include "inicond_sphere.f90"
 
+    ! richtmyer meshkov instability setup
+    include "inicond_richtmyer_meshkov.f90"
+
+    ! shear layer setup
+    include "inicond_shear_layer.f90"
+
 end module module_init

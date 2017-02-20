@@ -96,7 +96,8 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 	
 $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_ini_files_parser.o \
 	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
-	allocate_work_data.f90 inicond_vorticity_filaments.f90 ini_file_to_params.f90 inicond_zeros.f90 initial_block_distribution_3D.f90
+	allocate_work_data.f90 inicond_vorticity_filaments.f90 ini_file_to_params.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 \
+	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 	
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\

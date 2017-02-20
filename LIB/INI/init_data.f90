@@ -110,6 +110,12 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
 !            hvy_block( :, :, 2, : ) = 1.0_rk
 !            hvy_block( :, :, 5, : ) = 1e5_rk
 
+        case ("richtmyer_meshkov")
+!            call inicond_richtmyer_meshkov(params, lgt_block, hvy_block)
+
+        case ("shear_layer")
+            call inicond_shear_layer(params, lgt_block, hvy_block)
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: initial condition is unknown"

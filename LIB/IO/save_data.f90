@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n)
+subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -45,11 +45,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
     ! list of active blocks (light data)
     integer(kind=ik), intent(in)                    :: lgt_active(:)
     ! number of active blocks (light data)
-    integer(kind=ik), intent(in)                    :: lgt_n
+    integer(kind=ik), intent(in)                    :: lgt_n, hvy_n
 
     ! loop variable
     integer(kind=ik)                                :: k
-
+    character(len=80)                               :: fname
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: sub_t0, sub_t1
 
@@ -67,11 +67,31 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
 
     ! real datafields start at datafield 2
     do k = 2, params%number_data_fields+1
-        call write_field(time, iteration, k, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n)
+
+        ! file name depends on variable names
+        select case(params%physics_type)
+            case('2D_convection_diffusion')
+                ! select corresponding datafield name
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k-1))), nint(time * 1.0e6_rk)
+            case('2D_navier_stokes')
+                ! select corresponding datafield name
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
+            case('3D_convection_diffusion')
+                ! select corresponding datafield name
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k-1))), nint(time * 1.0e6_rk)
+            case('3D_navier_stokes')
+                ! select corresponding datafield name
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
+        end select
+
+        call write_field( fname, time, iteration, k, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n)
     end do
 
     ! end time
     sub_t1 = MPI_Wtime()
+
+    write(*,*) "save time=", sub_t1 -sub_t0, "for", lgt_n, "blocks"
+
     ! write time
     if ( params%debug ) then
         ! find free or corresponding line

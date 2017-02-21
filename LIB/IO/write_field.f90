@@ -1,232 +1,132 @@
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-! name: write_field.f90
-! version: 0.5
-! author: engels, msr
-!
-! write data of a single datafield dF at timestep iteration and time t
-!
-! input:    - time loop parameter
-!           - datafield number
-!           - parameter array
-!           - light data array
-!           - heavy data array
-! output:   -
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
-! 26/01/17 - switch to 3D, v0.5
-!          - add dirs_3D array for 3D neighbor codes
-!
-! ********************************************************************************************
-
-subroutine write_field(time, iteration, dF, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
-    implicit none
-
-    ! time loop parameters
-    real(kind=rk), intent(in)           :: time
-    integer(kind=ik), intent(in)        :: iteration
-
-    ! datafield number
-    integer(kind=ik), intent(in)        :: dF
-
-    ! user defined parameter structure
-    type (type_params), intent(in)      :: params
-    ! light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - block data
-    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neifghbor data
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-
-    ! file name
-    character(len=80)                   :: fname
-    ! set name
-    character(len=80)                   :: dsetname
-    ! neighbor name list
-    character(len=3)                    :: dirs_2D(16)
-    character(len=7)                    :: dirs_3D(74)
-
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank, lgt_rank
-
-    ! loop variable
-    integer(kind=ik)                    :: k, l, i, hvy_id
-    ! grid parameter
-    integer(kind=ik)                    :: Bs, g
-
-    ! array for coordinate values, need 6 values for 3D (4 for 2D)
-    real(kind=rk)                       :: coords_origin(3), coords_spacing(3)
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    ! set MPI parameters
-    rank            = params%rank
-
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
-
-    dirs_2D = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
-
-    dirs_3D = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___', &
-               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___', &
-               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152', &
-               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634', &
-               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652', &
-               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652', &
-               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652', &
-               '_43/134', '_43/634', '_45/145', '_45/645' /)
-
-!---------------------------------------------------------------------------------------------
-! main body
-
-    ! file name depends on variable names
-    select case(params%physics_type)
-        case('2D_convection_diffusion')
-            ! select corresponding datafield name
-            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(dF-1))), nint(time * 1.0e6_rk)
-
-        case('2D_navier_stokes')
-            ! select corresponding datafield name
-            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(dF-1))), nint(time * 1.0e6_rk)
-
-        case('3D_convection_diffusion')
-            ! select corresponding datafield name
-            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(dF-1))), nint(time * 1.0e6_rk)
-
-        case('3D_navier_stokes')
-            ! select corresponding datafield name
-            write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(dF-1))), nint(time * 1.0e6_rk)
-
-    end select
-
-    ! create the filename, dF == 2 is the first real datafield
-    if ( (rank == 0) .and. (dF == 2) ) then
-
-        write(*,'(80("_"))')
-        write(*,'("IO: writing data for time = ", f15.8," file = ",A)') time, trim(adjustl(fname))
-
-        ! overwrite the file, if it already exists
-        call init_empty_file( fname )
-    elseif (rank == 0) then
-        ! write output
-        write(*,'("IO: writing data for time = ", f15.8," file = ",A)') time, trim(adjustl(fname))
-
-    end if
-
-    l = 1
-    ! save block data, loop over all active light data
-    do k = 1, lgt_n
-
-        ! calculate proc rank from light data line number
-        call lgt_id_to_proc_rank( lgt_rank, lgt_active(k), params%number_blocks )
-
-        ! calculate heavy block id corresponding to light id
-        call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, params%number_blocks )
-
-        ! only proc corresponding to block writes data
-        if ( lgt_rank == rank ) then
-
-            ! the name of the block within th hdf5 file
-            write(dsetname,'("block_",i8.8)') k
-
-            ! write data field
-            if ( params%threeD_case ) then
-                ! 3D:
-                call write_field_hdf5_3D( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id), .false.)
-            else
-                ! 2D:
-                call write_field_hdf5( fname, dsetname, hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id), .false.)
-            end if
 
 
-            ! add useful attributes to the block:
-            ! write treecode
-            call write_attribute( fname, dsetname, "treecode", lgt_block(lgt_active(k), 1:lgt_block(lgt_active(k), params%max_treelevel+1) ) )
+subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n)
 
-            call write_attribute( fname, dsetname, "time", (/time/))
-            call write_attribute( fname, dsetname, "iteration", (/iteration/))
-            call write_attribute( fname, dsetname, "rank", (/rank/))
+  ! modules
+  use hdf5
+  use module_mpi
+  ! variables
 
-            ! save coordinates
-            call write_attribute( fname, dsetname, "coord_x", hvy_block( 1, 1:Bs, 1, 1, hvy_id) )
-            call write_attribute( fname, dsetname, "coord_y", hvy_block( 2, 1:Bs, 1, 1, hvy_id) )
-            call write_attribute( fname, dsetname, "coord_z", hvy_block( 3, 1:Bs, 1, 1, hvy_id) )
+  implicit none
+  character(len=*), intent(in)        :: fname
+  ! time loop parameters
+  real(kind=rk), intent(in)           :: time
+  integer(kind=ik), intent(in)        :: iteration
+  ! datafield number
+  integer(kind=ik), intent(in)        :: dF
+  ! user defined parameter structure
+  type (type_params), intent(in)      :: params
+  ! light data array
+  integer(kind=ik), intent(in)        :: lgt_block(:, :)
+  ! heavy data array - block data
+  real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
+  ! heavy data array - neifghbor data
+  integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+  ! list of active blocks (light data)
+  integer(kind=ik), intent(in)        :: lgt_active(:)
+  ! number of active blocks (light data)
+  integer(kind=ik), intent(in)        :: lgt_n, hvy_n
 
-            ! save neighbors
-            if ( params%threeD_case ) then
-                ! 3D:
-                ! loop over all neighbors
-                do i = 1, 74
-                    ! neighbor exists
-                    if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
-                        call write_attribute( fname, dsetname, dirs_3D(i),  lgt_block( hvy_neighbor( hvy_id, i ), 1:lgt_block( hvy_neighbor( hvy_id, i ), params%max_treelevel+1) ) )
-                    end if
-                end do
+  ! process rank
+  integer(kind=ik)                    :: myrank, lgt_rank
+  ! loop variable
+  integer(kind=ik)                    :: k, i, hvy_id, l
+  ! grid parameter
+  integer(kind=ik)                    :: Bs, g
+  real(kind=rk), allocatable :: myblockbuffer3D(:,:,:,:),myblockbuffer2D(:,:,:)
+  real(kind=rk), allocatable :: coords_origin(:,:), coords_spacing(:,:)
+  integer(hid_t):: file_id
+  integer :: error
+  integer,dimension(1:4) :: ubounds3D,lbounds3D
+  integer,dimension(1:3) :: ubounds2D,lbounds2D
+  integer, dimension(:), allocatable :: actual_blocks_per_proc
 
-            else
-                ! 2D:
-                ! loop over all neighbors
-                do i = 1, 16
-                    ! neighbor exists
-                    if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
-                        call write_attribute( fname, dsetname, dirs_2D(i),  lgt_block( hvy_neighbor( hvy_id, i ), 1:lgt_block( hvy_neighbor( hvy_id, i ), params%max_treelevel+1) ) )
-                    end if
-                end do
+  ! set MPI parameters
+  myrank = params%rank
+  Bs = params%number_block_nodes
+  g  = params%number_ghost_nodes
 
-            end if
+  if (myrank == 0) then
+    write(*,'("IO: writing data for time = ", f15.8," file = ",A," active blocks=",i5)') time, trim(adjustl(fname)), lgt_n
+  endif
 
-            ! write coordinates (origin and spacing) in new dataset
-            ! dataset name
-            write(dsetname,'("block_",i8.8,"_origin")') k
-            ! coordinate values
-            coords_origin(1) = hvy_block( 1, 1, 1, 1, hvy_id)
-            coords_origin(2) = hvy_block( 2, 1, 1, 1, hvy_id)
-            coords_origin(3) = hvy_block( 3, 1, 1, 1, hvy_id)
-            ! write data
-            if ( params%threeD_case ) then
-                ! 3D:
-                call write_field_hdf5_1D( fname, dsetname, coords_origin(:), .false.)
-            else
-                ! 2D:
-                call write_field_hdf5_1D( fname, dsetname, coords_origin(1:2), .false.)
-            end if
+  ! to know our position in the last index of the 4D output array, we need to
+  ! know how many blocks all procs have
+  allocate(actual_blocks_per_proc(0:params%number_procs-1))
+  call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
 
-            write(dsetname,'("block_",i8.8,"_spacing")') k
-            ! coordinate values
-            coords_spacing(1) = abs(hvy_block( 1, 1, 1, 1, hvy_id) - hvy_block( 1, 2, 1, 1, hvy_id) )
-            coords_spacing(2) = abs(hvy_block( 2, 1, 1, 1, hvy_id) - hvy_block( 2, 2, 1, 1, hvy_id) )
-            coords_spacing(3) = abs(hvy_block( 3, 1, 1, 1, hvy_id) - hvy_block( 3, 2, 1, 1, hvy_id) )
-            ! write data
-            if ( params%threeD_case ) then
-                ! 3D:
-                call write_field_hdf5_1D( fname, dsetname, coords_spacing(:), .false.)
-            else
-                ! 2D:
-                call write_field_hdf5_1D( fname, dsetname, coords_spacing(1:2), .false.)
-            end if
+  ! fill blocks buffer (we cannot use the bvy_block array as it is not contiguous, i.e.
+  ! it may contain holes)
+  if ( params%threeD_case ) then
+    ! 3D
+    allocate (myblockbuffer3D(1:bs,1:bs,1:bs,1:hvy_n), coords_spacing(1:3,1:hvy_n), coords_origin(1:3,1:hvy_n))
+    ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
+    ! array we hold, so that all CPU can write to the same file simultaneously
+    ! (note zero-based offset):
+    lbounds3D = (/1,1,1,sum(actual_blocks_per_proc(0:myrank-1))+1/) - 1
+    ubounds3D = (/bs-1,bs-1,bs-1,lbounds3D(4)+hvy_n-1/)
+  else
+    ! 2D
+    allocate (myblockbuffer2D(1:bs,1:bs,1:hvy_n), coords_spacing(1:2,1:hvy_n), coords_origin(1:2,1:hvy_n))
+    ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
+    ! array we hold, so that all CPU can write to the same file simultaneously
+    ! (note zero-based offset):
+    lbounds2D = (/1,1,sum(actual_blocks_per_proc(0:myrank-1))+1/) - 1
+    ubounds2D = (/bs-1,bs-1,lbounds2D(3)+hvy_n-1/)
+  endif
 
-        end if
+  l = 1
+  ! loop over all active light block IDs, check if it is mine, if so, copy the block to the buffer
+  do k = 1, lgt_n
+      ! calculate proc rank from light data line number
+      call lgt_id_to_proc_rank( lgt_rank, lgt_active(k), params%number_blocks )
+      ! calculate heavy block id corresponding to light id
+      call lgt_id_to_hvy_id( hvy_id, lgt_active(k), myrank, params%number_blocks )
+      ! if I own this block, I copy it to the buffer.
+      ! also extract block coordinate origin and spacing
+      if (lgt_rank == myrank) then
+        if ( params%threeD_case ) then
+          ! 3D
+          myblockbuffer3D(:,:,:,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
+          coords_origin(1:3,l)   = hvy_block( 1:3, 1, 1, 1, hvy_id)
+          coords_spacing(1:3,l)  = abs(hvy_block( 1:3, 2, 1, 1, hvy_id) - hvy_block( 1:3, 1, 1, 1, hvy_id) )
+        else
+          ! 2D
+          myblockbuffer2D(:,:,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id)
+          coords_origin(1:2,l)   = hvy_block( 1:2, 1, 1, 1, hvy_id)
+          coords_spacing(1:2,l)  = abs(hvy_block( 1:2, 2, 1, 1, hvy_id) - hvy_block( 1:2, 1, 1, 1, hvy_id) )
+        endif
+        l = l + 1
+      endif
+  end do
 
-        ! synchronize procs, to avoid simultaneous file operations
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  ! open the file
+  call open_file_hdf5( trim(adjustl(fname)), file_id, .true.)
 
-    end do
+  ! write heavy block data to disk
+  if ( params%threeD_case ) then
+    ! 3D data case
+    call write_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer3D)
+    call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly, params%Lz/))
+    call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
+    call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
+  else
+    ! 2D data case
+    call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer2D)
+    call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly/))
+    call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin)
+    call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing)
+  endif
 
+  ! add aditional annotations
+  call write_attribute(file_id, "blocks", "time", (/time/))
+  call write_attribute(file_id, "blocks", "iteration", (/iteration/))
+
+  ! close file and HDF5 library
+  call close_file_hdf5(file_id)
+
+  if (allocated(myblockbuffer3D)) deallocate(myblockbuffer3D)
+  if (allocated(myblockbuffer2D)) deallocate(myblockbuffer2D)
+
+  deallocate(actual_blocks_per_proc, coords_origin, coords_spacing)
 end subroutine write_field

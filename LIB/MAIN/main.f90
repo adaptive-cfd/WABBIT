@@ -174,7 +174,7 @@ program main
     end if
 
     ! save start data
-    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+    call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n )
 
     ! main time loop
     do while ( time < params%time_max )
@@ -234,7 +234,7 @@ program main
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
-          call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+          call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n )
           output_time = time
         endif
 
@@ -254,7 +254,7 @@ program main
     end do
 
     ! save end field to disk, only if timestep is not saved allready
-    if ( abs(output_time-time) > 1e-10_rk ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n )
+    if ( abs(output_time-time) > 1e-10_rk ) call save_data( iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n )
 
     ! debug info
     if ( params%debug ) then

@@ -33,6 +33,7 @@ module module_hdf5_wrapper
 ! modules
 
     use hdf5
+    use mpi
     ! global parameters
     use module_params
 
@@ -43,13 +44,14 @@ module module_hdf5_wrapper
 
     ! Precision of doubles
     character(len=80) :: field_precision = "double" !"single"
+    integer, parameter :: max_chunk = 1024
 
     ! interface for writing attributes. an attribute is an object which is attached
     ! to a dataset, in our case a array saved in the file. we put useful information
     ! in attributes, for example the time, resolution and domain size
     ! both routines take vector values input
     interface write_attribute
-    module procedure write_attrib_dble, write_attrib_int
+        module procedure write_attrib_dble, write_attrib_int
     end interface
 
 !---------------------------------------------------------------------------------------------
@@ -60,442 +62,892 @@ module module_hdf5_wrapper
 
 contains
 
-!-------------------------------------------------------------------------------
-! write array to HDF5 file
-! Note a single file can contain many arrays, if required
-! INPUT
-!   filename        file to write to
-!   dsetname        datasetname, i.e. the name of the array in the file
-!   field           actual data
-!   overwrite       (optional) if .false., an existing file will not be erased and
-!                   instead we just add the array to this file. Default is .true.
-!                   NOTE: an error occurs if the dataset already exists, as hdf5
-!                   does not provide a possibility to erase something already there
-! OUTPUT:
-!   none
-!-------------------------------------------------------------------------------
-subroutine write_field_hdf5( filename, dsetname, field, overwrite)
-  implicit none
+  !-----------------------------------------------------------------------------
+  ! open an hdf5 file, return handle file_id
+  !-----------------------------------------------------------------------------
+  subroutine open_file_hdf5(filename, file_id, ovrwrte)
+    implicit none
+    integer(hid_t),intent(out) ::  file_id
+    character(len=*), intent (in) :: filename
+    logical, intent(in) :: ovrwrte
 
-  character(len=*), intent (in) :: filename, dsetname
-  real(kind=rk),intent(in) :: field(1:,1:)
-  logical, intent(in), optional :: overwrite
+    integer(hid_t) :: plist_id
+    integer :: error
+    logical :: exist
 
-  integer, parameter :: rank = 2 ! data dimensionality (2D or 3D)
-  integer(hid_t) :: file_id   ! file identifier
-  integer(hid_t) :: dset_id   ! dataset identifier
-  integer(hid_t) :: filespace ! dataspace identifier in file
-  integer(hid_t) :: memspace  ! dataspace identifier in memory
-  integer(hid_t) :: plist_id  ! property list identifier
-  integer(hid_t) :: file_precision
+    ! Initialize HDF5 library and Fortran interfaces.
+    call h5open_f(error)
+    ! Setup file access property list with parallel I/O access.
+    ! this sets up a property list (plist_id) with standard values for
+    ! FILE_ACCESS
+    call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
+    ! Modify the property list and store the MPI IO comminucator
+    ! information in the file access property list
+    call h5pset_fapl_mpio_f(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL, error)
 
-  ! dataset dimensions in the file.
-  integer(hsize_t), dimension(rank) :: dims_global
-  ! hyperslab dimensions
-  integer(hsize_t), dimension(rank) :: dims_local
-  ! chunk dimensions
-  integer(hsize_t), dimension(rank) :: chunk_dims
-  ! how many blocks to select from dataspace
-  integer(hsize_t),  dimension(rank) :: count  = 1
-  integer(hssize_t), dimension(rank) :: offset = 0
-  ! stride is spacing between elements, this is one here. striding is done in the
-  ! caller; here, we just write the entire (possibly downsampled) field to disk.
-  integer(hsize_t),  dimension(rank) :: stride = 1
-  integer :: error  ! error flags
-  integer :: nx, ny
+    !---------------------------------------------------------------------------
+    ! open the file
+    !---------------------------------------------------------------------------
+    ! check if the file already exists
+    inquire ( file=filename, exist=exist )
+    if ((exist .eqv. .false. ) .or. (ovrwrte .eqv. .true.) ) then
+      ! file does not exist, create the file collectively
+      call h5fcreate_f(trim(adjustl(filename)), H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
+    else
+      ! file does exist, open it. if the dataset we want to write exists already
+      ! it will be overwritten. however, if other datasets are present, they will not
+      ! be erased
+      call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error, access_prp = plist_id)
+    endif
 
-  ! HDF attribute variables
-  !integer, parameter :: arank = 1
-  !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
-
-  !integer :: i, mindim, maxdim, mpicode
-  logical :: exist1, ovrwrte
-
-  if (present(overwrite)) then
-    ovrwrte = overwrite
-  else
-    ! default is erase file and re-create it
-    ovrwrte = .true.
-  endif
-
-  nx = size(field,1)
-  ny = size(field,2)
-
-  dims_global = (/nx, ny/)
-  dims_local  = (/nx, ny/)
-  chunk_dims  = (/nx, ny/)
-
-  ! Initialize HDF5 library and Fortran interfaces.
-  call h5open_f(error)
-  ! Setup file access property list with parallel I/O access.
-  ! this sets up a property list (plist_id) with standard values for
-  ! FILE_ACCESS
-  call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
-  ! setup serial driver (no MPI)
-  call H5Pset_fapl_stdio_f(plist_id, error)
+    ! this closes the property list plist_id (we'll re-use it)
+    call h5pclose_f(plist_id, error)
+  end subroutine open_file_hdf5
 
   !-----------------------------------------------------------------------------
-  ! open the file
+  ! close a file handle.
   !-----------------------------------------------------------------------------
-  ! check if the file already exists
-  inquire ( file=filename, exist=exist1 )
-  if ((exist1 .eqv. .false. ) .or. (ovrwrte .eqv. .true.) ) then
-    ! file does not exist, create the file collectively
-    call h5fcreate_f(trim(adjustl(filename)), H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
-  else
-    ! file does exist, open it. if the dataset we want to write exists already
-    ! it will be overwritten. however, if other datasets are present, they will not
-    ! be erased
-    call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error, access_prp = plist_id)
-  endif
+  subroutine close_file_hdf5(file_id)
+    implicit none
+    integer(hid_t),intent(inout) ::  file_id
 
-  ! this closes the property list plist_id (we'll re-use it)
-  call h5pclose_f(plist_id, error)
+    integer :: error
+    !!! Close dataspaces:
+    call h5fclose_f(file_id, error) ! Close the file.
+    call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
+  end subroutine close_file_hdf5
 
-  !-----------------------------------------------------------------------------
-  ! create dataspace "filespace" to write to
-  !-----------------------------------------------------------------------------
-  ! Create the data space for the  dataset.
-  ! Dataspace in the file: contains all data from all procs
-  call h5screate_simple_f(rank, dims_global, filespace, error)
+  !-------------------------------------------------------------------------------
+  ! write array to HDF5 file
+  ! Note a single file can contain many arrays, if required
+  ! INPUT
+  !   file_id         file handle to write to
+  !   dsetname        datasetname, i.e. the name of the array in the file
+  !   lbounds         lower bounds of memory portion hold by the CPU
+  !   ubounds         upper bounds of memory portion hold by the CPU
+  !                   NOTE: lbounds and ubounds are 1:3 arrays. if running on one proc
+  !                   they are lbounds=(/0,0,0/) ubounds=(/nx-1,ny-1,nz-1/). If the data
+  !                   is distributed among procs, each proc has to indicate which
+  !                   portion of the array it holds
+  !   field           actual data
+  ! OUTPUT:
+  !   none
+  !-------------------------------------------------------------------------------
+  subroutine write_dset_mpi_hdf5_2D(file_id, dsetname, lbounds, ubounds, field)
+    implicit none
+    integer, parameter :: datarank = 2 ! data dimensionality (2D or 3D)
 
-  ! Create chunked dataset.
-  call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-  call h5pset_chunk_f(plist_id, rank, chunk_dims, error)
+    integer(hid_t),intent(in) ::  file_id  ! file identifier
+    character(len=*), intent(in) :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    real(kind=rk),intent(in) :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2))
 
-  ! determine what precision to use when writing to disk
-  if (field_precision=="double") then
-    ! Output files in double precision
-    file_precision = H5T_NATIVE_DOUBLE
-  else
-    ! Output files in single precision
-    file_precision = H5T_NATIVE_REAL
-  endif
+    integer(hid_t) :: dset_id   ! dataset identifier
+    integer(hid_t) :: filespace ! dataspace identifier in file
+    integer(hid_t) :: memspace  ! dataspace identifier in memory
+    integer(hid_t) :: plist_id  ! property list identifier
+    integer(hid_t) :: file_precision
 
-  ! check if the dataset already exists
-  call h5lexists_f(file_id, dsetname, exist1, error)
-  if (exist1) then
-    write(*,'(80("_"))')
-    write(*,*) "ERROR: You are trying to write to an existing dataset...this is not supported."
-    stop
-  endif
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunk dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
 
-  ! create the dataset
-  call h5dcreate_f(file_id, dsetname, file_precision, filespace,dset_id, error, plist_id)
-  call h5sclose_f(filespace, error)
+    ! HDF attribute variables
+    integer, parameter :: adatarank = 1
+    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
-  ! Select hyperslab in the file.
-  call h5dget_space_f(dset_id, filespace, error)
-  call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
-  error, stride, dims_local)
+    integer :: i, mindim, maxdim, mpicode
+    logical :: exist
 
-  ! Create property list for collective dataset write
-  call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    ! ----------------------------------------------------------------------------
+    ! Compute the dimension of the complete field (i.e. the union of all CPU's)
+    ! which we will write to file.
+    ! ----------------------------------------------------------------------------
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) + 1
+    enddo
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
 
-  !-----------------------------------------------------------------------------
-  ! create dataspace "memspace" to be written
-  !-----------------------------------------------------------------------------
-  ! dataspace in memory: contains only local data
-  call h5screate_simple_f(rank, dims_local, memspace, error)
 
-  !-----------------------------------------------------------------------------
-  ! actual writing of heavy data
-  !-----------------------------------------------------------------------------
-  ! Write the dataset collectively, double precision in memory
-  call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
-  error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
+    !-----------------------------------------------------------------------------
+    ! chunking.
+    ! HDF writes "chunks" of data at once, and their size can be used for tuning
+    ! i/o performance. For example, when chunks fit the cache of the HDD, the performance
+    ! may be better.
+    !-----------------------------------------------------------------------------
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
 
-  !!! Close dataspaces:
-  call h5sclose_f(filespace, error)
-  call h5sclose_f(memspace, error)
-  call h5dclose_f(dset_id, error) ! Close the dataset.
-  call h5pclose_f(plist_id, error) ! Close the property list.
-  call h5fclose_f(file_id, error) ! Close the file.
-  call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
+    !-----------------------------------------------------------------------------
+    ! create dataspace "filespace" to write to
+    !-----------------------------------------------------------------------------
+    ! Create the data space for the  dataset.
+    ! Dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
 
-end subroutine write_field_hdf5
+    ! Create chunked dataset.
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
 
-subroutine write_field_hdf5_3D( filename, dsetname, field, overwrite)
-  implicit none
+    ! determine what precision to use when writing to disk
+    if (field_precision=="double") then
+      ! Output files in double precision
+      file_precision = H5T_NATIVE_DOUBLE
+    else
+      ! Output files in single precision
+      file_precision = H5T_NATIVE_REAL
+    endif
 
-  character(len=*), intent (in) :: filename, dsetname
-  real(kind=rk),intent(in) :: field(1:,1:,1:)
-  logical, intent(in), optional :: overwrite
+    ! check if the dataset already exists
+    call h5lexists_f(file_id, dsetname, exist, error)
+    if (exist) then
+      write(*,*) "You are trying to write to an existing dataset...this is not supported."
+      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+    endif
 
-  integer, parameter :: rank = 3 ! data dimensionality (2D or 3D)
-  integer(hid_t) :: file_id   ! file identifier
-  integer(hid_t) :: dset_id   ! dataset identifier
-  integer(hid_t) :: filespace ! dataspace identifier in file
-  integer(hid_t) :: memspace  ! dataspace identifier in memory
-  integer(hid_t) :: plist_id  ! property list identifier
-  integer(hid_t) :: file_precision
+    ! create the dataset
+    call h5dcreate_f(file_id, dsetname, file_precision, filespace, dset_id, error, plist_id)
+    call h5sclose_f(filespace, error)
 
-  ! dataset dimensions in the file.
-  integer(hsize_t), dimension(rank) :: dims_global
-  ! hyperslab dimensions
-  integer(hsize_t), dimension(rank) :: dims_local
-  ! chunk dimensions
-  integer(hsize_t), dimension(rank) :: chunk_dims
-  ! how many blocks to select from dataspace
-  integer(hsize_t),  dimension(rank) :: count  = 1
-  integer(hssize_t), dimension(rank) :: offset = 0
-  ! stride is spacing between elements, this is one here. striding is done in the
-  ! caller; here, we just write the entire (possibly downsampled) field to disk.
-  integer(hsize_t),  dimension(rank) :: stride = 1
-  integer :: error  ! error flags
-  integer :: nx, ny, nz
+    ! Select hyperslab in the file.
+    call h5dget_space_f(dset_id, filespace, error)
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
+    error, stride, dims_local)
 
-  ! HDF attribute variables
-  !integer, parameter :: arank = 1
-  !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    ! Create property list for collective dataset write
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "memspace" to be written
+    !-----------------------------------------------------------------------------
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
-  !integer :: i, mindim, maxdim, mpicode
-  logical :: exist1, ovrwrte
+    !-----------------------------------------------------------------------------
+    ! actual writing of heavy data
+    !-----------------------------------------------------------------------------
+    ! Write the dataset collectively, double precision in memory
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
-  if (present(overwrite)) then
-    ovrwrte = overwrite
-  else
-    ! default is erase file and re-create it
-    ovrwrte = .true.
-  endif
+    !!! Close dataspaces:
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5dclose_f(dset_id, error) ! Close the dataset.
+    call h5pclose_f(plist_id, error) ! Close the property list.
+  end subroutine write_dset_mpi_hdf5_2D
 
-  nx = size(field,1)
-  ny = size(field,2)
-  nz = size(field,3)
 
-  dims_global = (/nx, ny, nz/)
-  dims_local  = (/nx, ny, nz/)
-  chunk_dims  = (/nx, ny, nz/)
+  !-------------------------------------------------------------------------------
+  ! write array to HDF5 file
+  ! Note a single file can contain many arrays, if required
+  ! INPUT
+  !   file_id         file handle to write to
+  !   dsetname        datasetname, i.e. the name of the array in the file
+  !   lbounds         lower bounds of memory portion hold by the CPU
+  !   ubounds         upper bounds of memory portion hold by the CPU
+  !                   NOTE: lbounds and ubounds are 1:3 arrays. if running on one proc
+  !                   they are lbounds=(/0,0,0/) ubounds=(/nx-1,ny-1,nz-1/). If the data
+  !                   is distributed among procs, each proc has to indicate which
+  !                   portion of the array it holds
+  !   field           actual data
+  ! OUTPUT:
+  !   none
+  !-------------------------------------------------------------------------------
+  subroutine write_dset_mpi_hdf5_3D(file_id, dsetname, lbounds, ubounds, field)
+    implicit none
+    integer, parameter :: datarank = 3 ! data dimensionality (2D or 3D)
 
-  ! Initialize HDF5 library and Fortran interfaces.
-  call h5open_f(error)
-  ! Setup file access property list with parallel I/O access.
-  ! this sets up a property list (plist_id) with standard values for
-  ! FILE_ACCESS
-  call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
-  ! setup serial driver (no MPI)
-  call H5Pset_fapl_stdio_f(plist_id, error)
+    integer(hid_t),intent(in) ::  file_id  ! file identifier
+    character(len=*), intent(in) :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    real(kind=rk),intent(in) :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2),lbounds(3):ubounds(3))
 
-  !-----------------------------------------------------------------------------
-  ! open the file
-  !-----------------------------------------------------------------------------
-  ! check if the file already exists
-  inquire ( file=filename, exist=exist1 )
-  if ((exist1 .eqv. .false. ) .or. (ovrwrte .eqv. .true.) ) then
-    ! file does not exist, create the file collectively
-    call h5fcreate_f(trim(adjustl(filename)), H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
-  else
-    ! file does exist, open it. if the dataset we want to write exists already
-    ! it will be overwritten. however, if other datasets are present, they will not
-    ! be erased
-    call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error, access_prp = plist_id)
-  endif
+    integer(hid_t) :: dset_id   ! dataset identifier
+    integer(hid_t) :: filespace ! dataspace identifier in file
+    integer(hid_t) :: memspace  ! dataspace identifier in memory
+    integer(hid_t) :: plist_id  ! property list identifier
+    integer(hid_t) :: file_precision
 
-  ! this closes the property list plist_id (we'll re-use it)
-  call h5pclose_f(plist_id, error)
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunk dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
 
-  !-----------------------------------------------------------------------------
-  ! create dataspace "filespace" to write to
-  !-----------------------------------------------------------------------------
-  ! Create the data space for the  dataset.
-  ! Dataspace in the file: contains all data from all procs
-  call h5screate_simple_f(rank, dims_global, filespace, error)
+    ! HDF attribute variables
+    integer, parameter :: adatarank = 1
+    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
-  ! Create chunked dataset.
-  call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-  call h5pset_chunk_f(plist_id, rank, chunk_dims, error)
+    integer :: i, mindim, maxdim, mpicode
+    logical :: exist
 
-  ! determine what precision to use when writing to disk
-  if (field_precision=="double") then
-    ! Output files in double precision
-    file_precision = H5T_NATIVE_DOUBLE
-  else
-    ! Output files in single precision
-    file_precision = H5T_NATIVE_REAL
-  endif
+    ! ----------------------------------------------------------------------------
+    ! Compute the dimension of the complete field (i.e. the union of all CPU's)
+    ! which we will write to file.
+    ! ----------------------------------------------------------------------------
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) + 1
+    enddo
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
 
-  ! check if the dataset already exists
-  call h5lexists_f(file_id, dsetname, exist1, error)
-  if (exist1) then
-    write(*,'(80("_"))')
-    write(*,*) "ERROR: You are trying to write to an existing dataset...this is not supported."
-    stop
-  endif
 
-  ! create the dataset
-  call h5dcreate_f(file_id, dsetname, file_precision, filespace,dset_id, error, plist_id)
-  call h5sclose_f(filespace, error)
+    !-----------------------------------------------------------------------------
+    ! chunking.
+    ! HDF writes "chunks" of data at once, and their size can be used for tuning
+    ! i/o performance. For example, when chunks fit the cache of the HDD, the performance
+    ! may be better.
+    !-----------------------------------------------------------------------------
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
 
-  ! Select hyperslab in the file.
-  call h5dget_space_f(dset_id, filespace, error)
-  call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
-  error, stride, dims_local)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "filespace" to write to
+    !-----------------------------------------------------------------------------
+    ! Create the data space for the  dataset.
+    ! Dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
 
-  ! Create property list for collective dataset write
-  call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    ! Create chunked dataset.
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
 
-  !-----------------------------------------------------------------------------
-  ! create dataspace "memspace" to be written
-  !-----------------------------------------------------------------------------
-  ! dataspace in memory: contains only local data
-  call h5screate_simple_f(rank, dims_local, memspace, error)
+    ! determine what precision to use when writing to disk
+    if (field_precision=="double") then
+      ! Output files in double precision
+      file_precision = H5T_NATIVE_DOUBLE
+    else
+      ! Output files in single precision
+      file_precision = H5T_NATIVE_REAL
+    endif
 
-  !-----------------------------------------------------------------------------
-  ! actual writing of heavy data
-  !-----------------------------------------------------------------------------
-  ! Write the dataset collectively, double precision in memory
-  call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
-  error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
+    ! check if the dataset already exists
+    call h5lexists_f(file_id, dsetname, exist, error)
+    if (exist) then
+      write(*,*) "You are trying to write to an existing dataset...this is not supported."
+      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+    endif
 
-  !!! Close dataspaces:
-  call h5sclose_f(filespace, error)
-  call h5sclose_f(memspace, error)
-  call h5dclose_f(dset_id, error) ! Close the dataset.
-  call h5pclose_f(plist_id, error) ! Close the property list.
-  call h5fclose_f(file_id, error) ! Close the file.
-  call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
+    ! create the dataset
+    call h5dcreate_f(file_id, dsetname, file_precision, filespace, dset_id, error, plist_id)
+    call h5sclose_f(filespace, error)
 
-end subroutine write_field_hdf5_3D
+    ! Select hyperslab in the file.
+    call h5dget_space_f(dset_id, filespace, error)
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
+    error, stride, dims_local)
 
-subroutine write_field_hdf5_1D( filename, dsetname, field, overwrite)
-  implicit none
+    ! Create property list for collective dataset write
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "memspace" to be written
+    !-----------------------------------------------------------------------------
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
-  character(len=*), intent (in) :: filename, dsetname
-  real(kind=rk),intent(in) :: field(1:)
-  logical, intent(in), optional :: overwrite
+    !-----------------------------------------------------------------------------
+    ! actual writing of heavy data
+    !-----------------------------------------------------------------------------
+    ! Write the dataset collectively, double precision in memory
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
-  integer, parameter :: rank = 1 ! data dimensionality (2D or 3D)
-  integer(hid_t) :: file_id   ! file identifier
-  integer(hid_t) :: dset_id   ! dataset identifier
-  integer(hid_t) :: filespace ! dataspace identifier in file
-  integer(hid_t) :: memspace  ! dataspace identifier in memory
-  integer(hid_t) :: plist_id  ! property list identifier
-  integer(hid_t) :: file_precision
+    !!! Close dataspaces:
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5dclose_f(dset_id, error) ! Close the dataset.
+    call h5pclose_f(plist_id, error) ! Close the property list.
+  end subroutine write_dset_mpi_hdf5_3D
 
-  ! dataset dimensions in the file.
-  integer(hsize_t), dimension(rank) :: dims_global
-  ! hyperslab dimensions
-  integer(hsize_t), dimension(rank) :: dims_local
-  ! chunk dimensions
-  integer(hsize_t), dimension(rank) :: chunk_dims
-  ! how many blocks to select from dataspace
-  integer(hsize_t),  dimension(rank) :: count  = 1
-  integer(hssize_t), dimension(rank) :: offset = 0
-  ! stride is spacing between elements, this is one here. striding is done in the
-  ! caller; here, we just write the entire (possibly downsampled) field to disk.
-  integer(hsize_t),  dimension(rank) :: stride = 1
-  integer :: error  ! error flags
-  integer :: nx
 
-  ! HDF attribute variables
-  !integer, parameter :: arank = 1
-  !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+  !-------------------------------------------------------------------------------
+  ! write array to HDF5 file
+  ! Note a single file can contain many arrays, if required
+  ! INPUT
+  !   file_id         file handle to write to
+  !   dsetname        datasetname, i.e. the name of the array in the file
+  !   lbounds         lower bounds of memory portion hold by the CPU
+  !   ubounds         upper bounds of memory portion hold by the CPU
+  !                   NOTE: lbounds and ubounds are 1:3 arrays. if running on one proc
+  !                   they are lbounds=(/0,0,0/) ubounds=(/nx-1,ny-1,nz-1/). If the data
+  !                   is distributed among procs, each proc has to indicate which
+  !                   portion of the array it holds
+  !   field           actual data
+  ! OUTPUT:
+  !   none
+  !-------------------------------------------------------------------------------
+  subroutine write_dset_mpi_hdf5_4D(file_id, dsetname, lbounds, ubounds, field)
+    implicit none
+    integer, parameter :: datarank = 4 ! data dimensionality (2D or 3D)
 
-  !integer :: i, mindim, maxdim, mpicode
-  logical :: exist1, ovrwrte
+    integer(hid_t),intent(in) ::  file_id  ! file identifier
+    character(len=*), intent(in) :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    real(kind=rk),intent(in) :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2),lbounds(3):ubounds(3),lbounds(4):ubounds(4))
 
-  if (present(overwrite)) then
-    ovrwrte = overwrite
-  else
-    ! default is erase file and re-create it
-    ovrwrte = .true.
-  endif
+    integer(hid_t) :: dset_id   ! dataset identifier
+    integer(hid_t) :: filespace ! dataspace identifier in file
+    integer(hid_t) :: memspace  ! dataspace identifier in memory
+    integer(hid_t) :: plist_id  ! property list identifier
+    integer(hid_t) :: file_precision
 
-  nx = size(field,1)
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunk dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
 
-  dims_global = (/nx/)
-  dims_local  = (/nx/)
-  chunk_dims  = (/nx/)
+    ! HDF attribute variables
+    integer, parameter :: adatarank = 1
+    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
-  ! Initialize HDF5 library and Fortran interfaces.
-  call h5open_f(error)
-  ! Setup file access property list with parallel I/O access.
-  ! this sets up a property list (plist_id) with standard values for
-  ! FILE_ACCESS
-  call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
-  ! setup serial driver (no MPI)
-  call H5Pset_fapl_stdio_f(plist_id, error)
+    integer :: i, mindim, maxdim, mpicode
+    logical :: exist
 
-  !-----------------------------------------------------------------------------
-  ! open the file
-  !-----------------------------------------------------------------------------
-  ! check if the file already exists
-  inquire ( file=filename, exist=exist1 )
-  if ((exist1 .eqv. .false. ) .or. (ovrwrte .eqv. .true.) ) then
-    ! file does not exist, create the file collectively
-    call h5fcreate_f(trim(adjustl(filename)), H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
-  else
-    ! file does exist, open it. if the dataset we want to write exists already
-    ! it will be overwritten. however, if other datasets are present, they will not
-    ! be erased
-    call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error, access_prp = plist_id)
-  endif
+    ! ----------------------------------------------------------------------------
+    ! Compute the dimension of the complete field (i.e. the union of all CPU's)
+    ! which we will write to file.
+    ! ----------------------------------------------------------------------------
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) + 1
+    enddo
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
 
-  ! this closes the property list plist_id (we'll re-use it)
-  call h5pclose_f(plist_id, error)
 
-  !-----------------------------------------------------------------------------
-  ! create dataspace "filespace" to write to
-  !-----------------------------------------------------------------------------
-  ! Create the data space for the  dataset.
-  ! Dataspace in the file: contains all data from all procs
-  call h5screate_simple_f(rank, dims_global, filespace, error)
+    !-----------------------------------------------------------------------------
+    ! chunking.
+    ! HDF writes "chunks" of data at once, and their size can be used for tuning
+    ! i/o performance. For example, when chunks fit the cache of the HDD, the performance
+    ! may be better.
+    !-----------------------------------------------------------------------------
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
 
-  ! Create chunked dataset.
-  call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-  call h5pset_chunk_f(plist_id, rank, chunk_dims, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "filespace" to write to
+    !-----------------------------------------------------------------------------
+    ! Create the data space for the  dataset.
+    ! Dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
 
-  ! determine what precision to use when writing to disk
-  if (field_precision=="double") then
-    ! Output files in double precision
-    file_precision = H5T_NATIVE_DOUBLE
-  else
-    ! Output files in single precision
-    file_precision = H5T_NATIVE_REAL
-  endif
+    ! Create chunked dataset.
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
 
-  ! check if the dataset already exists
-  call h5lexists_f(file_id, dsetname, exist1, error)
-  if (exist1) then
-    write(*,'(80("_"))')
-    write(*,*) "ERROR: You are trying to write to an existing dataset...this is not supported."
-    stop
-  endif
+    ! determine what precision to use when writing to disk
+    if (field_precision=="double") then
+      ! Output files in double precision
+      file_precision = H5T_NATIVE_DOUBLE
+    else
+      ! Output files in single precision
+      file_precision = H5T_NATIVE_REAL
+    endif
 
-  ! create the dataset
-  call h5dcreate_f(file_id, dsetname, file_precision, filespace,dset_id, error, plist_id)
-  call h5sclose_f(filespace, error)
+    ! check if the dataset already exists
+    call h5lexists_f(file_id, dsetname, exist, error)
+    if (exist) then
+      write(*,*) "You are trying to write to an existing dataset...this is not supported."
+      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+    endif
 
-  ! Select hyperslab in the file.
-  call h5dget_space_f(dset_id, filespace, error)
-  call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
-  error, stride, dims_local)
+    ! create the dataset
+    call h5dcreate_f(file_id, dsetname, file_precision, filespace, dset_id, error, plist_id)
+    call h5sclose_f(filespace, error)
 
-  ! Create property list for collective dataset write
-  call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    ! Select hyperslab in the file.
+    call h5dget_space_f(dset_id, filespace, error)
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, dims_local, error, stride, count)
 
-  !-----------------------------------------------------------------------------
-  ! create dataspace "memspace" to be written
-  !-----------------------------------------------------------------------------
-  ! dataspace in memory: contains only local data
-  call h5screate_simple_f(rank, dims_local, memspace, error)
+    ! Create property list for collective dataset write
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "memspace" to be written
+    !-----------------------------------------------------------------------------
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
-  !-----------------------------------------------------------------------------
-  ! actual writing of heavy data
-  !-----------------------------------------------------------------------------
-  ! Write the dataset collectively, double precision in memory
-  call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
-  error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
+    !-----------------------------------------------------------------------------
+    ! actual writing of heavy data
+    !-----------------------------------------------------------------------------
+    ! Write the dataset collectively, double precision in memory
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
-  !!! Close dataspaces:
-  call h5sclose_f(filespace, error)
-  call h5sclose_f(memspace, error)
-  call h5dclose_f(dset_id, error) ! Close the dataset.
-  call h5pclose_f(plist_id, error) ! Close the property list.
-  call h5fclose_f(file_id, error) ! Close the file.
-  call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
+    !!! Close dataspaces:
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5dclose_f(dset_id, error) ! Close the dataset.
+    call h5pclose_f(plist_id, error) ! Close the property list.
+  end subroutine write_dset_mpi_hdf5_4D
 
-end subroutine write_field_hdf5_1D
+  !-------------------------------------------------------------------------------
+  ! write array to HDF5 file
+  ! Note a single file can contain many arrays, if required
+  ! INPUT
+  !   file_id         file handle to write to
+  !   dsetname        datasetname, i.e. the name of the array in the file
+  !   lbounds         lower bounds of memory portion hold by the CPU
+  !   ubounds         upper bounds of memory portion hold by the CPU
+  !                   NOTE: lbounds and ubounds are 1:3 arrays. if running on one proc
+  !                   they are lbounds=(/0,0,0/) ubounds=(/nx-1,ny-1,nz-1/). If the data
+  !                   is distributed among procs, each proc has to indicate which
+  !                   portion of the array it holds
+  !   field           actual data
+  ! OUTPUT:
+  !   none
+  !-------------------------------------------------------------------------------
+  subroutine write_int_dset_mpi_hdf5_2D(file_id, dsetname, lbounds, ubounds, field)
+    implicit none
+    integer, parameter :: datarank = 2 ! data dimensionality (2D or 3D)
+
+    integer(hid_t),intent(in) ::  file_id  ! file identifier
+    character(len=*), intent(in) :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    integer(kind=ik),intent(in) :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2))
+
+    integer(hid_t) :: dset_id   ! dataset identifier
+    integer(hid_t) :: filespace ! dataspace identifier in file
+    integer(hid_t) :: memspace  ! dataspace identifier in memory
+    integer(hid_t) :: plist_id  ! property list identifier
+    integer(hid_t) :: file_precision
+
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunk dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
+
+    ! HDF attribute variables
+    integer, parameter :: adatarank = 1
+    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+
+    integer :: i, mindim, maxdim, mpicode
+    logical :: exist
+
+    ! ----------------------------------------------------------------------------
+    ! Compute the dimension of the complete field (i.e. the union of all CPU's)
+    ! which we will write to file.
+    ! ----------------------------------------------------------------------------
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) + 1
+    enddo
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
+
+
+    !-----------------------------------------------------------------------------
+    ! chunking.
+    ! HDF writes "chunks" of data at once, and their size can be used for tuning
+    ! i/o performance. For example, when chunks fit the cache of the HDD, the performance
+    ! may be better.
+    !-----------------------------------------------------------------------------
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
+
+    !-----------------------------------------------------------------------------
+    ! create dataspace "filespace" to write to
+    !-----------------------------------------------------------------------------
+    ! Create the data space for the  dataset.
+    ! Dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
+
+    ! Create chunked dataset.
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
+
+    file_precision = H5T_NATIVE_INTEGER
+
+    ! check if the dataset already exists
+    call h5lexists_f(file_id, dsetname, exist, error)
+    if (exist) then
+      write(*,*) "You are trying to write to an existing dataset...this is not supported."
+      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+    endif
+
+    ! create the dataset
+    call h5dcreate_f(file_id, dsetname, file_precision, filespace, dset_id, error, plist_id)
+    call h5sclose_f(filespace, error)
+
+    ! Select hyperslab in the file.
+    call h5dget_space_f(dset_id, filespace, error)
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, dims_local, error, stride, count)
+
+    ! Create property list for collective dataset write
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "memspace" to be written
+    !-----------------------------------------------------------------------------
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
+
+    !-----------------------------------------------------------------------------
+    ! actual writing of heavy data
+    !-----------------------------------------------------------------------------
+    ! Write the dataset collectively, double precision in memory
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
+
+    !!! Close dataspaces:
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5dclose_f(dset_id, error) ! Close the dataset.
+    call h5pclose_f(plist_id, error) ! Close the property list.
+  end subroutine write_int_dset_mpi_hdf5_2D
+
+  !-------------------------------------------------------------------------------
+  ! write array to HDF5 file
+  ! Note a single file can contain many arrays, if required
+  ! INPUT
+  !   file_id         file handle to write to
+  !   dsetname        datasetname, i.e. the name of the array in the file
+  !   lbounds         lower bounds of memory portion hold by the CPU
+  !   ubounds         upper bounds of memory portion hold by the CPU
+  !                   NOTE: lbounds and ubounds are 1:3 arrays. if running on one proc
+  !                   they are lbounds=(/0,0,0/) ubounds=(/nx-1,ny-1,nz-1/). If the data
+  !                   is distributed among procs, each proc has to indicate which
+  !                   portion of the array it holds
+  !   field           actual data
+  ! OUTPUT:
+  !   none
+  !-------------------------------------------------------------------------------
+  subroutine write_int_dset_mpi_hdf5_3D(file_id, dsetname, lbounds, ubounds, field)
+    implicit none
+    integer, parameter :: datarank = 3 ! data dimensionality (2D or 3D)
+
+    integer(hid_t),intent(in) ::  file_id  ! file identifier
+    character(len=*), intent(in) :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    integer(kind=ik),intent(in) :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2),lbounds(3):ubounds(3))
+
+    integer(hid_t) :: dset_id   ! dataset identifier
+    integer(hid_t) :: filespace ! dataspace identifier in file
+    integer(hid_t) :: memspace  ! dataspace identifier in memory
+    integer(hid_t) :: plist_id  ! property list identifier
+    integer(hid_t) :: file_precision
+
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunk dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
+
+    ! HDF attribute variables
+    integer, parameter :: adatarank = 1
+    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+
+    integer :: i, mindim, maxdim, mpicode
+    logical :: exist
+
+    ! ----------------------------------------------------------------------------
+    ! Compute the dimension of the complete field (i.e. the union of all CPU's)
+    ! which we will write to file.
+    ! ----------------------------------------------------------------------------
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) + 1
+    enddo
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
+
+
+    !-----------------------------------------------------------------------------
+    ! chunking.
+    ! HDF writes "chunks" of data at once, and their size can be used for tuning
+    ! i/o performance. For example, when chunks fit the cache of the HDD, the performance
+    ! may be better.
+    !-----------------------------------------------------------------------------
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
+
+    !-----------------------------------------------------------------------------
+    ! create dataspace "filespace" to write to
+    !-----------------------------------------------------------------------------
+    ! Create the data space for the  dataset.
+    ! Dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
+
+    ! Create chunked dataset.
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
+
+    file_precision = H5T_NATIVE_INTEGER
+
+    ! check if the dataset already exists
+    call h5lexists_f(file_id, dsetname, exist, error)
+    if (exist) then
+      write(*,*) "You are trying to write to an existing dataset...this is not supported."
+      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+    endif
+
+    ! create the dataset
+    call h5dcreate_f(file_id, dsetname, file_precision, filespace, dset_id, error, plist_id)
+    call h5sclose_f(filespace, error)
+
+    ! Select hyperslab in the file.
+    call h5dget_space_f(dset_id, filespace, error)
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, dims_local, error, stride, count)
+
+    ! Create property list for collective dataset write
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "memspace" to be written
+    !-----------------------------------------------------------------------------
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
+
+    !-----------------------------------------------------------------------------
+    ! actual writing of heavy data
+    !-----------------------------------------------------------------------------
+    ! Write the dataset collectively, double precision in memory
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
+
+    !!! Close dataspaces:
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5dclose_f(dset_id, error) ! Close the dataset.
+    call h5pclose_f(plist_id, error) ! Close the property list.
+  end subroutine write_int_dset_mpi_hdf5_3D
+
+
+
+  !-------------------------------------------------------------------------------
+  ! write array to HDF5 file
+  ! Note a single file can contain many arrays, if required
+  ! INPUT
+  !   file_id         file handle to write to
+  !   dsetname        datasetname, i.e. the name of the array in the file
+  !   lbounds         lower bounds of memory portion hold by the CPU
+  !   ubounds         upper bounds of memory portion hold by the CPU
+  !                   NOTE: lbounds and ubounds are 1:3 arrays. if running on one proc
+  !                   they are lbounds=(/0,0,0/) ubounds=(/nx-1,ny-1,nz-1/). If the data
+  !                   is distributed among procs, each proc has to indicate which
+  !                   portion of the array it holds
+  !   field           actual data
+  ! OUTPUT:
+  !   none
+  !-------------------------------------------------------------------------------
+  subroutine write_int_dset_mpi_hdf5_4D(file_id, dsetname, lbounds, ubounds, field)
+    implicit none
+    integer, parameter :: datarank = 4 ! data dimensionality (2D or 3D)
+
+    integer(hid_t),intent(in) ::  file_id  ! file identifier
+    character(len=*), intent(in) :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    integer(kind=ik),intent(in) :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2),lbounds(3):ubounds(3),lbounds(4):ubounds(4))
+
+    integer(hid_t) :: dset_id   ! dataset identifier
+    integer(hid_t) :: filespace ! dataspace identifier in file
+    integer(hid_t) :: memspace  ! dataspace identifier in memory
+    integer(hid_t) :: plist_id  ! property list identifier
+    integer(hid_t) :: file_precision
+
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunk dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
+
+    ! HDF attribute variables
+    integer, parameter :: adatarank = 1
+    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+
+    integer :: i, mindim, maxdim, mpicode
+    logical :: exist
+
+    ! ----------------------------------------------------------------------------
+    ! Compute the dimension of the complete field (i.e. the union of all CPU's)
+    ! which we will write to file.
+    ! ----------------------------------------------------------------------------
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) + 1
+    enddo
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
+
+
+    !-----------------------------------------------------------------------------
+    ! chunking.
+    ! HDF writes "chunks" of data at once, and their size can be used for tuning
+    ! i/o performance. For example, when chunks fit the cache of the HDD, the performance
+    ! may be better.
+    !-----------------------------------------------------------------------------
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
+
+    !-----------------------------------------------------------------------------
+    ! create dataspace "filespace" to write to
+    !-----------------------------------------------------------------------------
+    ! Create the data space for the  dataset.
+    ! Dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
+
+    ! Create chunked dataset.
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
+
+    file_precision = H5T_NATIVE_INTEGER
+
+    ! check if the dataset already exists
+    call h5lexists_f(file_id, dsetname, exist, error)
+    if (exist) then
+      write(*,*) "You are trying to write to an existing dataset...this is not supported."
+      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+    endif
+
+    ! create the dataset
+    call h5dcreate_f(file_id, dsetname, file_precision, filespace, dset_id, error, plist_id)
+    call h5sclose_f(filespace, error)
+
+    ! Select hyperslab in the file.
+    call h5dget_space_f(dset_id, filespace, error)
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, dims_local, error, stride, count)
+
+    ! Create property list for collective dataset write
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+    !-----------------------------------------------------------------------------
+    ! create dataspace "memspace" to be written
+    !-----------------------------------------------------------------------------
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
+
+    !-----------------------------------------------------------------------------
+    ! actual writing of heavy data
+    !-----------------------------------------------------------------------------
+    ! Write the dataset collectively, double precision in memory
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
+
+    !!! Close dataspaces:
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5dclose_f(dset_id, error) ! Close the dataset.
+    call h5pclose_f(plist_id, error) ! Close the property list.
+  end subroutine write_int_dset_mpi_hdf5_4D
+
 
 !-------------------------------------------------------------------------------
 ! write an attribute
@@ -508,11 +960,12 @@ end subroutine write_field_hdf5_1D
 ! OUTPUT:
 !   none
 !-------------------------------------------------------------------------------
-subroutine write_attrib_dble(filename,dsetname,aname,attribute)
+subroutine write_attrib_dble(file_id,dsetname,aname,attribute)
 
   implicit none
 
-  character(len=*), intent (in) :: filename, dsetname, aname
+  integer(hid_t), intent(in) :: file_id
+  character(len=*), intent (in) :: dsetname, aname
   real(kind=rk), DIMENSION(:), intent (in) :: attribute
 
   integer, parameter :: arank = 1
@@ -520,7 +973,6 @@ subroutine write_attrib_dble(filename,dsetname,aname,attribute)
   integer :: error  ! error flags
   integer(hid_t) :: aspace_id ! Attribute Dataspace identifier
   integer(hid_t) :: attr_id   ! Attribute identifier
-  integer(hid_t) :: file_id
   integer(hid_t) :: dset_id  ! dataset identifier
   integer(hsize_t) :: adims(1)  ! Attribute dimension
   logical :: exists
@@ -528,12 +980,6 @@ subroutine write_attrib_dble(filename,dsetname,aname,attribute)
   ! convert input data for the attribute to the precision required by the HDF library
   dim = size(attribute)
   adims = int(dim, kind=hsize_t)
-
-  ! Initialize HDF5 library and Fortran interfaces.
-  call h5open_f(error)
-
-  ! open the file (existing file)
-  call h5fopen_f(filename, H5F_ACC_RDWR_F, file_id, error )
 
   ! open the dataset
   call h5dopen_f(file_id, dsetname, dset_id, error)
@@ -560,8 +1006,6 @@ subroutine write_attrib_dble(filename,dsetname,aname,attribute)
   call h5aclose_f(attr_id,error) ! Close the attribute.
   call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
   call h5dclose_f(dset_id,error)
-  call h5fclose_f(file_id,error)
-  call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
 
 end subroutine write_attrib_dble
 
@@ -576,11 +1020,12 @@ end subroutine write_attrib_dble
 ! OUTPUT:
 !   none
 !-------------------------------------------------------------------------------
-subroutine write_attrib_int(filename,dsetname,aname,attribute)
+subroutine write_attrib_int(file_id,dsetname,aname,attribute)
 
   implicit none
 
-  character(len=*), intent (in) :: filename, dsetname, aname
+  integer(hid_t), intent(in) :: file_id
+  character(len=*), intent (in) :: dsetname, aname
   integer, DIMENSION(:), intent (in) :: attribute
 
   integer(hsize_t) :: adims(1)  ! Attribute dimension
@@ -589,7 +1034,6 @@ subroutine write_attrib_int(filename,dsetname,aname,attribute)
   integer :: error  ! error flags
   integer(hid_t) :: aspace_id ! Attribute Dataspace identifier
   integer(hid_t) :: attr_id   ! Attribute identifier
-  integer(hid_t) :: file_id
   integer(hid_t) :: dset_id  ! dataset identifier
   logical :: exists
 
@@ -597,12 +1041,6 @@ subroutine write_attrib_int(filename,dsetname,aname,attribute)
   ! convert input data for the attribute to the precision required by the HDF library
   dim = size(attribute)
   adims = int(dim, kind=hsize_t)
-
-  ! Initialize HDF5 library and Fortran interfaces.
-  call h5open_f(error)
-
-  ! open the file (existing file)
-  call h5fopen_f(filename, H5F_ACC_RDWR_F, file_id, error )
 
   ! open the dataset
   call h5dopen_f(file_id, dsetname, dset_id, error)
@@ -629,8 +1067,6 @@ subroutine write_attrib_int(filename,dsetname,aname,attribute)
   call h5aclose_f(attr_id,error) ! Close the attribute.
   call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
   call h5dclose_f(dset_id,error)
-  call h5fclose_f(file_id,error)
-  call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
 
 end subroutine write_attrib_int
 

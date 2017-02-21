@@ -74,4 +74,6 @@ contains
     ! non blocking data transfer
     include "isend_irecv_data.f90"
 
+    include "blocks_per_mpirank.f90"
+
 end module module_MPI

@@ -39,7 +39,7 @@ PPFLAG= -cpp #preprocessor flag
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
 #FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
 # HDF_ROOT is set in environment.
-HDF_LIB = $(HDF_ROOT)/lib
+HDF_LIB = $(HDF_ROOT)/lib64
 HDF_INC = $(HDF_ROOT)/include
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
@@ -54,7 +54,7 @@ FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment.
-HDF_LIB = $(HDF_ROOT)/lib
+HDF_LIB = $(HDF_ROOT)/lib64
 HDF_INC = $(HDF_ROOT)/include
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)

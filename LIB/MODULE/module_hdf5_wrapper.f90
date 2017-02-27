@@ -163,8 +163,8 @@ contains
     integer :: error  ! error flags
 
     ! HDF attribute variables
-    integer, parameter :: adatarank = 1
-    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    !integer, parameter :: adatarank = 1
+    !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
     integer :: i, mindim, maxdim, mpicode
     logical :: exist
@@ -306,8 +306,8 @@ contains
     integer :: error  ! error flags
 
     ! HDF attribute variables
-    integer, parameter :: adatarank = 1
-    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    !integer, parameter :: adatarank = 1
+    !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
     integer :: i, mindim, maxdim, mpicode
     logical :: exist
@@ -449,8 +449,8 @@ contains
     integer :: error  ! error flags
 
     ! HDF attribute variables
-    integer, parameter :: adatarank = 1
-    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    !integer, parameter :: adatarank = 1
+    !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
     integer :: i, mindim, maxdim, mpicode
     logical :: exist
@@ -590,8 +590,8 @@ contains
     integer :: error  ! error flags
 
     ! HDF attribute variables
-    integer, parameter :: adatarank = 1
-    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    !integer, parameter :: adatarank = 1
+    !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
     integer :: i, mindim, maxdim, mpicode
     logical :: exist
@@ -724,8 +724,8 @@ contains
     integer :: error  ! error flags
 
     ! HDF attribute variables
-    integer, parameter :: adatarank = 1
-    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    !integer, parameter :: adatarank = 1
+    !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
     integer :: i, mindim, maxdim, mpicode
     logical :: exist
@@ -860,8 +860,8 @@ contains
     integer :: error  ! error flags
 
     ! HDF attribute variables
-    integer, parameter :: adatarank = 1
-    integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
+    !integer, parameter :: adatarank = 1
+    !integer(hsize_t), DIMENSION(1) :: adims  ! Attribute dimension
 
     integer :: i, mindim, maxdim, mpicode
     logical :: exist

@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n)
+subroutine save_data(iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -36,19 +36,19 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
 
     ! user defined parameter structure
     type (type_params), intent(in)                  :: params
-    ! light data array
-    integer(kind=ik), intent(in)                    :: lgt_block(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neifghbor data
-    integer(kind=ik), intent(in)                    :: hvy_neighbor(:,:)
+
     ! list of active blocks (light data)
     integer(kind=ik), intent(in)                    :: lgt_active(:)
     ! number of active blocks (light data)
-    integer(kind=ik), intent(in)                    :: lgt_n, hvy_n
+    integer(kind=ik), intent(in)                    :: lgt_n
+    ! number of active blocks (heavy data)
+    integer(kind=ik)                                :: hvy_n
 
     ! loop variable
     integer(kind=ik)                                :: k
+    ! file name
     character(len=80)                               :: fname
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: sub_t0, sub_t1
@@ -84,13 +84,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, hvy_neighbor
                 write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
         end select
 
-        call write_field( fname, time, iteration, k, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_n)
+        call write_field( fname, time, iteration, k, params, hvy_block, lgt_active, lgt_n, hvy_n)
     end do
 
     ! end time
     sub_t1 = MPI_Wtime()
-
-    write(*,*) "save time=", sub_t1 -sub_t0, "for", lgt_n, "blocks"
 
     ! write time
     if ( params%debug ) then

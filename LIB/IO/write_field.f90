@@ -126,6 +126,8 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
         stop
     end if
 
+    coords_origin = 7.0e6_rk
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -201,8 +203,8 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
         ! 2D data case
         call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
         call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly/))
-        call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin)
-        call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing)
+        call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
+        call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
     endif
 
     ! add aditional annotations

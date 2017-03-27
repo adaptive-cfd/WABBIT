@@ -443,7 +443,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! interpolate data
                 do dF = 2, params%number_data_fields+1
                     ! data to refine
-                    data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, Bs:Bs-1+g, dF, sender_id )
+                    data_corner = hvy_block( Bs+1:Bs+g, Bs+1:Bs+g, Bs+1:Bs+g, dF, sender_id )
                     ! interpolate data
                     call prediction_3D( data_corner , data_corner_fine, params%order_predictor)
                     ! data to synchronize
@@ -502,7 +502,6 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                 stop
             end if
-
         ! '152/___'
         case(22)
             if ( level_diff == 0 ) then
@@ -591,7 +590,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! interpolate data
                 do dF = 2, params%number_data_fields+1
                     ! data to refine
-                    data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, g+1:g+g, dF, sender_id )
+                    data_corner = hvy_block( Bs+1:Bs+g, Bs+1:Bs+g, g+1:g+g, dF, sender_id )
                     ! interpolate data
                     call prediction_3D( data_corner , data_corner_fine, params%order_predictor)
                     ! data to synchronize
@@ -1423,7 +1422,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, 1:g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, 2:g+1, Bs:Bs-1+g)
+                    !hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, 1:g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, 2:g+1, Bs:Bs-1+g)
+                    hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, 1:g, dF, receiver_id ) = data_face_fine(1:Bs, 2:g+1, Bs:Bs-1+g)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1451,7 +1451,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( 1:g, g+1:Bs+g, 1:g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, g+1:Bs+g, Bs:Bs-1+g)
+                    !hvy_block( 1:g, g+1:Bs+g, 1:g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, g+1:Bs+g, Bs:Bs-1+g)
+                    hvy_block( 1:g, g+1:Bs+g, 1:g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, 1:Bs, Bs:Bs-1+g)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1535,7 +1536,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( g+1:Bs+g, 1:g, 1:g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, Bs:Bs-1+g, Bs:Bs-1+g)
+                    !hvy_block( g+1:Bs+g, 1:g, 1:g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, Bs:Bs-1+g, Bs:Bs-1+g)
+                    hvy_block( g+1:Bs+g, 1:g, 1:g, dF, receiver_id ) = data_face_fine(1:Bs, Bs:Bs-1+g, Bs:Bs-1+g)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1591,7 +1593,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, 1:g, dF, receiver_id ) = data_face_fine(2:g+1, g+1:Bs+g, Bs:Bs-1+g)
+                    !hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, 1:g, dF, receiver_id ) = data_face_fine(2:g+1, g+1:Bs+g, Bs:Bs-1+g)
+                    hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, 1:g, dF, receiver_id ) = data_face_fine(2:g+1, 1:Bs, Bs:Bs-1+g)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1647,7 +1650,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, 2:g+1, 2:g+1)
+                    !hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, 2:g+1, 2:g+1)
+                    hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(1:Bs, 2:g+1, 2:g+1)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1675,7 +1679,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( 1:g, g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, g+1:Bs+g, 2:g+1)
+                    !hvy_block( 1:g, g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, g+1:Bs+g, 2:g+1)
+                    hvy_block( 1:g, g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, 1:Bs, 2:g+1)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1759,7 +1764,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( g+1:Bs+g, 1:g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, Bs:Bs-1+g, 2:g+1)
+                    !hvy_block( g+1:Bs+g, 1:g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(g+1:Bs+g, Bs:Bs-1+g, 2:g+1)
+                    hvy_block( g+1:Bs+g, 1:g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(1:Bs, Bs:Bs-1+g, 2:g+1)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1815,7 +1821,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(2:g+1, g+1:Bs+g, 2:g+1)
+                    !hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(2:g+1, g+1:Bs+g, 2:g+1)
+                    hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = data_face_fine(2:g+1, 1:Bs, 2:g+1)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1871,7 +1878,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( 1:g, Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, 2:g+1, g+1:Bs+g)
+                    !hvy_block( 1:g, Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, 2:g+1, g+1:Bs+g)
+                    hvy_block( 1:g, Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, 2:g+1, 1:Bs)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1927,7 +1935,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(2:g+1, 2:g+1, g+1:Bs+g)
+                    !hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(2:g+1, 2:g+1, g+1:Bs+g)
+                    hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(2:g+1, 2:g+1, 1:Bs)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -1983,7 +1992,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( 1:g, 1:g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, Bs:Bs-1+g, g+1:Bs+g)
+                    !hvy_block( 1:g, 1:g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, Bs:Bs-1+g, g+1:Bs+g)
+                    hvy_block( 1:g, 1:g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(Bs:Bs-1+g, Bs:Bs-1+g, 1:Bs)
                 end do
 
             elseif ( level_diff == 1 ) then
@@ -2039,7 +2049,8 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                     ! interpolate data
                     call prediction_3D( data_face , data_face_fine, params%order_predictor)
                     ! copy data
-                    hvy_block( Bs+g+1:Bs+g+g, 1:g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(2:g+1, Bs:Bs-1+g, g+1:Bs+g)
+                    !hvy_block( Bs+g+1:Bs+g+g, 1:g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(2:g+1, Bs:Bs-1+g, g+1:Bs+g)
+                    hvy_block( Bs+g+1:Bs+g+g, 1:g, g+1:Bs+g, dF, receiver_id ) = data_face_fine(2:g+1, Bs:Bs-1+g, 1:Bs)
                 end do
 
             elseif ( level_diff == 1 ) then

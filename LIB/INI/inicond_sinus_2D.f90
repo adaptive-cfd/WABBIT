@@ -1,23 +1,22 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: inicond_zeros.f90
+! name: inicond_sinus_2D.f90
 ! version: 0.5
 ! author: msr
 !
-! initialize zero for all fields
-! work for 2D and 3D data
+! initialize sinus for 2D case
 !
 ! input:    - params
 ! output:   - light and heavy data arrays
 !
 ! = log ======================================================================================
 !
-! 26/01/17 - create
+! 21/03/17 - create
 !
 ! ********************************************************************************************
 
-subroutine inicond_zeros( params, lgt_block, hvy_block )
+subroutine inicond_sinus_2D( params, lgt_block, hvy_block )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -33,23 +32,24 @@ subroutine inicond_zeros( params, lgt_block, hvy_block )
     ! heavy data array - block data
     real(kind=rk), intent(inout)            :: hvy_block(:, :, :, :, :)
 
-    ! process rank
-    integer(kind=ik)                        :: rank
-
     ! initial data field
     real(kind=rk), allocatable              :: phi(:, :, :)
 
     ! grid parameter, domainsize (Ds)
     integer(kind=ik)                        :: Ds
-
     ! number of datafields
     integer(kind=ik)                        :: dF
+
+    ! process rank
+    integer(kind=ik)                        :: rank
 
     ! allocation error variable
     integer(kind=ik)                        :: allocate_error
 
+    ! auxiliary variable for gauss pulse
+    real(kind=rk)                           :: x ,y
     ! loop variables
-    integer(kind=ik)                        :: k
+    integer(kind=ik)                        :: i, j
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -64,50 +64,42 @@ subroutine inicond_zeros( params, lgt_block, hvy_block )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! first: create start field
+    ! first: create field phi
     !-----------------------------------------------------------------------------------------
+
     ! allocate memory
-    if ( params%threeD_case ) then
-        ! 3D:
-        allocate( phi( Ds, Ds, Ds), stat=allocate_error )
-        call check_allocation(allocate_error)
-    else
-        ! 2D:
-        allocate( phi( Ds, Ds, 1), stat=allocate_error )
-        call check_allocation(allocate_error)
-    end if
+    allocate( phi( Ds, Ds, 1), stat=allocate_error )
+    call check_allocation(allocate_error)
 
+    ! create sin
+    do i = 1, Ds
+      do j = 1, Ds
+        x = real(i-1, kind=rk)
+        y = real(j-1, kind=rk)
 
-    ! set phi
-    phi = 0.0_rk
+        x = 10.0_rk*pi / real(Ds-1, kind=rk) * x
+        y = 10.0_rk*pi / real(Ds-1, kind=rk) * y
+
+        phi(i,j,1) = sin(x)*sin(y)
+      end do
+    end do
 
     ! output
     if (rank==0) then
         if ( params%unit_test .eqv. .false. ) then
             write(*,'(80("_"))')
-            write(*,'("INIT: initialize zero for all fields ")')
+            write(*,'("INIT: initialize sin(x)*sin(y) ")')
         end if
     end if
 
-    ! second: init light and heavy data for datafield 1, create starting block distribution
+    ! second: decompose init field phi to block data
     !-----------------------------------------------------------------------------------------
+    ! init light and heavy data for datafield 1, create starting block distribution
     ! note: subroutine use allways a simple equal distribution
     ! for other distributions: use balance_load subroutine after initial distribution
-    if ( params%threeD_case ) then
-        ! 3D:
-        call initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
-    else
-        ! 2D:
-        call initial_block_distribution_2D( params, lgt_block, hvy_block, phi )
-    end if
-
-    ! write heavy data for other datafields, copy first datafield
-    do k = 3, dF+1
-        hvy_block( :, :, :, k, : ) = hvy_block( :, :, :, 2, : )
-    end do
+    call initial_block_distribution_2D( params, lgt_block, hvy_block, phi )
 
     ! clean up
     deallocate( phi, stat=allocate_error )
 
-
-end subroutine inicond_zeros
+end subroutine inicond_sinus_2D

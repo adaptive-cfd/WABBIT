@@ -268,13 +268,15 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
                                     new_coord_y(1:(Bs-1)/2+1)              = hvy_block( 2, 1:Bs:2, 1, heavy_ids(1) )
                                 case(2)
                                     ! sister 1
-                                    new_coord_x((Bs-1)/2+1:Bs)             = hvy_block( 1, 1:Bs:2, 1, heavy_ids(2) )
+                                    !new_coord_x((Bs-1)/2+1:Bs)             = hvy_block( 1, 1:Bs:2, 1, heavy_ids(2) )
                                 case(3)
                                     ! sister 2
-                                    new_coord_y((Bs-1)/2+1:Bs)             = hvy_block( 2, 1:Bs:2, 1, heavy_ids(3) )
+                                    !new_coord_y((Bs-1)/2+1:Bs)             = hvy_block( 2, 1:Bs:2, 1, heavy_ids(3) )
                                 case(4)
                                     ! sister 3
                                     ! nothing to do
+                                    new_coord_x((Bs-1)/2+1:Bs)             = hvy_block( 1, 1:Bs:2, 1, heavy_ids(4) )
+                                    new_coord_y((Bs-1)/2+1:Bs)             = hvy_block( 2, 1:Bs:2, 1, heavy_ids(4) )
                             end select
                         else
                             ! receive data from other proc, note: not all blocks have to send coord vectors
@@ -289,16 +291,20 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
                                 case(2)
                                     ! sister 1
                                     ! receive coords
-                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_coord_x((Bs-1)/2+1:Bs)             = send_receive_coord(1:Bs:2)
+                                    !call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    !new_coord_x((Bs-1)/2+1:Bs)             = send_receive_coord(1:Bs:2)
                                 case(3)
                                     ! sister 2
                                     ! receive coords
-                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
-                                    new_coord_y((Bs-1)/2+1:Bs)              = send_receive_coord(1:Bs:2)
+                                    !call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    !new_coord_y((Bs-1)/2+1:Bs)              = send_receive_coord(1:Bs:2)
                                 case(4)
                                     ! sister 3
                                     ! nothing to do
+                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    new_coord_x((Bs-1)/2+1:Bs)              = send_receive_coord(1:Bs:2)
+                                    call MPI_Recv(send_receive_coord, Bs, MPI_REAL8, proc_rank(i), tag, MPI_COMM_WORLD, status, ierr)
+                                    new_coord_y((Bs-1)/2+1:Bs)              = send_receive_coord(1:Bs:2)
                             end select
                         end if
 
@@ -315,16 +321,20 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
                             case(2)
                                 ! sister 1
                                 ! send coord
-                                send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(2) )
-                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                !send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(2) )
+                                !call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(3)
                                 ! sister 2
                                 ! send coord
-                                send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(3) )
-                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                !send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(3) )
+                                !call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                             case(4)
                                 ! sister 3
                                 ! nothing to do
+                                send_receive_coord = hvy_block( 1, 1:Bs, 1, heavy_ids(4) )
+                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
+                                send_receive_coord = hvy_block( 2, 1:Bs, 1, heavy_ids(4) )
+                                call MPI_Send( send_receive_coord, Bs, MPI_REAL8, data_rank, tag, MPI_COMM_WORLD, ierr)
                         end select
                     else
                         ! nothing to do

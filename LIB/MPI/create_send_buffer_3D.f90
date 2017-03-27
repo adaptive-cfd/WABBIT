@@ -374,7 +374,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! sender one level down
                         ! interpolate data
                         ! data to refine
-                        data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, Bs:Bs-1+g, dF, my_block )
+                        data_corner = hvy_block( Bs+1:Bs+g, Bs+1:Bs+g, Bs+1:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_corner , data_corner_fine, params%order_predictor)
                         ! data to synchronize
@@ -530,7 +530,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! sender one level down
                         ! interpolate data
                         ! data to refine
-                        data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, g+1:g+g, dF, my_block )
+                        data_corner = hvy_block( Bs+1:Bs+g, Bs+1:Bs+g, g+1:g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_corner , data_corner_fine, params%order_predictor)
                         ! data to synchronize
@@ -1573,7 +1573,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, 1+i, Bs+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1610,7 +1611,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1:Bs, Bs+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1721,7 +1723,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+i-1, Bs+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1795,7 +1798,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1:Bs, Bs+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1869,7 +1873,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, 1+i, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1906,7 +1911,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1:Bs, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2017,7 +2023,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+i-1, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2091,7 +2098,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1:Bs, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2165,7 +2173,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2239,7 +2248,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1+j, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1+j, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1+j, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2313,7 +2323,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2387,7 +2398,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do

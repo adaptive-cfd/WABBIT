@@ -87,8 +87,10 @@ subroutine  allocate_block_data( params, hvy_block )
 
     ! output
     if (rank==0) then
-        write(*,'(80("_"))')
-        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, dF
+        if ( params%unit_test .eqv. .false. ) then
+            write(*,'(80("_"))')
+            write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, dF
+        end if
     end if
 
 end subroutine allocate_block_data

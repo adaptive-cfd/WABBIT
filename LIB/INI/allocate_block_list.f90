@@ -76,8 +76,10 @@ subroutine  allocate_block_list( params, lgt_block )
 
     ! output
     if (rank==0) then
-        write(*,'(80("_"))')
-        write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
+        if ( params%unit_test .eqv. .false. ) then
+            write(*,'(80("_"))')
+            write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
+        end if
     end if
 
 end subroutine allocate_block_list

@@ -33,6 +33,8 @@ program main
     use module_IO
     ! time step module
     use module_time_step
+    ! unit test module
+    use module_unit_test
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -126,6 +128,9 @@ program main
     params%rank         = rank
     params%number_procs = number_procs
 
+    ! unit test off
+    params%unit_test    = .false.
+
     ! cpu start time
     call cpu_time(t0)
 
@@ -173,8 +178,21 @@ program main
         call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
+    !---------------------------------------------------------------------------------------------
+    ! unit tests
+    !---------------------------------------------------------------------------------------------
+    ! unit test on
+    params%unit_test    = .true.
+
+    call unit_test_ghost_nodes_synchronization( params )
+
+    ! unit test off
+    params%unit_test    = .false.
+
+    !---------------------------------------------------------------------------------------------
+
     ! save start data
-    call save_data( iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_n )
+    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
     ! main time loop
     do while ( time < params%time_max )
@@ -234,7 +252,7 @@ program main
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
-          call save_data( iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_n )
+          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
           output_time = time
         endif
 
@@ -254,7 +272,7 @@ program main
     end do
 
     ! save end field to disk, only if timestep is not saved allready
-    if ( abs(output_time-time) > 1e-10_rk ) call save_data( iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_n )
+    if ( abs(output_time-time) > 1e-10_rk ) call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
     ! debug info
     if ( params%debug ) then

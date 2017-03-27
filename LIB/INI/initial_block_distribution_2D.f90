@@ -144,8 +144,10 @@ subroutine initial_block_distribution_2D( params, lgt_block, hvy_block, phi )
 
     ! output decomposition information
     if (rank==0) then
-        write(*,'(80("_"))')
-        write(*,'("INIT: Field with res: ", i5, " x", i5, " gives: ", i5,  " x", i5, " (", i5, ") blocks of size: ", i5)') Ds, Ds, num_blocks_x, num_blocks_y, num_blocks, Bs
+        if ( params%unit_test .eqv. .false. ) then
+            write(*,'(80("_"))')
+            write(*,'("INIT: Field with res: ", i5, " x", i5, " gives: ", i5,  " x", i5, " (", i5, ") blocks of size: ", i5)') Ds, Ds, num_blocks_x, num_blocks_y, num_blocks, Bs
+        end if
     end if
 
     ! decompose blocks to procs
@@ -187,8 +189,10 @@ subroutine initial_block_distribution_2D( params, lgt_block, hvy_block, phi )
                                      hvy_block, &
                                      heavy_id, &
                                      phi( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 , (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1, : ), &
-                                     coord_x( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
-                                     coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
+                                     !coord_x( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
+                                     !coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
+                                     coord_x( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
+                                     coord_y( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
                                      0.0_rk*coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ) )
 
             end if

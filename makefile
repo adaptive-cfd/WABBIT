@@ -3,7 +3,7 @@
 FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block_2D.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90 adjacent_block_3D.f90 RHS_3D_convection_diffusion.f90 \
-RHS_3D_navier_stokes.f90
+RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -11,7 +11,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 \
-	module_interpolation.f90 module_init.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90
+	module_interpolation.f90 module_init.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90
 # physics modules
 MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
@@ -82,7 +82,7 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusi
 
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
 	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90 write_debug_times.f90 write_block_distribution.f90 write_com_list.f90 \
-	write_com_matrix.f90 write_com_matrix_pos.f90
+	write_com_matrix.f90 write_com_matrix_pos.f90 unit_test_ghost_nodes_synchronization.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_params.o
@@ -97,9 +97,9 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 $(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_ini_files_parser.o \
 	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
 	allocate_work_data.f90 inicond_vorticity_filaments.f90 ini_file_to_params.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 \
-	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90
+	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90 inicond_sinus_2D.f90 inicond_sinus_3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
+	
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
 	synchronize_ghosts.f90 copy_ghost_nodes_2D.f90 create_send_buffer_2D.f90 write_receive_buffer_2D.f90 synchronize_internal_nodes.f90 \
 	max_com_num.f90 fill_send_buffer.f90 fill_receive_buffer.f90 RMA_lock_unlock_get_data.f90 RMA_lock_unlock_put_data.f90 \
@@ -118,6 +118,10 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90 update_neighbors_3D.f90 \
 	find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 refine_mesh_3D.f90 ensure_completeness_3D.f90 \
 	coarse_mesh_3D.f90 balance_load_3D.f90 treecode_to_3D_z_curve.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_init.o $(OBJDIR)/module_mesh.o \
+	unit_test_ghost_nodes_synchronization.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \

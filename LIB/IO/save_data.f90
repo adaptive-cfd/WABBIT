@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_n)
+subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -36,6 +36,8 @@ subroutine save_data(iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_
 
     ! user defined parameter structure
     type (type_params), intent(in)                  :: params
+    ! light data array
+    integer(kind=ik), intent(in)                    :: lgt_block(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
 
@@ -84,7 +86,7 @@ subroutine save_data(iteration, time, params, hvy_block, lgt_active, lgt_n, hvy_
                 write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
         end select
 
-        call write_field( fname, time, iteration, k, params, hvy_block, lgt_active, lgt_n, hvy_n)
+        call write_field( fname, time, iteration, k, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
     end do
 
     ! end time

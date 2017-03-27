@@ -84,12 +84,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
     buffer_i         = 1
 
-    data_corner      = 9.0e9_rk
-    data_corner_fine = 9.0e9_rk
-    data_edge        = 9.0e9_rk
-    data_edge_fine   = 9.0e9_rk
-
-    send_buff        = 9.0e9_rk
+!    data_corner      = 9.0e9_rk
+!    data_corner_fine = 9.0e9_rk
+!    data_edge        = 9.0e9_rk
+!    data_edge_fine   = 9.0e9_rk
+!
+!    send_buff        = 9.0e9_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body

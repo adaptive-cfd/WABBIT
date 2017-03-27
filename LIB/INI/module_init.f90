@@ -80,4 +80,8 @@ contains
     ! shear layer setup
     include "inicond_shear_layer.f90"
 
+    ! sinus initialization
+    include "inicond_sinus_2D.f90"
+    include "inicond_sinus_3D.f90"
+
 end module module_init

@@ -214,8 +214,10 @@ subroutine refine_mesh_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, hvy_active(k) )
+            !new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
+            !new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, hvy_active(k) )
+            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, hvy_active(k) )
+            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
@@ -248,8 +250,10 @@ subroutine refine_mesh_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
             ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
+            !new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, hvy_active(k) )
+            !new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
+            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, hvy_active(k) )
+            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, hvy_active(k) )
             do i = 2, Bs, 2
                 new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
                 new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk

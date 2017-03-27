@@ -22,7 +22,7 @@
 ! 21/02/17 - use parallel IO, write one data array with all data
 !
 ! ********************************************************************************************
-subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_active, lgt_n, hvy_n)
+subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -47,6 +47,8 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
 
     ! user defined parameter structure
     type (type_params), intent(in)      :: params
+    ! light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
 
@@ -67,7 +69,7 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
     ! coordinates and spacing arrays
-    real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:)
+    real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:), block_treecode(:,:)
 
     ! file id integer
     integer(hid_t)                      :: file_id
@@ -126,6 +128,14 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
         stop
     end if
 
+    allocate (block_treecode(1:params%max_treelevel, 1:hvy_n), stat=allocate_error)
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     coords_origin = 7.0e6_rk
 
 !---------------------------------------------------------------------------------------------
@@ -174,13 +184,18 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
             if ( params%threeD_case ) then
                 ! 3D
                 myblockbuffer(:,:,:,l)      = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
-                coords_origin(1:3,l)        = hvy_block( 1:3, 1, 1, 1, hvy_id)
+                coords_origin(1,l)          = hvy_block( 3, 1, 1, 1, hvy_id)
+                coords_origin(2,l)          = hvy_block( 2, 1, 1, 1, hvy_id)
+                coords_origin(3,l)          = hvy_block( 1, 1, 1, 1, hvy_id)
                 coords_spacing(1:3,l)       = abs(hvy_block( 1:3, 2, 1, 1, hvy_id) - hvy_block( 1:3, 1, 1, 1, hvy_id) )
+                block_treecode(:,l)         = lgt_block( lgt_active(k), 1:params%max_treelevel )
             else
                 ! 2D
                 myblockbuffer(:,:,1,l)      = hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id)
-                coords_origin(1:2,l)        = hvy_block( 1:2, 1, 1, 1, hvy_id)
+                coords_origin(1,l)          = hvy_block( 2, 1, 1, 1, hvy_id)
+                coords_origin(2,l)          = hvy_block( 1, 1, 1, 1, hvy_id)
                 coords_spacing(1:2,l)       = abs(hvy_block( 1:2, 2, 1, 1, hvy_id) - hvy_block( 1:2, 1, 1, 1, hvy_id) )
+                block_treecode(:,l)         = lgt_block( lgt_active(k), 1:params%max_treelevel )
             endif
 
             ! next block
@@ -199,12 +214,14 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
         call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly, params%Lz/))
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
+        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), block_treecode)
     else
         ! 2D data case
         call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
         call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly/))
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
+        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), block_treecode)
     endif
 
     ! add aditional annotations
@@ -219,5 +236,6 @@ subroutine write_field( fname, time, iteration, dF, params, hvy_block, lgt_activ
     deallocate(myblockbuffer, stat=allocate_error)
     deallocate(coords_origin, stat=allocate_error)
     deallocate(coords_spacing, stat=allocate_error)
+    deallocate(block_treecode, stat=allocate_error)
 
 end subroutine write_field

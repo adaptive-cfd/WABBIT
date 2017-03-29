@@ -57,13 +57,10 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     integer(kind=ik)                        :: allocate_error
 
     ! loop variables
-    integer(kind=ik)                        :: k, N, l, i, j
+    integer(kind=ik)                        :: k, l, i, j
 
     ! process rank
     integer(kind=ik)                        :: rank
-
-    ! number of blocks in one dimension
-    integer(kind=ik)                        :: block_num
 
     ! coordinates vectors
     real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
@@ -71,11 +68,16 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     real(kind=rk)                           :: dx, dy, dz
 
     ! grid parameter
-    integer(kind=ik)                        :: Bs, g
+    integer(kind=ik)                        :: Bs, g, Ds
     real(kind=rk)                           :: Lx, Ly, Lz
+    ! data dimensionality
+    integer(kind=ik)                        :: d
 
     ! error variable
     real(kind=rk)                           :: error, my_error
+
+    ! block sizes for convergence test:
+    ! integer(kind=ik) :: test_blocksizes=(/)
 
     ! MPI error variable
     integer(kind=ik)                        :: ierr
@@ -92,9 +94,6 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! local copy of params struct
     params_loc = params
 
-    ! number of blocks per proc
-    N = params_loc%number_blocks
-
     ! set MPI parameters
     rank = params_loc%rank
 
@@ -103,17 +102,34 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     Ly = params_loc%Ly
     Lz = params_loc%Lz
 
+    if ( params_loc%threeD_case ) then
+      d = 3
+    else
+      d = 2
+    endif
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! choose number of blocks here
-    block_num = 4!4!2
+    if (rank == 0) then
+      write(*,'(80("_"))')
+      write(*,*)  "Beginning ghost nodes Unit test"
+    end if
 
-    ! reset blocksize in params struct
-    params_loc%number_block_nodes = (params_loc%number_domain_nodes + (block_num-1)) / block_num
+    ! choose bocksize here:
+    params_loc%number_block_nodes = 129
+
     Bs = params_loc%number_block_nodes
     g = params_loc%number_ghost_nodes
+    DS = 513
 
+    ! determine the required number of blocks, given the current block
+    ! size and the desired "full resolution" size "Ds"
+    params_loc%number_blocks = ( ((Ds-1) / (Bs-1))**d ) * 2**d
+
+    if (rank == 0) then
+      write(*,'("Testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
+    end if
     !---------------------------------------------------------------------------------------------
     ! first: initializing new block data
     ! allocate block_list
@@ -123,7 +139,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     call allocate_block_data( params_loc, hvy_block_loc_exact )
 
     ! active heavy block list
-    allocate( hvy_active( N ), stat=allocate_error )
+    allocate( hvy_active( params_loc%number_blocks ), stat=allocate_error )
     !call check_allocation(allocate_error)
     if ( allocate_error /= 0 ) then
         write(*,'(80("_"))')
@@ -341,8 +357,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
 
     ! output
     if (rank==0) then
-        write(*,'(80("_"))')
-        write(*,'("UNIT TEST: ghost nodes synchronization error = ",f16.8)')  error
+        write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",f16.8)')  error
     end if
 
     !---------------------------------------------------------------------------------------------

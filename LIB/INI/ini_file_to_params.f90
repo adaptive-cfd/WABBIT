@@ -43,6 +43,13 @@ subroutine ini_file_to_params( params, filename )
     ! allocation error variabel
     integer(kind=ik)                                :: allocate_error
 
+    ! maximum memory avalable on all cpus
+    real(kind=rk)                                   :: maxmem
+    ! power used for dimensionality (d=2 or d=3)
+    integer(kind=ik)                                :: d,i
+    ! string read from command line call
+    character(len=80)                               :: memstring
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -302,6 +309,34 @@ subroutine ini_file_to_params( params, filename )
     else
         params%debug = .false.
     end if
+
+
+    !---------------------------------------------------------------------------
+    ! Automatic memory management. If specified --memory=0.3GB in the call line,
+    ! wabbit will automatically select the number of blocks per rank to be allocated
+    ! to consume this amount of memory. helpful on local machines.
+    !---------------------------------------------------------------------------
+    ! loop over all arguments until you find the string "--memory" in them (or not)
+    ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
+    do i = 1, command_argument_count()
+      call get_command_argument(i, memstring)
+      ! is memory limitation used?
+      if ( index(memstring,"--memory=")==1 ) then
+        ! read memory from command line and convert to bytes
+        read(memstring(10:len_trim(memstring)-2),* ) maxmem
+        ! how much memory is reserved, in bytes?
+        maxmem = maxmem * 1000.0 * 1000.0 * 1000.0 ! in bytes
+        if ( params%threeD_case ) then
+          d = 3
+        else
+          d = 2
+        endif
+        params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
+        if (params%rank==0) write(*,'(80("~"))')
+        if (params%rank==0) write(*,*) "automatic selection of blocks per rank is active!"
+        if (params%rank==0) write(*,'("we allocated ",i6," blocks per rank (total: ",i7," blocks) consuming total memory of",f12.4,"GB")') params%number_blocks, params%number_blocks*params%number_procs, maxmem/1000.0/1000.0/1000.0
+      endif
+    end do
 
     ! clean up
     call clean_ini_file(FILE)

@@ -240,6 +240,11 @@ program main
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
+        ! filter
+        if (modulo(iteration, params%filter_freq) == 0) then
+            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        end if
+
         ! adapt the mesh
         if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
 

@@ -27,9 +27,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 !---------------------------------------------------------------------------------------------
 ! modules
 
-    use hdf5
-    use module_mpi
-
 !---------------------------------------------------------------------------------------------
 ! variables
 

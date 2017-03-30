@@ -91,6 +91,23 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     ! allocate heavy work data
     call allocate_work_data( params, hvy_work )
 
+    ! check ghost nodes number
+    if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: need more ghost nodes for given refinement order"
+        stop
+    end if
+    if ( (params%number_ghost_nodes < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: need more ghost nodes for given refinement order"
+        stop
+    end if
+    if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: need more ghost nodes for given derivative order"
+        stop
+    end if
+
     ! initial data field
     select case( params%initial_cond )
         case ("gauss-blob","gauss_blob")

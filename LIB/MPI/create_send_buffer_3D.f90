@@ -102,9 +102,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
     allocate( data_corner_fine( 2*g-1, 2*g-1, 2*g-1), stat=allocate_error )
     call check_allocation(allocate_error)
 
-    allocate( data_face( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    !allocate( data_face( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    !allocate( data_face_fine( Bs+g, Bs+g, Bs+g), stat=allocate_error )
+    !call check_allocation(allocate_error)
+
+    allocate( data_face( (Bs+1)/2 + g, (Bs+1)/2 + g, (Bs+1)/2 + g), stat=allocate_error )
     call check_allocation(allocate_error)
-    allocate( data_face_fine( Bs+g, Bs+g, Bs+g), stat=allocate_error )
+    allocate( data_face_fine( Bs+2*g, Bs+2*g, Bs+2*g), stat=allocate_error )
     call check_allocation(allocate_error)
 
     buffer_i         = 1
@@ -642,13 +647,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, j, Bs+g+i-1)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -679,13 +686,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, g+j, Bs+g+i-1)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -716,13 +725,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, g+j, Bs+g+i-1)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -753,13 +764,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+i-1)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, Bs+g+i-1)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -790,13 +803,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, 1+i, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -827,13 +842,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, 1+i, j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -864,13 +881,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, 1+i, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -901,7 +920,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
@@ -938,13 +958,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+g+i-1, 1:Bs+g, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -975,13 +997,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+g+i-1, 1:Bs+g, j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1012,13 +1036,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+g+i-1, g+1:Bs+2*g, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1049,13 +1075,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+i-1, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(Bs+g+i-1, g+1:Bs+2*g, j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1086,13 +1114,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, Bs+g+i-1, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1123,13 +1153,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, Bs+g+i-1, j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1160,13 +1192,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+g+i-1, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1197,13 +1231,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+i-1, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, Bs+g+i-1, j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1234,13 +1270,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, g+1:Bs+2*g, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1271,13 +1309,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, g+1:Bs+2*g, j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1308,13 +1348,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, j)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, j)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1+i, 1:Bs+g, g+j)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1345,7 +1387,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
@@ -1382,13 +1425,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g , g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g , g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g , g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, 1+i)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, 1+i)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, j, 1+i)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1419,13 +1464,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, 1+i)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, 1+i)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(g+1:Bs+2*g, g+j, 1+i)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1456,13 +1503,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, Bs+g
-                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, 1+i)
+                                !send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, j, 1+i)
+                                send_buff(buffer_i:buffer_i+Bs+g-1)     = data_face_fine(1:Bs+g, g+j, 1+i)
                                 buffer_i                                = buffer_i + Bs+g
                             end do
                         end do
@@ -1493,7 +1542,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
@@ -1530,13 +1580,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+g+1:Bs+2*g, 1+i, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1567,14 +1619,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, Bs+j-1)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, 1+i, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, 1+i, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, 1+i, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1605,14 +1659,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, Bs+j-1)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1:Bs, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1:Bs, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, 1:Bs, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1643,13 +1699,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, g+g+1:Bs+2*g, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1680,13 +1738,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+g+1:Bs+2*g, Bs+g+i-1, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1717,14 +1777,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, Bs+j-1)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+i-1, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+i-1, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+g+i-1, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1755,13 +1817,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+g+1:Bs+2*g, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1792,14 +1856,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, Bs+j-1)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1:Bs, Bs+j-1)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1:Bs, Bs+j-1)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1:Bs, Bs+g+j-1)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1830,13 +1896,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, 1+i, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+g+1:Bs+2*g, 1+i, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1867,7 +1935,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
@@ -1905,14 +1974,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, 1+j)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1:Bs, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1:Bs, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, 1:Bs, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1943,13 +2014,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, g+1:Bs+g, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, g+g+1:Bs+2*g, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -1980,13 +2053,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+g+1:Bs+2*g, Bs+g+i-1, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2017,14 +2092,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(g+1:Bs+g, Bs+i-1, 1+j)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+i-1, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+i-1, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1:Bs, Bs+g+i-1, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2055,13 +2132,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, 1+j)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+1:Bs+g, 1+j)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, g+g+1:Bs+2*g, 1+j)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2092,7 +2171,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
@@ -2130,13 +2210,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, 1+j, g+g+1:Bs+2*g)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2167,14 +2249,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, g+1:Bs+g)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, 1:Bs)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, 1+j, 1:Bs)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, 1+j, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2205,13 +2289,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1+j, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1+j, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, 1+j, g+g+1:Bs+2*g)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2242,7 +2328,8 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
@@ -2280,13 +2367,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, Bs+g+j-1, g+g+1:Bs+2*g)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2317,14 +2406,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, g+1:Bs+g)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, 1:Bs)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+i-1, Bs+j-1, 1:Bs)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(Bs+g+i-1, Bs+g+j-1, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2355,13 +2446,15 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, g+1:Bs+g)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, g+1:Bs+g)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+g+j-1, g+g+1:Bs+2*g)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do
@@ -2392,14 +2485,16 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_face = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_face = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_3D( data_face , data_face_fine, params%order_predictor)
                         ! write data
                         do i = 1, g
                             do j = 1, g
                                 !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, g+1:Bs+g)
-                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, 1:Bs)
+                                !send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+j-1, 1:Bs)
+                                send_buff(buffer_i:buffer_i+Bs-1)     = data_face_fine(1+i, Bs+g+j-1, 1:Bs)
                                 buffer_i                                = buffer_i + Bs
                             end do
                         end do

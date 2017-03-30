@@ -70,20 +70,18 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! grid parameter
     integer(kind=ik)                        :: Bs, g, Ds
     real(kind=rk)                           :: Lx, Ly, Lz
-    ! data dimensionality
-    integer(kind=ik)                        :: d
 
     ! error variable
     real(kind=rk)                           :: error, my_error
-
-    ! block sizes for convergence test:
-    ! integer(kind=ik) :: test_blocksizes=(/)
 
     ! MPI error variable
     integer(kind=ik)                        :: ierr
 
     ! chance for block refinement, random number
     real(kind=rk)                           :: ref_chance, r
+
+    ! data dimensionality
+    integer(kind=ik)                        :: d
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -102,34 +100,41 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     Ly = params_loc%Ly
     Lz = params_loc%Lz
 
+    ! set data dimension
     if ( params_loc%threeD_case ) then
-      d = 3
+        d = 3
     else
-      d = 2
+        d = 2
     endif
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
     if (rank == 0) then
-      write(*,'(80("_"))')
-      write(*,*)  "Beginning ghost nodes Unit test"
+        write(*,'(80("_"))')
+        write(*,'("UNIT TEST: Beginning ghost nodes test")')
     end if
 
-    ! choose bocksize here:
-    params_loc%number_block_nodes = 129
+    ! choose bocksize and domainsize here:
+    if ( params_loc%threeD_case ) then
+        params_loc%number_block_nodes = 65
+        Ds = 129
+    else
+        params_loc%number_block_nodes = 129
+        Ds = 513
+    endif
 
     Bs = params_loc%number_block_nodes
-    g = params_loc%number_ghost_nodes
-    DS = 513
+    g  = params_loc%number_ghost_nodes
 
     ! determine the required number of blocks, given the current block
     ! size and the desired "full resolution" size "Ds"
     params_loc%number_blocks = ( ((Ds-1) / (Bs-1))**d ) * 2**d
 
     if (rank == 0) then
-      write(*,'("Testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
+        write(*,'("UNIT TEST: testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
     end if
+
     !---------------------------------------------------------------------------------------------
     ! first: initializing new block data
     ! allocate block_list
@@ -333,31 +338,43 @@ subroutine unit_test_ghost_nodes_synchronization( params )
                 do j = 1, Bs+2*g
                     do l = 1, Bs+2*g
 
-                        if ( sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  ) > 1e-6) then
-                            my_error = my_error + sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  )
-                        end if
+!                        if ( sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  ) > 1e-3) then
+!                            my_error = my_error + sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  )
+!                        end if
+                        my_error = my_error + sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  )
 
                     end do
                 end do
             end do
+            my_error = my_error / real((Bs+2*g)**3,rk)
+
         else
             ! 2D:
             do i = 1, Bs+2*g
                 do j = 1, Bs+2*g
+
+!                    if ( sqrt( ( hvy_block_loc(i,j,1,2,hvy_active(k)) - hvy_block_loc_exact(i,j,1,2,hvy_active(k)) )**2  ) > 1e-4) then
+!                        my_error = my_error + sqrt( ( hvy_block_loc(i,j,1,2,hvy_active(k)) - hvy_block_loc_exact(i,j,1,2,hvy_active(k)) )**2  )
+!                    end if
+
                     my_error = my_error + sqrt( ( hvy_block_loc(i,j,1,2,hvy_active(k)) - hvy_block_loc_exact(i,j,1,2,hvy_active(k)) )**2  )
+
                 end do
             end do
+            my_error = my_error / real((Bs+2*g)**2,rk)
 
         end if
 
     end do
+
 
     ! synchronize errors
     call MPI_Allreduce(my_error, error, 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! output
     if (rank==0) then
-        write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",f16.8)')  error
+        write(*,'(80("-"))')
+        write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",f12.6)')  error
     end if
 
     !---------------------------------------------------------------------------------------------

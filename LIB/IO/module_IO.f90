@@ -18,12 +18,15 @@ module module_IO
 ! modules
 
     use mpi
+    use hdf5
     ! global parameters
     use module_params
     ! debug module
     use module_debug
     ! hdf5 file wrapper
     use module_hdf5_wrapper
+    ! own MPI module
+    use module_mpi
 
 !---------------------------------------------------------------------------------------------
 ! variables

@@ -120,7 +120,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         params_loc%number_block_nodes = 65
         Ds = 129
     else
-        params_loc%number_block_nodes = 129
+        params_loc%number_block_nodes = 33
         Ds = 513
     endif
 

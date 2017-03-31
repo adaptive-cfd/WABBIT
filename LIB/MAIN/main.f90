@@ -251,7 +251,7 @@ program main
         ! output on screen
         if (rank==0) then
             write(*,'(80("-"))')
-            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, lgt_n
+            write(*, '("RUN: iteration=",i5,3x," time=",f16.6,3x," active blocks=",i7)') iteration, time, lgt_n
 
         end if
 

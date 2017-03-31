@@ -95,6 +95,9 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! com matrix pos: position in send buffer
     integer(kind=ik), allocatable       :: com_matrix(:,:), com_matrix_pos(:,:), my_com_matrix(:,:)
 
+    ! variable for non-uniform mesh correction
+    integer(kind=ik)                                :: one
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -106,6 +109,15 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! grid parameter
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
+
+    one = 0
+
+    ! set non-uniform mesh correction
+    if ( params%non_uniform_mesh ) then
+        one = 1
+    else
+        one = 0
+    end if
 
     ! set MPI parameter
     rank         = params%rank
@@ -274,14 +286,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         if ( params%threeD_case ) then
             ! 3D:
-            allocate( real_receive_buffer( n_com * (Bs+g) * g * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_receive_buffer( n_com * (Bs+(g+one)) * (g+one) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: memory allocation fails"
                 stop
             end if
-            allocate( real_send_buffer( n_com * (Bs+g) * g * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_send_buffer( n_com * (Bs+(g+one)) * (g+one) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
@@ -290,14 +302,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             end if
         else
             ! 2D:
-            allocate( real_receive_buffer( n_com * (Bs+g) * g * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_receive_buffer( n_com * (Bs+(g+one)) * (g+one) * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: memory allocation fails"
                 stop
             end if
-            allocate( real_send_buffer( n_com * (Bs+g) * g * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_send_buffer( n_com * (Bs+(g+one)) * (g+one) * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')

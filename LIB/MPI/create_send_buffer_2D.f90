@@ -20,6 +20,8 @@
 ! = log ======================================================================================
 !
 ! 06/01/17 - create for v0.4
+! 31/03/17 - add non-uniform mesh correction
+!
 ! ********************************************************************************************
 
 subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_buff, buffer_i)
@@ -52,7 +54,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
     integer(kind=ik)                                :: Bs, g
 
     ! interpolation variables
-    real(kind=rk), dimension(:,:), allocatable      :: data_corner, data_corner_fine, data_edge, data_edge_fine
+    real(kind=rk), dimension(:,:), allocatable      :: data_corner, data_corner_ONE, data_corner_fine, data_edge, data_edge_fine
 
     ! allocation error variable
     integer(kind=ik)                                :: allocate_error
@@ -62,6 +64,9 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
     ! loop variable
     integer(kind=ik)                                :: k, l, dF
+
+    ! variable for non-uniform mesh correction
+    integer(kind=ik)                                :: one
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -73,10 +78,28 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
 
+    one   = 0
+
+    ! set non-uniform mesh correction
+    if ( params%non_uniform_mesh ) then
+        one = 1
+    else
+        one = 0
+    end if
+
     allocate( data_corner( g, g), stat=allocate_error )
     call check_allocation(allocate_error)
+    allocate( data_corner_ONE( g+one, g+one), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )
     call check_allocation(allocate_error)
+
     !allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
     allocate( data_edge( (Bs+1)/2 + g, (Bs+1)/2 + g), stat=allocate_error )
     call check_allocation(allocate_error)
@@ -148,6 +171,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( g+2:g+1+g, Bs:Bs-1+g, dF, my_block )
 
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -158,9 +187,21 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(2:g+1, g-1:2*g-2)
 
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, dF, my_block )
+                        data_corner_ONE(1:g+one, 1:g+one) = hvy_block( g+3-one*2:g+1+g+g:2, Bs-g:Bs-2+g+one*2:2, dF, my_block )
+
+                        ! send data
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+g+one-1)    = data_corner_ONE(l, 1:g+one)
+                            buffer_i                                = buffer_i + g+one
+                        end do
 
                     else
                         ! error case
@@ -169,11 +210,6 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         stop
                     end if
 
-                    ! send data
-                    do l = 1, g
-                        send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                        buffer_i                            = buffer_i + g
-                    end do
                 end do
 
             ! '_NW'
@@ -183,6 +219,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         ! loop over all datafields
                         data_corner = hvy_block( g+2:g+1+g, g+2:g+1+g, dF, my_block )
+
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
 
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
@@ -194,9 +236,21 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(2:g+1, 2:g+1)
 
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( g+3:g+1+g+g:2, g+3:g+1+g+g:2, dF, my_block )
+                        data_corner_ONE(1:g+one, 1:g+one) = hvy_block( g+3-one*2:g+1+g+g:2, g+3-one*2:g+1+g+g:2, dF, my_block )
+
+                        ! send data
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+g+one-1)    = data_corner_ONE(l, 1:g+one)
+                            buffer_i                                = buffer_i + g+one
+                        end do
 
                     else
                         ! error case
@@ -205,11 +259,6 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         stop
                     end if
 
-                    ! send data
-                    do l = 1, g
-                        send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                        buffer_i                            = buffer_i + g
-                    end do
                 end do
 
             ! '_SE'
@@ -218,6 +267,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, dF, my_block )
+
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
 
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
@@ -229,9 +284,21 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(g-1:2*g-2, g-1:2*g-2)
 
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, dF, my_block )
+                        data_corner_ONE(1:g+one, 1:g+one) = hvy_block( Bs-g:Bs-2+g+2*one:2, Bs-g:Bs-2+g+2*one:2, dF, my_block )
+
+                        ! send data
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+g+one-1)    = data_corner_ONE(l, 1:g+one)
+                            buffer_i                                = buffer_i + g+one
+                        end do
 
                     else
                         ! error case
@@ -240,11 +307,6 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         stop
                     end if
 
-                    ! send data
-                    do l = 1, g
-                        send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                        buffer_i                            = buffer_i + g
-                    end do
                 end do
 
             ! '_SW'
@@ -253,6 +315,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         data_corner = hvy_block( Bs:Bs-1+g, g+2:g+1+g, dF, my_block )
+
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
 
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
@@ -264,9 +332,21 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(g-1:2*g-2, 2:g+1)
 
+                        ! send data
+                        do l = 1, g
+                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
+                            buffer_i                            = buffer_i + g
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, dF, my_block )
+                        data_corner_ONE(1:g+one, 1:g+one) = hvy_block( Bs-g:Bs-2+g+one*2:2, g+3-one*2:g+1+g+g:2, dF, my_block )
+
+                        ! send data
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+g+one-1)    = data_corner_ONE(l, 1:g+one)
+                            buffer_i                                = buffer_i + g+one
+                        end do
 
                     else
                         ! error case
@@ -275,11 +355,6 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         stop
                     end if
 
-                    ! send data
-                    do l = 1, g
-                        send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                        buffer_i                            = buffer_i + g
-                    end do
                 end do
 
             ! 'NNE'
@@ -303,8 +378,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+(2*l)+1, g+1:Bs+g:2, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+(2*l)+1-2*one, g+1:Bs+g:2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -336,8 +411,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+(2*l)+1, g+1:Bs+g:2, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+(2*l)+1-one*2, g+1:Bs+g:2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -369,8 +444,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( Bs+g-(2*l), g+1:Bs+g:2, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( Bs+g-(2*l)+one*2, g+1:Bs+g:2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -402,8 +477,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( Bs+g-(2*l), g+1:Bs+g:2, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( Bs+g-(2*l)+one*2, g+1:Bs+g:2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -435,8 +510,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, Bs-g+2*l-2, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, Bs-g+2*l-2+one*2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -467,8 +542,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, Bs-g+2*l-2, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, Bs-g+2*l-2+one*2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -498,8 +573,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, g+(2*l)+1, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, g+(2*l)+1-one*2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -531,8 +606,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, g+(2*l)+1, dF, my_block )
+                        do l = 1, g+one
+                            send_buff(buffer_i:buffer_i+(Bs+1)/2-1)   = hvy_block( g+1:Bs+g:2, g+(2*l)+1-one*2, dF, my_block )
                             buffer_i                                  = buffer_i + (Bs+1)/2
                         end do
 
@@ -552,6 +627,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
     ! clean up
     deallocate( data_corner, stat=allocate_error )
+    deallocate( data_corner_ONE, stat=allocate_error )
     deallocate( data_corner_fine, stat=allocate_error )
     deallocate( data_edge, stat=allocate_error )
     deallocate( data_edge_fine, stat=allocate_error )

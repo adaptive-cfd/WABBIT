@@ -16,7 +16,7 @@
 !
 ! ********************************************************************************************
 
-subroutine f_xy_2D( x, y, f, Bs, g, Lx, Ly )
+subroutine f_xy_2D( x, y, f, Bs, g, Lx, Ly, frequ )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,7 +31,7 @@ subroutine f_xy_2D( x, y, f, Bs, g, Lx, Ly )
 
     ! grid parameter
     integer(kind=ik), intent(in)            :: Bs, g
-    real(kind=rk), intent(in)               :: Lx, Ly
+    real(kind=rk), intent(in)               :: Lx, Ly, frequ
 
     ! coordinate arrays
     real(kind=rk), intent(in)               :: x(Bs+2*g), y(Bs+2*g)
@@ -52,7 +52,7 @@ subroutine f_xy_2D( x, y, f, Bs, g, Lx, Ly )
         do j = 1, Bs+2*g
 
             ! calculate function
-            f(i,j) = sin( x(i)/Lx * 2*pi ) * sin( y(j)/Ly * 2*pi )
+            f(i,j) = sin( frequ* x(i)/Lx * 2*pi ) * sin(frequ* y(j)/Ly * 2*pi )
             !f(i,j) = x(i)
 
         end do

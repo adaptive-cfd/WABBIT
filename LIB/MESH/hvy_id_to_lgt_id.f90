@@ -5,7 +5,10 @@
 ! version: 0.4
 ! author: msr
 !
-! convert heavy id into light id
+! convert heavy id into light id, requiring both to be on the same processor.
+! That means mpirank=1 has the heavy id hvy_id=17, which is the position of the
+! block in the heavy data array. The lgt_id is the corresponding position in the
+! global list of blocks, the light data.
 !
 ! input:    - heavy id, proc rank, number of blocks per proc
 ! output:   - ligth data id

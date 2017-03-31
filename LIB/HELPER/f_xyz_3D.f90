@@ -16,7 +16,7 @@
 !
 ! ********************************************************************************************
 
-subroutine f_xyz_3D( x, y, z, f, Bs, g, Lx, Ly, Lz )
+subroutine f_xyz_3D( x, y, z, f, Bs, g, Lx, Ly, Lz, frequ )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,7 +31,7 @@ subroutine f_xyz_3D( x, y, z, f, Bs, g, Lx, Ly, Lz )
 
     ! grid parameter
     integer(kind=ik), intent(in)            :: Bs, g
-    real(kind=rk), intent(in)               :: Lx, Ly, Lz
+    real(kind=rk), intent(in)               :: Lx, Ly, Lz, frequ
 
     ! coordinate arrays
     real(kind=rk), intent(in)               :: x(Bs+2*g), y(Bs+2*g), z(Bs+2*g)
@@ -53,7 +53,7 @@ subroutine f_xyz_3D( x, y, z, f, Bs, g, Lx, Ly, Lz )
             do k = 1, Bs+2*g
 
                 ! calculate function
-                f(i,j,k) = sin( x(i)/Lx * 2*pi ) * sin( y(j)/Ly * 2*pi ) * sin( z(k)/Lz * 2*pi )
+                f(i,j,k) = sin( frequ* x(i)/Lx * 2*pi ) * sin( frequ*y(j)/Ly * 2*pi ) * sin( frequ*z(k)/Lz * 2*pi )
                 !f(i,j,k) = z(k)
 
             end do

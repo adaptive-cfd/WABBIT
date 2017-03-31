@@ -72,16 +72,12 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     real(kind=rk)                           :: Lx, Ly, Lz
     ! data dimensionality
     integer(kind=ik)                        :: d
-
+    ! frequency of sin functions for testing:
+    real(kind=rk)                           :: frequ
     ! error variable
-    real(kind=rk)                           :: error, my_error
-
-    ! block sizes for convergence test:
-    ! integer(kind=ik) :: test_blocksizes=(/)
-
+    real(kind=rk)                           :: error, my_error, norm, my_norm
     ! MPI error variable
     integer(kind=ik)                        :: ierr
-
     ! chance for block refinement, random number
     real(kind=rk)                           :: ref_chance, r
 
@@ -90,6 +86,8 @@ subroutine unit_test_ghost_nodes_synchronization( params )
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+do frequ = 1.0_rk, 20.0_rk, 2.0_rk
 
     ! local copy of params struct
     params_loc = params
@@ -117,18 +115,18 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     end if
 
     ! choose bocksize here:
-    params_loc%number_block_nodes = 129
+    params_loc%number_block_nodes = 65
 
     Bs = params_loc%number_block_nodes
     g = params_loc%number_ghost_nodes
-    DS = 513
+    DS = params_loc%number_domain_nodes !513
 
     ! determine the required number of blocks, given the current block
     ! size and the desired "full resolution" size "Ds"
     params_loc%number_blocks = ( ((Ds-1) / (Bs-1))**d ) * 2**d
 
     if (rank == 0) then
-      write(*,'("Testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
+      write(*,'("Testing Bs=",i4," blocks-per-mpirank=",i5," frequ=",g12.4)')  Bs, params_loc%number_blocks, frequ
     end if
     !---------------------------------------------------------------------------------------------
     ! first: initializing new block data
@@ -179,7 +177,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
 
     ! refinement chance
-    ref_chance = 0.1_rk
+    ref_chance = 0.5_rk
 
     ! set random seed
     call init_random_seed()
@@ -265,11 +263,11 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         ! calculate f(x,y,z) for first datafield
         if ( params_loc%threeD_case ) then
             ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz )
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ )
 
         else
             ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly )
+            call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ )
         end if
 
     end do
@@ -323,41 +321,23 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! reset error
     error = 0.0_rk
     my_error = 0.0_rk
+    my_norm = 0.0_rk
 
     ! loop over all active blocks
     do k = 1, hvy_n
-
-        if ( params_loc%threeD_case ) then
-            ! 3D:
-            do i = 1, Bs+2*g
-                do j = 1, Bs+2*g
-                    do l = 1, Bs+2*g
-
-                        if ( sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  ) > 1e-6) then
-                            my_error = my_error + sqrt( ( hvy_block_loc(i,j,l,2,hvy_active(k)) - hvy_block_loc_exact(i,j,l,2,hvy_active(k)) )**2  )
-                        end if
-
-                    end do
-                end do
-            end do
-        else
-            ! 2D:
-            do i = 1, Bs+2*g
-                do j = 1, Bs+2*g
-                    my_error = my_error + sqrt( ( hvy_block_loc(i,j,1,2,hvy_active(k)) - hvy_block_loc_exact(i,j,1,2,hvy_active(k)) )**2  )
-                end do
-            end do
-
-        end if
-
+      my_error = my_error + sqrt(sum((hvy_block_loc(:,:,:,2,hvy_active(k))-hvy_block_loc_exact(:,:,:,2,hvy_active(k)))**2 ))
+      my_norm = my_norm  + sqrt(sum((hvy_block_loc_exact(:,:,:,2,hvy_active(k)))**2 ))
     end do
 
     ! synchronize errors
     call MPI_Allreduce(my_error, error, 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_norm, norm, 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+    error = error / norm
 
     ! output
     if (rank==0) then
-        write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",f16.8)')  error
+        write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",es16.8," dx_eff=",es16.8)')  error, dble(Ds) / (1.0_rk/frequ)
     end if
 
     !---------------------------------------------------------------------------------------------
@@ -371,5 +351,5 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     deallocate(coord_y, stat=allocate_error )
     deallocate(coord_z, stat=allocate_error )
     deallocate( hvy_neighbor_loc, stat=allocate_error )
-
+end do
 end subroutine unit_test_ghost_nodes_synchronization

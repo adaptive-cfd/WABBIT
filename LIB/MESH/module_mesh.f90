@@ -47,6 +47,7 @@ contains
     include "create_hvy_active_list.f90"
 
     ! update neighbors, 2D/3D
+    include "update_neighbors.f90"
     include "update_neighbors_2D.f90"
     include "update_neighbors_3D.f90"
 

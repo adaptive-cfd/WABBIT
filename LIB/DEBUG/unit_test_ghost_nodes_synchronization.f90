@@ -281,13 +281,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
         ! update neighbors
-        if ( params_loc%threeD_case ) then
-            ! 3D:
-            call update_neighbors_3D( params_loc, lgt_block_loc, hvy_neighbor_loc, lgt_active, lgt_n, hvy_active, hvy_n )
-        else
-            ! 2D:
-            call update_neighbors_2D( params_loc, lgt_block_loc, hvy_neighbor_loc, lgt_active, lgt_n, hvy_active, hvy_n )
-        end if
+        call update_neighbors( params_loc, lgt_block_loc, hvy_neighbor_loc, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! synchronize ghost nodes
         call synchronize_ghosts( params_loc, lgt_block_loc, hvy_block_loc, hvy_neighbor_loc, hvy_active, hvy_n )

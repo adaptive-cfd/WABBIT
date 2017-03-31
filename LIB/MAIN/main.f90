@@ -170,13 +170,7 @@ program main
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
     ! update neighbor relations
-    if ( params%threeD_case ) then
-        ! 3D:
-        call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-    else
-        ! 2D:
-        call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-    end if
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
     !---------------------------------------------------------------------------------------------
     ! unit tests
@@ -201,13 +195,7 @@ program main
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
         ! update neighbor relations
-        if ( params%threeD_case ) then
-            ! 3D:
-            call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        else
-            ! 2D:
-            call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        end if
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! balance load
         if ( params%threeD_case ) then
@@ -223,13 +211,7 @@ program main
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
         ! update neighbor relations
-        if ( params%threeD_case ) then
-            ! 3D:
-            call update_neighbors_3D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        else
-            ! 2D:
-            call update_neighbors_2D( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        end if
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )

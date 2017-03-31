@@ -46,7 +46,6 @@ subroutine create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
     ! reset active list
     hvy_active = -1
 
@@ -55,7 +54,6 @@ subroutine create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
     ! number of blocks per proc
     N = size(hvy_active, 1)
-
 !---------------------------------------------------------------------------------------------
 ! main body
 

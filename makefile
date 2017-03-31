@@ -3,7 +3,7 @@
 FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block_2D.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90 adjacent_block_3D.f90 RHS_3D_convection_diffusion.f90 \
-RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90
+RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -60,9 +60,6 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
-# Both programs are compiled by default.
-all: directories wabbit
-
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)
 	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
@@ -110,7 +107,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o\
-	time_step_RK4.f90
+	time_step_RK4.f90 filter_block.f90 filter_1D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
@@ -127,8 +124,8 @@ $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(O
 	unit_test_ghost_nodes_synchronization.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o \
-	save_data.f90 write_field.f90 $(OBJDIR)/module_MPI.o
+$(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o\
+	save_data.f90 write_field.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

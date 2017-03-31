@@ -41,4 +41,8 @@ contains
     ! time step
     include "time_step_RK4.f90"
 
+    ! filter
+    include "filter_block.f90"
+    include "filter_1D.f90"
+
 end module module_time_step

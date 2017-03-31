@@ -77,9 +77,11 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
     call check_allocation(allocate_error)
     allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )
     call check_allocation(allocate_error)
-    allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    !allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    allocate( data_edge( (Bs+1)/2 + g, (Bs+1)/2 + g), stat=allocate_error )
     call check_allocation(allocate_error)
-    allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    !allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    allocate( data_edge_fine( Bs+2*g, Bs+2*g), stat=allocate_error )
     call check_allocation(allocate_error)
 
     buffer_i         = 1
@@ -286,13 +288,15 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_edge = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
 
                         ! send data
                         do l = 1, g
-                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(l+1, 1:Bs+g)
+                            !send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(l+1, 1:Bs+g)
+                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(l+1, g+1:Bs+2*g)
                             buffer_i                               = buffer_i + Bs+g
                         end do
 
@@ -318,7 +322,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_edge = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
 
@@ -350,12 +355,14 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_edge = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                         ! send data
                         do l = 1, g
-                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(Bs+g-l, 1:Bs+g)
+                            !send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(Bs+g-l, 1:Bs+g)
+                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(Bs+2*g-l, g+1:Bs+2*g)
                             buffer_i                               = buffer_i + Bs+g
                         end do
 
@@ -381,12 +388,14 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_edge = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                         ! send data
                         do l = 1, g
-                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(Bs+g-l, 1:Bs+g)
+                            !send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(Bs+g-l, 1:Bs+g)
+                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(Bs+2*g-l, 1:Bs+g)
                             buffer_i                               = buffer_i + Bs+g
                         end do
 
@@ -412,12 +421,14 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_edge = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                         ! send data
                         do l = 1, g
-                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, Bs+l-1)
+                            !send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, Bs+l-1)
+                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, Bs+g+l-1)
                             buffer_i                               = buffer_i + Bs+g
                         end do
 
@@ -443,12 +454,14 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, my_block )
+                        data_edge = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                         ! send data
                         do l = 1, g
-                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, Bs+l-1)
+                            !send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, Bs+l-1)
+                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(g+1:Bs+2*g, Bs+g+l-1)
                             buffer_i                               = buffer_i + Bs+g
                         end do
 
@@ -473,7 +486,8 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_edge = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                         ! send data
@@ -503,12 +517,14 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
-                        data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, my_block )
+                        data_edge = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, my_block )
                         ! interpolate data
                         call prediction_2D( data_edge , data_edge_fine, params%order_predictor)
                         ! send data
                         do l = 1, g
-                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, l+1)
+                            !send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(1:Bs+g, l+1)
+                            send_buff(buffer_i:buffer_i+Bs+g-1)    = data_edge_fine(g+1:Bs+2*g, l+1)
                             buffer_i                               = buffer_i + Bs+g
                         end do
 

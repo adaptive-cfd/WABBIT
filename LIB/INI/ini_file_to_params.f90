@@ -13,6 +13,8 @@
 ! = log ======================================================================================
 !
 ! 25/01/17    - create
+! 29/01/17    - add filter parameter
+! 30/01/17    - add automatic memory management
 !
 ! ********************************************************************************************
 
@@ -292,6 +294,12 @@ subroutine ini_file_to_params( params, filename )
     ! boundary condition
     call read_param(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
+    ! filter type
+    call read_param(FILE, 'Discretization', 'filter_type', params%filter_type, "---" )
+    ! filter frequency
+    call read_param(FILE, 'Discretization', 'filter_freq', params%filter_freq, 1 )
+
+
     !***************************************************************************
     ! read MPI parameters
     !
@@ -310,7 +318,6 @@ subroutine ini_file_to_params( params, filename )
         params%debug = .false.
     end if
 
-
     !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,
     ! wabbit will automatically select the number of blocks per rank to be allocated
@@ -319,23 +326,26 @@ subroutine ini_file_to_params( params, filename )
     ! loop over all arguments until you find the string "--memory" in them (or not)
     ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
     do i = 1, command_argument_count()
-      call get_command_argument(i, memstring)
-      ! is memory limitation used?
-      if ( index(memstring,"--memory=")==1 ) then
-        ! read memory from command line and convert to bytes
-        read(memstring(10:len_trim(memstring)-2),* ) maxmem
-        ! how much memory is reserved, in bytes?
-        maxmem = maxmem * 1000.0 * 1000.0 * 1000.0 ! in bytes
-        if ( params%threeD_case ) then
-          d = 3
-        else
-          d = 2
+        call get_command_argument(i, memstring)
+        ! is memory limitation used?
+        if ( index(memstring,"--memory=")==1 ) then
+            ! read memory from command line and convert to bytes
+            read(memstring(10:len_trim(memstring)-2),* ) maxmem
+            ! how much memory is reserved, in bytes?
+            maxmem = maxmem * 1000.0 * 1000.0 * 1000.0 ! in bytes
+            if ( params%threeD_case ) then
+                d = 3
+            else
+                d = 2
+            endif
+            params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
+            if (params%rank==0) write(*,'(80("-"))')
+            if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
+
+            if (params%rank==0) write(*,'("INIT: we allocated ",i6," blocks per rank (total: ",i7," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
+            if (params%rank==0) write(*,'("INIT: consuming total memory of",f12.4,"GB")') maxmem/1000.0/1000.0/1000.0
+
         endif
-        params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
-        if (params%rank==0) write(*,'(80("~"))')
-        if (params%rank==0) write(*,*) "automatic selection of blocks per rank is active!"
-        if (params%rank==0) write(*,'("we allocated ",i6," blocks per rank (total: ",i7," blocks) consuming total memory of",f12.4,"GB")') params%number_blocks, params%number_blocks*params%number_procs, maxmem/1000.0/1000.0/1000.0
-      endif
     end do
 
     ! clean up

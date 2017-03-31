@@ -108,6 +108,14 @@ module module_params
         ! unit test params struct
         logical                                     :: unit_test
 
+        ! -------------------------------------------------------------------------------------
+        ! filter
+        ! -------------------------------------------------------------------------------------
+        ! type
+        character(len=80)                           :: filter_type
+        ! frequency
+        integer(kind=ik)                            :: filter_freq
+
     end type type_params
 
 !---------------------------------------------------------------------------------------------
@@ -130,15 +138,15 @@ contains
 !      INTEGER                            :: Location
 !      INTEGER                            :: i
 !
-!      Minimum  = x(Start)		! assume the first is the min
-!      Location = Start			! record its position
-!      DO i = Start+1, End		! start with next elements
-!         IF (x(i) < Minimum) THEN	!   if x(i) less than the min?
-!            Minimum  = x(i)		!      Yes, a new minimum found
+!      Minimum  = x(Start)      ! assume the first is the min
+!      Location = Start         ! record its position
+!      DO i = Start+1, End      ! start with next elements
+!         IF (x(i) < Minimum) THEN  !   if x(i) less than the min?
+!            Minimum  = x(i)        !      Yes, a new minimum found
 !            Location = i                !      record its position
 !         END IF
 !      END DO
-!      FindMinimum = Location        	! return the position
+!      FindMinimum = Location           ! return the position
 !   END FUNCTION  FindMinimum
 !
 !! --------------------------------------------------------------------
@@ -174,10 +182,10 @@ contains
 !
 !       ! SORT KEY IS SECOND ENTRY!!!!!!!!!!!!!!!
 !
-!      DO i = 1, sze-1			! except for the last
-!         Location = FindMinimum(x(:,2), i, sze)	! find min from this to last
-!         CALL  Swap(x(i,1), x(Location,1))	! swap this and the minimum
-!         CALL  Swap(x(i,2), x(Location,2))	! swap this and the minimum
+!      DO i = 1, sze-1          ! except for the last
+!         Location = FindMinimum(x(:,2), i, sze)    ! find min from this to last
+!         CALL  Swap(x(i,1), x(Location,1)) ! swap this and the minimum
+!         CALL  Swap(x(i,2), x(Location,2)) ! swap this and the minimum
 !      END DO
 !   END SUBROUTINE  Sort
 !

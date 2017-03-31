@@ -57,7 +57,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     integer(kind=ik)                        :: allocate_error
 
     ! loop variables
-    integer(kind=ik)                        :: k, l, i, j
+    integer(kind=ik)                        :: k, l, i, j, lgt_id, hvy_id
 
     ! process rank
     integer(kind=ik)                        :: rank
@@ -65,7 +65,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! coordinates vectors
     real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
     ! spacing
-    real(kind=rk)                           :: dx, dy, dz
+    real(kind=rk)                           :: dx, dy, dz, ddx(1:3), xx0(1:3)
 
     ! grid parameter
     integer(kind=ik)                        :: Bs, g, Ds
@@ -73,10 +73,11 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! data dimensionality
     integer(kind=ik)                        :: d
     ! frequency of sin functions for testing:
-    real(kind=rk)                           :: frequ
+    real(kind=rk)                           :: frequ(1:6)
     integer(kind=ik)                        :: ifrequ
+
     ! error variable
-    real(kind=rk)                           :: error, my_error, norm, my_norm
+    real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
     ! MPI error variable
     integer(kind=ik)                        :: ierr
 
@@ -235,48 +236,39 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! Step 2: Actual testing of ghost node routines
     !---------------------------------------------------------------------------
     ! the entire test procedure is repeated for a bunch of frequencies, which is
-    ! equivalent to using different block sizes, but way easier to program
-    do ifrequ = 1 , 20, 2
+    ! equivalent to using different block sizes, but way easier to program.
+    ! These frequencies are tested:
+    frequ=(/1.0_rk, 2.0_rk, 4.0_rk, 8.0_rk, 16.0_rk, 32.0_rk/)
+
+    ! loop over frequencies
+    do ifrequ = 1 , size(frequ)
 
         !-----------------------------------------------------------------------
         ! Fill the above constructed grid with the exact solution values
         !-----------------------------------------------------------------------
         ! loop over all active blocks
         do k = 1, hvy_n
+          ! hvy_id of the block we're looking at
+          hvy_id = hvy_active(k)
+          ! light id of this block
+          call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params_loc%number_blocks )
+          ! compute block spacing and origin from treecode
+          call get_block_spacing_origin( params_loc, lgt_id, lgt_block_loc, xx0, ddx )
 
-          ! write coord arrays
-          coord_x(g+1:Bs+g) = hvy_block_loc(1, 1:Bs, 1, 1, hvy_active(k))
-          coord_y(g+1:Bs+g) = hvy_block_loc(2, 1:Bs, 1, 1, hvy_active(k))
-          coord_z(g+1:Bs+g) = hvy_block_loc(3, 1:Bs, 1, 1, hvy_active(k))
-
-          ! spacing
-          dx = abs( hvy_block_loc(1, 2, 1, 1, hvy_active(k)) - hvy_block_loc(1, 1, 1, 1, hvy_active(k)) )
-          dy = abs( hvy_block_loc(2, 2, 1, 1, hvy_active(k)) - hvy_block_loc(2, 1, 1, 1, hvy_active(k)) )
-          dz = abs( hvy_block_loc(3, 2, 1, 1, hvy_active(k)) - hvy_block_loc(3, 1, 1, 1, hvy_active(k)) )
-
-          ! ghost nodes coordinates
-          do l = 1, g
-
-              ! minus direction
-              coord_x(l) = hvy_block_loc(1, 1, 1, 1, hvy_active(k)) - (g+1-l)*dx
-              coord_y(l) = hvy_block_loc(2, 1, 1, 1, hvy_active(k)) - (g+1-l)*dy
-              coord_z(l) = hvy_block_loc(3, 1, 1, 1, hvy_active(k)) - (g+1-l)*dz
-
-              ! plus direction
-              coord_x(Bs+g+l) = hvy_block_loc(1, Bs, 1, 1, hvy_active(k)) + (l)*dx
-              coord_y(Bs+g+l) = hvy_block_loc(2, Bs, 1, 1, hvy_active(k)) + (l)*dy
-              coord_z(Bs+g+l) = hvy_block_loc(3, Bs, 1, 1, hvy_active(k)) + (l)*dz
-
-          end do
+          ! fill coordinate arrays, of course including ghost nodes
+          do l = 1, Bs+2*g
+            coord_x(l) = real(l-(g+1), kind=rk) * ddx(1) + xx0(1)
+            coord_y(l) = real(l-(g+1), kind=rk) * ddx(2) + xx0(2)
+            coord_z(l) = real(l-(g+1), kind=rk) * ddx(3) + xx0(3)
+          enddo
 
           ! calculate f(x,y,z) for first datafield
-          frequ = real(ifrequ, kind=rk)
           if ( params_loc%threeD_case ) then
             ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ )
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
           else
             ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ )
+            call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
           end if
 
         end do
@@ -314,14 +306,14 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         end do
 
         ! synchronize errors
-        call MPI_Allreduce(my_error, error, 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(my_error, error(ifrequ), 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
         call MPI_Allreduce(my_norm, norm, 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
 
-        error = error / norm
+        error(ifrequ) = error(ifrequ) / norm
 
         ! output
         if (rank==0) then
-            write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",es16.8)')  error
+            write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",es16.8," frequ=",g12.4)')  error(ifrequ), frequ(ifrequ)
         end if
       end do
 

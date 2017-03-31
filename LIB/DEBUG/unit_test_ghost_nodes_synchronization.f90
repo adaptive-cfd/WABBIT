@@ -93,7 +93,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! local copy of params struct
     params_loc = params
     ! this ugly little flag supresses some verbosity
-    ! params_loc%unit_test = .true.
+    params_loc%unit_test = .true.
 
     ! set MPI parameters
     rank = params_loc%rank
@@ -139,140 +139,155 @@ subroutine unit_test_ghost_nodes_synchronization( params )
       write(*,'("UNIT TEST: testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
     end if
 
+    !---------------------------------------------------------------------------
+    ! Step 1: Construct a random grid for testing. Note we keep this grid
+    ! and perform the same test for differnet frequencies (= resolutions) only on
+    ! this one grid.
+    !---------------------------------------------------------------------------
+
+
+    ! first: initializing new block data
+    ! allocate block_list
+    call allocate_block_list( params_loc, lgt_block_loc )
+    ! allocate heavy data
+    call allocate_block_data( params_loc, hvy_block_loc )
+    call allocate_block_data( params_loc, hvy_block_loc_exact )
+
+    ! active heavy block list
+    allocate( hvy_active( params_loc%number_blocks ), stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+
+    ! create active light block list
+    allocate( lgt_active( size(lgt_block_loc, 1) ), stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+
+
+    ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
+    lgt_active = -1; lgt_N = 0
+    hvy_active = -1; hvy_N = 0
+
+    ! init data array with zeros => after this: blocks have correct coordinate vectors
+    call inicond_zeros( params_loc, lgt_block_loc, hvy_block_loc )
+
+    ! update lists of active blocks (light and heavy data)
+    call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
+    call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
+
+    ! init neighbor data array
+    ! 2D: maximal 16 neighbors per block
+    ! 3D: maximal 74 neighbors per block
+    if ( params%threeD_case ) then
+        ! 3D:
+        allocate( hvy_neighbor_loc( params_loc%number_blocks, 74 ), stat=allocate_error )
+        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    else
+        ! 2D:
+        allocate( hvy_neighbor_loc( params_loc%number_blocks, 16 ), stat=allocate_error )
+        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    end if
+
+    !---------------------------------------------------------------------------------------------
+    ! second: refine some blocks (random)
+
+    ! refinement chance
+    ref_chance = 0.25_rk
+
+    ! set random seed
+    call init_random_seed()
+
+    ! set refinement status
+    do k = 1, lgt_n
+        ! random number
+        call random_number(r)
+        ! set refinement status
+        if ( r <= ref_chance ) then
+            lgt_block_loc( lgt_active(k), params_loc%max_treelevel+2 ) = 1
+        end if
+    end do
+    ! refine blocks
+    ! check if block has reached maximal level
+    call respect_min_max_treelevel( params_loc, lgt_block_loc, lgt_active, lgt_n )
+
+    ! interpolate the new mesh
+    if ( params%threeD_case ) then
+        ! 3D:
+        call refine_mesh_3D( params_loc, lgt_block_loc, hvy_block_loc, hvy_active, hvy_n )
+    else
+        ! 2D:
+        call refine_mesh_2D( params_loc, lgt_block_loc, hvy_block_loc(:,:,1,:,:), hvy_active, hvy_n )
+    end if
+
+    ! update lists of active blocks (light and heavy data)
+    call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
+    call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
+
+    !---------------------------------------------------------------------------------------------
+    ! third: fill blocks with data
+
+    ! allocate coord arrays
+    allocate(coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ),  stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+
+
+    ! at this point now, the grid used for testing is ready.
+
+    !---------------------------------------------------------------------------
+    ! Step 2: Actual testing of ghost node routines
+    !---------------------------------------------------------------------------
     ! the entire test procedure is repeated for a bunch of frequencies, which is
     ! equivalent to using different block sizes, but way easier to program
     do ifrequ = 1 , 20, 2
 
-        !---------------------------------------------------------------------------------------------
-        ! first: initializing new block data
-        ! allocate block_list
-        call allocate_block_list( params_loc, lgt_block_loc )
-        ! allocate heavy data
-        call allocate_block_data( params_loc, hvy_block_loc )
-        call allocate_block_data( params_loc, hvy_block_loc_exact )
-
-        ! active heavy block list
-        allocate( hvy_active( params_loc%number_blocks ), stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-        ! create active light block list
-        allocate( lgt_active( size(lgt_block_loc, 1) ), stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-        ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-        lgt_active = -1; lgt_N = 0
-        hvy_active = -1; hvy_N = 0
-
-        ! init data array with zeros => after this: blocks have correct coordinate vectors
-        call inicond_zeros( params_loc, lgt_block_loc, hvy_block_loc )
-
-        ! update lists of active blocks (light and heavy data)
-        call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
-        call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
-
-        !---------------------------------------------------------------------------------------------
-        ! second: refine some blocks (random)
-
-        ! refinement chance
-        ref_chance = 0.5_rk
-
-        ! set random seed
-        call init_random_seed()
-
-        ! set refinement status
-        do k = 1, lgt_n
-            ! random number
-            call random_number(r)
-            ! set refinement status
-            if ( r <= ref_chance ) then
-                lgt_block_loc( lgt_active(k), params_loc%max_treelevel+2 ) = 1
-            end if
-        end do
-        ! refine blocks
-        ! check if block has reached maximal level
-        call respect_min_max_treelevel( params_loc, lgt_block_loc, lgt_active, lgt_n )
-
-        ! interpolate the new mesh
-        if ( params%threeD_case ) then
-            ! 3D:
-            call refine_mesh_3D( params_loc, lgt_block_loc, hvy_block_loc, hvy_active, hvy_n )
-        else
-            ! 2D:
-            call refine_mesh_2D( params_loc, lgt_block_loc, hvy_block_loc(:,:,1,:,:), hvy_active, hvy_n )
-        end if
-
-        ! update lists of active blocks (light and heavy data)
-        call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
-        call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
-
-        !---------------------------------------------------------------------------------------------
-        ! third: fill blocks with data
-
-        ! allocate coord arrays
-        allocate(coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ),  stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
+        !-----------------------------------------------------------------------
+        ! Fill the above constructed grid with the exact solution values
+        !-----------------------------------------------------------------------
         ! loop over all active blocks
         do k = 1, hvy_n
 
-            ! write coord arrays
-            coord_x(g+1:Bs+g) = hvy_block_loc(1, 1:Bs, 1, 1, hvy_active(k))
-            coord_y(g+1:Bs+g) = hvy_block_loc(2, 1:Bs, 1, 1, hvy_active(k))
-            coord_z(g+1:Bs+g) = hvy_block_loc(3, 1:Bs, 1, 1, hvy_active(k))
+          ! write coord arrays
+          coord_x(g+1:Bs+g) = hvy_block_loc(1, 1:Bs, 1, 1, hvy_active(k))
+          coord_y(g+1:Bs+g) = hvy_block_loc(2, 1:Bs, 1, 1, hvy_active(k))
+          coord_z(g+1:Bs+g) = hvy_block_loc(3, 1:Bs, 1, 1, hvy_active(k))
 
-            ! spacing
-            dx = abs( hvy_block_loc(1, 2, 1, 1, hvy_active(k)) - hvy_block_loc(1, 1, 1, 1, hvy_active(k)) )
-            dy = abs( hvy_block_loc(2, 2, 1, 1, hvy_active(k)) - hvy_block_loc(2, 1, 1, 1, hvy_active(k)) )
-            dz = abs( hvy_block_loc(3, 2, 1, 1, hvy_active(k)) - hvy_block_loc(3, 1, 1, 1, hvy_active(k)) )
+          ! spacing
+          dx = abs( hvy_block_loc(1, 2, 1, 1, hvy_active(k)) - hvy_block_loc(1, 1, 1, 1, hvy_active(k)) )
+          dy = abs( hvy_block_loc(2, 2, 1, 1, hvy_active(k)) - hvy_block_loc(2, 1, 1, 1, hvy_active(k)) )
+          dz = abs( hvy_block_loc(3, 2, 1, 1, hvy_active(k)) - hvy_block_loc(3, 1, 1, 1, hvy_active(k)) )
 
-            ! ghost nodes coordinates
-            do l = 1, g
+          ! ghost nodes coordinates
+          do l = 1, g
 
-                ! minus direction
-                coord_x(l) = hvy_block_loc(1, 1, 1, 1, hvy_active(k)) - (g+1-l)*dx
-                coord_y(l) = hvy_block_loc(2, 1, 1, 1, hvy_active(k)) - (g+1-l)*dy
-                coord_z(l) = hvy_block_loc(3, 1, 1, 1, hvy_active(k)) - (g+1-l)*dz
+              ! minus direction
+              coord_x(l) = hvy_block_loc(1, 1, 1, 1, hvy_active(k)) - (g+1-l)*dx
+              coord_y(l) = hvy_block_loc(2, 1, 1, 1, hvy_active(k)) - (g+1-l)*dy
+              coord_z(l) = hvy_block_loc(3, 1, 1, 1, hvy_active(k)) - (g+1-l)*dz
 
-                ! plus direction
-                coord_x(Bs+g+l) = hvy_block_loc(1, Bs, 1, 1, hvy_active(k)) + (l)*dx
-                coord_y(Bs+g+l) = hvy_block_loc(2, Bs, 1, 1, hvy_active(k)) + (l)*dy
-                coord_z(Bs+g+l) = hvy_block_loc(3, Bs, 1, 1, hvy_active(k)) + (l)*dz
+              ! plus direction
+              coord_x(Bs+g+l) = hvy_block_loc(1, Bs, 1, 1, hvy_active(k)) + (l)*dx
+              coord_y(Bs+g+l) = hvy_block_loc(2, Bs, 1, 1, hvy_active(k)) + (l)*dy
+              coord_z(Bs+g+l) = hvy_block_loc(3, Bs, 1, 1, hvy_active(k)) + (l)*dz
 
-            end do
+          end do
 
-            ! calculate f(x,y,z) for first datafield
-            frequ = real(ifrequ, kind=rk)
-            if ( params_loc%threeD_case ) then
-                ! 3D:
-                call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ )
-            else
-                ! 2D:
-                call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ )
-            end if
+          ! calculate f(x,y,z) for first datafield
+          frequ = real(ifrequ, kind=rk)
+          if ( params_loc%threeD_case ) then
+            ! 3D:
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ )
+          else
+            ! 2D:
+            call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ )
+          end if
 
         end do
 
-        !---------------------------------------------------------------------------------------------
-        ! fourth: synchronize ghost nodes
-
-        ! save heavy data
+        ! now the entire grid (inlc ghost nodes) holds the exact solution: make a
+        ! copy of the grid for later comparison (to be optimized as it consumes memory)
         hvy_block_loc_exact = hvy_block_loc
 
-        ! init neighbor data array
-        ! 2D: maximal 16 neighbors per block
-        ! 3D: maximal 74 neighbors per block
-        if ( params%threeD_case ) then
-            ! 3D:
-            allocate( hvy_neighbor_loc( params_loc%number_blocks, 74 ), stat=allocate_error )
-            if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-        else
-            ! 2D:
-            allocate( hvy_neighbor_loc( params_loc%number_blocks, 16 ), stat=allocate_error )
-            if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-        end if
-
+        !-----------------------------------------------------------------------
+        ! synchronize ghost nodes (this is what we test here)
+        !-----------------------------------------------------------------------
         ! update neighbors
         if ( params_loc%threeD_case ) then
             ! 3D:
@@ -285,9 +300,9 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         ! synchronize ghost nodes
         call synchronize_ghosts( params_loc, lgt_block_loc, hvy_block_loc, hvy_neighbor_loc, hvy_active, hvy_n )
 
-        !---------------------------------------------------------------------------------------------
-        ! fifth: compare values
-
+        !-----------------------------------------------------------------------
+        ! compute error (normalized, global, 2-norm)
+        !-----------------------------------------------------------------------
         ! reset error
         my_error = 0.0_rk
         my_norm = 0.0_rk
@@ -308,15 +323,13 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         if (rank==0) then
             write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",es16.8)')  error
         end if
+      end do
 
-        !---------------------------------------------------------------------------------------------
-        ! last: clean up
-        deallocate(coord_x, coord_y, coord_z, hvy_neighbor_loc)
-        deallocate(lgt_block_loc, lgt_active, stat=allocate_error )
-        deallocate(hvy_block_loc, stat=allocate_error )
-        deallocate(hvy_block_loc_exact, stat=allocate_error )
-        deallocate( hvy_active, stat=allocate_error )
-  end do
-
-  params_loc%unit_test    = .false.
+    !---------------------------------------------------------------------------------------------
+    ! last: clean up
+    deallocate(coord_x, coord_y, coord_z, hvy_neighbor_loc)
+    deallocate(lgt_block_loc, lgt_active, stat=allocate_error )
+    deallocate(hvy_block_loc, stat=allocate_error )
+    deallocate(hvy_block_loc_exact, stat=allocate_error )
+    deallocate( hvy_active, stat=allocate_error )
 end subroutine unit_test_ghost_nodes_synchronization

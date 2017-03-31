@@ -113,4 +113,8 @@ contains
     ! transfer treecode to 3D z-curve code
     include "treecode_to_3D_z_curve.f90"
 
+    ! goes back from a treecode to xyz cartesian coordinates
+    include "decoding.f90"
+    include "get_block_spacing_origin.f90"
+
 end module module_mesh

@@ -181,13 +181,7 @@ program main
     !---------------------------------------------------------------------------------------------
     ! unit tests
     !---------------------------------------------------------------------------------------------
-    ! unit test on
-    params%unit_test    = .true.
-
     call unit_test_ghost_nodes_synchronization( params )
-
-    ! unit test off
-    params%unit_test    = .false.
 
     !---------------------------------------------------------------------------------------------
 
@@ -198,6 +192,8 @@ program main
     do while ( time < params%time_max )
 
         iteration = iteration + 1
+
+        !if (iteration==2 ) params%adapt_mesh = .false.
 
         ! refine everywhere
         if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )

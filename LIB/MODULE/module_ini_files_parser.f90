@@ -32,7 +32,7 @@ module module_ini_files_parser
 ! modules
 
     ! global parameters
-    use module_params
+    use module_precision
 
 !---------------------------------------------------------------------------------------------
 ! variables

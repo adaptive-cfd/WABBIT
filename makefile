@@ -20,6 +20,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
+VPATH += :LIB/PARAMS
 
 # Set the default compiler if it's not already set
 FC = mpif90
@@ -60,6 +61,9 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
+# Both programs are compiled by default.
+all: directories wabbit
+
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)
 	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
@@ -74,10 +78,11 @@ $(OBJDIR)/module_precision.o: module_precision.f90
 #compile physics modules
 $(OBJDIR)/module_convection_diffusion.o: module_convection_diffusion.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
@@ -85,7 +90,7 @@ $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
 	write_com_matrix.f90 write_com_matrix_pos.f90 unit_test_ghost_nodes_synchronization.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_params.o
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
@@ -94,8 +99,8 @@ $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_para
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_ini_files_parser.o \
-	init_data.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
+$(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
+	set_blocks_initial_condition.f90 allocate_block_list.f90 allocate_block_data.f90 inicond_gauss_blob.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
 	allocate_work_data.f90 inicond_vorticity_filaments.f90 ini_file_to_params.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 \
 	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90 inicond_sinus_2D.f90 inicond_sinus_3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -133,7 +138,7 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 clean:
-	rm -rf $(PROGRAMS) $(OBJDIR)/*.o $(OBJDIR)/*.mod a.out
+	rm -rf $(PROGRAMS) $(OBJDIR) a.out
 
 tidy:
 	rm -rf $(OBJDIR)/*.o $(OBJDIR)/*.mod a.out

@@ -24,7 +24,7 @@
 ! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active)
+subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -50,10 +50,6 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
     integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
     ! list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
-
-    ! inifile name
-    character(len=80)                               :: filename
-
     ! allocation error variabel
     integer(kind=ik)                                :: allocate_error
 
@@ -74,12 +70,6 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
 
     ! start time
     sub_t0 = MPI_Wtime()
-
-    ! get the second command line argument: ini-file name
-    call get_command_argument(2, filename)
-
-    ! read ini-file and save parameter
-    call ini_file_to_params( params, filename)
 
     !***************************************************************************
     ! allocate light/heavy data, initialize start field and write block data
@@ -207,4 +197,4 @@ subroutine init_data(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_a
 
     end if
 
-end subroutine init_data
+end subroutine set_blocks_initial_condition

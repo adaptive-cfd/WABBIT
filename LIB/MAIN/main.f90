@@ -99,6 +99,8 @@ program main
 
     ! number of dimensions
     character(len=80)                   :: dim_number
+    ! filename of *.inni file used to read parameters
+    character(len=80)                   :: filename
 
     ! loop variable
     integer(kind=ik)                    :: k
@@ -150,10 +152,7 @@ program main
         case('3D')
             params%threeD_case = .true.
         case default
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: case dimension is wrong"
-            stop
-
+            call error_msg("ERROR: case dimension is wrong")
     end select
 
     ! output MPI status
@@ -162,8 +161,14 @@ program main
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
 
-    ! initializing data
-    call init_data( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    ! read in the parameter file to setup the case
+    ! get the second command line argument: ini-file name
+    call get_command_argument( 2, filename )
+    ! read ini-file and save parameter
+    call ini_file_to_params( params, filename )
+
+    ! On all blocks, set the initial condition
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 
     ! create lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )

@@ -20,8 +20,6 @@ module module_init
     use mpi
     ! global parameters
     use module_params
-    ! ini file parser module
-    use module_ini_files_parser
     ! debug module
     use module_debug
 
@@ -39,7 +37,7 @@ module module_init
 contains
 
     ! init_data subroutine
-    include "init_data.f90"
+    include "set_blocks_initial_condition.f90"
 
     ! block list allocation
     include "allocate_block_list.f90"
@@ -61,9 +59,6 @@ contains
 
     ! vorticity filaments testcase
     include "inicond_vorticity_filaments.f90"
-
-    ! read ini file
-    include "ini_file_to_params.f90"
 
     ! initial zeros for all fields
     include "inicond_zeros.f90"

@@ -311,6 +311,11 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         end if
       end do
 
+    if (rank==0) then
+      write(*,'("UNIT TEST DONE: convergence order was ",6(g12.4,1x))')  sqrt(error(2:6) / error(1:5))
+      write(*,'("UNIT TEST DONE: mean convergence order was ",g12.4)')  sum(sqrt(error(2:6) / error(1:5))) / 5.0_rk
+    endif
+
     !---------------------------------------------------------------------------------------------
     ! last: clean up
     deallocate(coord_x, coord_y, coord_z, hvy_neighbor_loc)

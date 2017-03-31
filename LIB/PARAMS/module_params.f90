@@ -19,10 +19,12 @@ module module_params
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
+    use mpi
     ! use physics module
     use module_convection_diffusion
     use module_navier_stokes
+    ! ini file parser module
+    use module_ini_files_parser
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -124,6 +126,11 @@ module module_params
 !---------------------------------------------------------------------------------------------
 ! main body
 contains
+
+    ! this file reads the ini file and distributes all the parameters to the
+    ! various structs holding them
+    include "ini_file_to_params.f90"
+
 ! --------------------------------------------------------------------
 ! INTEGER FUNCTION  FindMinimum():
 !    This function returns the location of the minimum in the section

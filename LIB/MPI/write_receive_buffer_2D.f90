@@ -18,6 +18,8 @@
 ! = log ======================================================================================
 !
 ! 09/01/17 - create for v0.4
+! 31/03/17 - add non-uniform mesh correction
+!
 ! ********************************************************************************************
 
 subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
@@ -47,7 +49,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
     integer(kind=ik)                                :: Bs, g
 
     ! interpolation variables
-    real(kind=rk), dimension(:,:), allocatable      :: data_corner, data_corner_fine, data_edge, data_edge_fine
+    real(kind=rk), dimension(:,:), allocatable      :: data_corner, data_corner_ONE, data_corner_fine, data_edge, data_edge_fine
 
     ! allocation error variable
     integer(kind=ik)                                :: allocate_error
@@ -57,6 +59,9 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
     ! loop variable
     integer(kind=ik)                                :: k, l, dF
+
+    ! variable for non-uniform mesh correction
+    integer(kind=ik)                                :: one
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -68,7 +73,23 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
 
+    one = 0
+
+    ! set non-uniform mesh correction
+    if ( params%non_uniform_mesh ) then
+        one = 1
+    else
+        one = 0
+    end if
+
     allocate( data_corner( g, g), stat=allocate_error )
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
+    allocate( data_corner_ONE( g+one, g+one), stat=allocate_error )
     if ( allocate_error /= 0 ) then
         write(*,'(80("_"))')
         write(*,*) "ERROR: memory allocation fails"
@@ -82,14 +103,16 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
         stop
     end if
 
-    allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    !allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    allocate( data_edge( (Bs+1)/2 + g, (Bs+1)/2 + g), stat=allocate_error )
     if ( allocate_error /= 0 ) then
         write(*,'(80("_"))')
         write(*,*) "ERROR: memory allocation fails"
         stop
     end if
 
-    allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    !allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
+    allocate( data_edge_fine( Bs+2*g, Bs+2*g), stat=allocate_error )
     if ( allocate_error /= 0 ) then
         write(*,'(80("_"))')
         write(*,*) "ERROR: memory allocation fails"
@@ -98,10 +121,10 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
     buffer_i         = 1
 
-    data_corner      = 9.0e9_rk
-    data_corner_fine = 9.0e9_rk
-    data_edge        = 9.0e9_rk
-    data_edge_fine   = 9.0e9_rk
+!    data_corner      = 9.0e9_rk
+!    data_corner_fine = 9.0e9_rk
+!    data_edge        = 9.0e9_rk
+!    data_edge_fine   = 9.0e9_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -153,49 +176,105 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
             ! '_NE'
             case(5)
                 do dF = 2, params%number_data_fields+1
-                    ! receive data
-                    do l = 1, g
-                        data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
-                        buffer_i            = buffer_i + g
-                    end do
-                    ! write data
-                    hvy_block( Bs+g+1:Bs+g+g, 1:g, dF, my_block ) = data_corner
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do l = 1, g+one
+                            data_corner_ONE(l, 1:g+one) = recv_buff(buffer_i:buffer_i+g+one-1)
+                            buffer_i                    = buffer_i + g+one
+                        end do
+                        ! write data
+                        hvy_block( Bs+g+1-one:Bs+g+g, 1:g+one, dF, my_block ) = data_corner_ONE(1:g+one, 1:g+one)
+
+                    else
+                        ! sender on same or lower level
+                        ! receive data
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
+                        end do
+                        ! write data
+                        hvy_block( Bs+g+1:Bs+g+g, 1:g, dF, my_block ) = data_corner
+
+                    end if
                 end do
 
             ! '_NW'
             case(6)
                 do dF = 2, params%number_data_fields+1
-                    ! receive data
-                    do l = 1, g
-                        data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
-                        buffer_i            = buffer_i + g
-                    end do
-                    ! write data
-                    hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do l = 1, g+one
+                            data_corner_ONE(l, 1:g+one) = recv_buff(buffer_i:buffer_i+g+one-1)
+                            buffer_i                    = buffer_i + g+one
+                        end do
+                        ! write data
+                        hvy_block( Bs+g+1-one:Bs+g+g, Bs+g+1-one:Bs+g+g, dF, my_block ) = data_corner_ONE(1:g+one, 1:g+one)
+
+                    else
+                        ! sender on same or lower level
+                        ! receive data
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
+                        end do
+                        ! write data
+                        hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner
+
+                    end if
                 end do
 
             ! '_SE'
             case(7)
                 do dF = 2, params%number_data_fields+1
-                    ! receive data
-                    do l = 1, g
-                        data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
-                        buffer_i            = buffer_i + g
-                    end do
-                    ! write data
-                    hvy_block( 1:g, 1:g, dF, my_block ) = data_corner
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do l = 1, g+one
+                            data_corner_ONE(l, 1:g+one) = recv_buff(buffer_i:buffer_i+g+one-1)
+                            buffer_i                    = buffer_i + g+one
+                        end do
+                        ! write data
+                        hvy_block( 1:g+one, 1:g+one, dF, my_block ) = data_corner_ONE(1:g+one, 1:g+one)
+
+                    else
+                        ! sender on same or lower level
+                        ! receive data
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
+                        end do
+                        ! write data
+                        hvy_block( 1:g, 1:g, dF, my_block ) = data_corner
+
+                    end if
                 end do
 
             ! '_SW'
             case(8)
                 do dF = 2, params%number_data_fields+1
-                    ! receive data
-                    do l = 1, g
-                        data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
-                        buffer_i            = buffer_i + g
-                    end do
-                    ! write data
-                    hvy_block( 1:g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do l = 1, g+one
+                            data_corner_ONE(l, 1:g+one) = recv_buff(buffer_i:buffer_i+g+one-1)
+                            buffer_i                    = buffer_i + g+one
+                        end do
+                        ! write data
+                        hvy_block( 1:g+one, Bs+g+1-one:Bs+g+g, dF, my_block ) = data_corner_ONE(1:g+one, 1:g+one)
+
+                    else
+                        ! sender on same or lower level
+                        ! receive data
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
+                        end do
+                        ! write data
+                        hvy_block( 1:g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner
+
+                    end if
                 end do
 
             ! 'NNE'
@@ -215,8 +294,8 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
-                            hvy_block( Bs+g+l, g+(Bs+1)/2:Bs+g, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do l = 1, g+one
+                            hvy_block( Bs+g+l-one, g+(Bs+1)/2:Bs+g, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                             = buffer_i + (Bs+1)/2
                         end do
 
@@ -244,8 +323,8 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
-                            hvy_block( Bs+g+l, g+1:g+(Bs+1)/2, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do l = 1, g+one
+                            hvy_block( Bs+g+l-one, g+1:g+(Bs+1)/2, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                            = buffer_i + (Bs+1)/2
                         end do
 
@@ -273,8 +352,8 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
-                            hvy_block( g-l+1, g+(Bs+1)/2:Bs+g, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do l = 1, g+one
+                            hvy_block( g-l+1+one, g+(Bs+1)/2:Bs+g, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                            = buffer_i + (Bs+1)/2
                         end do
 
@@ -302,8 +381,8 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
-                            hvy_block( g-l+1, g+1:g+(Bs+1)/2, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do l = 1, g+one
+                            hvy_block( g-l+1+one, g+1:g+(Bs+1)/2, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                           = buffer_i + (Bs+1)/2
                         end do
 
@@ -331,7 +410,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
+                        do l = 1, g+one
                             hvy_block( g+1:g+(Bs+1)/2, l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                       = buffer_i + (Bs+1)/2
                         end do
@@ -360,7 +439,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
+                        do l = 1, g+one
                             hvy_block( g+(Bs+1)/2:Bs+g, l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                        = buffer_i + (Bs+1)/2
                         end do
@@ -389,8 +468,8 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
-                            hvy_block( g+1:g+(Bs+1)/2, Bs+g+l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do l = 1, g+one
+                            hvy_block( g+1:g+(Bs+1)/2, Bs+g+l-one, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                            = buffer_i + (Bs+1)/2
                         end do
 
@@ -418,8 +497,8 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do l = 1, g
-                            hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+l, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do l = 1, g+one
+                            hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+l-one, dF, my_block )  = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                             buffer_i                                             = buffer_i + (Bs+1)/2
                         end do
 
@@ -437,6 +516,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
     ! clean up
     deallocate( data_corner, stat=allocate_error )
+    deallocate( data_corner_ONE, stat=allocate_error )
     deallocate( data_corner_fine, stat=allocate_error )
     deallocate( data_edge, stat=allocate_error )
     deallocate( data_edge_fine, stat=allocate_error )

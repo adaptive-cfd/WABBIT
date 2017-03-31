@@ -192,6 +192,8 @@ program main
 
         iteration = iteration + 1
 
+        !if (iteration==2 ) params%adapt_mesh = .false.
+
         ! refine everywhere
         if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
 
@@ -232,7 +234,7 @@ program main
         ! output on screen
         if (rank==0) then
             write(*,'(80("-"))')
-            write(*, '("RUN: iteration=",i5,3x," time=",f10.6,3x," active blocks=",i7)') iteration, time, lgt_n
+            write(*, '("RUN: iteration=",i5,3x," time=",f16.6,3x," active blocks=",i7)') iteration, time, lgt_n
 
         end if
 

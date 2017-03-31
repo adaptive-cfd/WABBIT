@@ -57,7 +57,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     integer(kind=ik)                        :: allocate_error
 
     ! loop variables
-    integer(kind=ik)                        :: k, l, i, j, lgt_id, hvy_id
+    integer(kind=ik)                        :: k, l, lgt_id, hvy_id
 
     ! process rank
     integer(kind=ik)                        :: rank
@@ -65,7 +65,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! coordinates vectors
     real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
     ! spacing
-    real(kind=rk)                           :: dx, dy, dz, ddx(1:3), xx0(1:3)
+    real(kind=rk)                           :: ddx(1:3), xx0(1:3)
 
     ! grid parameter
     integer(kind=ik)                        :: Bs, g, Ds
@@ -124,7 +124,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         params_loc%number_block_nodes = 17
         params_loc%number_domain_nodes = 65
     else
-        params_loc%number_block_nodes = 129
+        params_loc%number_block_nodes = 33
         params_loc%number_domain_nodes = 513
     endif
 
@@ -226,9 +226,29 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! third: fill blocks with data
 
     ! allocate coord arrays
-    allocate(coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ),  stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    allocate(coord_x( Bs + 2*g ),  stat=allocate_error )
+    !if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    if ( allocate_error /= 0 ) then
+        write(*,*) "ERROR: memory allocation fails"
+        write(*,*) "Code stops now."
+        stop
+    end if
 
+    allocate(coord_y( Bs + 2*g ),  stat=allocate_error )
+    !if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    if ( allocate_error /= 0 ) then
+        write(*,*) "ERROR: memory allocation fails"
+        write(*,*) "Code stops now."
+        stop
+    end if
+
+    allocate(coord_z( Bs + 2*g ),  stat=allocate_error )
+    !if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    if ( allocate_error /= 0 ) then
+        write(*,*) "ERROR: memory allocation fails"
+        write(*,*) "Code stops now."
+        stop
+    end if
 
     ! at this point now, the grid used for testing is ready.
 

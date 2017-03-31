@@ -250,7 +250,6 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         stop
     end if
 
-
     ! at this point now, the grid used for testing is ready.
 
     !---------------------------------------------------------------------------

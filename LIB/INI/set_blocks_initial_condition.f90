@@ -5,8 +5,7 @@
 ! version: 0.5
 ! author: msr
 !
-! initialize all data: read params from ini file, allocate memory, initialize starting condition
-! and decompose start matrix into block data
+! This routine initializes the block data, i.e. it evaluates the initial condition on the grid
 !
 ! input:    - parameter array
 !           - light data array
@@ -33,28 +32,21 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
 
     ! user defined parameter structure
     type (type_params), intent(inout)                 :: params
-
     ! light data array
-    integer(kind=ik), allocatable, intent(out)      :: lgt_block(:, :)
-
+    integer(kind=ik), intent(inout)      :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), allocatable, intent(out)         :: hvy_block(:, :, :, :, :)
-
+    real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
     ! heavy work array  )
-    real(kind=rk), allocatable, intent(out)         :: hvy_work(:, :, :, :, :)
-
+    real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
     ! neighbor array (heavy data)
-    integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:,:)
-
+    integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
+    ! list of active blocks light data)
+    integer(kind=ik), intent(inout)      :: lgt_active(:)
     ! list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
-    ! list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
-    ! allocation error variabel
-    integer(kind=ik)                                :: allocate_error
+    integer(kind=ik), intent(inout)      :: hvy_active(:)
 
     ! loop variable
-    integer(kind=ik)                                :: k
+    integer(kind=ik)                                :: k, allocate_error
 
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: sub_t0, sub_t1
@@ -70,33 +62,6 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
 
     ! start time
     sub_t0 = MPI_Wtime()
-
-    !***************************************************************************
-    ! allocate light/heavy data, initialize start field and write block data
-    !
-    ! allocate block_list
-    call allocate_block_list( params, lgt_block )
-    ! allocate heavy data
-    call allocate_block_data( params, hvy_block )
-    ! allocate heavy work data
-    call allocate_work_data( params, hvy_work )
-
-    ! check ghost nodes number
-    if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: need more ghost nodes for given refinement order"
-        stop
-    end if
-    if ( (params%number_ghost_nodes < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: need more ghost nodes for given refinement order"
-        stop
-    end if
-    if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: need more ghost nodes for given derivative order"
-        stop
-    end if
 
     ! initial data field
     select case( params%initial_cond )
@@ -131,53 +96,6 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
 
     end select
 
-    ! allocate active list
-    allocate( lgt_active( size(lgt_block, 1) ), stat=allocate_error )
-    call check_allocation(allocate_error)
-
-    ! note: 5th dimension in heavy data is block id
-    allocate( hvy_active( size(hvy_block, 5) ), stat=allocate_error )
-    call check_allocation(allocate_error)
-
-    ! ------------------------------------------------------------------------------------------------------
-    ! init neighbor data array
-    ! 2D: maximal 16 neighbors per block
-    ! 3D: maximal 74 neighbors per block
-    if ( params%threeD_case ) then
-        ! 3D:
-        allocate( hvy_neighbor( params%number_blocks, 74 ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-    else
-        ! 2D:
-        allocate( hvy_neighbor( params%number_blocks, 16 ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-    end if
-
-    ! reset neighbor data array
-    hvy_neighbor = -1
-
-    ! ------------------------------------------------------------------------------------------------------
-    ! init debug data
-    ! note: fix size of time measurements array
-    if ( params%debug ) then
-
-        ! allocate array for time measurements - data
-        allocate( debug%comp_time( 20, 4 ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-        ! reset times
-        debug%comp_time = 0.0_rk
-
-        ! allocate array for time measurements - names
-        allocate( debug%name_comp_time( 20 ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-        ! reset names
-        debug%name_comp_time = "---"
-
-    end if
 
     ! end time
     sub_t1 = MPI_Wtime()

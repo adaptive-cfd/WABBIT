@@ -60,7 +60,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
 
     ! process rank
-    integer(kind=ik)                        :: rank
+    integer(kind=ik)                        :: rank, number_procs
 
     ! coordinates vectors
     real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
@@ -68,10 +68,10 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     real(kind=rk)                           :: ddx(1:3), xx0(1:3)
 
     ! grid parameter
-    integer(kind=ik)                        :: Bs, g, Ds
+    integer(kind=ik)                        :: Bs, g, Ds, number_blocks
     real(kind=rk)                           :: Lx, Ly, Lz
     ! data dimensionality
-    integer(kind=ik)                        :: d
+    integer(kind=ik)                        :: d, dF
     ! frequency of sin functions for testing:
     real(kind=rk)                           :: frequ(1:6)
     integer(kind=ik)                        :: ifrequ
@@ -95,6 +95,8 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     params_loc = params
     ! this ugly little flag supresses some verbosity
     params_loc%unit_test = .true.
+    ! only use one field (current implementation allocates dF+1 however)
+    params_loc%number_data_fields = 1
 
     ! set MPI parameters
     rank = params_loc%rank
@@ -131,10 +133,15 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     Bs = params_loc%number_block_nodes
     g  = params_loc%number_ghost_nodes
     Ds = params_loc%number_domain_nodes
+    dF = params_loc%number_data_fields
+    number_procs = params_loc%number_procs
+
 
     ! determine the required number of blocks, given the current block
     ! size and the desired "full resolution" size "Ds"
     params_loc%number_blocks = ( ((Ds-1) / (Bs-1))**d ) * 2**d
+
+    number_blocks = params_loc%number_blocks
 
     if (rank == 0) then
       write(*,'("UNIT TEST: testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
@@ -146,13 +153,48 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! this one grid.
     !---------------------------------------------------------------------------
 
+    ! memory allocation
+    if (params%threeD_case) then
+        ! -- 3d case
+        ! datafields + 1 -> first field for coordinates, ...
+        allocate( hvy_block_loc( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ), stat=allocate_error )
+        call check_allocation(allocate_error)
 
-    ! first: initializing new block data
-    ! allocate block_list
-    call allocate_block_list( params_loc, lgt_block_loc )
-    ! allocate heavy data
-    call allocate_block_data( params_loc, hvy_block_loc )
-    call allocate_block_data( params_loc, hvy_block_loc_exact )
+        ! block memory for exact solution
+        allocate( hvy_block_loc_exact( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ), stat=allocate_error )
+        call check_allocation(allocate_error)
+
+        ! 3D: maximal 74 neighbors per block
+        allocate( hvy_neighbor_loc( params_loc%number_blocks, 74 ), stat=allocate_error )
+        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    else
+        ! -- 2d case
+        ! datafields + 1 -> first field for coordinates, ...
+        allocate( hvy_block_loc( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ), stat=allocate_error )
+        call check_allocation(allocate_error)
+
+        ! block memory for exact solution
+        allocate( hvy_block_loc_exact( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ), stat=allocate_error )
+        call check_allocation(allocate_error)
+
+        ! 2D: maximal 16 neighbors per block
+        allocate( hvy_neighbor_loc( params_loc%number_blocks, 16 ), stat=allocate_error )
+        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    end if
+
+    ! allocate light data array
+    allocate( lgt_block_loc( params%number_procs*number_blocks, params%max_treelevel+2), stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+
+    ! allocate coord arrays
+    allocate(coord_x( Bs + 2*g ),  stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+
+    allocate(coord_y( Bs + 2*g ),  stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+
+    allocate(coord_z( Bs + 2*g ),  stat=allocate_error )
+    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
 
     ! active heavy block list
     allocate( hvy_active( params_loc%number_blocks ), stat=allocate_error )
@@ -162,8 +204,8 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     allocate( lgt_active( size(lgt_block_loc, 1) ), stat=allocate_error )
     if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
 
-
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
+    lgt_block_loc = -1
     lgt_active = -1; lgt_N = 0
     hvy_active = -1; hvy_N = 0
 
@@ -174,18 +216,6 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
     call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
 
-    ! init neighbor data array
-    ! 2D: maximal 16 neighbors per block
-    ! 3D: maximal 74 neighbors per block
-    if ( params%threeD_case ) then
-        ! 3D:
-        allocate( hvy_neighbor_loc( params_loc%number_blocks, 74 ), stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    else
-        ! 2D:
-        allocate( hvy_neighbor_loc( params_loc%number_blocks, 16 ), stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    end if
 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random)
@@ -225,30 +255,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     !---------------------------------------------------------------------------------------------
     ! third: fill blocks with data
 
-    ! allocate coord arrays
-    allocate(coord_x( Bs + 2*g ),  stat=allocate_error )
-    !if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    if ( allocate_error /= 0 ) then
-        write(*,*) "ERROR: memory allocation fails"
-        write(*,*) "Code stops now."
-        stop
-    end if
 
-    allocate(coord_y( Bs + 2*g ),  stat=allocate_error )
-    !if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    if ( allocate_error /= 0 ) then
-        write(*,*) "ERROR: memory allocation fails"
-        write(*,*) "Code stops now."
-        stop
-    end if
-
-    allocate(coord_z( Bs + 2*g ),  stat=allocate_error )
-    !if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    if ( allocate_error /= 0 ) then
-        write(*,*) "ERROR: memory allocation fails"
-        write(*,*) "Code stops now."
-        stop
-    end if
 
     ! at this point now, the grid used for testing is ready.
 

@@ -299,9 +299,9 @@ subroutine ini_file_to_params( params, filename )
     call read_param(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
     ! filter type
-    call read_param(FILE, 'Discretization', 'filter_type', params%filter_type, "---" )
+    call read_param(FILE, 'Discretization', 'filter_type', params%filter_type, "no-filter" )
     ! filter frequency
-    call read_param(FILE, 'Discretization', 'filter_freq', params%filter_freq, 1 )
+    call read_param(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
 
 
     !***************************************************************************
@@ -352,7 +352,20 @@ subroutine ini_file_to_params( params, filename )
         endif
     end do
 
+
     ! clean up
     call clean_ini_file(FILE)
+
+
+    ! check ghost nodes number
+    if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
+        call error_msg("ERROR: need more ghost nodes for given refinement order")
+    end if
+    if ( (params%number_ghost_nodes < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+        call error_msg("ERROR: need more ghost nodes for given refinement order")
+    end if
+    if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+        call error_msg("ERROR: need more ghost nodes for given derivative order")
+    end if
 
 end subroutine ini_file_to_params

@@ -161,12 +161,31 @@ program main
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
 
+    !---------------------------------------------------------------------------
+    ! Initialize parameters and grid
+    !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
-    ! get the second command line argument: ini-file name
+    ! get the second command line argument: this should be the ini-file name
     call get_command_argument( 2, filename )
-    ! read ini-file and save parameter
+    ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
 
+    ! allocate memory for heavy, light, work and neighbor data
+    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    ! reset the grid: all blocks are inactive and empty
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    ! initalize debugging ( this is mainly time measurements )
+    call allocate_init_debugging( params )
+
+    !---------------------------------------------------------------------------
+    ! Unit tests
+    !---------------------------------------------------------------------------
+    ! perform a convergence test on ghost node sync'ing
+    call unit_test_ghost_nodes_synchronization( params )
+
+    !---------------------------------------------------------------------------
+    ! Initial condition
+    !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
     call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 
@@ -177,17 +196,12 @@ program main
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
-    !---------------------------------------------------------------------------------------------
-    ! unit tests
-    !---------------------------------------------------------------------------------------------
-    call unit_test_ghost_nodes_synchronization( params )
-
-    !---------------------------------------------------------------------------------------------
-
-    ! save start data
+    ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
+    !---------------------------------------------------------------------------
     ! main time loop
+    !---------------------------------------------------------------------------
     do while ( time < params%time_max )
 
         iteration = iteration + 1
@@ -224,7 +238,7 @@ program main
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
         ! filter
-        if (modulo(iteration, params%filter_freq) == 0) then
+        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then
             call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
         end if
 

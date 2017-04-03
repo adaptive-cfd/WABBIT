@@ -82,4 +82,7 @@ contains
     ! position com matrix
     include "write_com_matrix_pos.f90"
 
+    ! use this to initalize the memory for debugging:
+    include "allocate_init_debugging.f90"
+
 end module module_debug

@@ -39,14 +39,9 @@ contains
     ! init_data subroutine
     include "set_blocks_initial_condition.f90"
 
-    ! block list allocation
-    include "allocate_block_list.f90"
-
-    ! block data allocation
-    include "allocate_block_data.f90"
-
-    ! block work data allocation
-    include "allocate_work_data.f90"
+    ! allocate and reset all memotry requred for the gird
+    include "allocate_grid.f90"
+    include "reset_grid.f90"
 
     ! start field, gauss blob
     include "inicond_gauss_blob.f90"

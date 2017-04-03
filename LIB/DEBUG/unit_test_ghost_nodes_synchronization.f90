@@ -18,7 +18,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params )
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -27,34 +27,25 @@ subroutine unit_test_ghost_nodes_synchronization( params )
 ! variables
 
     implicit none
-
     ! user defined parameter structure
-    type (type_params), intent(in)          :: params
-
-    ! local copy of params struct
-    ! user defined parameter structure
-    type (type_params)                      :: params_loc
-
+    type (type_params), intent(inout)     :: params
     ! light data array
-    integer(kind=ik), allocatable           :: lgt_block_loc(:, :)
+    integer(kind=ik),  intent(inout)      :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk), allocatable              :: hvy_block_loc(:, :, :, :, :), hvy_block_loc_exact(:, :, :, :, :)
+    real(kind=rk),  intent(inout)         :: hvy_block(:, :, :, :, :)
+    ! heavy work array  )
+    real(kind=rk),  intent(inout)         :: hvy_work (:, :, :, :, :)
+    ! neighbor array (heavy data)
+    integer(kind=ik),  intent(inout)      :: hvy_neighbor(:,:)
+    ! list of active blocks (light data)
+    integer(kind=ik),  intent(inout)      :: lgt_active(:)
+    ! list of active blocks (light data)
+    integer(kind=ik),  intent(inout)      :: hvy_active(:)
 
-    ! list of active blocks (heavy data)
-    integer(kind=ik), allocatable           :: hvy_active(:)
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
-
-    ! list of active blocks (light data)
-    integer(kind=ik), allocatable           :: lgt_active(:)
     ! number of active blocks (light data)
     integer(kind=ik)                        :: lgt_n
-
-    ! neighbor array
-    integer(kind=ik), allocatable           :: hvy_neighbor_loc(:,:)
-
-    ! allocation error variable
-    integer(kind=ik)                        :: allocate_error
 
     ! loop variables
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
@@ -79,7 +70,7 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! error variable
     real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
     ! MPI error variable
-    integer(kind=ik)                        :: ierr
+    integer(kind=ik)                        :: ierr, allocate_error
 
     ! chance for block refinement, random number
     real(kind=rk)                           :: ref_chance, r
@@ -90,24 +81,16 @@ subroutine unit_test_ghost_nodes_synchronization( params )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-
-    ! local copy of params struct
-    params_loc = params
-    ! this ugly little flag supresses some verbosity
-    params_loc%unit_test = .true.
-    ! only use one field (current implementation allocates dF+1 however)
-    params_loc%number_data_fields = 1
-
     ! set MPI parameters
-    rank = params_loc%rank
+    rank = params%rank
 
     ! grid parameter
-    Lx = params_loc%Lx
-    Ly = params_loc%Ly
-    Lz = params_loc%Lz
+    Lx = params%Lx
+    Ly = params%Ly
+    Lz = params%Lz
 
     ! set data dimension
-    if ( params_loc%threeD_case ) then
+    if ( params%threeD_case ) then
         d = 3
     else
         d = 2
@@ -121,30 +104,15 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         write(*,'("UNIT TEST: Beginning ghost nodes test")')
     end if
 
-    ! choose bocksize and domainsize here:
-    if ( params_loc%threeD_case ) then
-        params_loc%number_block_nodes = 17
-        params_loc%number_domain_nodes = 65
-    else
-        params_loc%number_block_nodes = 33
-        params_loc%number_domain_nodes = 513
-    endif
-
-    Bs = params_loc%number_block_nodes
-    g  = params_loc%number_ghost_nodes
-    Ds = params_loc%number_domain_nodes
-    dF = params_loc%number_data_fields
-    number_procs = params_loc%number_procs
-
-
-    ! determine the required number of blocks, given the current block
-    ! size and the desired "full resolution" size "Ds"
-    params_loc%number_blocks = ( ((Ds-1) / (Bs-1))**d ) * 2**d
-
-    number_blocks = params_loc%number_blocks
+    Bs = params%number_block_nodes
+    g  = params%number_ghost_nodes
+    Ds = params%number_domain_nodes
+    dF = params%number_data_fields
+    number_procs  = params%number_procs
+    number_blocks = params%number_blocks
 
     if (rank == 0) then
-      write(*,'("UNIT TEST: testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params_loc%number_blocks
+      write(*,'("UNIT TEST: testing Bs=",i4," blocks-per-mpirank=",i5)')  Bs, params%number_blocks
     end if
 
     !---------------------------------------------------------------------------
@@ -152,40 +120,6 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     ! and perform the same test for differnet frequencies (= resolutions) only on
     ! this one grid.
     !---------------------------------------------------------------------------
-
-    ! memory allocation
-    if (params%threeD_case) then
-        ! -- 3d case
-        ! datafields + 1 -> first field for coordinates, ...
-        allocate( hvy_block_loc( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-        ! block memory for exact solution
-        allocate( hvy_block_loc_exact( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-        ! 3D: maximal 74 neighbors per block
-        allocate( hvy_neighbor_loc( params_loc%number_blocks, 74 ), stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    else
-        ! -- 2d case
-        ! datafields + 1 -> first field for coordinates, ...
-        allocate( hvy_block_loc( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-        ! block memory for exact solution
-        allocate( hvy_block_loc_exact( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
-        ! 2D: maximal 16 neighbors per block
-        allocate( hvy_neighbor_loc( params_loc%number_blocks, 16 ), stat=allocate_error )
-        if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-    end if
-
-    ! allocate light data array
-    allocate( lgt_block_loc( params%number_procs*number_blocks, params%max_treelevel+2), stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
     ! allocate coord arrays
     allocate(coord_x( Bs + 2*g ),  stat=allocate_error )
     if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
@@ -196,25 +130,17 @@ subroutine unit_test_ghost_nodes_synchronization( params )
     allocate(coord_z( Bs + 2*g ),  stat=allocate_error )
     if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
 
-    ! active heavy block list
-    allocate( hvy_active( params_loc%number_blocks ), stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-    ! create active light block list
-    allocate( lgt_active( size(lgt_block_loc, 1) ), stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-    lgt_block_loc = -1
+    lgt_block = -1
     lgt_active = -1; lgt_N = 0
     hvy_active = -1; hvy_N = 0
 
     ! init data array with zeros => after this: blocks have correct coordinate vectors
-    call inicond_zeros( params_loc, lgt_block_loc, hvy_block_loc )
+    call inicond_zeros( params, lgt_block, hvy_block )
 
     ! update lists of active blocks (light and heavy data)
-    call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
-    call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
+    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
 
 
     !---------------------------------------------------------------------------------------------
@@ -232,30 +158,25 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         call random_number(r)
         ! set refinement status
         if ( r <= ref_chance ) then
-            lgt_block_loc( lgt_active(k), params_loc%max_treelevel+2 ) = 1
+            lgt_block( lgt_active(k), params%max_treelevel+2 ) = 1
         end if
     end do
     ! refine blocks
     ! check if block has reached maximal level
-    call respect_min_max_treelevel( params_loc, lgt_block_loc, lgt_active, lgt_n )
+    call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
 
     ! interpolate the new mesh
     if ( params%threeD_case ) then
         ! 3D:
-        call refine_mesh_3D( params_loc, lgt_block_loc, hvy_block_loc, hvy_active, hvy_n )
+        call refine_mesh_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
     else
         ! 2D:
-        call refine_mesh_2D( params_loc, lgt_block_loc, hvy_block_loc(:,:,1,:,:), hvy_active, hvy_n )
+        call refine_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
     end if
 
     ! update lists of active blocks (light and heavy data)
-    call create_lgt_active_list( lgt_block_loc, lgt_active, lgt_n )
-    call create_hvy_active_list( lgt_block_loc, hvy_active, hvy_n )
-
-    !---------------------------------------------------------------------------------------------
-    ! third: fill blocks with data
-
-
+    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
     ! at this point now, the grid used for testing is ready.
 
@@ -278,9 +199,9 @@ subroutine unit_test_ghost_nodes_synchronization( params )
           ! hvy_id of the block we're looking at
           hvy_id = hvy_active(k)
           ! light id of this block
-          call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params_loc%number_blocks )
+          call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params%number_blocks )
           ! compute block spacing and origin from treecode
-          call get_block_spacing_origin( params_loc, lgt_id, lgt_block_loc, xx0, ddx )
+          call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 
           ! fill coordinate arrays, of course including ghost nodes
           do l = 1, Bs+2*g
@@ -290,28 +211,29 @@ subroutine unit_test_ghost_nodes_synchronization( params )
           enddo
 
           ! calculate f(x,y,z) for first datafield
-          if ( params_loc%threeD_case ) then
+          if ( params%threeD_case ) then
             ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block_loc(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
           else
             ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block_loc(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
+            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
           end if
 
         end do
 
-        ! now the entire grid (inlc ghost nodes) holds the exact solution: make a
-        ! copy of the grid for later comparison (to be optimized as it consumes memory)
-        hvy_block_loc_exact = hvy_block_loc
+        ! now the entire grid (incl ghost nodes) holds the exact solution: make a
+        ! copy of the grid for later comparison, but use work arrays ususally used for RK4 substages
+        ! so no additional memory is used.
+        hvy_work(:,:,:,1,:) = hvy_block(:,:,:,2,:)
 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
         ! update neighbors
-        call update_neighbors( params_loc, lgt_block_loc, hvy_neighbor_loc, lgt_active, lgt_n, hvy_active, hvy_n )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         ! synchronize ghost nodes
-        call synchronize_ghosts( params_loc, lgt_block_loc, hvy_block_loc, hvy_neighbor_loc, hvy_active, hvy_n )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)
@@ -320,10 +242,10 @@ subroutine unit_test_ghost_nodes_synchronization( params )
         my_error = 0.0_rk
         my_norm = 0.0_rk
 
-        ! loop over all active blocks
+        ! loop over all active blocks and compute their error
         do k = 1, hvy_n
-          my_error = my_error + sqrt(sum((hvy_block_loc(:,:,:,2,hvy_active(k))-hvy_block_loc_exact(:,:,:,2,hvy_active(k)))**2 ))
-          my_norm = my_norm  + sqrt(sum((hvy_block_loc_exact(:,:,:,2,hvy_active(k)))**2 ))
+          my_error = my_error + sqrt(sum((hvy_block(:,:,:,2,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k)))**2 ))
+          my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k)))**2 ))
         end do
 
         ! synchronize errors
@@ -345,9 +267,5 @@ subroutine unit_test_ghost_nodes_synchronization( params )
 
     !---------------------------------------------------------------------------------------------
     ! last: clean up
-    deallocate(coord_x, coord_y, coord_z, hvy_neighbor_loc)
-    deallocate(lgt_block_loc, lgt_active, stat=allocate_error )
-    deallocate(hvy_block_loc, stat=allocate_error )
-    deallocate(hvy_block_loc_exact, stat=allocate_error )
-    deallocate( hvy_active, stat=allocate_error )
+    deallocate(coord_x, coord_y, coord_z)
 end subroutine unit_test_ghost_nodes_synchronization

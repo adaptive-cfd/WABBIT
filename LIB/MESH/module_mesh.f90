@@ -84,8 +84,7 @@ contains
     include "ensure_gradedness.f90"
 
     ! completeness check
-    include "ensure_completeness_2D.f90"
-    include "ensure_completeness_3D.f90"
+    include "ensure_completeness.f90"
 
     ! coarse mesh
     include "coarse_mesh_2D.f90"
@@ -116,5 +115,8 @@ contains
     ! goes back from a treecode to xyz cartesian coordinates
     include "decoding.f90"
     include "get_block_spacing_origin.f90"
+
+    ! find sisters to a given block
+    include "find_sisters.f90"
 
 end module module_mesh

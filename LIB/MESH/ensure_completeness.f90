@@ -1,9 +1,9 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: ensure_completeness_2D.f90
+! name: ensure_completeness.f90
 ! version: 0.4
-! author: msr
+! author: msr, engels
 !
 ! sets refinement status to -2 for all sister blocks, if coarsening is possible
 !
@@ -13,9 +13,10 @@
 ! = log ======================================================================================
 !
 ! 10/11/16 - switch to v0.4
+! 05/04/17 - works for 2D and 3D data and uses readable find_sisters routine.
 ! ********************************************************************************************
 
-subroutine ensure_completeness_2D( params, lgt_block, lgt_active, lgt_n )
+subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -37,26 +38,10 @@ subroutine ensure_completeness_2D( params, lgt_block, lgt_active, lgt_n )
 
     ! max treelevel
     integer(kind=ik)                    :: max_treelevel
-
     ! loop variables
-    integer(kind=ik)                    :: k, l, i, lgt_id
-
+    integer(kind=ik)                    :: k, l, N_sisters, status
     ! sister ids
-    integer(kind=ik)                    :: id(3)
-
-    ! treecode variable
-    integer(kind=ik)                    :: treecode(params%max_treelevel)
-    ! block level
-    integer(kind=ik)                    :: level
-
-    ! exists variable
-    logical                             :: exists
-
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank
-
+    integer(kind=ik), allocatable       :: id(:)
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
 
@@ -67,15 +52,17 @@ subroutine ensure_completeness_2D( params, lgt_block, lgt_active, lgt_n )
 ! variables initialization
 
     max_treelevel = params%max_treelevel
-
-    i  = 0
+    if (params%threeD_case) then
+      N_sisters = 7
+    else
+      N_sisters = 3
+    end if
+    ! allocate the array which will hold the light ids of the sisters
+    allocate( id(1:N_sisters) )
     id = -1
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
     ! start time
     sub_t0 = MPI_Wtime()
@@ -83,52 +70,39 @@ subroutine ensure_completeness_2D( params, lgt_block, lgt_active, lgt_n )
     ! loop over all active blocks
     do k = 1, lgt_n
 
-        ! if the block want to coarsen, check refinement status of sister blocks
+        ! if the block wants to coarsen, check refinement status of sister blocks
         if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
+            ! find sister IDs of the block we're looking at. If a sister is not found, -1
+            ! is returned in the array id
+            call find_sisters( params, lgt_active(k), id, lgt_block, lgt_active, lgt_n )
 
-            ! data from current block
-            treecode = lgt_block( lgt_active(k), 1:max_treelevel )
-            level    = lgt_block( lgt_active(k), max_treelevel+1 )
+            ! if all sisters exists, then the array should not contain values smaller
+            ! zero (-1 would mean not found)
+            if ( minval(id) > 0 ) then
 
-            ! reset id list
-            id = -1
+                ! now loop over all sisters, check if they also want to coarsen and have status -1
+                ! only if all sisters agree to coarsen, they can all be merged into their mother block.
+                status = -1
+                do l = 1, N_sisters
+                  status = max( status, lgt_block(id(l), max_treelevel+2) )
+                end do
 
-            ! get sister id's
-            i = 0
-            do l = 1, 4
-                ! sister treecode differs only on last element
-                if ( lgt_block( lgt_active(k), level ) /= l-1) then
-
-                    i               = i + 1
-                    treecode(level) = l-1
-                    ! find block id, use exists subroutine
-                    call does_block_exist(treecode, lgt_block, max_treelevel, exists, lgt_id, lgt_active, lgt_n)
-                    ! block exists
-                    if (exists) then
-                        id(i) = lgt_id
-                    else
-                        ! sister does not exists, nothing to do
-                    end if
-
-                end if
-            end do
-
-            ! if all sisters exists
-            if ( (id(1)>0) .and. (id(2)>0) .and. (id(3)>0) ) then
-
-                ! if all sister blocks want to coarsen, then coarsening is allowed
-                if ( ( lgt_block( id(1), max_treelevel+2 ) == -1) .and. ( lgt_block( id(2), max_treelevel+2 ) == -1) .and. ( lgt_block( id(3), max_treelevel+2 ) == -1) ) then
-                    lgt_block( lgt_active(k), max_treelevel+2 )      = -2
-                    lgt_block( id(1), max_treelevel+2 )  = -2
-                    lgt_block( id(2), max_treelevel+2 )  = -2
-                    lgt_block( id(3), max_treelevel+2 )  = -2
+                ! if all agree, the status is -1, and we can indeed coarsen, set +2
+                if ( status == -1 ) then
+                  do l = 1, N_sisters
+                    lgt_block( id(l), max_treelevel+2 )  = -2
+                  end do
                 end if
 
             end if
-
         end if
-
     end do
+
+    deallocate( id )
+
+    ! NOTE: this routine runs redundantly on all procs - they all do the same. That means
+    ! by consequence that the light data here does not have to be synchronized.
+
 
     ! end time
     sub_t1 = MPI_Wtime()
@@ -147,4 +121,4 @@ subroutine ensure_completeness_2D( params, lgt_block, lgt_active, lgt_n )
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if
 
-end subroutine ensure_completeness_2D
+end subroutine ensure_completeness

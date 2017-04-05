@@ -236,6 +236,9 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         if (counter == 10) call error_msg("ERROR: unable to build a graded mesh")
     end do ! end do of repeat procedure until grid_changed==.false.
 
+
+
+
     ! end time
     sub_t1 = MPI_Wtime()
     ! write time

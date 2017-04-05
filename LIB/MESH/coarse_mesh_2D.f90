@@ -78,7 +78,7 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     logical                             :: exists
 
     ! rank of proc to keep the coarsen data
-    integer(kind=ik)                    :: data_rank
+    integer(kind=ik)                    :: data_rank, j
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
@@ -108,42 +108,11 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     g  = params%number_ghost_nodes
 
     ! allocate data array
-    allocate( new_data(Bs, Bs, params%number_data_fields), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
+    allocate( new_data(Bs, Bs, params%number_data_fields) )
     ! new coordinates vectors
-    allocate( new_coord_x(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_coord_y(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
+    allocate( new_coord_x(Bs), new_coord_y(Bs) )
     ! send/receive data and coordinates
-    allocate( send_receive_data(Bs, Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( send_receive_coord(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( send_receive_data(Bs, Bs), send_receive_coord(Bs) )
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -160,11 +129,14 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
             ! rank of proc to keep the data
             call lgt_id_to_proc_rank( data_rank, lgt_active(k), N )
 
-            ! block wants to coarsen
-            if ( lgt_block( lgt_active(k), params%max_treelevel+2) == -2 ) then
+            ! block wants to coarsen, definetly, i.e. it has the status -2. Note -1
+            ! is just a temporary state and four blocks, all -1, are given the -2 state
+            ! is ensure_completeness finds all four. So that means, by extension, we previously
+            ! searched all 4 sister blocks, and we found them all.
+            if ( lgt_block(lgt_active(k), maxtl+2) == -2 ) then
 
                 ! get treecodes for current block and sister-blocks
-                me                                                          = lgt_block( lgt_active(k), 1:maxtL)
+                me = lgt_block( lgt_active(k), 1:maxtL)
                 light_ids( me( lgt_block( lgt_active(k), maxtL+1) ) + 1 )   = lgt_active(k)
 
                 ! heavy id
@@ -414,7 +386,6 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
                             ! nothing to do
                         end if
                     end do
-
                 end do
 
                 ! delete all heavy data

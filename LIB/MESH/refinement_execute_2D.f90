@@ -1,13 +1,17 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: refine_mesh_2D.f90
-! version: 0.4
+! name: refinement_execute_2D.f90
+! version: 0.5
 ! author: msr
 !
-! refine the mesh:
-! every proc work on his own heavy data and change the corresponding light data
-! after this: synchronize light data array
+! Refine mesh (2D version). All cpu loop over their heavy data and check if the refinement
+! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
+! level and create four new blocks, each carrying a part of the interpolated data.
+! As all CPU first work individually, the light data array is synced.
+!
+! NOTE: The interpolation (or prediction) operator here is applied to a block EXCLUDING
+! any ghost nodes.
 !
 ! input:    - params, light and heavy data
 ! output:   - light and heavy data arrays
@@ -18,7 +22,7 @@
 !            subroutines
 ! ********************************************************************************************
 
-subroutine refine_mesh_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -151,8 +155,10 @@ subroutine refine_mesh_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
             ! first: interpolate block data
             ! loop over all data fields
             do dF = 2, params%number_data_fields+1
-                ! reset data
+                ! NOTE: the refinement interpolation acts on the blocks interior
+                ! nodes and ignores ghost nodes.
                 data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
+                ! reset data
                 data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
@@ -317,4 +323,4 @@ subroutine refine_mesh_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
     deallocate( new_coord_x, stat=allocate_error )
     deallocate( new_coord_y, stat=allocate_error )
 
-end subroutine refine_mesh_2D
+end subroutine refinement_execute_2D

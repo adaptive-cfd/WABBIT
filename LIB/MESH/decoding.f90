@@ -21,7 +21,7 @@ subroutine decoding(treecode, i, j, k, treeN)
     ! treecode size
     integer(kind=ik), intent(in)    :: treeN
     ! treecode
-    integer(kind=ik), intent(out)   :: treecode(treeN)
+    integer(kind=ik), intent(in)   :: treecode(treeN)
     integer(kind=ik) :: nx, step, l
 
     ! this is the maximum index possible (the last one on the finest grid)

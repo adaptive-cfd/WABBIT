@@ -26,7 +26,7 @@ program main
     ! debug module
     use module_debug
     ! init data module
-    use module_init
+    use module_initialization
     ! mesh manipulation subroutines
     use module_mesh
     ! IO module
@@ -183,6 +183,10 @@ program main
     !---------------------------------------------------------------------------
     ! perform a convergence test on ghost node sync'ing
     call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    ! stop
+
+
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 
@@ -191,7 +195,7 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, .true.  )
 
     ! create lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
@@ -203,6 +207,7 @@ program main
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
+    ! stop
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
@@ -210,33 +215,12 @@ program main
 
         iteration = iteration + 1
 
-        !if (iteration==2 ) params%adapt_mesh = .false.
+        ! if (iteration== 2)         params%adapt_mesh = .false.
 
         ! refine everywhere
-        if ( params%adapt_mesh ) call refine_everywhere( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n )
-
-        ! update lists of active blocks (light and heavy data)
-        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
-        ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-
-        ! balance load
-        if ( params%threeD_case ) then
-            ! 3D:
-            call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
-        else
-            ! 2D:
-            call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        end if
-
-        ! update lists of active blocks (light and heavy data)
-        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
-        ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        if ( params%adapt_mesh ) then
+          call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "everywhere" )
+        endif
 
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
@@ -247,7 +231,9 @@ program main
         end if
 
         ! adapt the mesh
-        if ( params%adapt_mesh ) call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+        if ( params%adapt_mesh ) then
+          call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+        endif
 
         ! output on screen
         if (rank==0) then

@@ -3,9 +3,22 @@
 ! ============================================================================================
 ! name: adapt_mesh.f90
 ! version: 0.4
-! author: msr
+! author: msr, engels
 !
-! mesh adapting main function
+! This routine performs the coarsing of the mesh, where possible. For the given mesh
+! we compute the details-coefficients on all blocks. If four sister blocks have maximum
+! details below the specified tolerance, (so they are insignificant), they are merged to
+! one coarser block one level below. This process is repeated until the grid does not change
+! anymore.
+!
+! As the grid changes, active lists and neighbor relations are updated, and load balancing
+! is applied.
+!
+! NOTE: The block thresholding is done with the restriction/prediction operators acting on the
+! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed in threshold_block.
+!
+! NOTE: It is well possible to start with a very fine mesh and end up with only one active
+! block after this routine. You do *NOT* have to call it several times.
 !
 ! input:    - params, light and heavy data
 ! output:   - light and heavy data arrays
@@ -31,9 +44,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     ! heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neifghbor data
+    ! heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-
     ! list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     ! number of active blocks (light data)

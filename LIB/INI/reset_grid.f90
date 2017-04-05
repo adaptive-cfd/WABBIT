@@ -5,7 +5,7 @@
 ! version: 0.5
 ! author: msr
 !
-! This routine initializes the block data, i.e. it evaluates the initial condition on the grid
+! reset grid, set all blocks to empty
 !
 ! input:    - parameter array
 !           - light data array

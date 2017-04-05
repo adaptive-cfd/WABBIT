@@ -5,7 +5,8 @@
 ! version: 0.4
 ! author: msr
 !
-! thresholding for all blocks
+! The block thresholding is done with the restriction/prediction operators acting on the
+! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed here.
 !
 ! input:    - params, light and heavy data, neighbor list
 ! output:   - light and heavy data arrays

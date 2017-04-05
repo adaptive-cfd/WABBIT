@@ -24,9 +24,8 @@ module module_mesh
     use module_debug
     ! interpolation routines
     use module_interpolation
-    ! time step module
-    use module_time_step
-
+    ! use MPI module, since thrshold_block needs to synch ghosts
+    use module_MPI
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -66,14 +65,14 @@ contains
     include "does_block_exist.f90"
 
     ! block refinement subroutine
-    include "refine_everywhere.f90"
+    include "refine_mesh.f90"
 
     ! check treelevel restrictions
     include "respect_min_max_treelevel.f90"
 
     ! check treelevel restrictions
-    include "refine_mesh_2D.f90"
-    include "refine_mesh_3D.f90"
+    include "refinement_execute_2D.f90"
+    include "refinement_execute_3D.f90"
 
     ! adapt the mesh
     include "adapt_mesh.f90"

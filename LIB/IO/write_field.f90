@@ -54,12 +54,12 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     ! number of active blocks (heavy data)
-    integer(kind=ik)                    :: hvy_n
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! process rank
     integer(kind=ik)                    :: rank, lgt_rank
     ! loop variable
-    integer(kind=ik)                    :: k, hvy_id, l
+    integer(kind=ik)                    :: k, hvy_id, l, lgt_id
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
@@ -80,6 +80,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! allocation error variable
     integer(kind=ik)                    :: allocate_error
+
+    ! spacing and origin (new)
+    real(kind=rk) :: xx0(1:3) , ddx(1:3)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -109,7 +112,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         stop
     end if
 
-    allocate (coords_spacing(1:3, 1:hvy_n), stat=allocate_error)
+    allocate (coords_spacing(1:3, 1:hvy_n) , stat=allocate_error)
     !call check_allocation(allocate_error)
     if ( allocate_error /= 0 ) then
         write(*,'(80("_"))')
@@ -178,20 +181,35 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! if I own this block, I copy it to the buffer.
         ! also extract block coordinate origin and spacing
         if (lgt_rank == rank) then
+            ! compute block spacing and origin from the treecode
+            lgt_id = lgt_active(k)
+            call get_block_spacing_origin( params, lgt_id , lgt_block, xx0, ddx )
+
             if ( params%threeD_case ) then
                 ! 3D
                 myblockbuffer(:,:,:,l)      = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
-                coords_origin(1,l)          = hvy_block( 3, 1, 1, 1, hvy_id)
-                coords_origin(2,l)          = hvy_block( 2, 1, 1, 1, hvy_id)
-                coords_origin(3,l)          = hvy_block( 1, 1, 1, 1, hvy_id)
-                coords_spacing(1:3,l)       = abs(hvy_block( 1:3, 2, 1, 1, hvy_id) - hvy_block( 1:3, 1, 1, 1, hvy_id) )
+
+                ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
+                coords_origin(1,l) = xx0(3)
+                coords_origin(2,l) = xx0(2)
+                coords_origin(3,l) = xx0(1)
+                coords_spacing(1,l) = ddx(3)
+                coords_spacing(2,l) = ddx(2)
+                coords_spacing(3,l) = ddx(1)
+
+                ! copy treecode (we'll save it to file as well)
                 block_treecode(:,l)         = lgt_block( lgt_active(k), 1:params%max_treelevel )
             else
                 ! 2D
                 myblockbuffer(:,:,1,l)      = hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id)
-                coords_origin(1,l)          = hvy_block( 2, 1, 1, 1, hvy_id)
-                coords_origin(2,l)          = hvy_block( 1, 1, 1, 1, hvy_id)
-                coords_spacing(1:2,l)       = abs(hvy_block( 1:2, 2, 1, 1, hvy_id) - hvy_block( 1:2, 1, 1, 1, hvy_id) )
+
+                ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
+                coords_origin(1,l) = xx0(2)
+                coords_origin(2,l) = xx0(1)
+                coords_spacing(1,l) = ddx(2)
+                coords_spacing(2,l) = ddx(1)
+
+                ! copy treecode (we'll save it to file as well)
                 block_treecode(:,l)         = lgt_block( lgt_active(k), 1:params%max_treelevel )
             endif
 

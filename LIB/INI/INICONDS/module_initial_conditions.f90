@@ -1,19 +1,18 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_unit_test.f90
-! version: 0.5
-! author: msr
+! name: module_initialization.f90
+! version: 0.4
+! author: engels
 !
-! module for all unit test subroutines
+! module for all init subroutines
 !
 ! = log ======================================================================================
 !
-! 21/03/17 - create
-!
+! 03 Apr 2017 - create
 ! ********************************************************************************************
 
-module module_unit_test
+module module_initial_conditions
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -21,11 +20,6 @@ module module_unit_test
     use mpi
     ! global parameters
     use module_params
-    ! init module
-    use module_initialization
-    ! mesh module
-    use module_mesh
-
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -39,8 +33,7 @@ module module_unit_test
 
 contains
 
-    ! ghost nodes unit test
-    include "unit_test_ghost_nodes_synchronization.f90"
-
-    include "unit_test_wavelet_compression.f90"
-end module module_unit_test
+  include "initial_condition_on_block_wrapper.f90"
+  include "inicond_gauss_blob.f90"
+  include "inicond_sinus_2D.f90"
+end module module_initial_conditions

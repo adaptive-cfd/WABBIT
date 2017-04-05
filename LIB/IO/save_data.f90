@@ -40,13 +40,12 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     integer(kind=ik), intent(in)                    :: lgt_block(:, :)
     ! heavy data array - block data
     real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
-
     ! list of active blocks (light data)
-    integer(kind=ik), intent(in)                    :: lgt_active(:)
+    integer(kind=ik), intent(inout)                 :: lgt_active(:)
     ! number of active blocks (light data)
-    integer(kind=ik), intent(in)                    :: lgt_n
+    integer(kind=ik), intent(inout)                 :: lgt_n
     ! number of active blocks (heavy data)
-    integer(kind=ik)                                :: hvy_n
+    integer(kind=ik), intent(inout)                 :: hvy_n
 
     ! loop variable
     integer(kind=ik)                                :: k
@@ -67,6 +66,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! start time
     sub_t0 = MPI_Wtime()
 
+    ! FIXME DF
     ! real datafields start at datafield 2
     do k = 2, params%number_data_fields+1
 

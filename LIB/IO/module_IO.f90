@@ -27,6 +27,8 @@ module module_IO
     use module_hdf5_wrapper
     ! own MPI module
     use module_mpi
+    ! use mesh module, since we want to compute origin/spacing of blocks
+    use module_mesh
 
 !---------------------------------------------------------------------------------------------
 ! variables

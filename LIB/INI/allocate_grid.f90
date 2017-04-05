@@ -5,7 +5,7 @@
 ! version: 0.5
 ! author: msr
 !
-! This routine initializes the block data, i.e. it evaluates the initial condition on the grid
+! Allocate grid data (light, heavy, neighbors, active lists etc), initialize
 !
 ! input:    - parameter array
 !           - light data array

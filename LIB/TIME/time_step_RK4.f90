@@ -54,11 +54,12 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
     ! loop variables
-    integer(kind=ik)                    :: k, dF, N_dF
+    integer(kind=ik)                    :: k, dF, N_dF, lgt_id, d
 
     ! time step, dx
     real(kind=rk)                       :: dt, dx, my_dx
-
+    ! spacing and origin of a block
+    real(kind=rk)                       :: xx0(1:3), ddx(1:3)
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
@@ -89,6 +90,8 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     ! set MPI parameter
     rank         = params%rank
+    d = 2
+    if ( params%threeD_case) d = 3
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -99,19 +102,34 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
     ! loop over all active blocks (heavy data)
+    ! FIXME: you could also look over light data, as ddx is available only from that. no mpi
     do k = 1, hvy_n
-        my_dx = min(my_dx, hvy_block(1, 2, 1, 1, hvy_active(k) ) - hvy_block(1, 1, 1, 1, hvy_active(k) ) )
+        ! light id of this block
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+        ! compute blocks' spacing from treecode
+        call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+        ! find smallest dx of active blocks
+        my_dx = min(my_dx, minval(ddx(1:d)) )
+
+        ! HACK repair first datafield, as we're about to remove it
+        hvy_block(:,:,:,1,hvy_active(k)) = 0.0_rk
+        hvy_block(1,2,:,1,hvy_active(k)) = ddx(1)
+        hvy_block(2,2,:,1,hvy_active(k)) = ddx(2)
+        hvy_block(3,2,:,1,hvy_active(k)) = ddx(3)
+
     end do
 
-    ! synchronize dx
+    ! find globally smallest dx
     call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
+
+
 
     ! calculate dt, depends on physics
     select case(params%physics_type)
         case('2D_convection_diffusion')
             ! calculate time step, loop over all data fields
             do dF = 2, N_dF+1
-                dt = min(dt, params%CFL * dx / norm2( params%physics%u0( (dF-2)*2 + 1 : (dF-2)*2 + 2 ) ) )
+                dt = minval((/dt,params%CFL*dx/ norm2(params%physics%u0((dF-2)*2+1:(dF-2)*2+2)), 0.5_rk*dx**2/params%physics%nu(dF-1) /))
             end do
 
         case('2D_navier_stokes')
@@ -140,9 +158,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     sub_t1   = MPI_Wtime()
     time_sum = time_sum + (sub_t1 - sub_t0)
 
-    !------------------------------
+    !***************************************************************************
     ! first stage
-    !------------------------------
+    !***************************************************************************
     ! synchronize ghostnodes
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -231,9 +249,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     end select
 
-    !------------------------------
+    !***************************************************************************
     ! second stage
-    !------------------------------
+    !***************************************************************************
     ! loop over all datafields
     select case(params%physics_type)
         case('2D_convection_diffusion')
@@ -350,9 +368,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     end select
 
-    !------------------------------
+    !***************************************************************************
     ! third stage
-    !------------------------------
+    !***************************************************************************
     ! loop over all datafields
     select case(params%physics_type)
         case('2D_convection_diffusion')
@@ -469,9 +487,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     end select
 
-    !------------------------------
+    !***************************************************************************
     ! fourth stage
-    !------------------------------
+    !***************************************************************************
     ! loop over all datafields
     select case(params%physics_type)
         case('2D_convection_diffusion')
@@ -588,9 +606,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     end select
 
-    !------------------------------
+    !***************************************************************************
     ! final stage
-    !------------------------------
+    !***************************************************************************
     select case(params%physics_type)
         case('2D_convection_diffusion')
             ! loop over all datafields

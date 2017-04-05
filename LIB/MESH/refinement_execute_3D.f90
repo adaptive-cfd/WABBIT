@@ -1,13 +1,17 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: refine_mesh_3D.f90
+! name: refinement_execute_3D.f90
 ! version: 0.5
-! author: msr
+! author: msr, engels
 !
-! refine the mesh:
-! every proc work on his own heavy data and change the corresponding light data
-! after this: synchronize light data array
+! Refine mesh (3D version). All cpu loop over their heavy data and check if the refinement
+! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
+! level and create four new blocks, each carrying a part of the interpolated data.
+! As all CPU first work individually, the light data array is synced.
+!
+! NOTE: The interpolation (or prediction) operator here is applied to a block EXCLUDING
+! any ghost nodes.
 !
 ! input:    - params, light and heavy data
 ! output:   - light and heavy data arrays
@@ -18,7 +22,7 @@
 !
 ! ********************************************************************************************
 
-subroutine refine_mesh_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -489,4 +493,4 @@ subroutine refine_mesh_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
     deallocate( new_coord_y, stat=allocate_error )
     deallocate( new_coord_z, stat=allocate_error )
 
-end subroutine refine_mesh_3D
+end subroutine refinement_execute_3D

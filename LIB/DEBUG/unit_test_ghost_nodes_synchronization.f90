@@ -3,7 +3,7 @@
 ! ============================================================================================
 ! name: unit_test_ghost_nodes_synchronization.f90
 ! version: 0.5
-! author: msr
+! author: msr, engels
 !
 ! unit test for ghost nodes synchronization
 ! note: input only params struct to this subroutine
@@ -15,6 +15,8 @@
 ! = log ======================================================================================
 !
 ! 21/01/17 - create
+! 03/04/17 - major rewrite: no local memory allocation, convergence test is performed
+! 05/04/17 - use the renewed refine_mesh with random indicator
 !
 ! ********************************************************************************************
 
@@ -72,8 +74,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! MPI error variable
     integer(kind=ik)                        :: ierr, allocate_error
 
-    ! chance for block refinement, random number
-    real(kind=rk)                           :: ref_chance, r
+
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -135,50 +136,24 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     lgt_active = -1; lgt_N = 0
     hvy_active = -1; hvy_N = 0
 
-    ! init data array with zeros => after this: blocks have correct coordinate vectors
-    call inicond_zeros( params, lgt_block, hvy_block )
-
-    ! update lists of active blocks (light and heavy data)
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+    ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
+    ! Note that active lists + neighbor relations are updated inside this routine as well, as
+    ! the grid is modified
+    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, 2 )
 
 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random)
+    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
+    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
+    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
+    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
 
-    ! refinement chance
-    ref_chance = 0.25_rk
 
-    ! set random seed
-    call init_random_seed()
-
-    ! set refinement status
-    do k = 1, lgt_n
-        ! random number
-        call random_number(r)
-        ! set refinement status
-        if ( r <= ref_chance ) then
-            lgt_block( lgt_active(k), params%max_treelevel+2 ) = 1
-        end if
-    end do
-    ! refine blocks
-    ! check if block has reached maximal level
-    call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-
-    ! interpolate the new mesh
-    if ( params%threeD_case ) then
-        ! 3D:
-        call refine_mesh_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
-    else
-        ! 2D:
-        call refine_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
-    end if
-
-    ! update lists of active blocks (light and heavy data)
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
-    ! at this point now, the grid used for testing is ready.
+    if (params%rank == 0) then
+      write(*,'("UNIT TEST: done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
+      write(*,'("UNIT TEST: Ready for testing.")')
+    endif
 
     !---------------------------------------------------------------------------
     ! Step 2: Actual testing of ghost node routines
@@ -229,10 +204,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        ! update neighbors
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-
-        ! synchronize ghost nodes
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         !-----------------------------------------------------------------------

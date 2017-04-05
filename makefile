@@ -11,7 +11,8 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 \
-	module_interpolation.f90 module_init.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90
+	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
+	module_initial_conditions.f90
 # physics modules
 MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
@@ -20,7 +21,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
-VPATH += :LIB/PARAMS
+VPATH += :LIB/PARAMS:LIB/INI/INICONDS
 
 # Set the default compiler if it's not already set
 FC = mpif90
@@ -37,7 +38,7 @@ PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
 #FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
 #FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
 # HDF_ROOT is set in environment.
 HDF_LIB = $(HDF_ROOT)/lib64
@@ -97,13 +98,18 @@ $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/modul
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90 $(OBJDIR)/module_params.o \
+	inicond_gauss_blob.f90 initial_condition_on_block_wrapper.f90 inicond_sinus_2D.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_init.o: module_init.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	set_blocks_initial_condition.f90 inicond_gauss_blob.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
-	inicond_vorticity_filaments.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 \
-	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90 inicond_sinus_2D.f90 inicond_sinus_3D.f90 allocate_grid.f90 reset_grid.f90
+$(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mesh.o \
+	set_blocks_initial_condition.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
+	inicond_vorticity_filaments.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
+	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90 allocate_grid.f90 reset_grid.f90 \
+	$(OBJDIR)/module_initial_conditions.o set_inicond_all_blocks.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
@@ -112,25 +118,25 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	isend_irecv_data.f90 copy_ghost_nodes_3D.f90 create_send_buffer_3D.f90 write_receive_buffer_3D.f90 blocks_per_mpirank.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o\
+$(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o \
 	time_step_RK4.f90 filter_block.f90 filter_1D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
-	$(OBJDIR)/module_time_step.o\
+	$(OBJDIR)/module_MPI.o\
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
-	find_neighbor_corner_2D.f90 refine_everywhere.f90 respect_min_max_treelevel.f90 refine_mesh_2D.f90 adapt_mesh.f90 threshold_block.f90 \
+	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness_2D.f90 coarse_mesh_2D.f90 balance_load_2D.f90 set_desired_num_blocks_per_rank.f90 \
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90 update_neighbors_3D.f90 \
-	find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 refine_mesh_3D.f90 ensure_completeness_3D.f90 \
+	find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 refinement_execute_3D.f90 ensure_completeness_3D.f90 \
 	coarse_mesh_3D.f90 balance_load_3D.f90 treecode_to_3D_z_curve.f90 get_block_spacing_origin.f90 decoding.f90 update_neighbors.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_init.o $(OBJDIR)/module_mesh.o \
-	unit_test_ghost_nodes_synchronization.f90
+$(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o \
+	unit_test_ghost_nodes_synchronization.f90 unit_test_wavelet_compression.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o\
+$(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o\
 	save_data.f90 write_field.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

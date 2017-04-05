@@ -24,6 +24,8 @@ module module_time_step
     use module_debug
     ! MPI module
     use module_MPI
+    ! use mesh module, since we need to compute dx and origin of blocks
+    use module_mesh, only : get_block_spacing_origin
 
 !---------------------------------------------------------------------------------------------
 ! variables

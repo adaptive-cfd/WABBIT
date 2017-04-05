@@ -173,7 +173,7 @@ program main
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
 
@@ -188,7 +188,7 @@ program main
 
 
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
 
     !---------------------------------------------------------------------------

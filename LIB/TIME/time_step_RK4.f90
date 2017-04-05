@@ -129,7 +129,7 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
         case('2D_convection_diffusion')
             ! calculate time step, loop over all data fields
             do dF = 2, N_dF+1
-                dt = minval((/dt,params%CFL*dx/ norm2(params%physics%u0((dF-2)*2+1:(dF-2)*2+2)), 0.5_rk*dx**2/params%physics%nu(dF-1) /))
+                dt = minval((/dt, params%CFL*dx/ norm2(params%physics%u0((dF-2)*2+1:(dF-2)*2+2)) /))
             end do
 
         case('2D_navier_stokes')

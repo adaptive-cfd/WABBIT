@@ -188,8 +188,8 @@ subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, d
 
             else
                 ! error case
-                print*, my_treecode
-                print*, neighbor
+                print*, "for this block:", my_treecode
+                print*, "I cannot find:", neighbor
                 print*, 'ERROR: can not find edge neighbor'
                 stop
             end if
@@ -210,8 +210,8 @@ subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, d
 
             else
                 ! error case
-                print*, my_treecode
-                print*, neighbor
+                print*, "for this block:", my_treecode
+                print*, "I cannot find:", neighbor
                 print*, 'ERROR: can not find edge neighbor'
                 stop
             end if

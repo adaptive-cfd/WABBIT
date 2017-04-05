@@ -23,7 +23,7 @@
 ! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active)
+subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -42,8 +42,12 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     integer(kind=ik),  intent(inout)      :: hvy_neighbor(:,:)
     ! list of active blocks (light data)
     integer(kind=ik),  intent(inout)      :: lgt_active(:)
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n
     ! list of active blocks (light data)
     integer(kind=ik),  intent(inout)      :: hvy_active(:)
+    ! number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -72,7 +76,9 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     hvy_block = 9.99e99_rk
     hvy_work = 9.99e99_rk
     hvy_neighbor = -1
-    lgt_active = -1
-    hvy_active = -1
+    ! as the grid has changed (we deleted it here), we now update the heavy and light
+    ! active lists
+    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
 
 end subroutine reset_grid

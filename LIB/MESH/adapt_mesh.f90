@@ -57,8 +57,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     ! coarsening indicator
     character(len=*), intent(in)        :: indicator
     ! loop variables
-    integer(kind=ik)                    :: k, lgt_id, j, ierr, Jmax
-    real(kind=rk) :: xx0(1:3), ddx(1:3), r
+    integer(kind=ik)                    :: k, lgt_id, j, ierr, Jmax, lgt_n_old
+    ! random variable for coarsening
+    real(kind=rk)                       :: r
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -66,28 +67,16 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 !---------------------------------------------------------------------------------------------
 ! variables initialization
   Jmax = params%max_treelevel
+  lgt_n_old = 0
 !---------------------------------------------------------------------------------------------
 ! main body
 
-do k = 1, hvy_n
-    ! light id of this block
-    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-    ! compute blocks' spacing from treecode
-    call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+    ! we iterate until the number of blocks is constant (note: as only coarseing
+    ! is done here, no new blocks arise that could compromise the number of blocks -
+    ! if it's constant, its because no more blocks are refined)
+    do while ( lgt_n_old /= lgt_n )
 
-    ! HACK repair first datafield, as we're about to remove it
-    hvy_block(:,:,:,1,hvy_active(k)) = 0.0_rk
-    hvy_block(1,1,:,1,hvy_active(k)) = xx0(1)
-    hvy_block(2,1,:,1,hvy_active(k)) = xx0(2)
-    hvy_block(3,1,:,1,hvy_active(k)) = xx0(3)
-
-    hvy_block(1,2,:,1,hvy_active(k)) = xx0(1)+ddx(1)
-    hvy_block(2,2,:,1,hvy_active(k)) = xx0(2)+ddx(2)
-    hvy_block(3,2,:,1,hvy_active(k)) = xx0(3)+ddx(3)
-end do
-
-    ! maximal number of loops to coarsen the mesh == one block go down from max_treelevel to min_treelevel
-    do k = 1, (params%max_treelevel - params%min_treelevel)
+        lgt_n_old = lgt_n
 
         ! check where to coarsen (refinement done with safety zone)
         if ( indicator == "threshold") then

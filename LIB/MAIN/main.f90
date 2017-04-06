@@ -238,7 +238,9 @@ program main
         ! output on screen
         if (rank==0) then
             write(*,'(80("-"))')
-            write(*, '("RUN: iteration=",i5,3x," time=",f16.6,3x," active blocks=",i7)') iteration, time, lgt_n
+            write(*, '("RUN: iteration=",i5,3x," time=",f16.6,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
+             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             max_active_level( lgt_block, lgt_active, lgt_n )
 
         end if
 

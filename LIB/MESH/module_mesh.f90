@@ -119,4 +119,8 @@ contains
     ! find sisters to a given block
     include "find_sisters.f90"
 
+    ! find globally coarsest / finest levels
+    include "max_active_level.f90"
+    include "min_active_level.f90"
+
 end module module_mesh

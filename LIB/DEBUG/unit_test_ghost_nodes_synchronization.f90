@@ -122,14 +122,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! this one grid.
     !---------------------------------------------------------------------------
     ! allocate coord arrays
-    allocate(coord_x( Bs + 2*g ),  stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-    allocate(coord_y( Bs + 2*g ),  stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
-
-    allocate(coord_z( Bs + 2*g ),  stat=allocate_error )
-    if ( allocate_error /= 0 ) call error_msg("ERROR: memory allocation fails")
+    allocate( coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ) )
 
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
     lgt_block = -1
@@ -143,14 +136,14 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
 
     !---------------------------------------------------------------------------------------------
-    ! second: refine some blocks (random)
-    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
-    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
-    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
-    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
-
+    ! second: refine some blocks (random), coarsen some blocks (random)
+    do l = 1, 5
+      call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
+      call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
+    end do
 
     if (params%rank == 0) then
+      write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
       write(*,'("UNIT TEST: done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
       write(*,'("UNIT TEST: Ready for testing.")')
     endif

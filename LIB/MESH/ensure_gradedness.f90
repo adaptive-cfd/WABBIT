@@ -1,3 +1,6 @@
+
+
+
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
@@ -169,6 +172,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                               elseif ( neighbor_status == -1) then
                                   ! neighbor wants to coarsen, which is what I want too,
                                   ! so we both would just go up one level together - that's fine
+                                  ! FIXME: I have no idea why the following line is required.
+                                  my_refine_change( lgt_active(k) ) = max( 0, my_refine_change( lgt_active(k) ) )
                               end if
                         else
                           call error_msg("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")

@@ -102,7 +102,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
           ! random refinement can set at most this many blocks to refine (avoid errors
           ! sue to insufficient memory) (since we already have lgt_n blocks we can set the status
           ! at most for Nmax-lgt_n blocks, whcih genrate ech 2**d new blocks)
-          max_blocks = 4!(size(lgt_block,1)-lgt_n-10) / 2**d
+          max_blocks = (size(lgt_block,1)-lgt_n-10) / 2**d
           ! set random seed
           call init_random_seed()
           ! unset all refinement flags

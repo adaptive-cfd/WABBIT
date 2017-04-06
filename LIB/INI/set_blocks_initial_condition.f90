@@ -93,7 +93,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
 
         ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
         ! adapt-mesh also performs neighbor and active lists updates
-        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
 
         if (params%rank == 0) then
           write(*,'("did one mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))

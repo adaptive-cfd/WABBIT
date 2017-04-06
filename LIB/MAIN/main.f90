@@ -232,7 +232,7 @@ program main
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-          call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n  )
+          call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
         endif
 
         ! output on screen

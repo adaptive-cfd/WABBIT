@@ -92,7 +92,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call check_allocation(allocate_error)
     allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ), stat=allocate_error )
     call check_allocation(allocate_error)
-    ! coarsen field are half block size + 1/2
+    ! coarsened field is half block size + 1/2
     allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g), stat=allocate_error )
     call check_allocation(allocate_error)
 

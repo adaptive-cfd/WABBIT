@@ -203,7 +203,6 @@ program main
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
-    ! stop
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------

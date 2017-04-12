@@ -34,6 +34,9 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   case ("gauss-blob","gauss_blob")
     call inicond_gauss_blob( params, u, x0, dx )
 
+  case ("3D_sphere")
+        call inicond_sphere( params, u, x0, dx )
+
   case default
     call error_msg("the initial condition is unkown: "//trim(adjustl(inicond)))
 

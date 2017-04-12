@@ -99,7 +99,7 @@ $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_para
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90 $(OBJDIR)/module_params.o \
-	inicond_gauss_blob.f90 initial_condition_on_block_wrapper.f90 inicond_sinus_2D.f90
+	inicond_gauss_blob.f90 initial_condition_on_block_wrapper.f90 inicond_sinus_2D.f90 inicond_sphere.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o

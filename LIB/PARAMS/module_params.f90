@@ -78,7 +78,7 @@ module module_params
         logical                                     :: debug
 
         ! use non-uniform mesh correction
-        logical                                     :: non_uniform_mesh
+        logical                                     :: non_uniform_mesh_correction
 
         ! -------------------------------------------------------------------------------------
         ! physics

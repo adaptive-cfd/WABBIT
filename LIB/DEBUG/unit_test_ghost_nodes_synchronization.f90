@@ -30,19 +30,19 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
     implicit none
     ! user defined parameter structure
-    type (type_params), intent(inout)     :: params
+    type (type_params), intent(inout)       :: params
     ! light data array
-    integer(kind=ik),  intent(inout)      :: lgt_block(:, :)
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk),  intent(inout)         :: hvy_block(:, :, :, :, :)
+    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
     ! heavy work array  )
-    real(kind=rk),  intent(inout)         :: hvy_work (:, :, :, :, :)
+    real(kind=rk),  intent(inout)           :: hvy_work (:, :, :, :, :)
     ! neighbor array (heavy data)
-    integer(kind=ik),  intent(inout)      :: hvy_neighbor(:,:)
+    integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
     ! list of active blocks (light data)
-    integer(kind=ik),  intent(inout)      :: lgt_active(:)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:)
     ! list of active blocks (light data)
-    integer(kind=ik),  intent(inout)      :: hvy_active(:)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:)
 
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
@@ -72,7 +72,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! error variable
     real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
     ! MPI error variable
-    integer(kind=ik)                        :: ierr, allocate_error
+    integer(kind=ik)                        :: ierr
 
 
 
@@ -143,9 +143,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     end do
 
     if (params%rank == 0) then
-      write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
-      write(*,'("UNIT TEST: done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
-      write(*,'("UNIT TEST: Ready for testing.")')
+        write(*,'(80("-"))')
+        write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
+        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
+        write(*,'(" ready for testing.")')
     endif
 
     !---------------------------------------------------------------------------
@@ -220,16 +221,17 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
         ! output
         if (rank==0) then
-            write(*,'("UNIT TEST DONE: ghost nodes synchronization error = ",es16.8," frequ=",g12.4)')  error(ifrequ), frequ(ifrequ)
+            write(*,'(" done - ghost nodes synchronization error = ",es16.8," frequ=",g12.4)')  error(ifrequ), frequ(ifrequ)
         end if
       end do
 
     if (rank==0) then
-      write(*,'("UNIT TEST DONE: convergence order was ",6(g12.4,1x))')  sqrt(error(2:6) / error(1:5))
-      write(*,'("UNIT TEST DONE: mean convergence order was ",g12.4)')  sum(sqrt(error(2:6) / error(1:5))) / 5.0_rk
+      write(*,'(" done - convergence order was ",6(g12.4,1x))')  sqrt(error(2:6) / error(1:5))
+      write(*,'(" done - mean convergence order was ",g12.4)')  sum(sqrt(error(2:6) / error(1:5))) / 5.0_rk
     endif
 
     !---------------------------------------------------------------------------------------------
     ! last: clean up
     deallocate(coord_x, coord_y, coord_z)
+
 end subroutine unit_test_ghost_nodes_synchronization

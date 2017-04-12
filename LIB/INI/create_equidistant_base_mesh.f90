@@ -80,12 +80,12 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
 
   if (params%rank == 0) then
     write(*,'(80("_"))')
-    write(*,'(A)') "Initializing an equidistant grid..."
-    write(*,'("Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
-    write(*,'("On this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz
+    write(*,'(A)') "INIT: initializing an equidistant grid..."
+    write(*,'(" Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
+    write(*,'(" on this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz
     ! check if there is already some data on the grid (see routine header description)
     if ( maxval(lgt_block(:,1))>=0 ) then
-      write(*,'(A)') "CREATE-EQUIDISTANT MESH is called with NON_EMPTY DATA!!!!!"
+      write(*,'(A)') "ERROR: CREATE-EQUIDISTANT MESH is called with NON_EMPTY DATA!!!!!"
     endif
   endif
 
@@ -99,7 +99,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   ! arise.
   ! this list contains (on each mpirank) the number of blocks for each mpirank. note
   ! zero indexing as required by MPI
-  allocate( blocks_per_rank_list( 0:number_procs-1 ), stat=allocate_error )
+  allocate( blocks_per_rank_list( 0:number_procs-1 ) )
   ! set list to the average value
   blocks_per_rank_list = (num_blocks - mod(num_blocks,number_procs)) / number_procs
   ! as this does not necessairly work out, distribute remaining blocks on the first CPUs
@@ -108,7 +108,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   end if
   ! some error control -> did we loose blocks? should never happen.
   if ( sum(blocks_per_rank_list) /= num_blocks) then
-    call error_msg("on the coarsest grid, we seem to have gained/lost some blocks during distribution...")
+    call error_msg("ERROR: on the coarsest grid, we seem to have gained/lost some blocks during distribution...")
   end if
 
 

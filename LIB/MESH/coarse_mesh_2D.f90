@@ -78,7 +78,7 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     logical                             :: exists
 
     ! rank of proc to keep the coarsen data
-    integer(kind=ik)                    :: data_rank, j
+    integer(kind=ik)                    :: data_rank
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1

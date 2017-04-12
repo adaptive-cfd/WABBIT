@@ -41,7 +41,7 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_d
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)                    :: rhs
     ! auxiliary variables
     real(kind=rk)                                               :: phi_dx, phi_dy, phi_dxdx, phi_dydy, dx_inv, dy_inv, dx2_inv, dy2_inv
-    real(kind=rk)                                               :: a(-3:+3), b1, b2, b3 ,b4 ,b5, x, y
+    real(kind=rk)                                               :: a(-3:+3), b1, b2, b3 ,b4 ,b5
     ! loop variables
     integer                                                     :: ix, iy
 

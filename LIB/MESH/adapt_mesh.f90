@@ -57,7 +57,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     ! coarsening indicator
     character(len=*), intent(in)        :: indicator
     ! loop variables
-    integer(kind=ik)                    :: k, lgt_id, j, ierr, Jmax, lgt_n_old
+    integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old
     ! random variable for coarsening
     real(kind=rk)                       :: r
 
@@ -104,7 +104,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
           call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
 
         else
-            call error_msg("unknown coarsening operator")
+            call error_msg("ERROR: unknown coarsening operator")
 
         endif
 

@@ -152,6 +152,7 @@ subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_rece
 
             ! receive data
             call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            !call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
 
             ! send buffer column number, read position matrix
             send_pos = com_matrix_pos(rank+1, k)
@@ -161,6 +162,7 @@ subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_rece
 
             ! send data
             call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            !call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
 
         end if
 

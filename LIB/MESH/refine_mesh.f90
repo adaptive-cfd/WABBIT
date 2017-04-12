@@ -125,7 +125,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
           call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
 
       case default
-          call error_msg("refine_mesh: the refinement indicator is unkown")
+          call error_msg("ERROR: refine_mesh: the refinement indicator is unkown")
 
     end select
 
@@ -176,15 +176,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
-
-
-
     ! end time
     sub_t1 = MPI_Wtime()
-
-
-
-
 
     ! write time
     if ( params%debug ) then

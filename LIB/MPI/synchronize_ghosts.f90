@@ -21,6 +21,7 @@
 ! 08/11/16 - switch to v0.4
 ! 06/01/17 - use RMA to synchronize data
 ! 31/01/17 - switch to 3D, v0.5
+! 12/04/17 - redundant ghost nodes workaround
 !
 ! ********************************************************************************************
 
@@ -95,8 +96,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! com matrix pos: position in send buffer
     integer(kind=ik), allocatable       :: com_matrix(:,:), com_matrix_pos(:,:), my_com_matrix(:,:)
 
-    ! variable for non-uniform mesh correction
-    integer(kind=ik)                                :: one
+    ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
+    integer(kind=ik)                                :: rmv_redundant
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -110,13 +111,13 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    one = 0
+    rmv_redundant = 0
 
     ! set non-uniform mesh correction
-    if ( params%non_uniform_mesh ) then
-        one = 1
+    if ( params%non_uniform_mesh_correction ) then
+        rmv_redundant = 1
     else
-        one = 0
+        rmv_redundant = 0
     end if
 
     ! set MPI parameter
@@ -162,28 +163,25 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     com_matrix_pos  =  0
     my_com_matrix   =  0
 
-    ! reset ghost nodes for all active blocks
-    ! loop over all datafields
-!    do dF = 2, params%number_data_fields+1
-!        ! loop over all active blocks
-!        do k = 1, hvy_n
-!            ! reset ghost nodes
-!            if ( params%threeD_case ) then
-!                ! 3D:
-!                hvy_block(1:g, :, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
-!                hvy_block(Bs+g+1:Bs+2*g, :, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
-!                hvy_block(:, 1:g, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
-!                hvy_block(:, Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
-!                hvy_block(:, :, 1:g, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
-!                hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
-!            else
-!                ! 2D:
-!                hvy_block(1:g, :, 1, dF, hvy_active(k) )           = 9.0e9_rk
-!                hvy_block(Bs+g+1:Bs+2*g, :, 1, dF, hvy_active(k) ) = 9.0e9_rk
-!                hvy_block(:, 1:g, 1, dF, hvy_active(k) )           = 9.0e9_rk
-!                hvy_block(:, Bs+g+1:Bs+2*g, 1, dF, hvy_active(k) ) = 9.0e9_rk
-!            end if
-!        end do
+!    ! reset ghost nodes for all active blocks
+!    ! loop over all active blocks
+!    do k = 1, hvy_n
+!        ! reset ghost nodes
+!        if ( params%threeD_case ) then
+!            ! 3D:
+!!            hvy_block(1:g, :, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
+!!            hvy_block(Bs+g+1:Bs+2*g, :, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
+!!            hvy_block(:, 1:g, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
+!!            hvy_block(:, Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
+!!            hvy_block(:, :, 1:g, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
+!!            hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
+!        else
+!            ! 2D:
+!            hvy_block(1:g, :, 1, 2, hvy_active(k) )           = 9.0e9_rk
+!            hvy_block(Bs+g+1:Bs+2*g, :, 1, 2, hvy_active(k) ) = 9.0e9_rk
+!            hvy_block(:, 1:g, 1, 2, hvy_active(k) )           = 9.0e9_rk
+!            hvy_block(:, Bs+g+1:Bs+2*g, 1, 2, hvy_active(k) ) = 9.0e9_rk
+!        end if
 !    end do
 
 !---------------------------------------------------------------------------------------------
@@ -286,14 +284,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         if ( params%threeD_case ) then
             ! 3D:
-            allocate( real_receive_buffer( n_com * (Bs+(g+one)) * (g+one) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_receive_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: memory allocation fails"
                 stop
             end if
-            allocate( real_send_buffer( n_com * (Bs+(g+one)) * (g+one) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_send_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
@@ -302,14 +300,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             end if
         else
             ! 2D:
-            allocate( real_receive_buffer( n_com * (Bs+(g+one)) * (g+one) * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_receive_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: memory allocation fails"
                 stop
             end if
-            allocate( real_send_buffer( n_com * (Bs+(g+one)) * (g+one) * params%number_data_fields, n_procs ), stat=allocate_error )
+            allocate( real_send_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * params%number_data_fields, n_procs ), stat=allocate_error )
             !call check_allocation(allocate_error)
             if ( allocate_error /= 0 ) then
                 write(*,'(80("_"))')
@@ -318,7 +316,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             end if
         end if
 
-        ! reset buffer for debuggung
+!        ! reset buffer for debuggung
 !        if ( params%debug ) then
 !            real_send_buffer        = 7.0e9_rk
 !            real_receive_buffer     = 5.0e9_rk
@@ -433,6 +431,9 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         end do
 
     end if
+
+    ! workaround: second internal synchronization to overwrite external redundant nodes
+    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists )
 
     ! clean up
     deallocate( com_lists, stat=allocate_error )

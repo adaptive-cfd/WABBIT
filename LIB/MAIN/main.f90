@@ -177,25 +177,21 @@ program main
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
 
-
     !---------------------------------------------------------------------------
     ! Unit tests
     !---------------------------------------------------------------------------
     ! perform a convergence test on ghost node sync'ing
     call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
     ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-    ! stop
-
 
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-
 
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, .true.  )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, .true.  )
 
     ! create lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
@@ -215,11 +211,11 @@ program main
 
         iteration = iteration + 1
 
-        ! if (iteration== 2)         params%adapt_mesh = .false.
+        !if (iteration== 1) params%adapt_mesh = .false.
 
         ! refine everywhere
         if ( params%adapt_mesh ) then
-          call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "everywhere" )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "everywhere" )
         endif
 
         ! advance in time
@@ -232,7 +228,7 @@ program main
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-          call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
+            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
         endif
 
         ! output on screen
@@ -246,8 +242,8 @@ program main
 
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
-          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-          output_time = time
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+            output_time = time
         endif
 
         ! debug info

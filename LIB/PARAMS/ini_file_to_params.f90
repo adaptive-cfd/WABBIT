@@ -102,11 +102,11 @@ subroutine ini_file_to_params( params, filename )
     call read_param(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
 
     ! use non-uniform mesh correction
-    call read_param(FILE, 'Blocks', 'non_uniform_mesh', read_logical, 1 )
+    call read_param(FILE, 'Blocks', 'non_uniform_mesh_correction', read_logical, 1 )
     if ( read_logical == 1 ) then
-        params%non_uniform_mesh = .true.
+        params%non_uniform_mesh_correction = .true.
     else
-        params%non_uniform_mesh = .false.
+        params%non_uniform_mesh_correction = .false.
     end if
 
     !***************************************************************************

@@ -24,14 +24,16 @@ subroutine inicond_sinus_2D( params, u, x0, dx )
     implicit none
 
     ! user defined parameter structure
-    type (type_params), intent(inout)    :: params
+    type (type_params), intent(inout)       :: params
+
     ! actual block data (note this routine acts only on one block)
-    real(kind=rk), intent(inout) :: u(:,:,:,:)
+    real(kind=rk), intent(inout)            :: u(:,:,:,:)
+
     ! spacing and origin of block
-    real(kind=rk), intent(in) :: x0(1:3),dx(1:3)
+    real(kind=rk), intent(in)               :: x0(1:3),dx(1:3)
 
     ! auxiliary variable for gauss pulse
-    real(kind=rk)                           :: mux, muy, x ,y, sigma
+    real(kind=rk)                           :: x ,y
     ! loop variables
     integer(kind=ik)                        :: ix, iy
     ! grid

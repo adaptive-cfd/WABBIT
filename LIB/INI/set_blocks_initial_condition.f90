@@ -23,7 +23,7 @@
 ! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, adapt)
+subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, adapt)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -36,8 +36,6 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
   integer(kind=ik), intent(inout)      :: lgt_block(:, :)
   ! heavy data array - block data
   real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
-  ! heavy work array  )
-  real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
   ! neighbor array (heavy data)
   integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
   ! list of active blocks light data)
@@ -49,7 +47,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
   ! if .false. the code initializes on the coarsest grid, if .true. iterations
   ! are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
-  integer(kind=ik)                                :: lgt_id, lgt_n_old
+  integer(kind=ik)                     :: lgt_n_old
 
   !---------------------------------------------------------------------------------------------
   ! interfaces
@@ -96,7 +94,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_work, 
         call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
 
         if (params%rank == 0) then
-          write(*,'("did one mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
+          write(*,'(" did one mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
         endif
       enddo
     endif

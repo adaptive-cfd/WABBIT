@@ -38,26 +38,19 @@ use module_IO
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
     ! number of active blocks (light data)
-    integer(kind=ik)                        :: lgt_n, lgt_n_old
+    integer(kind=ik)                        :: lgt_n
     ! loop variables
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
 
     ! process rank
-    integer(kind=ik)                        :: rank, number_procs, ierr
+    integer(kind=ik)                        :: rank, ierr
 
-    ! coordinates vectors
-    real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
     ! spacing
-    real(kind=rk)                           :: ddx(1:3), xx0(1:3), eeps(1:6)
+    real(kind=rk)                           :: eeps(1:6)
 
-    ! grid parameter
-    integer(kind=ik)                        :: Bs, g, Ds, number_blocks
     real(kind=rk)                           :: Lx, Ly, Lz
     ! data dimensionality
-    integer(kind=ik)                        :: d, dF
-    ! frequency of sin functions for testing:
-    real(kind=rk)                           :: frequ(1:6)
-    integer(kind=ik)                        :: ifrequ
+    integer(kind=ik)                        :: d
 
     ! error variable
     real(kind=rk)                           :: error_l2, my_error_l2, norm_l2, my_norm_l2

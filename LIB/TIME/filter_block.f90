@@ -118,6 +118,9 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
         case('explicit_11pt')
             filter_pos = 6
+            
+        case('no-filter')
+            ! do nothing..
 
         case default
             write(*,'(80("_"))')

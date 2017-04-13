@@ -41,6 +41,7 @@
 ! = log ======================================================================================
 !
 ! 01/02/17 - create
+! 13/04/17 - remove redundant nodes between blocks with meshlevel +1
 !
 ! ********************************************************************************************
 
@@ -82,6 +83,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
     ! loop variable
     integer(kind=ik)                                :: k, i, j, dF
 
+    ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
+    integer(kind=ik)                                :: rmv_redundant
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -91,6 +95,15 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
     ! grid parameter
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
+
+    rmv_redundant = 0
+
+    ! set non-uniform mesh correction
+    if ( params%non_uniform_mesh_correction ) then
+        rmv_redundant = 1
+    else
+        rmv_redundant = 0
+    end if
 
     allocate( data_corner( g, g, g), stat=allocate_error )
     if ( allocate_error /= 0 ) then
@@ -351,103 +364,217 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
             ! '123/___'
             case(19)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            !hvy_block( g+1-i, Bs+g+j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
-                            hvy_block( i, Bs+g+j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                !hvy_block( g+1-i, Bs+g+j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, Bs+g+j-rmv_redundant, 1:g+rmv_redundant, dF, my_block )     = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                !hvy_block( g+1-i, Bs+g+j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, Bs+g+j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
                 end do
 
             ! '134/___'
             case(20)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            !hvy_block( g+1-i, g+1-j, 1:g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
-                            hvy_block( i, j, 1:g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                !hvy_block( g+1-i, g+1-j, 1:g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, j, 1:g+rmv_redundant, dF, my_block )      = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                !hvy_block( g+1-i, g+1-j, 1:g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, j, 1:g, dF, my_block )      = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
                 end do
 
             ! '145/___'
             case(21)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            !hvy_block( Bs+g+i, g+1-j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
-                            hvy_block( Bs+g+i, j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                !hvy_block( Bs+g+i, g+1-j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( Bs+g+i-rmv_redundant, j, 1:g+rmv_redundant, dF, my_block )     = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                !hvy_block( Bs+g+i, g+1-j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( Bs+g+i, j, 1:g, dF, my_block )     = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
                 end do
 
             ! '152/___'
             case(22)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            hvy_block( Bs+g+i, Bs+g+j, 1:g, dF, my_block )    = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, Bs+g+j-rmv_redundant, 1:g+rmv_redundant, dF, my_block )    = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                hvy_block( Bs+g+i, Bs+g+j, 1:g, dF, my_block )    = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
                 end do
 
             ! '623/___'
             case(23)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            !hvy_block( g+1-i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
-                            hvy_block( i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                !hvy_block( g+1-i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, Bs+g+j-rmv_redundant, Bs+g+1-rmv_redundant:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                !hvy_block( g+1-i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
+
                 end do
 
             ! '634/___'
             case(24)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            !hvy_block( g+1-i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
-                            hvy_block( i, j, Bs+g+1:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                !hvy_block( g+1-i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, j, Bs+g+1-rmv_redundant:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                !hvy_block( g+1-i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( i, j, Bs+g+1:Bs+g+g, dF, my_block )                = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
+
                 end do
 
             ! '645/___'
             case(25)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            !hvy_block( Bs+g+i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
-                            hvy_block( Bs+g+i, j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                !hvy_block( Bs+g+i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( Bs+g+i-rmv_redundant, j, Bs+g+1-rmv_redundant:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                !hvy_block( Bs+g+i, g+1-j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                                hvy_block( Bs+g+i, j, Bs+g+1:Bs+g+g, dF, my_block )               = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
+
                 end do
 
             ! '652/___'
             case(26)
                 do dF = 2, params%number_data_fields+1
-
-                    do i = 1, g
-                        do j = 1, g
-                            hvy_block( Bs+g+i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )              = recv_buff(buffer_i:buffer_i+g-1)
-                            buffer_i                                                    = buffer_i + g
+                    if ( level_diff == 1 ) then
+                        ! sender one level up -> need non-uniform mesh correction
+                        ! receive data
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, Bs+g+j-rmv_redundant, Bs+g+1-rmv_redundant:Bs+g+g, dF, my_block )              = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
+                                buffer_i                                                    = buffer_i + g+rmv_redundant
+                            end do
                         end do
-                    end do
+
+                    else
+                        ! sender on same or lower level
+                        do i = 1, g
+                            do j = 1, g
+                                hvy_block( Bs+g+i, Bs+g+j, Bs+g+1:Bs+g+g, dF, my_block )              = recv_buff(buffer_i:buffer_i+g-1)
+                                buffer_i                                                    = buffer_i + g
+                            end do
+                        end do
+
+                    end if
+
                 end do
 
             ! '__1/123'
@@ -469,9 +596,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, g+j, g-i+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, g+j, g-i+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -503,9 +630,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, g-i+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, g-i+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -537,9 +664,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, g-i+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, g-i+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -571,9 +698,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, g+j, g-i+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, g+j, g-i+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -605,9 +732,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i-rmv_redundant, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -639,9 +766,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i-rmv_redundant, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -673,9 +800,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i-rmv_redundant, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -707,9 +834,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i-rmv_redundant, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -741,9 +868,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g-i+1, g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g-i+1+rmv_redundant, g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -775,9 +902,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g-i+1, g+1:g+(Bs+1)/2, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g-i+1+rmv_redundant, g+1:g+(Bs+1)/2, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -809,9 +936,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g-i+1, g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g-i+1+rmv_redundant, g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -843,9 +970,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g-i+1, g+(Bs+1)/2:Bs+g, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g-i+1+rmv_redundant, g+(Bs+1)/2:Bs+g, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -877,9 +1004,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1+rmv_redundant, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -911,9 +1038,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1+rmv_redundant, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -945,9 +1072,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, g-i+1, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, g-i+1+rmv_redundant, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -979,9 +1106,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, g-i+1, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, g-i+1+rmv_redundant, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1013,9 +1140,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( Bs+g+i, g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( Bs+g+i-rmv_redundant, g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1047,9 +1174,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( Bs+g+i, g+(Bs+1)/2:Bs+g, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( Bs+g+i-rmv_redundant, g+(Bs+1)/2:Bs+g, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1081,9 +1208,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( Bs+g+i, g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( Bs+g+i-rmv_redundant, g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1115,9 +1242,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( Bs+g+i, g+1:g+(Bs+1)/2, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( Bs+g+i-rmv_redundant, g+1:g+(Bs+1)/2, g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1149,9 +1276,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, g+j, Bs+g+i, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, g+j, Bs+g+i-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1183,9 +1310,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, Bs+g+i, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+(Bs+1)/2:Bs+g, g+(Bs+1)/2+j-1, Bs+g+i-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1217,9 +1344,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, Bs+g+i, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, g+(Bs+1)/2+j-1, Bs+g+i-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1251,9 +1378,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                hvy_block( g+1:g+(Bs+1)/2, g+j, Bs+g+i, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g+1:g+(Bs+1)/2, g+j, Bs+g+i-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1285,9 +1412,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i-rmv_redundant, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1318,9 +1445,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i-rmv_redundant, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1352,9 +1479,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g-i+1, g+1:g+(Bs+1)/2, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g-i+1+rmv_redundant, g+1:g+(Bs+1)/2, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1386,9 +1513,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g-i+1, g+(Bs+1)/2:Bs+g, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g-i+1+rmv_redundant, g+(Bs+1)/2:Bs+g, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1420,9 +1547,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1+rmv_redundant, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1454,9 +1581,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+1:g+(Bs+1)/2, g-i+1, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+1:g+(Bs+1)/2, g-i+1+rmv_redundant, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1488,9 +1615,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, g+(Bs+1)/2:Bs+g, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, g+(Bs+1)/2:Bs+g, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1522,9 +1649,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, g+1:g+(Bs+1)/2, g-j+1, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, g+1:g+(Bs+1)/2, g-j+1+rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1556,9 +1683,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+i-rmv_redundant, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1590,9 +1717,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+1:g+(Bs+1)/2, Bs+g+i-rmv_redundant, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1624,9 +1751,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g-i+1, g+1:g+(Bs+1)/2, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g-i+1+rmv_redundant, g+1:g+(Bs+1)/2, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1658,9 +1785,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g-i+1, g+(Bs+1)/2:Bs+g, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g-i+1+rmv_redundant, g+(Bs+1)/2:Bs+g, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1692,9 +1819,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+(Bs+1)/2:Bs+g, g-i+1+rmv_redundant, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1726,9 +1853,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g+1:g+(Bs+1)/2, g-i+1, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g+1:g+(Bs+1)/2, g-i+1+rmv_redundant, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1760,9 +1887,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, g+(Bs+1)/2:Bs+g, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, g+(Bs+1)/2:Bs+g, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1794,9 +1921,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, g+1:g+(Bs+1)/2, Bs+g+j, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, g+1:g+(Bs+1)/2, Bs+g+j-rmv_redundant, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1828,9 +1955,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g-i+1, Bs+g+j, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g-i+1+rmv_redundant, Bs+g+j-rmv_redundant, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1862,9 +1989,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( g-i+1, Bs+g+j, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( g-i+1+rmv_redundant, Bs+g+j-rmv_redundant, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1896,9 +2023,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, Bs+g+j, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, Bs+g+j-rmv_redundant, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1930,9 +2057,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, Bs+g+j, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, Bs+g+j-rmv_redundant, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1964,10 +2091,10 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
                                 !hvy_block( Bs+g+i, Bs+g+j, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
-                                hvy_block( g-i+1, g-j+1, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g-i+1+rmv_redundant, g-j+1+rmv_redundant, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1999,10 +2126,10 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
                                 !hvy_block( Bs+g+i, Bs+g+j, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
-                                hvy_block( g-i+1, g-j+1, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                                hvy_block( g-i+1+rmv_redundant, g-j+1+rmv_redundant, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2034,9 +2161,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, g-j+1, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, g-j+1+rmv_redundant, g+(Bs+1)/2:Bs+g, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2068,9 +2195,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! receive data
-                        do i = 1, g
-                            do j = 1, g
-                                hvy_block( Bs+g+i, g-j+1, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                hvy_block( Bs+g+i-rmv_redundant, g-j+1+rmv_redundant, g+1:g+(Bs+1)/2, dF, my_block ) = recv_buff(buffer_i:buffer_i+(Bs+1)/2-1)
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do

@@ -43,6 +43,7 @@
 ! = log ======================================================================================
 !
 ! 01/02/17 - create
+! 13/04/17 - remove redundant nodes between blocks with meshlevel +1
 !
 ! ********************************************************************************************
 
@@ -76,7 +77,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
     integer(kind=ik)                                :: Bs, g
 
     ! interpolation variables
-    real(kind=rk), dimension(:,:,:), allocatable    :: data_corner, data_corner_fine, data_face, data_face_fine
+    real(kind=rk), dimension(:,:,:), allocatable    :: data_corner, data_corner_fine, data_face, data_face_fine, data_corner_rmv_redundant
 
     ! allocation error variable
     integer(kind=ik)                                :: allocate_error
@@ -86,6 +87,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
     ! loop variable
     integer(kind=ik)                                :: k, i, j, dF
+
+    ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
+    integer(kind=ik)                                :: rmv_redundant
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -97,15 +101,27 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
 
+    rmv_redundant = 0
+
+    ! set non-uniform mesh correction
+    if ( params%non_uniform_mesh_correction ) then
+        rmv_redundant = 1
+    else
+        rmv_redundant = 0
+    end if
+
     allocate( data_corner( g, g, g), stat=allocate_error )
     call check_allocation(allocate_error)
     allocate( data_corner_fine( 2*g-1, 2*g-1, 2*g-1), stat=allocate_error )
     call check_allocation(allocate_error)
 
-    !allocate( data_face( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
+    allocate( data_corner_rmv_redundant( g+rmv_redundant, g+rmv_redundant, g+rmv_redundant), stat=allocate_error )
     !call check_allocation(allocate_error)
-    !allocate( data_face_fine( Bs+g, Bs+g, Bs+g), stat=allocate_error )
-    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
 
     allocate( data_face( (Bs+1)/2 + g, (Bs+1)/2 + g, (Bs+1)/2 + g), stat=allocate_error )
     call check_allocation(allocate_error)
@@ -335,6 +351,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( Bs:Bs-1+g, g+2:g+1+g, Bs:Bs-1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -345,10 +369,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(g-1:2*g-2, 2:g+1, g-1:2*g-2)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( Bs-g:Bs-2+g+2*rmv_redundant:2, g+3-2*rmv_redundant:g+1+g+g:2, Bs-g:Bs-2+g+2*rmv_redundant:2, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -356,14 +395,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -375,6 +406,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, Bs:Bs-1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -385,9 +424,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(g-1:2*g-2, g-1:2*g-2, g-1:2*g-2)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( Bs-g:Bs-2+g+2*rmv_redundant:2, Bs-g:Bs-2+g+2*rmv_redundant:2, Bs-g:Bs-2+g+2*rmv_redundant:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -395,14 +450,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -414,6 +461,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( g+2:g+1+g, Bs:Bs-1+g, Bs:Bs-1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -424,9 +479,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(2:g+1, g-1:2*g-2, g-1:2*g-2)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( g+3-2*rmv_redundant:g+1+g+g:2, Bs-g:Bs-2+g+2*rmv_redundant:2, Bs-g:Bs-2+g+2*rmv_redundant:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -434,14 +505,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -453,6 +516,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( g+2:g+1+g, g+2:g+1+g, Bs:Bs-1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -463,9 +534,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(2:g+1, 2:g+1, g-1:2*g-2)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( g+3:g+1+g+g:2, g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( g+3-2*rmv_redundant:g+1+g+g:2, g+3-2*rmv_redundant:g+1+g+g:2, Bs-g:Bs-2+g+2*rmv_redundant:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -473,14 +560,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -492,6 +571,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( Bs:Bs-1+g, g+2:g+1+g, g+2:g+1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -502,9 +589,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(g-1:2*g-2, 2:g+1, 2:g+1)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, g+3:g+1+g+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( Bs-g:Bs-2+g+2*rmv_redundant:2, g+3-2*rmv_redundant:g+1+g+g:2, g+3-2*rmv_redundant:g+1+g+g:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -512,14 +615,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -531,6 +626,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, g+2:g+1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -541,9 +644,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(g-1:2*g-2, g-1:2*g-2, 2:g+1)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( Bs-g:Bs-2+g+2*rmv_redundant:2, Bs-g:Bs-2+g+2*rmv_redundant:2, g+3-2*rmv_redundant:g+1+g+g:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -551,14 +670,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -570,6 +681,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( g+2:g+1+g, Bs:Bs-1+g, g+2:g+1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -580,9 +699,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(2:g+1, g-1:2*g-2, 2:g+1)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( g+3-2*rmv_redundant:g+1+g+g:2, Bs-g:Bs-2+g+2*rmv_redundant:2, g+3-2*rmv_redundant:g+1+g+g:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -590,14 +725,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -609,6 +736,14 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! blocks on same level
                         data_corner = hvy_block( g+2:g+1+g, g+2:g+1+g, g+2:g+1+g, dF, my_block )
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == -1 ) then
                         ! sender one level down
                         ! interpolate data
@@ -619,9 +754,25 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         ! data to synchronize
                         data_corner = data_corner_fine(2:g+1, 2:g+1, 2:g+1)
 
+                        ! write buffer
+                        do i = 1, g
+                            do j = 1, g
+                                send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
+                                buffer_i                            = buffer_i + g
+                            end do
+                        end do
+
                     elseif ( level_diff == 1) then
                         ! sender one level up
-                        data_corner = hvy_block( g+3:g+1+g+g:2, g+3:g+1+g+g:2, g+3:g+1+g+g:2, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( g+3-2*rmv_redundant:g+1+g+g:2, g+3-2*rmv_redundant:g+1+g+g:2, g+3-2*rmv_redundant:g+1+g+g:2, dF, my_block )
+
+                        ! write buffer
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant( i, j, 1:g+rmv_redundant )
+                                buffer_i                            = buffer_i + g+rmv_redundant
+                            end do
+                        end do
 
                     else
                         ! error case
@@ -629,14 +780,6 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
                         stop
                     end if
-
-                    ! write buffer
-                    do i = 1, g
-                        do j = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner( i, j, 1:g )
-                            buffer_i                            = buffer_i + g
-                        end do
-                    end do
 
                 end do
 
@@ -663,9 +806,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i), dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -702,9 +845,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i), dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -741,9 +884,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i), dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -780,9 +923,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i), dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, Bs+g-(2*i)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -819,9 +962,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -858,9 +1001,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -897,9 +1040,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -935,9 +1078,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -974,9 +1117,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1013,9 +1156,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1052,9 +1195,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1091,9 +1234,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1130,9 +1273,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1169,9 +1312,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1208,9 +1351,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1247,9 +1390,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1286,9 +1429,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1325,9 +1468,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1364,9 +1507,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1402,9 +1545,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, g+2*j-1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, g+2*j-1, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1441,9 +1584,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1480,9 +1623,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1519,9 +1662,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1557,9 +1700,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
+                        do i = 1, g+rmv_redundant
                             do j = 1, (Bs+1)/2
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1, dF, my_block )
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+2*j-1, g+(2*i)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1596,9 +1739,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1636,9 +1779,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1676,9 +1819,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1715,9 +1858,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1754,9 +1897,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1794,9 +1937,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1833,9 +1976,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1873,9 +2016,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, Bs+g-(2*j), dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, Bs+g-(2*j)+2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1912,9 +2055,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1951,9 +2094,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1, g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, g+(2*i)+1-2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -1991,9 +2134,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2030,9 +2173,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i), g+1:Bs+g:2, g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( Bs+g-(2*i)+2*rmv_redundant, g+1:Bs+g:2, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2069,9 +2212,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2109,9 +2252,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i), g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+1:Bs+g:2, Bs+g-(2*i)+2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2148,9 +2291,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2187,9 +2330,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1, g+1:Bs+g:2, g+(2*j)+1, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block( g+(2*i)+1-2*rmv_redundant, g+1:Bs+g:2, g+(2*j)+1-2*rmv_redundant, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2226,9 +2369,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i), g+(2*j)+1, g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i)+2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2266,9 +2409,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i), g+(2*j)+1, g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i)+2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2305,9 +2448,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1, g+(2*j)+1, g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1-2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2344,9 +2487,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1, g+(2*j)+1, g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1-2*rmv_redundant, g+(2*j)+1-2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2383,9 +2526,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i), Bs+g-(2*j), g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i)+2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2423,9 +2566,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i), Bs+g-(2*j), g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(Bs+g-(2*i)+2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2462,9 +2605,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1, Bs+g-(2*j), g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1-2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do
@@ -2502,9 +2645,9 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
                     elseif ( level_diff == 1 ) then
                         ! sender on higher level
                         ! write data
-                        do i = 1, g
-                            do j = 1, g
-                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1, Bs+g-(2*j), g+1:Bs+g:2, dF, my_block )
+                        do i = 1, g+rmv_redundant
+                            do j = 1, g+rmv_redundant
+                                send_buff(buffer_i:buffer_i+(Bs+1)/2-1)     = hvy_block(g+(2*i)+1-2*rmv_redundant, Bs+g-(2*j)+2*rmv_redundant, g+1:Bs+g:2, dF, my_block )
                                 buffer_i                                    = buffer_i + (Bs+1)/2
                             end do
                         end do

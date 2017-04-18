@@ -38,6 +38,10 @@ module module_params
         real(kind=rk)                               :: time_max
         ! CFL criteria for time step calculation
         real(kind=rk)                               :: CFL
+        ! dt
+        real(kind=rk)                               :: dt
+        ! time stepper method
+        character(len=80)                           :: time_step_method
         ! data writing frequency
         integer(kind=ik)                            :: write_freq
 

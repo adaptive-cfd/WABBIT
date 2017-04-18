@@ -89,7 +89,7 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusi
 
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
 	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90 write_debug_times.f90 write_block_distribution.f90 write_com_list.f90 \
-	write_com_matrix.f90 write_com_matrix_pos.f90 unit_test_ghost_nodes_synchronization.f90 allocate_init_debugging.f90
+	write_com_matrix.f90 write_com_matrix_pos.f90 unit_test_ghost_nodes_synchronization.f90 allocate_init_debugging.f90 unit_test_time_stepper_convergence.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o
@@ -119,7 +119,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o \
-	time_step_RK4.f90 filter_block.f90 filter_1D.f90
+	time_step_RK4.f90 filter_block.f90 filter_1D.f90 calculate_time_step.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \

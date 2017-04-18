@@ -122,29 +122,30 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! find globally smallest dx
     call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
 
+    ! calculate dt
+    call calculate_time_step(params, dx, dt)
 
-
-    ! calculate dt, depends on physics
-    select case(params%physics_type)
-        case('2D_convection_diffusion')
-            ! calculate time step, loop over all data fields
-            do dF = 2, N_dF+1
-                dt = minval((/dt, params%CFL*dx/ norm2(params%physics%u0((dF-2)*2+1:(dF-2)*2+2)) /))
-            end do
-
-        case('2D_navier_stokes')
-            dt = 0.000001_rk
-
-        case('3D_convection_diffusion')
-            ! calculate time step, loop over all data fields
-            do dF = 2, N_dF+1
-                dt = min(dt, params%CFL * dx / norm2( params%physics%u0( (dF-2)*2 + 1 : (dF-2)*2 + 3 ) ) )
-            end do
-
-        case('3D_navier_stokes')
-            dt = 0.00001_rk
-
-    end select
+!    ! calculate dt, depends on physics
+!    select case(params%physics_type)
+!        case('2D_convection_diffusion')
+!            ! calculate time step, loop over all data fields
+!            do dF = 2, N_dF+1
+!                dt = minval((/dt, params%CFL*dx/ norm2(params%physics%u0((dF-2)*2+1:(dF-2)*2+2)) /))
+!            end do
+!
+!        case('2D_navier_stokes')
+!            dt = 0.000001_rk
+!
+!        case('3D_convection_diffusion')
+!            ! calculate time step, loop over all data fields
+!            do dF = 2, N_dF+1
+!                dt = min(dt, params%CFL * dx / norm2( params%physics%u0( (dF-2)*2 + 1 : (dF-2)*2 + 3 ) ) )
+!            end do
+!
+!        case('3D_navier_stokes')
+!            dt = 0.00001_rk
+!
+!    end select
 
     time = time + dt
     ! last timestep should fit in maximal time

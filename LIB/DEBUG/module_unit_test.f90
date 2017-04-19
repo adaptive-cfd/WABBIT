@@ -25,6 +25,8 @@ module module_unit_test
     use module_initialization
     ! mesh module
     use module_mesh
+    ! time step module
+    use module_time_step
 
 !---------------------------------------------------------------------------------------------
 ! variables

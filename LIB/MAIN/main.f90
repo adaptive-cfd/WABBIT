@@ -187,14 +187,15 @@ program main
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
-!    if ( params%debug ) then
-!        ! time stepper convergence order
-!        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-!        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-!
-!    end if
-!stop
+    if ( params%debug ) then
+        ! time stepper convergence order
+        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
+        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+        ! reset the grid: all blocks are inactive and empty
+        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+
+    end if
+stop
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------

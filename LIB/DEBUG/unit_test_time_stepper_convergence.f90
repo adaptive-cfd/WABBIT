@@ -145,7 +145,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     ! setup the finest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call create_equidistant_base_mesh( params_loc, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, params_loc%max_treelevel )
+    call create_equidistant_base_mesh( params_loc, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, params_loc%max_treelevel, .true. )
 
 
     !---------------------------------------------------------------------------

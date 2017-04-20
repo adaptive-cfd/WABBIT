@@ -49,4 +49,7 @@ contains
     ! time stepper convergence unit test
     include "unit_test_time_stepper_convergence.f90"
 
+    ! spatial convergence order test
+    include "unit_test_spatial_convergence_order.f90"
+
 end module module_unit_test

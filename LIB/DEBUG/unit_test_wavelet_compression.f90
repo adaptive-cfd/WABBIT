@@ -105,9 +105,9 @@ use module_IO
 eeps= (/1.0e-1_rk, 1.0e-2_rk, 1.0e-3_rk, 1.0e-4_rk, 1.0e-5_rk, 0.0_rk/)
     do l = 1,5
 
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
-    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, Jmax )
+    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, Jmax, .true. )
     ! call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, l )
 
     ! FIXME: always set gauss blob

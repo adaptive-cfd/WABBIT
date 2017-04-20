@@ -23,7 +23,7 @@
 ! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, verbosity )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -31,23 +31,25 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     implicit none
 
     ! user defined parameter structure
-    type (type_params), intent(inout)     :: params
+    type (type_params), intent(inout)       :: params
     ! light data array
-    integer(kind=ik),  intent(inout)      :: lgt_block(:, :)
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     ! heavy data array - block data
-    real(kind=rk),  intent(inout)         :: hvy_block(:, :, :, :, :)
+    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
     ! heavy work array  )
-    real(kind=rk),  intent(inout)         :: hvy_work(:, :, :, :, :)
+    real(kind=rk),  intent(inout)           :: hvy_work(:, :, :, :, :)
     ! neighbor array (heavy data)
-    integer(kind=ik),  intent(inout)      :: hvy_neighbor(:,:)
+    integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
     ! list of active blocks (light data)
-    integer(kind=ik),  intent(inout)      :: lgt_active(:)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:)
     ! number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
+    integer(kind=ik), intent(inout)         :: lgt_n
     ! list of active blocks (light data)
-    integer(kind=ik),  intent(inout)      :: hvy_active(:)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:)
     ! number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
+    integer(kind=ik), intent(inout)         :: hvy_n
+    ! write output
+    logical, intent(in)                     :: verbosity
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -58,7 +60,7 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    if (params%rank == 0) then
+    if ( (params%rank == 0) .and. verbosity ) then
       write(*,'(80("_"))')
       write(*,'(A)') "RESET: resetting grid to empty (deactivate all blocks)."
     endif

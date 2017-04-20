@@ -19,7 +19,7 @@
 !
 ! ********************************************************************************************
 
-subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, Jmin )
+subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, Jmin, verbosity )
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -44,6 +44,9 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   integer(kind=ik), intent(inout)     :: hvy_n
   ! what level to initialize?
   integer(kind=ik), intent(in)        :: Jmin
+
+  ! write output
+  logical, intent(in)                 :: verbosity
 
   ! loop control variables in space
   integer(kind=ik)                    :: ix, iy, iz, icpu, nx, ny, nz
@@ -78,7 +81,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   nx = 2**Jmin
   ny = 2**Jmin
 
-  if (params%rank == 0) then
+  if ( (params%rank == 0) .and. verbosity ) then
     write(*,'(80("_"))')
     write(*,'(A)') "INIT: initializing an equidistant grid..."
     write(*,'(" Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
@@ -136,7 +139,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
               if (params%threeD_case) then
                 call encoding_3D( treecode, ix, iy, iz, num_blocks, params%max_treelevel )
               else
-                call encoding_2D( treecode, ix,iy, 2**Jmin, 2**Jmin, params%max_treelevel )
+                call encoding_2D( treecode, ix, iy, 2**Jmin, 2**Jmin, params%max_treelevel )
               endif
 
               ! on my section of the global light data list, which is the first and last light id I hold?

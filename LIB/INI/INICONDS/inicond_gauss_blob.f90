@@ -49,9 +49,12 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
 
     ! place pulse in the center of the domain
     mux = 0.5_rk * params%Lx;
-    muy = 0.5_rk * params%Ly;
+    !muy = 0.5_rk * params%Ly;
+    muy = 0.75_rk * params%Ly;
+
     ! pulse width
-    sigma     = 0.1e2_rk
+    !sigma     = 0.1e-2_rk * params%Lx * params%Ly
+    sigma     = 0.01
 
     ! create gauss pulse
     do ix = g+1,Bs+g

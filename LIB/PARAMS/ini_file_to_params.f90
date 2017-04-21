@@ -284,6 +284,23 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
 
+        case('2D_advection')
+            ! domain size
+            call read_param(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            ! set third dimension to zero
+            params%Lz = 0.0_rk
+
+            ! read variable names
+            ! allocate names list
+            ! use convection-diffusion physics struct !
+            allocate( params%physics%names( params%number_data_fields ), stat=allocate_error )
+            call check_allocation(allocate_error)
+
+            params%physics%names = "---"
+            ! read file
+            call read_param(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: physics type is unknown"

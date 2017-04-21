@@ -84,6 +84,13 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
             case('3D_navier_stokes')
                 ! select corresponding datafield name
                 write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
+            case('2D_advection')
+                ! select corresponding datafield name
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k-1))), nint(time * 1.0e6_rk)
+            case default
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: physics type is unknown - can not save data"
+                stop
         end select
 
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)

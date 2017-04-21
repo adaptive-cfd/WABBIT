@@ -177,31 +177,31 @@ program main
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
 
-    !---------------------------------------------------------------------------
-    ! Unit tests
-    !---------------------------------------------------------------------------
-    ! perform a convergence test on ghost node sync'ing
-    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!    !---------------------------------------------------------------------------
+!    ! Unit tests
+!    !---------------------------------------------------------------------------
+!    ! perform a convergence test on ghost node sync'ing
+!    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!
+!    ! reset the grid: all blocks are inactive and empty
+!    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
+!
+!    if ( params%debug ) then
+!        ! time stepper convergence order
+!        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
+!        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!        ! reset the grid: all blocks are inactive and empty
+!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
+!
+!        ! spatial convergence order
+!        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
+!        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!        ! reset the grid: all blocks are inactive and empty
+!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
+!
+!    end if
 
-    ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
-
-    if ( params%debug ) then
-        ! time stepper convergence order
-        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-        ! reset the grid: all blocks are inactive and empty
-        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
-
-        ! spatial convergence order
-        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-        ! reset the grid: all blocks are inactive and empty
-        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
-
-    end if
-stop
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------

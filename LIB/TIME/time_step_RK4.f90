@@ -65,6 +65,9 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! process rank
     integer(kind=ik)                    :: rank
 
+    ! new time after timestep dt, so current time can be used in RHS
+    real(kind=rk)                       :: time_dt
+
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
@@ -125,12 +128,12 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     ! calculate dt
     call calculate_time_step(params, dx, dt)
 
-    time = time + dt
+    ! calculate value for time after one dt
+    time_dt = time + dt
     ! last timestep should fit in maximal time
-    if (time >= params%time_max) then
-        time = time - dt
+    if ( time_dt >= params%time_max) then
         dt = params%time_max - time
-        time = params%time_max
+        time_dt = params%time_max
     end if
 
     ! time measurement without ghost nodes synchronization
@@ -226,6 +229,38 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('2D_advection')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! light id of this block
+                    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+                    ! compute blocks' spacing from treecode
+                    call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+
+                    ! save old data
+                    hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! set k1 step
+                    hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+2, hvy_active(k) ), &
+                                                      xx0(1:2), &
+                                                      ddx(1:2), &
+                                                      g, Bs, &
+                                                      time, &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
+
     end select
 
     !***************************************************************************
@@ -260,6 +295,20 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 ! save old data
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, N_dF+1:2*N_dF, hvy_active(k) )
             end do
+
+        case('2D_advection')
+            do dF = 2, N_dF+1
+                do k = 1, hvy_n
+                    ! save old data
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) )
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
 
     end select
 
@@ -345,6 +394,36 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('2D_advection')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! light id of this block
+                    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+                    ! compute blocks' spacing from treecode
+                    call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+
+                    ! set k2 step
+                    hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+3, hvy_active(k) ), &
+                                                      xx0(1:2), &
+                                                      ddx(1:2), &
+                                                      g, Bs, &
+                                                      time, &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
+
     end select
 
     !***************************************************************************
@@ -379,6 +458,20 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 ! save old data
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, 2*N_dF+1:3*N_dF, hvy_active(k) )
             end do
+
+        case('2D_advection')
+            do dF = 2, N_dF+1
+                do k = 1, hvy_n
+                    ! save old data
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + (0.5_rk * dt) * hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) )
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
 
     end select
 
@@ -464,6 +557,36 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('2D_advection')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! light id of this block
+                    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+                    ! compute blocks' spacing from treecode
+                    call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+
+                    ! set k3 step
+                    hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+4, hvy_active(k) ), &
+                                                      xx0(1:2), &
+                                                      ddx(1:2), &
+                                                      g, Bs, &
+                                                      time, &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
+
     end select
 
     !***************************************************************************
@@ -498,6 +621,20 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                 ! save old data
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k) ) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) + dt * hvy_work( :, :, :, 3*N_dF+1:4*N_dF, hvy_active(k) )
             end do
+
+        case('2D_advection')
+            do dF = 2, N_dF+1
+                do k = 1, hvy_n
+                    ! save old data
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) + dt * hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) )
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
 
     end select
 
@@ -583,6 +720,36 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('2D_advection')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! light id of this block
+                    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+                    ! compute blocks' spacing from treecode
+                    call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+
+                    ! set k4 step
+                    hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! RHS
+                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+5, hvy_active(k) ), &
+                                                      xx0(1:2), &
+                                                      ddx(1:2), &
+                                                      g, Bs, &
+                                                      time, &
+                                                      params%order_discretization  )
+
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
+
     end select
 
     !***************************************************************************
@@ -647,7 +814,32 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
             end do
 
+        case('2D_advection')
+            ! loop over all datafields
+            do dF = 2, N_dF+1
+                ! loop over all active heavy data blocks
+                do k = 1, hvy_n
+
+                    ! final step
+                    hvy_block( :, :, :, dF, hvy_active(k) ) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) ) &
+                                                            + (dt/6.0_rk) * ( hvy_work( :, :, :, (dF-2)*5+2, hvy_active(k) ) &
+                                                            + 2.0_rk * hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) &
+                                                            + 2.0_rk * hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) &
+                                                            + hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) )
+
+                end do
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
+
     end select
+
+    ! increase time variable after all RHS substeps
+    time = time_dt
 
     ! end time
     sub_t1   = MPI_Wtime()

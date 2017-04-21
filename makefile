@@ -3,7 +3,7 @@
 FFILES = check_allocation.f90 encoding_2D.f90 int_to_binary.f90 treecode_size.f90 adjacent_block_2D.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 encoding_3D.f90 adjacent_block_3D.f90 RHS_3D_convection_diffusion.f90 \
-RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90
+RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 RHS_2D_advection.f90
 
 # Object and module directory:
 OBJDIR = OBJ

@@ -291,6 +291,15 @@ subroutine ini_file_to_params( params, filename )
             ! set third dimension to zero
             params%Lz = 0.0_rk
 
+            ! use convection velocity for time step calculation
+            allocate( params%physics%u0( 2*params%number_data_fields ), stat=allocate_error )
+            call check_allocation(allocate_error)
+
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            ! read velocity
+            call read_param(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+
             ! read variable names
             ! allocate names list
             ! use convection-diffusion physics struct !

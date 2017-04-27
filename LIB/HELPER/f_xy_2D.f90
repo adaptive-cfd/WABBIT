@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: f_xy_2D.f90
-! version: 0.5
-! author: msr
+!> \name f_xy_2D.f90
+!> \version 0.5
+!> \author msr
 !
-! calculate periodic f(x,y) for 2D field
+!> \brief calculate periodic f(x,y) for 2D field
 !
-! input:    - params, coordinate arrays
-! output:   - f(x,y)
-!
-! = log ======================================================================================
-!
-! 22/03/17 - create
+!> \details
+!> input:    - params, coordinate arrays \n
+!! output:   - f(x,y)
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 22/03/17 - create
 !
 ! ********************************************************************************************
 
@@ -29,14 +32,14 @@ subroutine f_xy_2D( x, y, f, Bs, g, Lx, Ly, frequ )
 
     implicit none
 
-    ! grid parameter
+    !> grid parameter
     integer(kind=ik), intent(in)            :: Bs, g
     real(kind=rk), intent(in)               :: Lx, Ly, frequ
 
-    ! coordinate arrays
+    !> coordinate arrays
     real(kind=rk), intent(in)               :: x(Bs+2*g), y(Bs+2*g)
 
-    ! function array
+    !> function array
     real(kind=rk), intent(inout)            :: f(Bs+2*g,Bs+2*g)
 
     ! loop variables

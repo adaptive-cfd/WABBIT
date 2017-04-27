@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: inicond_sinus_2D.f90
-! version: 0.5
-! author: msr
+!> \name inicond_sinus_2D.f90
+!> \version 0.5
+!> \author msr
 !
-! initialize sinus for 2D case
+!> \brief initialize sinus for 2D case
 !
-! input:    - params
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 21/03/17 - create
+!> \details
+!! input:    - params \n
+!! output:   - light and heavy data arrays
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 21/03/17 - create
 !
 ! ********************************************************************************************
 
@@ -23,13 +26,13 @@ subroutine inicond_sinus_2D( params, u, x0, dx )
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)       :: params
 
-    ! actual block data (note this routine acts only on one block)
+    !> actual block data (note this routine acts only on one block)
     real(kind=rk), intent(inout)            :: u(:,:,:,:)
 
-    ! spacing and origin of block
+    !> spacing and origin of block
     real(kind=rk), intent(in)               :: x0(1:3),dx(1:3)
 
     ! auxiliary variable for gauss pulse

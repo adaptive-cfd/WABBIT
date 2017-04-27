@@ -1,27 +1,30 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: synchronize_ghosts.f90
-! version: 0.5
-! author: msr
+!> \name synchronize_ghosts.f90
+!> \version 0.5
+!> \author msr
 !
-! synchronize ghosts nodes
+!> \brief synchronize ghosts nodes
 !
-! input:    - params, light and heavy data
-! output:   - heavy data array
+!> \details
+!! input:    - params, light and heavy data \n
+!! output:   - heavy data array
 !
-! todo: change soubroutine, to work only on one datafield, not on all to the same time
+!> \todo change soubroutine, to work only on one datafield, not on all to the same time
 !
 ! -------------------------------------------------------------------------------------------------------------------------
-! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+!> dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
 ! -------------------------------------------------------------------------------------------------------------------------
-!
-! = log ======================================================================================
-!
-! 08/11/16 - switch to v0.4
-! 06/01/17 - use RMA to synchronize data
-! 31/01/17 - switch to 3D, v0.5
-! 12/04/17 - redundant ghost nodes workaround
+!> \details
+!! = log ======================================================================================
+!! \n
+!! 08/11/16 - switch to v0.4 \n
+!! 06/01/17 - use RMA to synchronize data \n
+!! 31/01/17 - switch to 3D, v0.5 \n
+!! 12/04/17 - redundant ghost nodes workaround
 !
 ! ********************************************************************************************
 
@@ -35,18 +38,18 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neifghbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables

@@ -1,20 +1,25 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: max_com_num.f90
-! version: 0.4
-! author: msr
+!> \name max_com_num.f90
+!> \version 0.4
+!> \author msr
 !
-! find max communication number
+!> \brief find max communication number
 !
-! input:    - com matrix line
-!           - proc rank
-! output:   - number of maximal communication to one other proc
-!
-!
-! = log ======================================================================================
-!
-! 13/01/17 - create for v0.4
+!> \details
+!! input:    
+!!           - com matrix line
+!!           - proc rank
+!!
+!! output:   
+!!           - number of maximal communication to one other proc
+!!
+!! = log ======================================================================================
+!! \n
+!! 13/01/17 - create for v0.4
 ! ********************************************************************************************
 
 subroutine max_com_num( N, P, com_matrix_line, rank )
@@ -27,13 +32,13 @@ subroutine max_com_num( N, P, com_matrix_line, rank )
 
     implicit none
 
-    ! number of coms, number of procs
+    !> number of coms, number of procs
     integer(kind=ik), intent(out)                   :: N, P
 
-    ! com matrix line
+    !> com matrix line
     integer(kind=ik), intent(in)                    :: com_matrix_line(:)
 
-    ! proc rank
+    !> proc rank
     integer(kind=ik), intent(in)                    :: rank
 
     ! loop variable

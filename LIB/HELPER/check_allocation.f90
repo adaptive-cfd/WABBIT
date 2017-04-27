@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: check_allocation.f90
-! version: 0.5
-! author: msr
+!> \name check_allocation.f90
+!> \version 0.5
+!> \author msr
 !
-! convert a integer i to binary b
-! binary return as vector with length N
+!> \brief convert an integer i to binary b \n
+!! binary return as vector with length N
 !
-! input:    - allocation error
-! output:   - stop program if error variable /= 0
-!
-! = log ======================================================================================
-!
-! 25/01/17 - create
+!> \details
+!! input:    - allocation error \n
+!! output:   - stop program if error variable /= 0
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 25/01/17 - create
 ! ********************************************************************************************
 
 subroutine check_allocation(allocate_error)
@@ -29,7 +32,7 @@ subroutine check_allocation(allocate_error)
 
     implicit none
 
-    ! allocation error variable
+    !> allocation error variable
     integer(kind=ik), intent(in) :: allocate_error
 
 !---------------------------------------------------------------------------------------------

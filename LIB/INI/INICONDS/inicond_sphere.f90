@@ -1,20 +1,23 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: inicond_sphere.f90
-! version: 0.5
-! author: msr
+!> \name inicond_sphere.f90
+!> \version 0.5
+!> \author msr
 !
-! initialize sphere
+!> \brief initialize sphere
 !
-! input:    - params
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 02/02/17 - create
-! 12/04/17 - rewrite to work on one block and initialize with spacing and origin of block
-!
+!> \details
+!! input:    - params \n
+!! output:   - light and heavy data arrays
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 02/02/17 - create \n
+!! 12/04/17 - rewrite to work on one block and initialize with spacing and origin of block
+!!
 ! ********************************************************************************************
 
 subroutine inicond_sphere( params, u, x0, dx)
@@ -24,13 +27,13 @@ subroutine inicond_sphere( params, u, x0, dx)
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)       :: params
 
-    ! actual block data (note this routine acts only on one block)
+    !> actual block data (note this routine acts only on one block)
     real(kind=rk), intent(inout)            :: u(:,:,:,:)
 
-    ! spacing and origin of block
+    !> spacing and origin of block
     real(kind=rk), intent(in)               :: x0(1:3), dx(1:3)
 
     ! auxiliary variable for gauss pulse

@@ -1,21 +1,26 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: encoding_2D.f90
-! version: 0.4
-! author: msr
+!> \name encoding_2D.f90
+!> \version 0.4
+!> \author msr
 !
-! encoding 2D treecode
+!> \brief encoding 2D treecode
 !
-! input:    - block position varaibles i, j
-!           - number of blocks
-!           - length of treecode in light data
-! output:   - treecode
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
-! 26/01/17 - rename to encoding 2D
+!> \details input:    
+!!                   - block position varaibles i, j
+!!                   - number of blocks
+!!                   - length of treecode in light data
+!!
+!!          output: 
+!!                   - treecode
+!!
+!> = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4 \n
+!! 26/01/17 - rename to encoding 2D
 !
 ! ********************************************************************************************
 
@@ -32,14 +37,14 @@ subroutine encoding_2D(treecode, i, j, nx, ny, treeN)
 
     implicit none
 
-    ! block position coordinates
+    !> block position coordinates
     integer(kind=ik), intent(in)    :: i, j
-    ! number of blocks
+    !> number of blocks
     integer(kind=ik), intent(in)    :: nx, ny
 
-    ! treecode size
+    !> treecode size
     integer(kind=ik), intent(in)    :: treeN
-    ! treecode
+    !> treecode
     integer(kind=ik), intent(out)   :: treecode(treeN)
 
     ! variables for calculate real treecode length N

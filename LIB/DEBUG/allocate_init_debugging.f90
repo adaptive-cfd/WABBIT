@@ -1,3 +1,5 @@
+!> \file
+!> \callgraph
 subroutine allocate_init_debugging(params)
   implicit none
     ! user defined parameter structure

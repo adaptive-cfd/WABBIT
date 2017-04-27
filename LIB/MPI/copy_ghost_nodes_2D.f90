@@ -1,30 +1,36 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: copy_ghost_nodes_2D.f90
-! version: 0.4
-! author: msr
+!> \name copy_ghost_nodes_2D.f90
+!> \version 0.4
+!> \author msr
 !
-! copy ghost points from sender block to receiver block
-! note: works only for block on same process
+!> \brief copy ghost points from sender block to receiver block 
+!! \note works only for block on same process
 !
-! input:    - heavy data array
-!           - sender block id
-!           - receiver block id
-!           - neighbor relations between sender/receiver
-!           - level difference between these two blocks
-! output:   - heavy data array
+!> \details
+!! input:    
+!!           - heavy data array
+!!           - sender block id
+!!           - receiver block id
+!!           - neighbor relations between sender/receiver
+!!           - level difference between these two blocks
+!!
+!! output:   
+!!           - heavy data array
 !
 ! -------------------------------------------------------------------------------------------------------------------------
-! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+!> \details
+!! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
 ! -------------------------------------------------------------------------------------------------------------------------
-!
-! = log ======================================================================================
-!
-! 09/11/16 - create for v0.4
-! 31/03/17 - add non-uniform mesh correction
-! 12/04/17 - remove redundant nodes between blocks with meshlevel +1
-!
+!> \n
+!! = log ======================================================================================
+!! \n
+!! 09/11/16 - create for v0.4 \n
+!! 31/03/17 - add non-uniform mesh correction \n
+!! 12/04/17 - remove redundant nodes between blocks with meshlevel +1
 ! ********************************************************************************************
 
 subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neighborhood, level_diff)
@@ -37,15 +43,15 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)                  :: params
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :)
-    ! heavy data id's
+    !> heavy data id's
     integer(kind=ik), intent(in)                    :: sender_id, receiver_id
-    ! neighborhood relation, id from dirs
+    !> neighborhood relation, id from dirs
     integer(kind=ik), intent(in)                    :: neighborhood
-    ! difference between block levels
+    !> difference between block levels
     integer(kind=ik), intent(in)                    :: level_diff
 
     ! grid parameter

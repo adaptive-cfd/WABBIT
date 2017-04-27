@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: lgt_id_to_proc_rank.f90
-! version: 0.4
-! author: msr
+!> \name lgt_id_to_proc_rank.f90
+!> \version 0.4
+!> \author msr
 !
-! return proc rank corresponding to given light id
+!> \brief return proc rank corresponding to given light id
 !
-! input:    - light id, number of blocks
-! output:   - rank
-!
-! = log ======================================================================================
-!
-! 23/11/16 - create
+!> \details
+!! input:    - light id, number of blocks \n
+!! output:   - rank \n
+!!
+!! = log ======================================================================================
+!! \n
+!! 23/11/16 - create
 ! ********************************************************************************************
 
 subroutine lgt_id_to_proc_rank( rank, lgt_id, N )
@@ -28,13 +31,13 @@ subroutine lgt_id_to_proc_rank( rank, lgt_id, N )
 
     implicit none
 
-    ! light data start index
+    !> light data start index
     integer(kind=ik), intent(out)       :: rank
 
-    ! rank of proc
+    !> rank of proc
     integer(kind=ik), intent(in)        :: lgt_id
 
-    ! number of blocks per proc
+    !> number of blocks per proc
     integer(kind=ik), intent(in)        :: N
 
 !---------------------------------------------------------------------------------------------

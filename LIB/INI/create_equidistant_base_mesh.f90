@@ -1,21 +1,23 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: create_coarse_base_mesh.f90
-! version: 0.5
-! author: engels
+!> \name create_coarse_base_mesh.f90
+!> \version 0.5
+!> \author engels
 !
-! This routine tries to create an equidistant mesh on the specified level Jmin, so all blocks on
-! this level are set to active and their treecodes are stored.
-! Since the grid changes, the neighbor relations and active-lists are updated as well.
+!> \brief This routine tries to create an equidistant mesh on the specified level Jmin, so all blocks on
+!! this level are set to active and their treecodes are stored.
+!! Since the grid changes, the neighbor relations and active-lists are updated as well.
 !
-! NOTE: In almost all cases, you'll want to call reset_grid before call this routine, as any existing
-! blocks are not deleted here. Not calling reset_grid is possible but will cause strange behavior and
-! probably is unintended. This routine warns if active blocks are found.
-!
-! = log ======================================================================================
-!
-! 03 Apr 2017 - create
+!> \note In almost all cases, you'll want to call reset_grid before call this routine, as any existing
+!! blocks are not deleted here. Not calling reset_grid is possible but will cause strange behavior and
+!! probably is unintended. This routine warns if active blocks are found.
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 03 Apr 2017 - create
 !
 ! ********************************************************************************************
 
@@ -26,26 +28,26 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
 
   implicit none
 
-  ! user defined parameter structure
+  !> user defined parameter structure
   type (type_params), intent(in)      :: params
-  ! light data array
+  !> light data array
   integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-  ! heavy data array - block data
+  !> heavy data array - block data
   real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-  ! heavy data array - neighbor data
+  !> heavy data array - neighbor data
   integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-  ! list of active blocks (light data)
+  !> list of active blocks (light data)
   integer(kind=ik), intent(inout)     :: lgt_active(:)
-  ! number of active blocks (light data)
+  !> number of active blocks (light data)
   integer(kind=ik), intent(inout)     :: lgt_n
-  ! list of active blocks (heavy data)
+  !> list of active blocks (heavy data)
   integer(kind=ik), intent(inout)     :: hvy_active(:)
-  ! number of active blocks (heavy data)
+  !> number of active blocks (heavy data)
   integer(kind=ik), intent(inout)     :: hvy_n
-  ! what level to initialize?
+  !> what level to initialize?
   integer(kind=ik), intent(in)        :: Jmin
 
-  ! write output
+  !> write output
   logical, intent(in)                 :: verbosity
 
   ! loop control variables in space

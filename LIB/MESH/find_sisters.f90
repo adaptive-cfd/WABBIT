@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: find_sisters.f90
-! version: 0.5
-! author: engels
+!> name: find_sisters.f90
+!> version: 0.5
+!> author: engels
 !
-! To a given light id "my_id", find the 3 (2D) or 7 (3D) sister block that have a common mother
-! block. They are returned in the sisters array.
+!> \brief To a given light id "my_id", find the 3 (2D) or 7 (3D) sister block that have a common mother
+!! block. They are returned in the sisters array.
 !
-! input:    - light data array
-! output:   - light data array
-!
-! = log ======================================================================================
-!
-! 10/11/16 - switch to v0.4
+!> \details
+!! input:    - light data array \n
+!! output:   - light data array
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_active, lgt_n )
@@ -27,17 +30,17 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_activ
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! this is the block whose sisters we look for
+    !> this is the block whose sisters we look for
     integer(kind=ik), intent(in)        :: lgt_my_id
-    ! here we will return the sisters
+    !> here we will return the sisters
     integer(kind=ik), intent(inout)     :: lgt_sisters_id(:)
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! loop variables

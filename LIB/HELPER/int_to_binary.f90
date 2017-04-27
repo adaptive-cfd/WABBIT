@@ -1,20 +1,26 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: int_to_binary.f90
-! version: 0.4
-! author: msr
+!> \name int_to_binary.f90
+!> \version 0.4
+!> \author msr
 !
-! convert a integer i to binary b
-! binary return as vector with length N
+!> \brief convert a integer i to binary b \n
+!! binary return as vector with length N
 !
-! input:    - integer to convert
-!           - length of output vector
-! output:   - "binary" vector
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
+!> \details
+!! input:    
+!!           - integer to convert
+!!           - length of output vector
+!!
+!! output:   
+!!           - "binary" vector
+!!
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 subroutine int_to_binary(i, N, b)
@@ -30,13 +36,13 @@ subroutine int_to_binary(i, N, b)
 
     implicit none
 
-    ! integer to convert into binary
+    !> integer to convert into binary
     integer(kind=ik), intent(in)    :: i
 
-    ! length of binary output vector
+    !> length of binary output vector
     integer(kind=ik), intent(in)    :: N
 
-    ! output vector
+    !> output vector
     integer(kind=ik), intent(out)   :: b(N)
 
     ! loop variables

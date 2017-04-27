@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_debug_times.f90
-! version: 0.4
-! author: msr
+!> \name write_debug_times.f90
+!> \version 0.4
+!> \author msr
 !
-! write time measurements
+!> \brief write time measurements
 !
-! input:    - current iteration
-! output:   -
-!
-! = log ======================================================================================
-!
-! 02/12/16 - create
+!> \details
+!! input:    - current iteration \n
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 02/12/16 - create
 ! ********************************************************************************************
 
 subroutine write_debug_times( iteration )
@@ -25,7 +28,7 @@ subroutine write_debug_times( iteration )
 
     implicit none
 
-    ! iteration
+    !> iteration
     integer(kind=ik), intent(in)        :: iteration
 
     ! MPI error variable

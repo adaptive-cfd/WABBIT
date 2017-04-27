@@ -1,27 +1,31 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: compute_affinity.f90
-! version: 0.4
-! author: engels, msr
+!> \name compute_affinity.f90
+!> \version 0.4
+!> \author engels, msr
 !
 !-------------------------------------------------------------------------------
-! compute the affinity for all my blocks to a given rank.
-! That means, if a block has many neighbor relations with the target rank, it has a high
-! value in the array, otherwise a low value or -10 if the block is not active at all
-!
-! This list is at the core of heuristic load balancing: we know whom to send to, and using this list
-! we decide which blocks will be sent.
+!> \brief compute the affinity for all my blocks to a given rank.
+!> \details That means, if a block has many neighbor relations with the target rank, it has a high
+!! value in the array, otherwise a low value or -10 if the block is not active at all
+!! \n
+!! This list is at the core of heuristic load balancing: we know whom to send to, and using this list
+!! we decide which blocks will be sent.
 !-------------------------------------------------------------------------------
 !
-! input:    - params, non-synchronized light data list, neighbor list
-! output:   - affinity list
+!> \details
+!!  input:    - params, non-synchronized light data list, neighbor list \n
+!! output:    - affinity list \n
 !
-! = log ======================================================================================
-!
-! 28/11/16 - create
+!> = log ======================================================================================
+!! \n
+!! 28/11/16 - create
 !
 ! ********************************************************************************************
+
 subroutine compute_affinity(params, my_block_list, hvy_neighbor, rank, rank_partner, affinity, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
@@ -32,24 +36,24 @@ subroutine compute_affinity(params, my_block_list, hvy_neighbor, rank, rank_part
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: my_block_list(:, :)
 
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
-    ! affinity list
+    !> affinity list
     integer(kind=ik), intent(out)       :: affinity(:)
 
-    ! proc status
+    !> proc status
     integer(kind=ik), intent(in)        :: rank, rank_partner
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables

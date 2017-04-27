@@ -1,30 +1,39 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_hdf5_wrapper.f90
-! version: 0.4
-! author: engels, msr
+!> \name module_hdf5_wrapper.f90
+!> \version 0.4
+!> \author engels, msr
 !
-! !-------------------------------------------------------------------------------
-! ! Read a field from a file
-! ! Note a single file can contain many arrays, if required
-! ! INPUT
-! !   filename        file to read from
-! !   dsetname        datasetname, i.e. the name of the array in the file
-! !   rared           lower bounds of memory portion hold by the CPU
-! !   rbred           upper bounds of memory portion hold by the CPU
-! !                   NOTE: rared and rbred are 1:3 arrays. if running on one proc
-! !                   they are rared=(/0,0,0/) rbred=(/nx-1,ny-1,nz-1/). If the data
-! !                   is distributed among procs, each proc has to indicate which
-! !                   portion of the array it holds
-! !   field           actual data (ALLOCATED!!!)
-! ! OUTPUT:
-! !   field           data read from file
-! !-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+!> \brief Read a field from a file \n
+!! Note a single file can contain many arrays, if required
+!!
+!> \details
+!!
+!! |INPUT      |                                                                  |
+!! |-----------|------------------------------------------------------------------|
+!! |filename   |     file to read from                                            |
+!! |dsetname   |     datasetname, i.e. the name of the array in the file          |
+!! |field      |     actual data (ALLOCATED!!!)                                   |
+!! |rared      |     lower bounds of memory portion hold by the CPU               |
+!! |rbred      |     upper bounds of memory portion hold by the CPU               |
+!!                   NOTE: rared and rbred are 1:3 arrays. if running on one proc
+!!                   they are rared=(/0,0,0/) rbred=(/nx-1,ny-1,nz-1/). If the data
+!!                   is distributed among procs, each proc has to indicate which
+!!                   portion of the array it holds
+!!
+!! |OUTPUT     |                                                                  |
+!! |-----------|------------------------------------------------------------------|
+!! |field      |     data read from file                                          |
+!!
+!-------------------------------------------------------------------------------
 !
-! = log ======================================================================================
-!
-! 04/11/16 - linked old module version to wabbit (use module_params)
+!> = log ======================================================================================
+!! \n
+!! 04/11/16 - linked old module version to wabbit (use module_params)
 ! ********************************************************************************************
 
 module module_hdf5_wrapper

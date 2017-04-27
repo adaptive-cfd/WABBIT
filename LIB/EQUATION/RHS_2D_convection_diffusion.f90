@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: RHS_2D_convection_diffusion.f90
-! version: 0.4
-! author: msr, engels
+!> \name RHS_2D_convection_diffusion.f90
+!> \version 0.4
+!> \author msr, engels
 !
-! rhs for 2D convection diffusion equation
+!> \brief rhs for 2D convection diffusion equation
 !
-! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order
-! output:   - RHS(datafield)
-!
-! = log ======================================================================================
-!
-! 10/11/16 - switch to v0.4
+!> \details
+!! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
+!! output:   - RHS(datafield)
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_discretization)
@@ -28,11 +31,11 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_d
 
     implicit none
 
-    ! grid parameter
+    !> grid parameter
     integer(kind=ik), intent(in)                                :: g, Bs
-    ! rhs parameter
+    !> rhs parameter
     real(kind=rk), intent(in)                                   :: dx, dy, u01, u02, nu
-    ! datafield
+    !> datafield
     real(kind=rk), dimension(Bs+2*g, Bs+2*g), intent(inout)     :: phi
     ! order discretization
     character(len=80)                                           :: order_discretization

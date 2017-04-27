@@ -1,19 +1,25 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: get_free_light_id.f90
-! version: 0.4
-! author: msr, engels
+!> \name get_free_light_id.f90
+!> \version 0.4
+!> \author msr, engels
 !
-! return light free block id
+!> \brief return light free block id
 !
-! input:    - first column of light data array
-!           - length of input vector
-! output:   - id of first passive block
-!
-! = log ======================================================================================
-!
-! 08/11/16 - switch to v0.4
+!> \details
+!! input:    
+!!           - first column of light data array
+!!           - length of input vector
+!!
+!! output:   
+!!           - id of first passive block
+!!
+!! = log ======================================================================================
+!! \n
+!! 08/11/16 - switch to v0.4
 !
 ! ********************************************************************************************
 
@@ -30,12 +36,12 @@ subroutine get_free_light_id( id, block_list, N )
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     integer(kind=ik), intent(in)        :: N
-    ! light data array, first column
+    !> light data array, first column
     integer(kind=ik), intent(in)        :: block_list(N)
 
-    ! free id
+    !> free id
     integer(kind=ik), intent(out)       :: id
 
     ! loop variables

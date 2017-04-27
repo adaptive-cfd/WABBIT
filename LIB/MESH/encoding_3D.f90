@@ -1,20 +1,25 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: encoding_3D.f90
-! version: 0.5
-! author: msr
+!> \name encoding_3D.f90
+!> \version 0.5
+!> \author msr
 !
-! encoding 3D treecode
+!> \brief encoding 3D treecode
 !
-! input:    - block position varaibles i, j, k
-!           - number of blocks
-!           - length of treecode in light data
-! output:   - treecode
-!
-! = log ======================================================================================
-!
-! 26/01/17 - create
+!> \details  input:    
+!!                    - block position varaibles i, j, k
+!!                    - number of blocks
+!!                    - length of treecode in light data
+!!
+!!           output:   
+!!                    - treecode
+!!
+!! = log ======================================================================================
+!! \n
+!! 26/01/17 - create
 !
 ! ********************************************************************************************
 
@@ -31,14 +36,14 @@ subroutine encoding_3D(treecode, i, j, k, block_num, treeN)
 
     implicit none
 
-    ! block position coordinates
+    !> block position coordinates
     integer(kind=ik), intent(in)    :: i, j, k
-    ! number of blocks
+    !> number of blocks
     integer(kind=ik), intent(in)    :: block_num
 
-    ! treecode size
+    !> treecode size
     integer(kind=ik), intent(in)    :: treeN
-    ! treecode
+    !> treecode
     integer(kind=ik), intent(out)   :: treecode(treeN)
 
     ! variables for calculate real treecode length N

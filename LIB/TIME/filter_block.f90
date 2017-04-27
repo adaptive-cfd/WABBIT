@@ -1,19 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: filter_block.f90
-! version: 0.5
-! author: msr
+!> \name filter_block.f90
+!> \version 0.5
+!> \author msr
 !
-! filter heavy data
+!> \brief filter heavy data
 !
-! input:    - params, heavy data array
-! output:   - filtered heavy data array
-!
-!
-! = log ======================================================================================
-!
-! 27/03/17 - create
+!> \details
+!! input:    - params, heavy data array \n
+!! output:   - filtered heavy data array
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 27/03/17 - create
 !
 ! ********************************************************************************************
 
@@ -27,19 +29,19 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables

@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_com_matrix.f90
-! version: 0.4
-! author: msr
+!> \name write_com_matrix.f90
+!> \version 0.4
+!> \author msr
 !
-! write communication matrix to file
+!> \brief write communication matrix to file
 !
-! input:    - current com matrix
-! output:   -
-!
-! = log ======================================================================================
-!
-! 16/12/16 - create
+!> \details
+!! input:    - current com matrix \n
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 16/12/16 - create
 ! ********************************************************************************************
 
 subroutine write_com_matrix( com_matrix )
@@ -25,7 +28,7 @@ subroutine write_com_matrix( com_matrix )
 
     implicit none
 
-    ! iteration
+    !> iteration
     integer(kind=ik), intent(in)        :: com_matrix(:, :)
 
     ! MPI error variable

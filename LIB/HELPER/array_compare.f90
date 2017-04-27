@@ -1,20 +1,25 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: array_compare.f90
-! version: 0.4
-! author: msr
+!> \name array_compare.f90
+!> \version 0.4
+!> \author msr
 !
-! compare 2 arrays
+!> \brief compare 2 arrays
 !
-! input:    - 2 array
-!           - array size N
-! output:   - .true. if arrays are equal
-!
-!
-! = log ======================================================================================
-!
-! 08/11/16 - switch to v0.4
+!> \details
+!! input:    
+!!           - 2 array
+!!           - array size N
+!!
+!! output:   
+!!           - .true. if arrays are equal
+!!
+!! = log ======================================================================================
+!! \n
+!! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 logical function array_compare(array1, array2, N)
@@ -30,9 +35,9 @@ logical function array_compare(array1, array2, N)
 
     implicit none
 
-    ! array size
+    !> array size
     integer(kind=ik), intent(in)        :: N
-    ! arrays
+    !> arrays
     integer(kind=ik), intent(in)        :: array1(N), array2(N)
 
     ! loop variable

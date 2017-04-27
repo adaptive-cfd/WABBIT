@@ -1,26 +1,32 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_receive_buffer_2D.f90
-! version: 0.4
-! author: msr
+!> \name write_receive_buffer_2D.f90
+!> \version 0.4
+!> \author msr
 !
-! write received buffer to heavy data with integer and real buffer
+!> \brief write received buffer to heavy data with integer and real buffer
 !
-! input:    - params struct
-!           - received buffer
-! output:   - heavy data array
-!
+!> \details
+!! input:    
+!!           - params struct
+!!           - received buffer
+!!
+!! output:   
+!!           - heavy data array
+!!
+!! \n
 ! -------------------------------------------------------------------------------------------------------------------------
-! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+!> dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/) \n
 ! -------------------------------------------------------------------------------------------------------------------------
 !
-! = log ======================================================================================
-!
-! 09/01/17 - create for v0.4
-! 31/03/17 - add non-uniform mesh correction
-! 12/04/17 - remove redundant nodes between blocks with meshlevel +1
-!
+!> = log ======================================================================================
+!! \n
+!! 09/01/17 - create for v0.4 \n
+!! 31/03/17 - add non-uniform mesh correction \n
+!! 12/04/17 - remove redundant nodes between blocks with meshlevel +1
 ! ********************************************************************************************
 
 subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
@@ -33,14 +39,14 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)                  :: params
-    ! send buffer
+    !> send buffer
     integer(kind=ik), intent(in)                    :: int_buffer(:)
-    ! send buffer
+    !> send buffer
     real(kind=rk), intent(in)                       :: recv_buff(:)
 
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :)
 
     ! buffer index

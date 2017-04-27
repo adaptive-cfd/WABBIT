@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: set_desired_num_blocks_per_rank.f90
-! version: 0.4
-! author: engels, msr
+!> \name set_desired_num_blocks_per_rank.f90
+!> \version 0.4
+!> \author engels, msr
 !
-! create block distribution lists
+!> \brief create block distribution lists
 !
-! input:    - params, light data, lists of active blocks
-! output:   - distribution arrays
-!
-! = log ======================================================================================
-!
-! 28/11/16 - create
+!> \details
+!! input:    - params, light data, lists of active blocks \n
+!! output:   - distribution arrays \n
+!!
+!! = log ======================================================================================
+!! \n
+!! 28/11/16 - create
 !
 ! ********************************************************************************************
 
@@ -26,15 +29,15 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! block distribution lists
+    !> block distribution lists
     integer(kind=ik), intent(out)       :: dist_list(:), opt_dist_list(:)
 
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! loop variables

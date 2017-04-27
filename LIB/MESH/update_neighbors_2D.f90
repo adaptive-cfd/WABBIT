@@ -1,23 +1,30 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: update_neighbors_2D.f90
-! version: 0.4
-! author: msr
+!> \name update_neighbors_2D.f90
+!> \version 0.4
+!> \author msr
 !
-! update neighbor relations with light data, store neighbors in neighbor list (heavy data)
-! 2D version
+!> \brief update neighbor relations with light data, store neighbors in neighbor list (heavy data)
+!!        2D version
 !
-! input:    - light data array
-!           - params struct
-! output:   - neighbor list array
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
-! 27/01/17 - use process rank from params struct
+!> \details
+!! input:    
+!!           - light data array
+!!           - params struct
+!!
+!! output:   
+!!           - neighbor list array
+!!
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4 \n
+!! 27/01/17 - use process rank from params struct
 !
 ! ********************************************************************************************
+!> \image html neighborhood.png "Neighborhood Relations in 2D" width=400cm
 
 subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
 
@@ -26,20 +33,20 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! number of blocks per proc

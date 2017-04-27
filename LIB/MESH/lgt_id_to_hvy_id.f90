@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: lgt_id_to_hvy_id.f90
-! version: 0.4
-! author: msr
+!> \name lgt_id_to_hvy_id.f90
+!> \version 0.4
+!> \author msr
 !
-! convert light id into heavy id
+!> \brief convert light id into heavy id
 !
-! input:    - light id, proc rank, number of blocks per proc
-! output:   - heavy data id
-!
-! = log ======================================================================================
-!
-! 23/11/16 - create
+!> \details
+!! input:    - light id, proc rank, number of blocks per proc \n
+!! output:   - heavy data id \n
+!!
+!! = log ======================================================================================
+!! \n
+!! 23/11/16 - create
 ! ********************************************************************************************
 
 subroutine lgt_id_to_hvy_id( hvy_id, lgt_id, rank, N )
@@ -28,16 +31,16 @@ subroutine lgt_id_to_hvy_id( hvy_id, lgt_id, rank, N )
 
     implicit none
 
-    ! heavy id
+    !> heavy id
     integer(kind=ik), intent(out)       :: hvy_id
 
-    ! light id
+    !> light id
     integer(kind=ik), intent(in)        :: lgt_id
 
-    ! rank of proc
+    !> rank of proc
     integer(kind=ik), intent(in)        :: rank
 
-    ! number of blocks per proc
+    !> number of blocks per proc
     integer(kind=ik), intent(in)        :: N
 
 !---------------------------------------------------------------------------------------------

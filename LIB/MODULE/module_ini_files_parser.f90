@@ -1,29 +1,30 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_ini_files_parser.f90
-! version: 0.4
-! author: engels, msr
+!> \name module_ini_files_parser.f90
+!> \version 0.4
+!> \author engels, msr
 !
+!>-------------------------------------------------------------------------------
+!! FORTRAN ini files parser module
+!!-------------------------------------------------------------------------------
+!! This module reads values from standard ini-files.
+!! The first step is to read in the entire file into a derived datatype. this datatype
+!! is provided here. After reading the file, you can call the generic routine
+!! "read_param" to extract a value, e.g. parameter=10.0; \n
+!! note we expect lines to end on a colon (;) \n
+!! commented lines beginning with # ; ! are ignored. \n
+!! The ini files are organized in sections and values: \n
+!! [Section] \n
+!! parameter=10; \n
 !-------------------------------------------------------------------------------
-! FORTRAN ini files parser module
+!> This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this \n
 !-------------------------------------------------------------------------------
-! This module reads values from standard ini-files.
-! The first step is to read in the entire file into a derived datatype. this datatype
-! is provided here. After reading the file, you can call the generic routine
-! "read_param" to extract a value, e.g. parameter=10.0;
-! note we expect lines to end on a colon (;)
-! commented lines beginning with # ; ! are ignored.
-! The ini files are organized in sections and values:
-! [Section]
-! parameter=10;
-!-------------------------------------------------------------------------------
-! This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this
-!-------------------------------------------------------------------------------
-!
-! = log ======================================================================================
-!
-! 04/11/16 - linked old module version to wabbit (use module_params)
+!> = log ======================================================================================
+!! \n
+!! 04/11/16 - linked old module version to wabbit (use module_params)
 ! ********************************************************************************************
 
 module module_ini_files_parser

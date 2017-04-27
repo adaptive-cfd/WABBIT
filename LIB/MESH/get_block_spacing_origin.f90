@@ -1,35 +1,41 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: get_block_spacing_origin.f90
-! version: 0.5
-! author: engels
+!> name get_block_spacing_origin.f90
+!> version 0.5
+!> author engels
 !
-! For any block lgt_id this routine computes, from the treecode stored in
-! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
-! and origin are 3D vectors, the third component being zero in a 2D case.
+!> \brief For any block lgt_id this routine computes, from the treecode stored in
+!! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
+!! and origin are 3D vectors, the third component being zero in a 2D case.
 !
-! input:    params
-!           lgt_id (this is the block we look at)
-!           lgt_block (this is the list of light block data, which contains the treecode, level (and refinement status, but we don't use that here))
-! output:   x0(1:3) vector with the origin of the block
-!           dx(1:3) spacing on the block
-!
-! = log ======================================================================================
-!
-! 30/03/17 - create
+!> \details
+!! input:    
+!!           - params
+!!           - lgt_id (this is the block we look at)
+!!           - lgt_block (this is the list of light block data, which contains the treecode, level (and refinement status, but we don't use that here))
+!!
+!! output:   
+!!           - x0(1:3) vector with the origin of the block
+!!           - dx(1:3) spacing on the block
+!!
+!! = log ======================================================================================
+!! \n
+!! 30/03/17 - create
 !
 subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
   implicit none
 
-  ! user defined parameter structure
+  !> user defined parameter structure
   type (type_params), intent(in)      :: params
-  ! the block in question
+  !> the block in question
   integer(kind=ik), intent(in)        :: lgt_id
-  ! output
+  !> output
   real(kind=rk), dimension(1:3), intent(out) :: x0, dx
-  ! light data array
+  !> light data array
   integer(kind=ik), intent(in)     :: lgt_block(:, :)
   ! loop variables and shortcuts
   integer(kind=ik) :: ix,iy,iz,level,bs

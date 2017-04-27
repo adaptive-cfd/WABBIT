@@ -1,27 +1,32 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: compute_friends_table.f90
-! version: 0.4
-! author: engels, msr
+!> \name compute_friends_table.f90
+!> \version 0.4
+!> \author engels, msr
 !
-! compute friends table. This is a mpisize x mpisize array of integers, and it counts
-! how many neighbor relations the mpiranks have to each other mpirank. the matrix is
-! (most of the time) symmetric, exceptions from symmetry can occur in the case of finer/coarser
-! relations
-! In the friends array, we thus just know who's my most important neighbor. The array can look like this: (mpisize=4)
-! -1    3    2    4
-!  3   -1   22   12
-!  2   22   -1   27
-!  4   12   27   -1
-! Note we set (-1) on the diagonal (since an mpirank is likely its own best friend, they're egocentric in that regard)
+!> \brief compute friends table. 
+!> \details This is a (mpisize) x (mpisize) array of integers, and it counts
+!! how many neighbor relations the mpiranks have to each other mpirank. the matrix is
+!! (most of the time) symmetric, exceptions from symmetry can occur in the case of finer/coarser
+!! relations.
+!! In the friends array, we thus just know who's my most important neighbor. The array can look like this: (mpisize=4)
+!! |     |     |     |    |
+!! |-----|-----|-----|----|
+!! | -1  |  3  |  2  |  4 |
+!! |  3  | -1  |  22 |  12|
+!! |  2  |  22 |  -1 |  27|
+!! |  4  | 12  |  27 |  -1|
+!! Note we set (-1) on the diagonal (since an mpirank is likely its own best friend, they're egocentric in that regard)
+!! \n
+!! input:    - params, neighbor lists \n
+!! output:   - friends table \n
 !
-! input:    - params, neighbor lists
-! output:   - friends table
-!
-! = log ======================================================================================
-!
-! 28/11/16 - create
+!> = log ======================================================================================
+!! \n
+!! 28/11/16 - create
 !
 ! ********************************************************************************************
 
@@ -35,21 +40,21 @@ subroutine compute_friends_table(params, hvy_neighbor, friends, hvy_active, hvy_
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! heavy data array - neighbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
-    ! friends table
+    !> friends table
     integer(kind=ik),intent(inout)      :: friends(:,:)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
-    ! friends array buffer
+    !> friends array buffer
     integer(kind=ik), allocatable       :: friends_loc(:,:)
 
     ! loop variables

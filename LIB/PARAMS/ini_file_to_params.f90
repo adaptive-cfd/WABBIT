@@ -1,20 +1,23 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: ini_file_to_params.f90
-! version: 0.5
-! author: msr
+!> \name ini_file_to_params.f90
+!> \version 0.5
+!> \author msr
 !
-! distribute blocks at start => create light data array
+!> \brief distribute blocks at start => create light data array
 !
-! input:    - filename
-! output:   - filled parameter struct
-!
-! = log ======================================================================================
-!
-! 25/01/17    - create
-! 29/01/17    - add filter parameter
-! 30/01/17    - add automatic memory management
+!>  \details
+!! input:    - filename \n
+!! output:   - filled parameter struct
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 25/01/17    - create \n
+!! 29/01/17    - add filter parameter \n
+!! 30/01/17    - add automatic memory management
 !
 ! ********************************************************************************************
 
@@ -25,10 +28,10 @@ subroutine ini_file_to_params( params, filename )
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)               :: params
 
-    ! inifile name
+    !> inifile name
     character(len=*), intent(in)                   :: filename
 
     ! process rank

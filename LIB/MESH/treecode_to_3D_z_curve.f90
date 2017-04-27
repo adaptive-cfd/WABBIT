@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: treecode_to_3D_z_curve.f90
-! version: 0.5
-! author: msr
+!> \name treecode_to_3D_z_curve.f90
+!> \version 0.5
+!> \author msr
 !
-! convert given treecode to position in sfc
+!> \brief convert given treecode to position in sfc
 !
-! input:    - treecode
-! output:   - position in sfc curve
+!> \details
+!! input:    - treecode \n
+!! output:   - position in sfc curve \n
 !
 !
-! = log ======================================================================================
-!
-! 09/02/17 - create
+!> = log ======================================================================================
+!! \n
+!! 09/02/17 - create
 !
 ! ********************************************************************************************
 
@@ -27,16 +30,16 @@ subroutine treecode_to_3D_z_curve(sfc_id, treecode, n)
 
     implicit none
 
-    ! sfc id
+    !> sfc id
     integer(kind=ik), intent(out)       :: sfc_id
 
-    ! treecode size
+    !> treecode size
     integer(kind=ik), intent(in)        :: n
 
-    ! treecode
+    !> treecode
     integer(kind=ik), intent(in)        :: treecode(n)
 
-    ! loop variable
+    !> loop variable
     integer(kind=ik)                    :: k
 
 !---------------------------------------------------------------------------------------------

@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: check_ghost_nodes.f90
-! version: 0.4
-! author: msr
+!> \name check_ghost_nodes.f90
+!> \version 0.4
+!> \author msr
 !
-! check if ghost nodes synchronization fails
-! first check: if synchroniozation fails, ghost nodes can have values of 9e9, so check if value larger than given value
+!> \brief check if ghost nodes synchronization fails
 !
-! input:    - params, heavy data, list of active heavy blocks, data field number, value for checking
-! output:   -
-!
-! = log ======================================================================================
-!
-! 29/11/16 - create
+!> \details first check: if synchroniozation fails, ghost nodes can have values of 9e9, so check if value larger than given value
+!! \n
+!! input:    - params, heavy data, list of active heavy blocks, data field number, value for checking \n
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 29/11/16 - create
 ! ********************************************************************************************
 
 subroutine check_ghost_nodes( params, hvy_block, hvy_active, hvy_n, dF, value)
@@ -26,20 +29,20 @@ subroutine check_ghost_nodes( params, hvy_block, hvy_active, hvy_n, dF, value)
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
-    ! datafield to check
+    !> datafield to check
     integer(kind=ik), intent(in)        :: dF
-    ! value to check
+    !> value to check
     real(kind=rk), intent(in)           :: value
 
     ! loop variables

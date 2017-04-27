@@ -1,30 +1,35 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: find_neighbor_edge_2D.f90
-! version: 0.4
-! author: msr
+!> \name find_neighbor_edge_2D.f90
+!> \version 0.4
+!> \author msr
 !
-! find neighbor on block edge
-! valid cases for edge neighbors:
-! i) same level: allways exact one neighbor
-! ii) one level down: one neighbor, two possible
-! neighbor relations
-! iii) one level up: allways two neighbors
-!
-! input:    - heavy and light data id
-!           - light data array and max treelevel
-!           - direction for neighbor search
-!           - list of active blocks
-! output:   - neighbor list array
-!
+!> \brief find neighbor on block edge
+!> \details valid cases for edge neighbors:
+!!           1. same level: allways exact one neighbor
+!!           2. one level down: one neighbor, two possible
+!! neighbor relations
+!!           3. one level up: allways two neighbors
+!!
+!! input:    
+!!           - heavy and light data id
+!!           - light data array and max treelevel
+!!           - direction for neighbor search
+!!           - list of active blocks
+!! output:   
+!!           - neighbor list array
+!!
 ! -------------------------------------------------------------------------------------------------------------------------
-! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+!> \details
+!! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
 ! -------------------------------------------------------------------------------------------------------------------------
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
+!> \details
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
@@ -37,22 +42,22 @@ subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, d
 
     implicit none
 
-    ! heavy data id
+    !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
-    ! light data id
+    !> light data id
     integer(kind=ik), intent(in)        :: light_id
-    ! max treelevel
+    !> max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! direction for neighbor search
+    !> direction for neighbor search
     character(len=3), intent(in)        :: dir
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! auxiliary variables

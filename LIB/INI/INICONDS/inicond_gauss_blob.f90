@@ -1,22 +1,30 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: inicond_gauss_blob.f90
-! version: 0.5
-! author: engels, msr
+!> \name inicond_gauss_blob.f90
+!> \version 0.5
+!> \author engels, msr
 !
-! initialize gauss pulse for 2D case
-! note: field phi is 3D, but third dimension is not used
+!> \brief initialize gauss pulse for 2D case \n
+!! note: field phi is 3D, but third dimension is not used
 !
-! input:    - params
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4
-! 26/01/17 - use process rank from params struct
-!          - use v0.5 hvy data array
-! 04/04/17 - rewrite to wokr only on blocks, no large datafield required
+!> \details
+!! input:    - params \n
+!! output:   - light and heavy data arrays
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 04/11/16 
+!!          - switch to v0.4 
+!!
+!! 26/01/17 
+!!          - use process rank from params struct 
+!!          - use v0.5 hvy data array 
+!!
+!! 04/04/17 
+!!          - rewrite to work only on blocks, no large datafield required
 !
 ! ********************************************************************************************
 
@@ -24,11 +32,11 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)    :: params
-    ! actual block data (note this routine acts only on one block)
+    !> actual block data (note this routine acts only on one block)
     real(kind=rk), intent(inout) :: u(:,:,:,:)
-    ! spacing and origin of block
+    !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:3),dx(1:3)
 
     ! auxiliary variable for gauss pulse
@@ -53,8 +61,8 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
     muy = 0.5_rk * params%Ly;
 
     ! pulse width
-    !sigma     = 0.1e-2_rk * params%Lx * params%Ly
-    sigma     = 0.01
+    sigma     = 0.1e-2_rk * params%Lx * params%Ly
+    !sigma     = 0.01
 
     ! create gauss pulse
     do ix = g+1,Bs+g

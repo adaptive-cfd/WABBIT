@@ -1,26 +1,29 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: refine_mesh.f90
-! version: 0.5
-! author: msr, engels
+!> \name refine_mesh.f90
+!> \version 0.5
+!> \author msr, engels
 !
-! This routine first sets the refinement flag for all blocks to +1
-! and then executes the refinement directly. Blocks that cannot be refined because they
-! are already on the finest allowed level are unaltered.
+!> \brief This routine first sets the refinement flag for all blocks to +1
+!! and then executes the refinement directly. Blocks that cannot be refined because they
+!! are already on the finest allowed level are unaltered.
+!! \n
+!! As the grid changes, active lists and neighbor relations are updated, and load balancing
+!! is applied.
 !
-! As the grid changes, active lists and neighbor relations are updated, and load balancing
-! is applied.
-!
-! input:    - params, light and heavy data
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 08/11/16 - switch to v0.4
-! 03/02/17 - 3D heavy data
-! 04/04/17 - include active lists, neighbor relations and load balancing, symmetrical to adapt_mesh
-! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
+!> \details
+!! input:    - params, light and heavy data \n
+!! output:   - light and heavy data arrays
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 08/11/16 - switch to v0.4 \n
+!! 03/02/17 - 3D heavy data \n
+!! 04/04/17 - include active lists, neighbor relations and load balancing, symmetrical to adapt_mesh \n
+!! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
 subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator )
@@ -33,23 +36,23 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neighbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(inout)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(inout)        :: lgt_n
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(inout)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)        :: hvy_n
-    ! how to choose blocks for refinement
+    !> how to choose blocks for refinement
     character(len=*), intent(in)           :: indicator
 
     ! loop variables

@@ -1,31 +1,32 @@
-
-
-
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: ensure_gradedness.f90
-! version: 0.5
-! author: msr, engels
+!> \name ensure_gradedness.f90
+!> \version 0.5
+!> \author msr, engels
 !
-! This routine is called after all blocks have been tagged whether to refine or coarsen or stay.
-! It now goes through the list of blocks and looks for refinement or coarsening states that would
-! result in an non-graded mesh. These mistakes are corrected, their status -1 or 0 is overwritten.
-! The status +1 is always conserved (recall to call respect_min_max_treelevel before).
+!> \brief check the gradedness after new refinement status
 !
-! Sine 04/2017, the new code checks all blocks that want to coarsen or remain, NOT the ones that
-! want to refine, as was done in prototypes. The reason is MPI: I cannot easily set the flags of
-! my neighbors, as they might reside on another proc.
-!
-! input:    - light data, neighbor list, list of active blocks(light data)
-! output:   - light data array
-!
-! = log ======================================================================================
-!
-! 10/11/16 - switch to v0.4
-! 23/11/16 - rework complete subroutine: use list of active blocks, procs works now on light data
-! 03/02/17 - insert neighbor_num variable to use subroutine for 2D and 3D data
-! 05/04/17 - Improvement: Ensure a graded mesh in any case, not only in the coarsen states (which was done before)
+!> \details This routine is called after all blocks have been tagged whether to refine or coarsen or stay.
+!! It now goes through the list of blocks and looks for refinement or coarsening states that would
+!! result in an non-graded mesh. These mistakes are corrected, their status -1 or 0 is overwritten.
+!! The status +1 is always conserved (recall to call respect_min_max_treelevel before).
+!! \n
+!! Since 04/2017, the new code checks all blocks that want to coarsen or remain, NOT the ones that
+!! want to refine, as was done in prototypes. The reason is MPI: I cannot easily set the flags of
+!! my neighbors, as they might reside on another proc.
+!! \n  
+!! input:    - light data, neighbor list, list of active blocks(light data) \n
+!! output:   - light data array
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 10/11/16 - switch to v0.4 \n
+!! 23/11/16 - rework complete subroutine: use list of active blocks, procs works now on light data \n
+!! 03/02/17 - insert neighbor_num variable to use subroutine for 2D and 3D data
+!! 05/04/17 - Improvement: Ensure a graded mesh in any case, not only in the coarsen states (which was done before)
 !
 ! ********************************************************************************************
 
@@ -39,16 +40,16 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! neighbor list
+    !> neighbor list
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
 
-    ! active_block_list (light data)
+    !> active_block_list (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! MPI error variable

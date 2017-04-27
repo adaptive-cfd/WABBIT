@@ -1,22 +1,28 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: new_block_heavy.f90
-! version: 0.5
-! author: msr
+!> \name new_block_heavy.f90
+!> \version 0.5
+!> \author msr
 !
-! write heavy block data in first datafield, reset all other datafields
+!> \brief write heavy block data in first datafield, reset all other datafields
 !
-! input:    - params
-!           - heavy data id
-!           - data for second datafield
-!           - coordinate vectors (store in first datafield)
-! output:   - heavy block data array
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
-! 26/01/17 - use 2D/3D hvy data array
+!> \details
+!! input:    
+!!           - params
+!!           - heavy data id
+!!           - data for second datafield
+!!           - coordinate vectors (store in first datafield)
+!!
+!! output:   
+!!           - heavy block data array
+!!
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4 \n
+!! 26/01/17 - use 2D/3D hvy data array
 !
 ! ********************************************************************************************
 
@@ -27,19 +33,19 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi, coord_x, coord_y, 
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
 
-    ! heavy data id
+    !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
 
-    ! input data
+    !> input data
     real(kind=rk), intent(in)           :: phi(:, :, :)
 
-    ! coordinate vectors
+    !> coordinate vectors
     real(kind=rk), intent(in)           :: coord_x(:), coord_y(:), coord_z(:)
 
     ! grid parameter

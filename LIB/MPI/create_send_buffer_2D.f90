@@ -1,28 +1,34 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: create_send_buffer_2D.f90
-! version: 0.4
-! author: msr
+!> \name create_send_buffer_2D.f90
+!> \version 0.4
+!> \author msr
 !
-! write send buffer with given com list
+!> \brief write send buffer with given com list
 !
-! input:    - heavy data array
-!           - params struct
-!           - communications list
-!           - number of communications to send/receive
-! output:   - send buffer
-!
+!> \details
+!! input:    
+!!           - heavy data array
+!!           - params struct
+!!           - communications list
+!!           - number of communications to send/receive
+!!
+!! output:   
+!!           - send buffer
+!!
+!! \n
 ! -------------------------------------------------------------------------------------------------------------------------
-! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+!> dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/) \n
 ! -------------------------------------------------------------------------------------------------------------------------
 !
-! = log ======================================================================================
-!
-! 06/01/17 - create for v0.4
-! 31/03/17 - add non-uniform mesh correction
-! 12/04/17 - remove redundant nodes between blocks with meshlevel +1
-!
+!> = log ======================================================================================
+!! \n
+!! 06/01/17 - create for v0.4 \n
+!! 31/03/17 - add non-uniform mesh correction \n
+!! 12/04/17 - remove redundant nodes between blocks with meshlevel +1
 ! ********************************************************************************************
 
 subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_buff, buffer_i)
@@ -35,20 +41,20 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)                  :: params
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :)
 
-    ! com list
+    !> com list
     integer(kind=ik), intent(in)                    :: com_list(:, :)
-    ! com_list id, number of communications
+    !> com_list id, number of communications
     integer(kind=ik), intent(in)                    :: com_number
 
-    ! send buffer
+    !> send buffer
     real(kind=rk), intent(out)                      :: send_buff(:)
 
-    ! buffer index
+    !> buffer index
     integer(kind=ik), intent(out)                   :: buffer_i
 
     ! grid parameter

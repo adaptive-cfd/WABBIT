@@ -1,32 +1,36 @@
-! ********************************************************************************************
+!> \file
+!> \callgraph
+!********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: adapt_mesh.f90
-! version: 0.4
-! author: msr, engels
+!> \name     adapt_mesh.f90
+!! \version  0.4
+!! \author   msr, engels
 !
-! This routine performs the coarsing of the mesh, where possible. For the given mesh
-! we compute the details-coefficients on all blocks. If four sister blocks have maximum
-! details below the specified tolerance, (so they are insignificant), they are merged to
-! one coarser block one level below. This process is repeated until the grid does not change
-! anymore.
+!> \brief This routine performs the coarsing of the mesh, where possible. For the given mesh
+!! we compute the details-coefficients on all blocks. If four sister blocks have maximum
+!! details below the specified tolerance, (so they are insignificant), they are merged to
+!! one coarser block one level below. This process is repeated until the grid does not change
+!! anymore.
+!! \n
+!! As the grid changes, active lists and neighbor relations are updated, and load balancing
+!! is applied.
 !
-! As the grid changes, active lists and neighbor relations are updated, and load balancing
-! is applied.
+!! \note The block thresholding is done with the restriction/prediction operators acting on the
+!! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed in threshold_block.
 !
-! NOTE: The block thresholding is done with the restriction/prediction operators acting on the
-! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed in threshold_block.
+!! \note It is well possible to start with a very fine mesh and end up with only one active
+!! block after this routine. You do *NOT* have to call it several times.
 !
-! NOTE: It is well possible to start with a very fine mesh and end up with only one active
-! block after this routine. You do *NOT* have to call it several times.
-!
-! input:    - params, light and heavy data
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 10/11/16 - switch to v0.4
-! ********************************************************************************************
+!> \details 
+!! input:    - params, light and heavy data \n
+!! output:   - light and heavy data arrays
+!!
+!> = log ======================================================================================
+!!
+!! 10/11/16 - switch to v0.4
+! ==========================================================================================
+!********************************************************************************************
 
 subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator )
 
@@ -38,23 +42,23 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! heavy data array
+    !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neighbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_n
-    ! coarsening indicator
+    !> coarsening indicator
     character(len=*), intent(in)        :: indicator
     ! loop variables
     integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old

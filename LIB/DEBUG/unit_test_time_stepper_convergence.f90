@@ -1,19 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: unit_test_time_stepper_convergence.f90
-! version: 0.5
-! author: msr
+!> \name unit_test_time_stepper_convergence.f90
+!> \version 0.5
+!> \author msr
 !
-! unit test for time stepper
-! note: need additional memory to save results for smallest time step
+!> \brief unit test for time stepper
+!> \details note: need additional memory to save results for smallest time step
 !
-! input:    - params, empty light and heavy data arrays
-! output:   -
-!
-! = log ======================================================================================
-!
-! 18/04/17 - create
+!> input:    - params, empty light and heavy data arrays \n
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 18/04/17 - create
 !
 ! ********************************************************************************************
 
@@ -26,19 +28,19 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
 ! variables
 
     implicit none
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)       :: params
-    ! light data array
+    !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
-    ! heavy work array  )
+    !> heavy work array  )
     real(kind=rk),  intent(inout)           :: hvy_work (:, :, :, :, :)
-    ! neighbor array (heavy data)
+    !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: lgt_active(:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
 
     ! local user defined parameter structure - use to change settings

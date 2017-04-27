@@ -1,26 +1,32 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: init_data.f90
-! version: 0.5
-! author: msr
+!> \name init_data.f90
+!> \version 0.5
+!> \author msr
 !
-! Allocate grid data (light, heavy, neighbors, active lists etc), initialize
+!> \brief Allocate grid data (light, heavy, neighbors, active lists etc), initialize
 !
-! input:    - parameter array
-!           - light data array
-!           - heavy data array
-!           - neighbor data array
-!           - light and heavy active block list
-! output:   - filled user defined data structure for global params
-!           - initialized light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
-!            initialized block data to main program
-! 07/12/16 - now uses heavy work data array
-! 25/01/17 - switch to 3D, v0.5
+!> \details
+!! input:   
+!!           - parameter array
+!!           - light data array
+!!           - heavy data array
+!!           - neighbor data array
+!!           - light and heavy active block list
+!!
+!! output:   
+!!           - filled user defined data structure for global params
+!!           - initialized light and heavy data arrays
+!!
+!! = log ======================================================================================
+!! \n
+!! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
+!!            initialized block data to main program \n
+!! 07/12/16 - now uses heavy work data array \n
+!! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
 subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active)
@@ -30,21 +36,21 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)               :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), allocatable, intent(out)      :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)         :: hvy_block(:, :, :, :, :)
-    ! heavy work array  )
+    !> heavy work array  )
     real(kind=rk), allocatable, intent(out)         :: hvy_work(:, :, :, :, :)
-    ! neighbor array (heavy data)
+    !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
-    ! allocation error variabel
+    ! allocation error variable
     integer(kind=ik)                                :: allocate_error
     ! local shortcuts:
     integer(kind=ik)                                :: Bs,g,dF,number_blocks, rank, number_procs

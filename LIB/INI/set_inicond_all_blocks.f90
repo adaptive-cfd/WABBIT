@@ -1,9 +1,11 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: init_data.f90
-! version: 0.5
-! author: msr
+! \name init_data.f90
+! \version 0.5
+! \author msr
 !
 !
 !
@@ -15,17 +17,17 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
 
   implicit none
 
-  ! user defined parameter structure
+  !> user defined parameter structure
   type (type_params), intent(inout)    :: params
-  ! light data array
+  !> light data array
   integer(kind=ik), intent(inout)      :: lgt_block(:, :)
-  ! heavy data array - block data
+  !> heavy data array - block data
   real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
-  ! list of active blocks (light data)
+  !> list of active blocks (light data)
   integer(kind=ik), intent(inout)      :: hvy_active(:)
-  ! number of heavy and light active blocks
+  !> number of heavy and light active blocks
   integer(kind=ik), intent(inout)      :: hvy_n
-  ! what function to use
+  !> what function to use
   character(len=*), intent(in) :: inicond
   ! loop variable
   integer(kind=ik)                     :: k

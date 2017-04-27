@@ -1,27 +1,38 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_field.f90
-! version: 0.5
-! author: engels, msr
+!> \name write_field.f90
+!> \version 0.5
+!> \author engels, msr
 !
-! write data of a single datafield dF at timestep iteration and time t
+!> \brief write data of a single datafield dF at timestep iteration and time t
 !
-! input:    - time loop parameter
-!           - datafield number
-!           - parameter array
-!           - light data array
-!           - heavy data array
-! output:   -
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
-! 26/01/17 - switch to 3D, v0.5
-!          - add dirs_3D array for 3D neighbor codes
-! 21/02/17 - use parallel IO, write one data array with all data
+!> \details
+!! input:    
+!!           - time loop parameter
+!!           - datafield number
+!!           - parameter array
+!!           - light data array
+!!           - heavy data array
+!!
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 
+!!          - switch to v0.4
+!!
+!! 26/01/17 
+!!          - switch to 3D, v0.5
+!!          - add dirs_3D array for 3D neighbor codes
+!!
+!! 21/02/17 
+!!          - use parallel IO, write one data array with all data
 !
 ! ********************************************************************************************
+
 subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
@@ -32,28 +43,28 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     implicit none
 
-    ! file name
+    !> file name
     character(len=*), intent(in)        :: fname
 
-    ! time loop parameters
+    !> time loop parameters
     real(kind=rk), intent(in)           :: time
     integer(kind=ik), intent(in)        :: iteration
 
-    ! datafield number
+    !> datafield number
     integer(kind=ik), intent(in)        :: dF
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
 
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! process rank

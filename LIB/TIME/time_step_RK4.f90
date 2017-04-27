@@ -1,24 +1,27 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: time_step_RK4.f90
-! version: 0.5
-! author: msr
+!> \name time_step_RK4.f90
+!> \version 0.5
+!> \author msr
 !
-! time step main function, RK4
+!> \brief time step main function, RK4
 !
-! input:    - time variable, params, light and heavy data, neighbor list
-! output:   - time variable and heavy data array
-!
-! physics:
+!> \details
+!! input:    - time variable, params, light and heavy data, neighbor list \n
+!! output:   - time variable and heavy data array
+!! \n
+!! physics: \n
 ! --------
-! - convection/diffusion: works only for one datafield
-!
-! = log ======================================================================================
-!
-! 08/11/16 - switch to v0.4
-! 07/12/16 - now uses heavy work data array and work for different physics
-! 31/01/17 - switch to 3D, v0.5
+!> - convection/diffusion: works only for one datafield
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 08/11/16 - switch to v0.4 \n
+!! 07/12/16 - now uses heavy work data array and work for different physics \n
+!! 31/01/17 - switch to 3D, v0.5 \n
 !
 ! ********************************************************************************************
 
@@ -32,23 +35,23 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     implicit none
 
-    ! time varible
+    !> time varible
     real(kind=rk), intent(inout)        :: time
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy work data array - block data
+    !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! grid parameter

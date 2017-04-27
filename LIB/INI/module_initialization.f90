@@ -1,17 +1,20 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_initialization.f90
-! version: 0.4
-! author: msr
+!> \name module_initialization.f90
+!> \version 0.4
+!> \author msr
 !
-! module for all init subroutines
+!> \brief module for all init subroutines
 !
-! = log ======================================================================================
-!
-! 24/11/16 - create
-! 04/04/17 - rename to module_initialization (as specific iniconds are in the module module_initital_conditions.f90)
-!            here we provide interfaces for mesh creation and inicond setting
+!> \details
+!! = log ======================================================================================
+!! \n
+!! 24/11/16 - create \n
+!! 04/04/17 - rename to module_initialization (as specific iniconds are in the module module_initital_conditions.f90)
+!!            here we provide interfaces for mesh creation and inicond setting
 ! ********************************************************************************************
 
 module module_initialization

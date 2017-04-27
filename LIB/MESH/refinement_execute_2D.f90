@@ -1,25 +1,28 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: refinement_execute_2D.f90
-! version: 0.5
-! author: msr
+!> \name refinement_execute_2D.f90
+!> \version 0.5
+!> \author msr
 !
-! Refine mesh (2D version). All cpu loop over their heavy data and check if the refinement
-! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
-! level and create four new blocks, each carrying a part of the interpolated data.
-! As all CPU first work individually, the light data array is synced.
+!> \brief Refine mesh (2D version). All cpu loop over their heavy data and check if the refinement
+!! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
+!! level and create four new blocks, each carrying a part of the interpolated data.
+!! As all CPU first work individually, the light data array is synced.
 !
-! NOTE: The interpolation (or prediction) operator here is applied to a block EXCLUDING
-! any ghost nodes.
+!> \note The interpolation (or prediction) operator here is applied to a block EXCLUDING
+!! any ghost nodes.
 !
-! input:    - params, light and heavy data
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
-!            subroutines
+!> \details
+!! input:    - params, light and heavy data \n
+!! output:   - light and heavy data arrays
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
+!!            subroutines
 ! ********************************************************************************************
 
 subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
@@ -32,16 +35,16 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables

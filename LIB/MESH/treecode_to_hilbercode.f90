@@ -1,31 +1,42 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: treecode_to_hilbercode.f90
-! version: 0.4
-! author: msr
+!> \name treecode_to_hilbercode.f90
+!> \version 0.4
+!> \author msr
 !
-! convert given treecode to code in hilbert curve
+!> \brief convert given treecode to code in hilbert curve
 !
-! input:    - treecode
-!           - size of treecode
-! output:   - hilbert code
-!
-! hilbert pattern
+!> \details
+!! input:   
+!!           - treecode
+!!           - size of treecode
+!!
+!! output:   
+!!           - hilbert code
+!!
+!! hilbert pattern
 ! ---------------
-!
-!    |0 3|     |0 1|     |2 1|     |2 3|
-! A: |1 2|  B: |3 2|  C: |3 0|  D: |1 0|
-!
-! one level up:
-!    |B D|     |A B|     |C C|     |D A|
-! A: |A A|  B: |C B|  C: |B D|  D: |D C|
-!
-! = log ======================================================================================
-!
-! 25/01/17 - create
-!
+!>
+!!   |A: |B: |C: |D: |
+!!   |---|---|---|---|
+!!   |0 3|0 1|2 1|2 3|
+!!   |1 2|3 2|3 0|1 0|
+!!
+!! one level up:
+!!    |A: |B: |C: |D: |
+!!    |---|---|---|---|
+!!    |B D|A B|C C|D A|
+!!    |A A|C B|B D|D C|
+!!
+!! = log ======================================================================================
+!! \n
+!! 25/01/17 - create
 ! ********************************************************************************************
+!
+!> \image html hilbert.png "Example for Path of the Hilbert Curve in 2D" width=300cm
 
 subroutine treecode_to_hilbercode(treecode, hilbertcode, n)
 
@@ -37,13 +48,13 @@ subroutine treecode_to_hilbercode(treecode, hilbertcode, n)
 
     implicit none
 
-    ! treecode size
+    !> treecode size
     integer(kind=ik), intent(in)        :: n
 
-    ! treecode
+    !> treecode
     integer(kind=ik), intent(in)        :: treecode(n)
 
-    ! hilbert code
+    !> hilbert code
     integer(kind=ik), intent(out)       :: hilbertcode(n)
 
     ! loop variable

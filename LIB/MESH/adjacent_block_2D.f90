@@ -1,21 +1,26 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: adjacent_block_2D.f90
-! version: 0.4
-! author: msr
+!> \name    adjacent_block_2D.f90
+!> \version  0.4
+!> \author   msr
 !
-! give treecode for adjacent block
+!> \brief give treecode for adjacent block
 !
-! input:    - treecode for block N
-!           - direction for neighbor search
-!           - max treelevel
-! output:   - neighbor treecode, for neighbor on same level
-!
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
+!> \details input:    
+!!                    - treecode for block N
+!!                    - direction for neighbor search
+!!                    - max treelevel
+!!
+!! output:   
+!!                    - neighbor treecode, for neighbor on same level
+!!
+!!
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 recursive subroutine adjacent_block_2D(me, neighbor, direction, level, max_treelevel)
@@ -31,16 +36,16 @@ recursive subroutine adjacent_block_2D(me, neighbor, direction, level, max_treel
 
     implicit none
 
-    ! max treelevel
+    !> max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
-    ! mesh level
+    !> mesh level
     integer(kind=ik), intent(in)        :: level
-    ! block treecode
+    !> block treecode
     integer(kind=ik), intent(in)        :: me(max_treelevel)
-    ! direction for neighbor search
+    !> direction for neighbor search
     character(len=3), intent(in)        :: direction
 
-    ! neighbor treecode
+    !> neighbor treecode
     integer(kind=ik), intent(out)       :: neighbor(max_treelevel)
 
     ! treecode variable

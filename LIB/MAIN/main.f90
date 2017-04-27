@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: main.f90
-! version: 0.5
-! author: msr
+!> \name    main.f90
+!> \version 0.5
+!> \author  msr
 !
-! main program, init all data, start time loop, output on screen during program run
+!> \brief main program, init all data, start time loop, output on screen during program run \n
 !
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4
-! 23/11/16 - use computing time array for simple performance tests
-! 07/12/16 - now uses heavy work data array
-! 25/01/17 - switch to 3D, v0.5
+!> = log ======================================================================================
+!! \n 
+!! 04/11/16 - switch to v0.4 \n
+!! 23/11/16 - use computing time array for simple performance tests \n
+!! 07/12/16 - now uses heavy work data array \n
+!! 25/01/17 - switch to 3D, v0.5 
 ! ********************************************************************************************
+!> \image html grogram.png "WABBIT" width=600cm 
 
 program main
 

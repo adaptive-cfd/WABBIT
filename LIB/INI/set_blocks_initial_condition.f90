@@ -1,28 +1,35 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: init_data.f90
-! version: 0.5
-! author: msr
+!> \name set_blocks_initial_condition.f90
+!> \version 0.5
+!> \author msr
 !
-! This routine initializes the block data, i.e. it evaluates the initial condition on the grid
+!> \brief This routine initializes the block data, i.e. it evaluates the initial condition on the grid
 !
-! input:    - parameter array
-!           - light data array
-!           - heavy data array
-!           - neighbor data array
-!           - light and heavy active block list
-! output:   - filled user defined data structure for global params
-!           - initialized light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
-!            initialized block data to main program
-! 07/12/16 - now uses heavy work data array
-! 25/01/17 - switch to 3D, v0.5
+!> \details
+!! input:    
+!!           - parameter array
+!!           - light data array
+!!           - heavy data array
+!!           - neighbor data array
+!!           - light and heavy active block list
+!!
+!! output:   
+!!           - filled user defined data structure for global params
+!!           - initialized light and heavy data arrays
+!!
+!! = log ======================================================================================
+!! \n
+!! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
+!!            initialized block data to main program \n
+!! 07/12/16 - now uses heavy work data array \n
+!! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
+
 subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, adapt)
 
   !---------------------------------------------------------------------------------------------
@@ -30,22 +37,22 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
 
   implicit none
 
-  ! user defined parameter structure
+  !> user defined parameter structure
   type (type_params), intent(inout)    :: params
-  ! light data array
+  !> light data array
   integer(kind=ik), intent(inout)      :: lgt_block(:, :)
-  ! heavy data array - block data
+  !> heavy data array - block data
   real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
-  ! neighbor array (heavy data)
+  !> neighbor array (heavy data)
   integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
-  ! list of active blocks light data)
+  !> list of active blocks light data)
   integer(kind=ik), intent(inout)      :: lgt_active(:)
-  ! list of active blocks (light data)
+  !> list of active blocks (light data)
   integer(kind=ik), intent(inout)      :: hvy_active(:)
-  ! number of heavy and light active blocks
+  !> number of heavy and light active blocks
   integer(kind=ik), intent(inout)      :: hvy_n, lgt_n
-  ! if .false. the code initializes on the coarsest grid, if .true. iterations
-  ! are performed and the mesh is refined to gurantee the error eps
+  !> if .false. the code initializes on the coarsest grid, if .true. iterations
+  !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
   integer(kind=ik)                     :: lgt_n_old
 

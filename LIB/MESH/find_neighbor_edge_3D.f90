@@ -1,48 +1,58 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: find_neighbor_edge_3D.f90
-! version: 0.5
-! author: msr
+!> \name find_neighbor_edge_3D.f90
+!> \version 0.5
+!> \author msr
 !
-! find neighbor on block edge
+!> \brief find neighbor on block edge
 !
-! input:    - heavy and light data id
-!           - light data array and max treelevel
-!           - direction for neighbor search
-!           - list of active blocks
-! output:   - neighbor list array
-!
+!> \details
+!! input:    
+!!           - heavy and light data id
+!!           - light data array and max treelevel
+!!           - direction for neighbor search
+!!           - list of active blocks
+!!
+!! output:   
+!!           - neighbor list array
+!!
+!! \n
+!!
+!  --------------------------------------------------------------------------------------------
+!> neighbor codes: \n
+!  --------------- 
+!> for imagination: 
+!!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
+!!                   - edge: boundary between two sides - use sides numbers for coding
+!!                   - corner: between three sides - so use all three sides numbers
+!!                   - block on higher/lower level: block shares face/edge and one unique corner,
+!!                     so use this corner code in second part of neighbor code
+!!
+!! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
+!! edges:  '_12/___', '_13/___', '_14/___', '_15/___' 
+!!         '_62/___', '_63/___', '_64/___', '_65/___' 
+!!         '_23/___', '_25/___', '_43/___', '_45/___' \n
+!! corner: '123/___', '134/___', '145/___', '152/___' 
+!!         '623/___', '634/___', '645/___', '652/___' \n
+!!
+!! complete neighbor code array, 74 possible neighbor relations \n
+!! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
+!!                '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
+!!                '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
+!!                '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
+!!                '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
+!!                '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
+!!                '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
+!!               '_43/134', '_43/634', '_45/145', '_45/645' /)
 ! --------------------------------------------------------------------------------------------
-! neighbor codes:
-! ---------------
-! for imagination:  - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-!                   - edge: boundary between two sides - use sides numbers for coding
-!                   - corner: between three sides - so use all three sides numbers
-!                   - block on higher/lower level: block shares face/edge and one unique corner,
-!                     so use this corner code in second part of neighbor code
 !
-! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
-! edges:  '_12/___', '_13/___', '_14/___', '_15/___'
-!         '_62/___', '_63/___', '_64/___', '_65/___'
-!         '_23/___', '_25/___', '_43/___', '_45/___'
-! corner: '123/___', '134/___', '145/___', '152/___'
-!         '623/___', '634/___', '645/___', '652/___'
-!
-! complete neighbor code array, 74 possible neighbor relations
-! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-!               '_43/134', '_43/634', '_45/145', '_45/645' /)
-! --------------------------------------------------------------------------------------------
-!
-! = log ======================================================================================
-!
-! 30/01/17 - create
+!> \details
+!! = log ======================================================================================
+!! \n
+!! 30/01/17 - create
 !
 ! ********************************************************************************************
 
@@ -56,22 +66,22 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
     implicit none
 
-    ! heavy data id
+    !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
-    ! light data id
+    !> light data id
     integer(kind=ik), intent(in)        :: lgt_id
-    ! max treelevel
+    !> max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! direction for neighbor search
+    !> direction for neighbor search
     character(len=7), intent(in)        :: dir
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! auxiliary variables

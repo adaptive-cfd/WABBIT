@@ -1,22 +1,27 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: save_data.f90
-! version: 0.5
-! author: msr
+!> \name save_data.f90
+!> \version 0.5
+!> \author msr
 !
-! save data main function, call write data routine
+!> \brief save data main function, call write data routine
 !
-! input:    - time loop parameter
-!           - parameter array
-!           - light data array
-!           - heavy data array
-! output:   -
-!
-! = log ======================================================================================
-!
-! 07/11/16 - switch to v0.4
-! 26/01/17 - switch to 3D, v0.5
+!> \details
+!! input:    
+!!           - time loop parameter
+!!           - parameter array
+!!           - light data array
+!!           - heavy data array
+!!
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 07/11/16 - switch to v0.4 \n
+!! 26/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
 
@@ -30,21 +35,21 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
     implicit none
 
-    ! time loop parameters
+    !> time loop parameters
     real(kind=rk), intent(in)                       :: time
     integer(kind=ik), intent(in)                    :: iteration
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)                  :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)                    :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(inout)                 :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(inout)                 :: lgt_n
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)                 :: hvy_n
 
     ! loop variable

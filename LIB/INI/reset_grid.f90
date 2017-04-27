@@ -1,26 +1,32 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: init_data.f90
-! version: 0.5
-! author: msr
+!> \name init_data.f90
+!> \version 0.5
+!> \author msr
 !
-! reset grid, set all blocks to empty
+!> \brief reset grid, set all blocks to empty
 !
-! input:    - parameter array
-!           - light data array
-!           - heavy data array
-!           - neighbor data array
-!           - light and heavy active block list
-! output:   - filled user defined data structure for global params
-!           - initialized light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
-!            initialized block data to main program
-! 07/12/16 - now uses heavy work data array
-! 25/01/17 - switch to 3D, v0.5
+!> \details
+!! input:    
+!!           - parameter array
+!!           - light data array
+!!           - heavy data array
+!!           - neighbor data array
+!!           - light and heavy active block list
+!!
+!! output:   
+!!           - filled user defined data structure for global params
+!!           - initialized light and heavy data arrays
+!!
+!! = log ======================================================================================
+!! \n
+!! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
+!            initialized block data to main program \n
+!! 07/12/16 - now uses heavy work data array \n
+!! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
 subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, verbosity )
@@ -30,25 +36,25 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)       :: params
-    ! light data array
+    !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
-    ! heavy work array  )
+    !> heavy work array  )
     real(kind=rk),  intent(inout)           :: hvy_work(:, :, :, :, :)
-    ! neighbor array (heavy data)
+    !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(inout)         :: lgt_n
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)         :: hvy_n
-    ! write output
+    !> write output
     logical, intent(in)                     :: verbosity
 
 !---------------------------------------------------------------------------------------------

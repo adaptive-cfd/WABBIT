@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: RHS_2D_advection.f90
-! version: 0.5
-! author: msr
+!> \name RHS_2D_advection.f90
+!> \version 0.5
+!> \author msr
 !
-! rhs for 2D advection equation, calculate velocity field with f_x_y_t subroutine
+!> \brief rhs for 2D advection equation, calculate velocity field with f_x_y_t subroutine
 !
-! input:    - datafield, grid parameter, time, derivative order
-! output:   - RHS(datafield)
-!
-! = log ======================================================================================
-!
-! 20/04/17 - create
+!> \details
+!> input:    - datafield, grid parameter, time, derivative order \n
+!! output:   - RHS(datafield)
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 20/04/17 - create
 !
 ! ********************************************************************************************
 
@@ -29,11 +32,11 @@ subroutine RHS_2D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
 
     implicit none
 
-    ! grid parameter
+    !> grid parameter
     integer(kind=ik), intent(in)                                :: g, Bs
-    ! rhs parameter
+    !> rhs parameter
     real(kind=rk), intent(in)                                   :: xx0(1:2), ddx(1:2), time
-    ! datafield
+    !> datafield
     real(kind=rk), dimension(Bs+2*g, Bs+2*g), intent(inout)     :: phi
     ! order discretization
     character(len=80)                                           :: order_discretization

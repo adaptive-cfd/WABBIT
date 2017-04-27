@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: coarse_mesh_3D.f90
-! version: 0.5
-! author: msr
+!> \name coarse_mesh_3D.f90
+!> \version 0.5
+!> \author msr
 !
-! coarse the mesh:
-! every proc work on light data array,
+!> \brief coarse the mesh: \n
+!! every proc work on light data array
 !
-! input:    - params, light and heavy data
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 03/02/17 - create
+!> \details 
+!! input:    - params, light and heavy data \n
+!! output:   - light and heavy data arrays
+!! \n
+!> = log ======================================================================================
+!! \n
+!! 03/02/17 - create
 !
 ! ********************************************************************************************
 
@@ -27,16 +30,16 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
 
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n
 
     ! loop variables

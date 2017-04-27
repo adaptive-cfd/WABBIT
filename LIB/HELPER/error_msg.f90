@@ -1,3 +1,5 @@
+!> \file
+!> \callgraph
 subroutine error_msg(msg)
     implicit none
     character(len=*), intent(in) :: msg

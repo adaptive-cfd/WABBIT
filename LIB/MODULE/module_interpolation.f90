@@ -1,16 +1,19 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: module_interpolation.f90
-! version: 0.5
-! author: msr, engels
+!> \name module_interpolation.f90
+!> \version 0.5
+!> \author msr, engels
 !
-! refinement and coarsening subroutines
+!> \brief refinement and coarsening subroutines
 !
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4
-! 03/02/17 - create subroutines for 3D
+!> \details
+!! = log ======================================================================================
+!! \n
+!! 04/11/16 - switch to v0.4 \n
+!! 03/02/17 - create subroutines for 3D
 !
 ! ********************************************************************************************
 

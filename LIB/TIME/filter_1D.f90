@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: filter_1D.f90
-! version: 0.5
-! author: msr
+!> \name filter_1D.f90
+!> \version 0.5
+!> \author msr
 !
-! 1D Filter subroutine
+!> \brief 1D Filter subroutine
 !
-! input:    - filter stencil, data array, position of value to filter
-! output:   - filtered data
-!
-! = log ======================================================================================
-!
-! 27/03/17 - create
+!> \details
+!! input:    - filter stencil, data array, position of value to filter \n
+!! output:   - filtered data
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 27/03/17 - create
 !
 ! ********************************************************************************************
 
@@ -29,11 +32,11 @@ subroutine filter_1D(phi, a, pos)
 
     implicit none
 
-    ! datafield
+    !> datafield
     real(kind=rk), intent(inout)        :: phi(:)
-    ! filter coefficients
+    !> filter coefficients
     real(kind=rk), intent(in)           :: a(:)
-    ! filter position
+    !> filter position
     integer(kind=ik), intent(in)        :: pos
 
     ! loop variable

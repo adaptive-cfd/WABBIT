@@ -1,21 +1,27 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: synchronize_internal_nodes.f90
-! version: 0.5
-! author: msr
+!> \name synchronize_internal_nodes.f90
+!> \version 0.5
+!> \author msr
 !
-! synchronize internal ghosts nodes, create com matrix and com list for external communication
+!> \brief synchronize internal ghosts nodes, create com matrix and com list for external communication
 !
-! input:    - params, light and heavy data
-! output:   - heavy data
-!           - com matrix
-!           - com lists for external synchronization
-!
-! = log ======================================================================================
-!
-! 12/01/17 - create from old synchronize ghost routine
-! 31/01/17 - switch to 3D, v0.5
+!> \details
+!! input:    
+!!           - params, light and heavy data
+!!
+!! output:   
+!!           - heavy data
+!!           - com matrix
+!!           - com lists for external synchronization
+!!
+!! = log ======================================================================================
+!! \n
+!! 12/01/17 - create from old synchronize ghost routine \n
+!! 31/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
 
@@ -29,35 +35,35 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! heavy data array - neifghbor data
+    !> heavy data array - neifghbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
-    ! communication lists:
-    ! dim 1: list elements
-    ! dim 2: columns
-    !                       1   rank of sender process
-    !                       2   rank of receiver process
-    !                       3   sender block heavy data id
-    !                       4   receiver block heavy data id
-    !                       5   sender block neighborhood to receiver (dirs id)
-    !                       6   difference between sender-receiver level
-    ! dim 3: receiver proc rank
+    !> communication lists: 
+    !!       - dim 1: list elements 
+    !!       - dim 2: columns
+    !!                      - 1   rank of sender process
+    !!                      - 2   rank of receiver process
+    !!                      - 3   sender block heavy data id
+    !!                      - 4   receiver block heavy data id
+    !!                      - 5   sender block neighborhood to receiver (dirs id)
+    !!                      - 6   difference between sender-receiver level
+    !!       - dim 3: receiver proc rank
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :)
 
-    ! communications matrix:
-    ! count the number of communications between procs
-    ! row/column number encodes process rank + 1
+    !> communications matrix: \n
+    !! count the number of communications between procs
+    !! row/column number encodes process rank + 1
     integer(kind=ik), intent(inout)     :: com_matrix(:,:)
 
     ! loop variables

@@ -1,26 +1,37 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: initial_block_distribution_3D.f90
-! version: 0.5
-! author: msr
+!> \name initial_block_distribution_3D.f90
+!> \version 0.5
+!> \author msr
 !
-! distribute blocks at start => create light data array
-! note: field phi is 3D, but third dimension is not used
+!> \brief distribute blocks at start => create light data array \n
+!! \note field phi is 3D, but third dimension is not used
 !
-! input:    - parameters
-!           - light block data array
-!           - heavy block data array
-!           - start field phi
-! output:   - filled light and heavy data array
-!
-! = log ======================================================================================
-!
-! 07/11/16  - switch to v0.4
-! 05/12/16  - add dummy space filling curve distribution
-! 26/01/17  - use process rank from params struct
-!           - remove sfc distribution: for sfc start dist, call balance_load after this routine
-!           - use v0.5 hvy data array, but still work only for 2D data
+!> \details
+!! input:    
+!!           - parameters
+!!           - light block data array
+!!           - heavy block data array
+!!           - start field phi
+!!
+!! output:   
+!!           - filled light and heavy data array
+!!
+!! = log ======================================================================================
+!!
+!! 07/11/16  
+!!            - switch to v0.4
+!!
+!! 05/12/16  
+!!            - add dummy space filling curve distribution
+!!
+!! 26/01/17  
+!!            - use process rank from params struct
+!!            - remove sfc distribution: for sfc start dist, call balance_load after this routine
+!!            - use v0.5 hvy data array, but still work only for 2D data
 !
 ! ********************************************************************************************
 
@@ -31,13 +42,13 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! initial data field
+    !> initial data field
     real(kind=rk), intent(in)           :: phi(:, :, :)
 
     ! process rank

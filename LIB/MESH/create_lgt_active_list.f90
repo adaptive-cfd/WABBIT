@@ -1,20 +1,25 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: create_lgt_active_list.f90
-! version: 0.4
-! author: msr
+!> \name create_lgt_active_list.f90
+!> \version 0.4
+!> \author msr
 !
-! create a list of all active blocks (light data)
-! dim 1: light data id
-!
-! input:    - light data
-! output:   - list of active blocks, light data id
-!           - number of active blocks
-!
-! = log ======================================================================================
-!
-! 23/11/16 - create subroutine
+!> \brief create a list of all active blocks (light data)
+!> \details dim 1: light data id
+!! \n
+!! input:    
+!!           - light data
+!!
+!! output:
+!!           - list of active blocks, light data id
+!!           - number of active blocks
+!!
+!> = log ======================================================================================
+!! \n
+!! 23/11/16 - create subroutine
 ! ********************************************************************************************
 
 subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
@@ -24,13 +29,13 @@ subroutine create_lgt_active_list( lgt_block, lgt_active, lgt_n )
 
     implicit none
 
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
 
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik), intent(out)       :: lgt_active(:)
 
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(out)       :: lgt_n
 
     ! loop variables

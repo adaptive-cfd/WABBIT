@@ -1,20 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_future_mesh_lvl.f90
-! version: 0.4
-! author: msr
+!> \name write_future_mesh_lvl.f90
+!> \version 0.4
+!> \author msr
 !
-! debug planned mesh changes
-! write file with future mesh level for all blocks
-! write also future mesh level for all known neighbor blocks
-!
-! input:    - params, light data
-! output:   - status of lgt_block synchronzation
-!
-! = log ======================================================================================
-!
-! 29/11/16 - create
+!> \brief debug planned mesh changes \n
+!! write file with future mesh level for all blocks \n
+!! write also future mesh level for all known neighbor blocks
+!! \n
+!! input:    - params, light data \n
+!! output:   - status of lgt_block synchronzation
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 29/11/16 - create
 ! ********************************************************************************************
 
 subroutine write_future_mesh_lvl( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
@@ -27,16 +29,16 @@ subroutine write_future_mesh_lvl( params, lgt_block, hvy_neighbor, lgt_active, l
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! neighbor list
+    !> neighbor list
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
 
-    ! active_block_list (light data)
+    !> active_block_list (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
-    ! number of active blocks (light data)
+    !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! local data array, rows: block id, number of columns: future lvl, 16 possible neighbors

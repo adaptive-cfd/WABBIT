@@ -1,18 +1,21 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: RHS_2D_navier_stokes.f90
-! version: 0.4
-! author: msr
+!> \name RHS_2D_navier_stokes.f90
+!> \version 0.4
+!> \author msr
 !
-! RHS for 2D navier stokes equation
+!> \brief RHS for 2D navier stokes equation
 !
-! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order
-! output:   - RHS(datafield)
-!
-! = log ======================================================================================
-!
-! 08/12/16 - create
+!> \details
+!! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
+!! output:   - RHS(datafield)
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 08/12/16 - create
 ! ********************************************************************************************
 
 subroutine RHS_2D_navier_stokes(params, g, Bs, dx, dy, N_dF, phi)
@@ -28,17 +31,17 @@ subroutine RHS_2D_navier_stokes(params, g, Bs, dx, dy, N_dF, phi)
 
     implicit none
 
-    ! physics parameter structure
+    !> physics parameter structure
     type (type_params_physics_navier_stokes), intent(in)    :: params
 
-    ! grid parameter
+    !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
-    ! rhs parameter
+    !> rhs parameter
     real(kind=rk), intent(in)                               :: dx, dy
 
-    ! number of datafields
+    !> number of datafields
     integer(kind=ik), intent(in)                            :: N_dF
-    ! datafields
+    !> datafields
     real(kind=rk), intent(inout)                            :: phi(Bs+2*g, Bs+2*g, N_dF)
 
      ! adiabatic coefficient

@@ -1,22 +1,24 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: unit_test_ghost_nodes_synchronization.f90
-! version: 0.5
-! author: msr, engels
+!> \name unit_test_ghost_nodes_synchronization.f90
+!> \version 0.5
+!> \author msr, engels
 !
-! unit test for ghost nodes synchronization
-! note: input only params struct to this subroutine
-!       create new light/heavy data arrays here and deallocate them after this function
+!> \brief  unit test for ghost nodes synchronization
+!> \details  note: input only params struct to this subroutine
+!!       create new light/heavy data arrays here and deallocate them after this function \n
 !
-! input:    - params
-! output:   -
-!
-! = log ======================================================================================
-!
-! 21/01/17 - create
-! 03/04/17 - major rewrite: no local memory allocation, convergence test is performed
-! 05/04/17 - use the renewed refine_mesh with random indicator
+!> input:    - params \n
+!! output:   -
+!! \n
+!> = log ======================================================================================
+!! \n
+!! 21/01/17 - create
+!! 03/04/17 - major rewrite: no local memory allocation, convergence test is performed
+!! 05/04/17 - use the renewed refine_mesh with random indicator
 !
 ! ********************************************************************************************
 
@@ -29,19 +31,19 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 ! variables
 
     implicit none
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)       :: params
-    ! light data array
+    !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
-    ! heavy work array  )
+    !> heavy work array  )
     real(kind=rk),  intent(inout)           :: hvy_work (:, :, :, :, :)
-    ! neighbor array (heavy data)
+    !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: lgt_active(:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
 
     ! number of active blocks (heavy data)

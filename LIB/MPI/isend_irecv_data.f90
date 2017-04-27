@@ -1,19 +1,25 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: isend_irecv_data.f90
-! version: 0.4
-! author: msr
+!> \name isend_irecv_data.f90
+!> \version 0.4
+!> \author msr
 !
-! transfer data with MPI non blocking subroutines
+!> \brief transfer data with MPI non blocking subroutines
 !
-! input:    - send buffer
-!           - com matrix and com position matrix
-! output:   - receive buffer
-!
-! = log ======================================================================================
-!
-! 16/01/17 - create for v0.4
+!> \details
+!! input:    
+!!           - send buffer
+!!           - com matrix and com position matrix
+!!
+!! output:   
+!!           - receive buffer
+!!
+!! = log ======================================================================================
+!! \n
+!! 16/01/17 - create for v0.4
 ! ********************************************************************************************
 
 subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
@@ -26,18 +32,18 @@ subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_rece
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    ! send/receive buffer, integer and real
+    !> send/receive buffer, integer and real
     integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
     integer(kind=ik), intent(out)       :: int_receive_buffer(:,:)
 
     real(kind=rk), intent(in)           :: real_send_buffer(:,:)
     real(kind=rk), intent(out)          :: real_receive_buffer(:,:)
 
-    ! communications matrix: neighboring proc rank
-    ! com matrix pos: position in send buffer
+    !> communications matrix: neighboring proc rank
+    !> com matrix pos: position in send buffer
     integer(kind=ik), intent(in)        :: com_matrix(:,:), com_matrix_pos(:,:)
 
     ! MPI error variable

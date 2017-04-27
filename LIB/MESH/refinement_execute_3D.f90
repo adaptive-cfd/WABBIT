@@ -1,24 +1,27 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: refinement_execute_3D.f90
-! version: 0.5
-! author: msr, engels
+!> \name refinement_execute_3D.f90
+!> \version 0.5
+!> \author msr, engels
 !
-! Refine mesh (3D version). All cpu loop over their heavy data and check if the refinement
-! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
-! level and create four new blocks, each carrying a part of the interpolated data.
-! As all CPU first work individually, the light data array is synced.
+!> \brief Refine mesh (3D version). All cpu loop over their heavy data and check if the refinement
+!! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
+!! level and create four new blocks, each carrying a part of the interpolated data.
+!! As all CPU first work individually, the light data array is synced.
 !
-! NOTE: The interpolation (or prediction) operator here is applied to a block EXCLUDING
-! any ghost nodes.
+!> \note The interpolation (or prediction) operator here is applied to a block EXCLUDING
+!! any ghost nodes.
 !
-! input:    - params, light and heavy data
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 03/02/17 - create
+!> \details
+!! input:    - params, light and heavy data \n
+!! output:   - light and heavy data arrays
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 03/02/17 - create
 !
 ! ********************************************************************************************
 
@@ -32,16 +35,16 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
 
-    ! list of active blocks (heavy data)
+    !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
-    ! number of active blocks (heavy data)
+    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables

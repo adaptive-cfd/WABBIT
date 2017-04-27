@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: check_lgt_block_synchronization.f90
-! version: 0.4
-! author: msr
+!> \name check_lgt_block_synchronization.f90
+!> \version 0.4
+!> \author msr
 !
-! debug lgt_block data
-! proc 0 gather all data and compare the data to his own light data
+!> \brief debug lgt_block data
 !
-! input:    - params, light data
-! output:   - status of lgt_block synchronzation
-!
-! = log ======================================================================================
-!
-! 29/11/16 - create
+!> \details proc 0 gather all data and compare the data to his own light data
+!! \n
+!! input:    - params, light data \n
+!! output:   - status of lgt_block synchronzation
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 29/11/16 - create
 ! ********************************************************************************************
 
 subroutine check_lgt_block_synchronization( params, lgt_block)
@@ -26,9 +29,9 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
 
     ! local light data array

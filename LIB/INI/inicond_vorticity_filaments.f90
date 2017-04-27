@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: inicond_vorticity_filaments.f90
-! version: 0.4
-! author: msr
+!> \name inicond_vorticity_filaments.f90
+!> \version 0.4
+!> \author msr
 !
-! initialize the vorticity_filaments testcase
-! load velocity fields from file
+!> \brief initialize the vorticity_filaments testcase \n
+!! load velocity fields from file
 !
-! input:    - params, light and heavy data
-! output:   - params, light and heavy data
-!
-! = log ======================================================================================
-!
-! 04/11/16 - switch to v0.4
+!> \details
+!! input:    - params, light and heavy data \n
+!! output:   - params, light and heavy data
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 04/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
@@ -23,13 +26,13 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
 
     implicit none
 
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)       :: params
 
-    ! light data array
+    !> light data array
     integer(kind=ik), intent(inout)         :: lgt_block(:, :)
 
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk), intent(inout)            :: hvy_block(:, :, :, :)
 
     ! field from file

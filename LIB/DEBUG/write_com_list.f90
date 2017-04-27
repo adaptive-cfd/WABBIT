@@ -1,19 +1,22 @@
+!> \file
+!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-! name: write_com_list.f90
-! version: 0.4
-! author: msr
+!> \name write_com_list.f90
+!> \version 0.4
+!> \author msr
 !
-! write communication list to file
-! note: existing file will be overridden
+!> \brief write communication list to file \n
+!! note: existing file will be overridden
 !
-! input:    - current com list
-! output:   -
-!
-! = log ======================================================================================
-!
-! 05/12/16 - create
+!> \details
+!! input:    - current com list \n
+!! output:   -
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 05/12/16 - create
 ! ********************************************************************************************
 
 subroutine write_com_list( com_list )
@@ -26,7 +29,7 @@ subroutine write_com_list( com_list )
 
     implicit none
 
-    ! iteration
+    !> iteration
     integer(kind=ik), intent(in)        :: com_list(:, :)
 
     ! MPI error variable

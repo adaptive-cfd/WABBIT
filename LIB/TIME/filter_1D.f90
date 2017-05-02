@@ -16,10 +16,11 @@
 !! = log ======================================================================================
 !! \n
 !! 27/03/17 - create
+!! 02/05/17 - return filtered value separatly
 !
 ! ********************************************************************************************
 
-subroutine filter_1D(phi, a, pos)
+subroutine filter_1D(phi, phi_tilde, a)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -33,11 +34,11 @@ subroutine filter_1D(phi, a, pos)
     implicit none
 
     !> datafield
-    real(kind=rk), intent(inout)        :: phi(:)
+    real(kind=rk), intent(in)           :: phi(:)
+    !> filtered value
+    real(kind=rk), intent(out)          :: phi_tilde
     !> filter coefficients
     real(kind=rk), intent(in)           :: a(:)
-    !> filter position
-    integer(kind=ik), intent(in)        :: pos
 
     ! loop variable
     integer(kind=ik)                    :: k
@@ -51,7 +52,8 @@ subroutine filter_1D(phi, a, pos)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    phi_old = phi
+    phi_old   = phi
+    phi_tilde = 0.0_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -67,7 +69,7 @@ subroutine filter_1D(phi, a, pos)
 
     ! filter data
     do k = 1, size(a)
-        phi(pos) = phi(pos) + a(k)*phi_old(k)
+        phi_tilde = phi_tilde + a(k)*phi_old(k)
     end do
 
 end subroutine filter_1D

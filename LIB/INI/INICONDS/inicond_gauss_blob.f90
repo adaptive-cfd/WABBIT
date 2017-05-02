@@ -61,8 +61,8 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
     muy = 0.5_rk * params%Ly;
 
     ! pulse width
-    sigma     = 0.1e-2_rk * params%Lx * params%Ly
-    !sigma     = 0.01
+    !sigma     = 0.1e-2_rk * params%Lx * params%Ly
+    sigma     = 0.01
 
     ! create gauss pulse
     do ix = g+1,Bs+g
@@ -77,12 +77,6 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
         u(ix,iy,1,2) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
       end do
     end do
-
-    ! ! it sometimes causes bizarre effects not to delete extremely small numbers:
-    ! ! so we do that now.
-    ! where ( u<1.0e-13_rk )
-    !     u = 0.0_rk
-    ! end where
 
 end subroutine inicond_gauss_blob
 
@@ -110,6 +104,14 @@ subroutine shift_x_y( x, y, Lx, Ly )
 
     if ( x < 0.0_rk ) then
         x = Lx + x
+    end if
+
+    if ( y > Ly ) then
+        y = Ly - y
+    end if
+
+    if ( x > Lx ) then
+        x = Lx - x
     end if
 
 end subroutine shift_x_y

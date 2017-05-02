@@ -16,6 +16,7 @@
 !! = log ======================================================================================
 !! \n
 !! 27/03/17 - create
+!! 02/05/17 - filter (x,y,z)-values separatly
 !
 ! ********************************************************************************************
 
@@ -58,6 +59,10 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
     ! filter position (array postion of value to filter)
     integer(kind=ik)                    :: filter_pos
+
+    ! filtered values
+    real(kind=rk)                       :: phi_tilde(3)
+
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -107,6 +112,8 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                     -5.0_rk/ 512.0_rk, &
                      1.0_rk/1024.0_rk/)
 
+    filter_pos = 0
+
     ! set filter pos
     select case(params%filter_type)
         case('explicit_5pt')
@@ -121,7 +128,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
         case('explicit_11pt')
             filter_pos = 6
             
-        case('no-filter')
+        case('no_filter')
             ! do nothing..
 
         case default
@@ -163,11 +170,14 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                                 do l = g+1, Bs+g
 
                                     ! x direction
-                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), stencil_5, filter_pos )
+                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), phi_tilde(1), stencil_5 )
                                     ! y direction
-                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), stencil_5, filter_pos )
+                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), phi_tilde(2), stencil_5 )
                                     ! z direction
-                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), stencil_5, filter_pos )
+                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), phi_tilde(3), stencil_5 )
+
+                                    ! filter
+                                    hvy_block(i, j, l, dF, hvy_active(k) ) = hvy_block(i, j, l, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
 
                                 end do
                             end do
@@ -179,9 +189,12 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                             do j = g+1, Bs+g
 
                                 ! x direction
-                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), stencil_5, filter_pos )
+                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), phi_tilde(1), stencil_5 )
                                 ! y direction
-                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), stencil_5, filter_pos )
+                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), phi_tilde(2), stencil_5 )
+
+                                ! filter
+                                hvy_block(i, j, 1, dF, hvy_active(k) ) = hvy_block(i, j, 1, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2)
 
                             end do
                         end do
@@ -204,11 +217,14 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                                 do l = g+1, Bs+g
 
                                     ! x direction
-                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), stencil_7, filter_pos )
+                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), phi_tilde(1), stencil_7 )
                                     ! y direction
-                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), stencil_7, filter_pos )
+                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), phi_tilde(2), stencil_7 )
                                     ! z direction
-                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), stencil_7, filter_pos )
+                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), phi_tilde(3), stencil_7 )
+
+                                    ! filter
+                                    hvy_block(i, j, l, dF, hvy_active(k) ) = hvy_block(i, j, l, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
 
                                 end do
                             end do
@@ -220,9 +236,12 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                             do j = g+1, Bs+g
 
                                 ! x direction
-                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), stencil_7, filter_pos )
+                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), phi_tilde(1), stencil_7 )
                                 ! y direction
-                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), stencil_7, filter_pos )
+                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), phi_tilde(2), stencil_7 )
+
+                                ! filter
+                                hvy_block(i, j, 1, dF, hvy_active(k) ) = hvy_block(i, j, 1, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2)
 
                             end do
                         end do
@@ -245,11 +264,14 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                                 do l = g+1, Bs+g
 
                                     ! x direction
-                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), stencil_9, filter_pos )
+                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), phi_tilde(1), stencil_9 )
                                     ! y direction
-                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), stencil_9, filter_pos )
+                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), phi_tilde(2), stencil_9 )
                                     ! z direction
-                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), stencil_9, filter_pos )
+                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), phi_tilde(3), stencil_9 )
+
+                                    ! filter
+                                    hvy_block(i, j, l, dF, hvy_active(k) ) = hvy_block(i, j, l, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
 
                                 end do
                             end do
@@ -261,9 +283,12 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                             do j = g+1, Bs+g
 
                                 ! x direction
-                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), stencil_9, filter_pos )
+                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), phi_tilde(1), stencil_9 )
                                 ! y direction
-                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), stencil_9, filter_pos )
+                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), phi_tilde(2), stencil_9 )
+
+                                ! filter
+                                hvy_block(i, j, 1, dF, hvy_active(k) ) = hvy_block(i, j, 1, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2)
 
                             end do
                         end do
@@ -286,11 +311,14 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                                 do l = g+1, Bs+g
 
                                     ! x direction
-                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), stencil_11, filter_pos )
+                                    call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, l, dF, hvy_active(k) ), phi_tilde(1), stencil_11)
                                     ! y direction
-                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), stencil_11, filter_pos )
+                                    call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), l, dF, hvy_active(k) ), phi_tilde(2), stencil_11 )
                                     ! z direction
-                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), stencil_11, filter_pos )
+                                    call filter_1D( hvy_block(i, j, l-(filter_pos-1):l+(filter_pos-1), dF, hvy_active(k) ), phi_tilde(3), stencil_11 )
+
+                                    ! filter
+                                    hvy_block(i, j, l, dF, hvy_active(k) ) = hvy_block(i, j, l, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
 
                                 end do
                             end do
@@ -302,9 +330,12 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
                             do j = g+1, Bs+g
 
                                 ! x direction
-                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), stencil_11, filter_pos )
+                                call filter_1D( hvy_block(i-(filter_pos-1):i+(filter_pos-1), j, 1, dF, hvy_active(k) ), phi_tilde(1), stencil_11 )
                                 ! y direction
-                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), stencil_11, filter_pos )
+                                call filter_1D( hvy_block(i, j-(filter_pos-1):j+(filter_pos-1), 1, dF, hvy_active(k) ), phi_tilde(2), stencil_11 )
+
+                                ! filter
+                                hvy_block(i, j, 1, dF, hvy_active(k) ) = hvy_block(i, j, 1, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2)
 
                             end do
                         end do
@@ -313,6 +344,9 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
                 end do
             end do
+
+        case('no_filter')
+            ! do nothing
 
         case default
             write(*,'(80("_"))')

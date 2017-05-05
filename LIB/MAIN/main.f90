@@ -16,7 +16,7 @@
 !! 07/12/16 - now uses heavy work data array \n
 !! 25/01/17 - switch to 3D, v0.5 
 ! ********************************************************************************************
-!> \image html grogram.png "WABBIT" width=600cm 
+!> \image html program.png "WABBIT" width=600cm 
 
 program main
 

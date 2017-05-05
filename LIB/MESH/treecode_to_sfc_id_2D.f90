@@ -3,7 +3,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name treecode_to_sfc_id.f90
+!> \name treecode_to_sfc_id_2D.f90
 !> \version 0.4
 !> \author msr
 !
@@ -19,7 +19,7 @@
 !! 05/12/16 - create
 ! ********************************************************************************************
 
-subroutine treecode_to_sfc_id(sfc_id, treecode, n)
+subroutine treecode_to_sfc_id_2D(sfc_id, treecode, n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -61,4 +61,4 @@ subroutine treecode_to_sfc_id(sfc_id, treecode, n)
         end if
     end do
 
-end subroutine treecode_to_sfc_id
+end subroutine treecode_to_sfc_id_2D

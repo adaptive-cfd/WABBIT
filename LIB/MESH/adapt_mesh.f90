@@ -22,7 +22,7 @@
 !! \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
 !
-!> \details 
+!>  
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
 !!

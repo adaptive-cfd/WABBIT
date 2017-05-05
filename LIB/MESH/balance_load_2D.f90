@@ -345,7 +345,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! loop over active blocks
             do k = 1, lgt_n
                 ! calculate sfc position
-                call treecode_to_sfc_id( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
                 ! fill sfc list with light data id
                 sfc_list(sfc_id+1) = lgt_active(k)
             end do
@@ -534,9 +534,9 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! loop over active blocks
             do k = 1, lgt_n
                 ! transfer treecode to hilbertcode
-                call treecode_to_hilbercode( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
                 ! calculate sfc position from hilbertcode
-                call treecode_to_sfc_id( sfc_id, hilbertcode, params%max_treelevel )
+                call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
                 ! fill sfc list with light data id
                 sfc_list(sfc_id+1) = lgt_active(k)
             end do

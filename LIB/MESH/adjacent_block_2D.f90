@@ -9,7 +9,8 @@
 !
 !> \brief give treecode for adjacent block
 !
-!> \details input:    
+!> 
+!! input:    
 !!                    - treecode for block N
 !!                    - direction for neighbor search
 !!                    - max treelevel

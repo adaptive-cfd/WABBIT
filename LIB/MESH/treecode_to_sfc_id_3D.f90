@@ -3,7 +3,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name treecode_to_3D_z_curve.f90
+!> \name treecode_to_sfc_id_3D.f90
 !> \version 0.5
 !> \author msr
 !
@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine treecode_to_3D_z_curve(sfc_id, treecode, n)
+subroutine treecode_to_sfc_id_3D(sfc_id, treecode, n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -62,4 +62,4 @@ subroutine treecode_to_3D_z_curve(sfc_id, treecode, n)
         end if
     end do
 
-end subroutine treecode_to_3D_z_curve
+end subroutine treecode_to_sfc_id_3D

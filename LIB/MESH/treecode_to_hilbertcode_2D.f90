@@ -3,13 +3,13 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name treecode_to_hilbercode.f90
+!> \name treecode_to_hilbertcode_2D.f90
 !> \version 0.4
 !> \author msr
 !
 !> \brief convert given treecode to code in hilbert curve
 !
-!> \details
+!> 
 !! input:   
 !!           - treecode
 !!           - size of treecode
@@ -36,9 +36,9 @@
 !! 25/01/17 - create
 ! ********************************************************************************************
 !
-!> \image html hilbert.png "Example for Path of the Hilbert Curve in 2D" width=300cm
+!> \image html hilbert.png "Example for a Path of the Hilbert Curve in 2D" width=300cm
 
-subroutine treecode_to_hilbercode(treecode, hilbertcode, n)
+subroutine treecode_to_hilbertcode_2D(treecode, hilbertcode, n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -95,11 +95,11 @@ subroutine treecode_to_hilbercode(treecode, hilbertcode, n)
             hilbert_pattern = 1
         else
             ! calculate pattern
-            call prev_pattern_to_pattern( prev_hilbert_pattern, hilbert_pattern, prev_tree_i )
+            call prev_pattern_to_pattern_2D( prev_hilbert_pattern, hilbert_pattern, prev_tree_i )
         end if
 
         ! position in new pattern
-        call pattern_pos( hilbert_pattern, tree_i, hilbertcode(k) )
+        call pattern_pos_2D( hilbert_pattern, tree_i, hilbertcode(k) )
 
         ! save previous pattern and treecode
         prev_hilbert_pattern    = hilbert_pattern
@@ -108,12 +108,12 @@ subroutine treecode_to_hilbercode(treecode, hilbertcode, n)
     end do
 
 
-end subroutine treecode_to_hilbercode
+end subroutine treecode_to_hilbertcode_2D
 
 !---------------------------------------------------------------------------------------------
 
 ! subroutine to calculate new hilbert pattern
-subroutine prev_pattern_to_pattern( prev_hilbert_pattern, hilbert_pattern, pos )
+subroutine prev_pattern_to_pattern_2D( prev_hilbert_pattern, hilbert_pattern, pos )
 
     implicit none
 
@@ -181,10 +181,10 @@ subroutine prev_pattern_to_pattern( prev_hilbert_pattern, hilbert_pattern, pos )
 
     end select
 
-end subroutine prev_pattern_to_pattern
+end subroutine prev_pattern_to_pattern_2D
 
 ! position in given hilbert pattern
-subroutine pattern_pos( hilbert_pattern, pos, hilbert_pos )
+subroutine pattern_pos_2D( hilbert_pattern, pos, hilbert_pos )
 
     implicit none
 
@@ -255,4 +255,4 @@ subroutine pattern_pos( hilbert_pattern, pos, hilbert_pos )
 
     end select
 
-end subroutine pattern_pos
+end subroutine pattern_pos_2D

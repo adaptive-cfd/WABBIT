@@ -107,13 +107,16 @@ contains
     include "compute_affinity.f90"
 
     ! treecode to 2D z-sfc position
-    include "treecode_to_sfc_id.f90"
+    include "treecode_to_sfc_id_2D.f90"
+
+    ! treecode to 3D z-sfc position
+    include "treecode_to_sfc_id_3D.f90"
 
     ! transfer treecode to 2D hilbert code
-    include "treecode_to_hilbercode.f90"
-
-    ! transfer treecode to 3D z-curve code
-    include "treecode_to_3D_z_curve.f90"
+    include "treecode_to_hilbertcode_2D.f90"
+    
+    ! transfer treecode to 3D hilbert code
+    include "treecode_to_hilbertcode_3D.f90"
 
     ! goes back from a treecode to xyz cartesian coordinates
     include "decoding.f90"

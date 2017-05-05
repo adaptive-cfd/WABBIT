@@ -63,7 +63,7 @@ FFLAGS += -I$(HDF_INC)
 endif
 
 # Both programs are compiled by default.
-all: directories wabbit
+all: directories wabbit doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)
@@ -127,9 +127,9 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh_2D.f90 balance_load_2D.f90 set_desired_num_blocks_per_rank.f90 \
-	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id.f90 treecode_to_hilbercode.f90 update_neighbors_3D.f90 \
-	find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 refinement_execute_3D.f90 \
-	coarse_mesh_3D.f90 balance_load_3D.f90 treecode_to_3D_z_curve.f90 get_block_spacing_origin.f90 decoding.f90 update_neighbors.f90 \
+	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
+        treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
+        refinement_execute_3D.f90 coarse_mesh_3D.f90 balance_load_3D.f90 get_block_spacing_origin.f90 decoding.f90 update_neighbors.f90 \
 	find_sisters.f90 max_active_level.f90 min_active_level.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -148,6 +148,10 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit
 
+doc:
+	doxygen docu_configuration
+	firefox documentation/output/html/index.html
+
 # If the object directory doesn't exist, create it.
 .PHONY: directories
 
@@ -155,3 +159,4 @@ directories: ${OBJDIR}
 
 ${OBJDIR}:
 	mkdir -p ${OBJDIR}
+

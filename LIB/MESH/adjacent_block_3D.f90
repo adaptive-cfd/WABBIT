@@ -9,7 +9,8 @@
 !
 !> \bief give treecode for adjacent block in 3D \n
 !
-!> \details input:    
+!> 
+!! input:    
 !!                    - treecode for block N
 !!                    - direction for neighbor search
 !!                    - max treelevel

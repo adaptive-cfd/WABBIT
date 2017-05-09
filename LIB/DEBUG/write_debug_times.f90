@@ -9,10 +9,11 @@
 !
 !> \brief write time measurements
 !
-!> \details
+!>
 !! input:    - current iteration \n
-!! output:   -
-!! \n
+!! output:   -                   \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 02/12/16 - create

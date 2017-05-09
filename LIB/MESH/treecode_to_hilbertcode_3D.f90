@@ -8,7 +8,7 @@
 !> \author sm
 !> \brief convert given treecode to code in hilbert curve
 !
-!> \details
+!> 
 !! algorithm from: Michael Bader. "Space-Filling Curves: An Introduction With Applications in Scientific Computing."
 !! Springer Science & Business Media, 2012. p. 115
 !! \n
@@ -18,11 +18,14 @@
 !!
 !! output:   
 !!           - hilbert code
+!!
 !! = log ======================================================================================
 !! \n
+!! 02/05/17 - create 
 ! ********************************************************************************************
 !
-!> \image html hilbert_3D.png "Example for a Path of the Hilbert Curve in 3D" width=300cm
+!> \image html 3dhilbert.png "The 12 Basic Patterns for the Hilbert Curve in 3D" width=400
+!> \image latex 3dhilbert.eps "The 12 Basic Patterns for the Hilbert Curve in 3D"
 
 subroutine treecode_to_hilbertcode_3D(treecode, hilbertcode, n)
 

@@ -9,7 +9,7 @@
 !
 !> \brief refinement and coarsening subroutines
 !
-!> \details
+!>
 !! = log ======================================================================================
 !! \n
 !! 04/11/16 - switch to v0.4 \n

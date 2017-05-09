@@ -9,10 +9,11 @@
 !
 !> \brief rhs for 3D convection diffusion equation
 !
-!> \details
+!>
 !! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
-!! output:   - RHS(datafield)
-!! \n
+!! output:   - RHS(datafield) \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 02/02/17 - create

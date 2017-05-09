@@ -3,13 +3,13 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name update_neighbors_2D.f90
+!> \name update_neighbors.f90
 !> \version 0.4
 !> \author engels
 !
 !> \brief functional wrapper for the 2D and 3D version of update neighbors.
 !
-!> \details
+!>
 !! input:    
 !!            - light data array
 !!            - params struct

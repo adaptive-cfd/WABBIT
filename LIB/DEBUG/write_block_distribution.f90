@@ -9,10 +9,11 @@
 !
 !> \brief write current block distribution to file
 !
-!> \details
+!>
 !! input:    - current distribution list \n
-!! output:   -
-!! \n
+!! output:   -                           \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 05/12/16 - create

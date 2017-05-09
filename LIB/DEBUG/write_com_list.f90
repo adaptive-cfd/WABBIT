@@ -8,12 +8,13 @@
 !> \author msr
 !
 !> \brief write communication list to file \n
-!! note: existing file will be overridden
-!
-!> \details
+!> \note existing file will be overridden  \n
+!!
+!!
 !! input:    - current com list \n
-!! output:   -
-!! \n
+!! output:   -                  \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 05/12/16 - create

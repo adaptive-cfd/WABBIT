@@ -9,7 +9,7 @@
 !
 !> \brief write data of a single datafield dF at timestep iteration and time t
 !
-!> \details
+!>
 !! input:    
 !!           - time loop parameter
 !!           - datafield number
@@ -17,8 +17,10 @@
 !!           - light data array
 !!           - heavy data array
 !!
-!! output:   -
-!! \n
+!! output:   
+!!           -
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 07/11/16 

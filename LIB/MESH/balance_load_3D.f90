@@ -18,6 +18,7 @@
 !! 09/02/17    - create
 !
 ! ********************************************************************************************
+!> \image html balancing.png "Load balancing" width=300
 
 subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
 

@@ -9,10 +9,11 @@
 !
 !> \brief initialize sphere
 !
-!> \details
+!>
 !! input:    - params \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 02/02/17 - create \n

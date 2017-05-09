@@ -36,7 +36,7 @@
 !! 25/01/17 - create
 ! ********************************************************************************************
 !
-!> \image html hilbert.png "Example for a Path of the Hilbert Curve in 2D" width=300cm
+!> \image html hilbert.png "A Path taken by the Hilbert Curve in 2D" width=300
 
 subroutine treecode_to_hilbertcode_2D(treecode, hilbertcode, n)
 

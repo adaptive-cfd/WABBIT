@@ -13,8 +13,9 @@
 !
 !> \note In almost all cases, you'll want to call reset_grid before call this routine, as any existing
 !! blocks are not deleted here. Not calling reset_grid is possible but will cause strange behavior and
-!! probably is unintended. This routine warns if active blocks are found.
-!! \n
+!! probably is unintended. This routine warns if active blocks are found. \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 03 Apr 2017 - create

@@ -23,8 +23,6 @@
 !!  output:   
 !!           - neighbor list array
 !!
-!! \n
-!!
 ! -------------------------------------------------------------------------------------------------------------------------
 !>  dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
 ! -------------------------------------------------------------------------------------------------------------------------
@@ -33,6 +31,7 @@
 !! \n
 !! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
+!> \image html neighborhood.png "Neighborhood Relations in 2D" width=400
 
 subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
 

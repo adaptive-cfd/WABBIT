@@ -9,10 +9,11 @@
 !
 !> \brief initialize richtmyer meshkov setup
 !
-!> \details
+!>
 !! input:    - params \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 16/02/17 - create

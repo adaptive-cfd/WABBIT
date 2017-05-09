@@ -22,19 +22,19 @@ use module_IO
 ! variables
 
     implicit none
-    ! user defined parameter structure
+    !> user defined parameter structure
     type (type_params), intent(inout)     :: params
-    ! light data array
+    !> light data array
     integer(kind=ik),  intent(inout)      :: lgt_block(:, :)
-    ! heavy data array - block data
+    !> heavy data array - block data
     real(kind=rk),  intent(inout)         :: hvy_block(:, :, :, :, :)
-    ! heavy work array
+    !> heavy work array
     real(kind=rk),  intent(inout)         :: hvy_work (:, :, :, :, :)
-    ! neighbor array (heavy data)
+    !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)      :: hvy_neighbor(:,:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)      :: lgt_active(:)
-    ! list of active blocks (light data)
+    !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)      :: hvy_active(:)
 
     ! number of active blocks (heavy data)

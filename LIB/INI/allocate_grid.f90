@@ -9,7 +9,7 @@
 !
 !> \brief Allocate grid data (light, heavy, neighbors, active lists etc), initialize
 !
-!> \details
+!>
 !! input:   
 !!           - parameter array
 !!           - light data array

@@ -9,11 +9,14 @@
 !
 !> \brief debug lgt_block data
 !
-!> \details proc 0 gather all data and compare the data to his own light data
-!! \n
+!>
+!!  proc 0 gather all data and compare the data to his own light data \n
+!!
+!!
 !! input:    - params, light data \n
-!! output:   - status of lgt_block synchronzation
-!! \n
+!! output:   - status of lgt_block synchronzation \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 29/11/16 - create

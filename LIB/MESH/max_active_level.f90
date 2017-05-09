@@ -7,7 +7,7 @@
 !> \version 0.5
 !> \author engels
 !
-!> \brief return coarsest level in active block list
+!> \brief return finest level in active block list
 !
 !> \details
 !! = log ======================================================================================

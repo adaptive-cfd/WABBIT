@@ -8,16 +8,18 @@
 !> \author msr, engels
 !
 !> \brief  unit test for ghost nodes synchronization
-!> \details  note: input only params struct to this subroutine
-!!       create new light/heavy data arrays here and deallocate them after this function \n
-!
-!> input:    - params \n
-!! output:   -
+!> \note input only params struct to this subroutine
+!!       create new light/heavy data arrays here and deallocate them after this function
+!!
+!!
+!! input:    - params \n
+!! output:   -        \n
+!! 
+!!
+!! = log ======================================================================================
 !! \n
-!> = log ======================================================================================
-!! \n
-!! 21/01/17 - create
-!! 03/04/17 - major rewrite: no local memory allocation, convergence test is performed
+!! 21/01/17 - create \n
+!! 03/04/17 - major rewrite: no local memory allocation, convergence test is performed \n
 !! 05/04/17 - use the renewed refine_mesh with random indicator
 !
 ! ********************************************************************************************

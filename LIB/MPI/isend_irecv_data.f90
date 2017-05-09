@@ -9,13 +9,14 @@
 !
 !> \brief transfer data with MPI non blocking subroutines
 !
-!> \details
+!>
 !! input:    
 !!           - send buffer
 !!           - com matrix and com position matrix
 !!
 !! output:   
 !!           - receive buffer
+!!
 !!
 !! = log ======================================================================================
 !! \n

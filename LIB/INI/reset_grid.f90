@@ -9,7 +9,7 @@
 !
 !> \brief reset grid, set all blocks to empty
 !
-!> \details
+!>
 !! input:    
 !!           - parameter array
 !!           - light data array

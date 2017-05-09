@@ -8,12 +8,13 @@
 !> \author engels, msr
 !
 !> \brief initialize gauss pulse for 2D case \n
-!! note: field phi is 3D, but third dimension is not used
+!> \note field phi is 3D, but third dimension is not used
 !
 !> \details
 !! input:    - params \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 04/11/16 

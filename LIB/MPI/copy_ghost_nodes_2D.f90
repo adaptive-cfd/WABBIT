@@ -8,7 +8,7 @@
 !> \author msr
 !
 !> \brief copy ghost points from sender block to receiver block 
-!! \note works only for block on same process
+!> \note works only for block on same process
 !
 !> \details
 !! input:    
@@ -20,12 +20,13 @@
 !!
 !! output:   
 !!           - heavy data array
-!
+!!
+!! \n
 ! -------------------------------------------------------------------------------------------------------------------------
-!> \details
-!! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+!> dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/) \n
 ! -------------------------------------------------------------------------------------------------------------------------
-!> \n
+!>
+!!
 !! = log ======================================================================================
 !! \n
 !! 09/11/16 - create for v0.4 \n

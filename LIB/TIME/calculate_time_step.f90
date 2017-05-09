@@ -9,10 +9,10 @@
 !
 !> \brief calculate time step
 !
-!> \details
+!>
 !! input:    -  params \n
-!! output:   -  time step dt
-!! \n
+!! output:   -  time step dt \n
+!!
 !!
 !! = log ======================================================================================
 !! \n

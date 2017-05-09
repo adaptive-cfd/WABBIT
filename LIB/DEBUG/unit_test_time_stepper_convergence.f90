@@ -8,11 +8,13 @@
 !> \author msr
 !
 !> \brief unit test for time stepper
-!> \details note: need additional memory to save results for smallest time step
-!
-!> input:    - params, empty light and heavy data arrays \n
-!! output:   -
-!! \n
+!> \note need additional memory to save results for smallest time step \n
+!!
+!!
+!! input:    - params, empty light and heavy data arrays \n
+!! output:   -                                           \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 18/04/17 - create

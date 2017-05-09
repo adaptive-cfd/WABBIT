@@ -7,10 +7,11 @@
 !> \version 0.4
 !> \author engels, msr
 !
-!>-------------------------------------------------------------------------------
-!! FORTRAN ini files parser module
-!!-------------------------------------------------------------------------------
-!! This module reads values from standard ini-files.
+!-------------------------------------------------------------------------------
+!> FORTRAN ini files parser module
+!-------------------------------------------------------------------------------
+!>
+!!  This module reads values from standard ini-files.
 !! The first step is to read in the entire file into a derived datatype. this datatype
 !! is provided here. After reading the file, you can call the generic routine
 !! "read_param" to extract a value, e.g. parameter=10.0; \n

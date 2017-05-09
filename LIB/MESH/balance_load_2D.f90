@@ -9,7 +9,7 @@
 !
 !> \brief balance the load
 !
-!> \details 
+!> \details
 !! input:    - params, light and heavy data, neighbor data, lists of active blocks \n
 !! output:   - light and heavy data arrays
 !! \n
@@ -19,6 +19,7 @@
 !! 16/11/2016  - Avoid some communication by more carefully distributing the excess blocks \n
 !! 05/12/2016  - add space filling curve distribution \n
 !
+!> \image html balancing.png "Load balancing" width=400
 ! ********************************************************************************************
 
 subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)

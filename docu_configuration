@@ -291,7 +291,7 @@ OPTIMIZE_OUTPUT_VHDL   = NO
 # Note that for custom extensions you also need to set FILE_PATTERNS otherwise
 # the files are not read by doxygen.
 
-EXTENSION_MAPPING      = f90=FortranFree
+EXTENSION_MAPPING      = f90=FortranFree txt=FortranFree
 
 # If the MARKDOWN_SUPPORT tag is enabled then doxygen pre-processes all comments
 # according to the Markdown format, which allows for more readable
@@ -689,7 +689,7 @@ SHOW_NAMESPACES        = YES
 # by doxygen. Whatever the program writes to standard output is used as the file
 # version. For an example see the documentation.
 
-FILE_VERSION_FILTER    =  
+FILE_VERSION_FILTER    = 
 
 # The LAYOUT_FILE tag can be used to specify a layout file which will be parsed
 # by doxygen. The layout file controls the global structure of the generated
@@ -789,7 +789,8 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = /home/mutzel/mywabbit/LIB
+INPUT                  = /home/mutzel/mywabbit/LIB \
+		       	 /home/mutzel/mywabbit/mainpage.txt
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -814,51 +815,7 @@ INPUT_ENCODING         = UTF-8
 # *.m, *.markdown, *.md, *.mm, *.dox, *.py, *.pyw, *.f90, *.f95, *.f03, *.f08,
 # *.f, *.for, *.tcl, *.vhd, *.vhdl, *.ucf and *.qsf.
 
-FILE_PATTERNS          =
-#		         *.c \
-#                        *.cc \
-#                        *.cxx \
-#                        *.cpp \
-#                        *.c++ \
-#                        *.java \
-#                        *.ii \
-#                        *.ixx \
-#                        *.ipp \
-#                        *.i++ \
-#                        *.inl \
-#                        *.idl \
-#                        *.ddl \
-#                        *.odl \
-#                        *.h \
-#                        *.hh \
-#                        *.hxx \
-#                        *.hpp \
-#                        *.h++ \
-#                        *.cs \
-#                        *.d \
-#                        *.php \
-#                        *.php4 \
-#                        *.php5 \
-#                        *.phtml \
-#                        *.inc \
-#                        *.m \
-#                        *.markdown \
-#                        *.md \
-#                        *.mm \
-#                        *.dox \
-#                        *.py \
-#                        *.pyw \
-                         *.f90\
-#                        *.f95 \
-#                        *.f03 \
-#                        *.f08 \
-#                        *.f \
-#                         *.for \
-#                         *.tcl \
-#                         *.vhd \
-#                         *.vhdl \
-#                         *.ucf \
-#                         *.qsf
+FILE_PATTERNS          = *.f90
 #
 # The RECURSIVE tag can be used to specify whether or not subdirectories should
 # be searched for input files as well.

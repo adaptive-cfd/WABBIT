@@ -9,7 +9,7 @@
 !
 !> \brief write heavy block data in first datafield, reset all other datafields
 !
-!> \details
+!>
 !! input:    
 !!           - params
 !!           - heavy data id

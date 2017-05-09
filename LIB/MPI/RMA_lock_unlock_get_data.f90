@@ -8,9 +8,9 @@
 !> \author msr
 !
 !> \brief get data from RMA window on other proc \n
-!! use lock/unlock synchronization
+!! use lock/unlock synchronization \n
 !
-!> \details
+!>
 !! input:    
 !!           - send buffer
 !!           - com matrix and com position matrix

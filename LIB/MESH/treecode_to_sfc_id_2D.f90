@@ -9,7 +9,7 @@
 !
 !> \brief convert given treecode to position in sfc
 !
-!> \details
+!> 
 !! input:    - treecode \n
 !! output:   - position in sfc curve \n
 !!

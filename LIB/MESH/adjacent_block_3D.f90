@@ -7,7 +7,7 @@
 !> \version 0.5
 !> \author msr
 !
-!> \bief give treecode for adjacent block in 3D \n
+!> \brief give treecode for adjacent block in 3D \n
 !
 !> 
 !! input:    

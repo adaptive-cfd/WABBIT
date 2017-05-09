@@ -9,11 +9,14 @@
 !
 !> \brief check if ghost nodes synchronization fails
 !
-!> \details first check: if synchroniozation fails, ghost nodes can have values of 9e9, so check if value larger than given value
-!! \n
+!> 
+!!first check: if synchroniozation fails, ghost nodes can have values of 9e9, so check if value larger than given value \n
+!! 
+!!
 !! input:    - params, heavy data, list of active heavy blocks, data field number, value for checking \n
-!! output:   -
-!! \n
+!! output:   -       \n
+!! 
+!!
 !! = log ======================================================================================
 !! \n
 !! 29/11/16 - create

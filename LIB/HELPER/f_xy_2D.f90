@@ -9,10 +9,11 @@
 !
 !> \brief calculate periodic f(x,y) for 2D field
 !
-!> \details
+!>
 !> input:    - params, coordinate arrays \n
-!! output:   - f(x,y)
-!! \n
+!! output:   - f(x,y) \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 22/03/17 - create

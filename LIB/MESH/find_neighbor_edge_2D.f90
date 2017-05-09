@@ -31,6 +31,7 @@
 !! \n
 !! 07/11/16 - switch to v0.4
 ! ********************************************************************************************
+!> \image html neighborhood.png "Neighborhood Relations in 2D" width=400
 
 subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
 

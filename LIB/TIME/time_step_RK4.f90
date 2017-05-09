@@ -9,14 +9,16 @@
 !
 !> \brief time step main function, RK4
 !
-!> \details
+!>
 !! input:    - time variable, params, light and heavy data, neighbor list \n
-!! output:   - time variable and heavy data array
-!! \n
+!! output:   - time variable and heavy data array \n
+!!
+!!
 !! physics: \n
 ! --------
-!> - convection/diffusion: works only for one datafield
-!! \n
+!> - convection/diffusion: works only for one datafield \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 08/11/16 - switch to v0.4 \n

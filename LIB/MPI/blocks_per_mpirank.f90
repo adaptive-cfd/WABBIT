@@ -8,7 +8,7 @@
 ! ********************************************************************************************
 subroutine blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
   implicit none
-  ! user defined parameter structure
+  !> user defined parameter structure
   type (type_params), intent(in)      :: params
   integer, intent(in) :: hvy_n
   integer, dimension(0:params%number_procs-1), intent(out) :: actual_blocks_per_proc

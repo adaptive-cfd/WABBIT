@@ -9,9 +9,10 @@
 !
 !> \brief return start index on light data corresponding to proc rank
 !
-!> \details
+!>
 !! input:    - rank, number of blocks \n
 !! output:   - start of light data \n
+!!
 !!
 !! = log ======================================================================================
 !! \n

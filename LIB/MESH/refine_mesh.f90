@@ -10,11 +10,11 @@
 !> \brief This routine first sets the refinement flag for all blocks to +1
 !! and then executes the refinement directly. Blocks that cannot be refined because they
 !! are already on the finest allowed level are unaltered.
-!! \n
+!! 
 !! As the grid changes, active lists and neighbor relations are updated, and load balancing
 !! is applied.
 !
-!> \details
+!> 
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
 !! \n

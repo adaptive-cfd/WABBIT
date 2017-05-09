@@ -9,7 +9,7 @@
 !
 !> \brief synchronize internal ghosts nodes, create com matrix and com list for external communication
 !
-!> \details
+!>
 !! input:    
 !!           - params, light and heavy data
 !!

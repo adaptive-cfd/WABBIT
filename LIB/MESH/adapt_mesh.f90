@@ -12,17 +12,17 @@
 !! details below the specified tolerance, (so they are insignificant), they are merged to
 !! one coarser block one level below. This process is repeated until the grid does not change
 !! anymore.
-!! \n
+!!
 !! As the grid changes, active lists and neighbor relations are updated, and load balancing
 !! is applied.
 !
-!! \note The block thresholding is done with the restriction/prediction operators acting on the
+!> \note The block thresholding is done with the restriction/prediction operators acting on the
 !! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed in threshold_block.
 !
-!! \note It is well possible to start with a very fine mesh and end up with only one active
+!> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
 !
-!>  
+!> \details  
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
 !!
@@ -31,6 +31,7 @@
 !! 10/11/16 - switch to v0.4
 ! ==========================================================================================
 !********************************************************************************************
+!> \image html adapt_mesh.png width=400
 
 subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator )
 

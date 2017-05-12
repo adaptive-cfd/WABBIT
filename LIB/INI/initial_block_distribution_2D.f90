@@ -8,7 +8,7 @@
 !> \author msr
 !
 !> \brief distribute blocks at start => create light data array \n
-!! \note field phi is 3D, but third dimension is not used
+!> \note field phi is 3D, but third dimension is not used \n
 !
 !> \details
 !! input:    

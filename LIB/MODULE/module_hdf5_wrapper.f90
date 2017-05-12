@@ -8,8 +8,8 @@
 !> \author engels, msr
 !
 !-------------------------------------------------------------------------------
-!> \brief Read a field from a file \n
-!! Note a single file can contain many arrays, if required
+!> \brief Read a field from a file
+!> \note a single file can contain many arrays, if required
 !!
 !> \details
 !!

@@ -17,8 +17,9 @@
 !
 !> \details
 !! input:    - params, light and heavy data \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 03/02/17 - create

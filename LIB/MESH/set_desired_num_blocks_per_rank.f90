@@ -9,9 +9,10 @@
 !
 !> \brief create block distribution lists
 !
-!> \details
+!> 
 !! input:    - params, light data, lists of active blocks \n
 !! output:   - distribution arrays \n
+!!
 !!
 !! = log ======================================================================================
 !! \n

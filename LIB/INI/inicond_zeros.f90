@@ -10,10 +10,11 @@
 !> \brief initialize zero for all fields \n
 !! works for 2D and 3D data
 !
-!> \details
+!>
 !! input:    - params \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 26/01/17 - create

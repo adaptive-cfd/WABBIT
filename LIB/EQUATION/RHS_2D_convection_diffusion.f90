@@ -9,10 +9,11 @@
 !
 !> \brief rhs for 2D convection diffusion equation
 !
-!> \details
+!>
 !! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
-!! output:   - RHS(datafield)
-!! \n
+!! output:   - RHS(datafield) \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 10/11/16 - switch to v0.4

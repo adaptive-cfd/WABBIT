@@ -10,10 +10,11 @@
 !> \brief initialize the vorticity_filaments testcase \n
 !! load velocity fields from file
 !
-!> \details
+!>
 !! input:    - params, light and heavy data \n
-!! output:   - params, light and heavy data
-!! \n
+!! output:   - params, light and heavy data \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 04/11/16 - switch to v0.4

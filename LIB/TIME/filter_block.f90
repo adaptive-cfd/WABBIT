@@ -9,10 +9,11 @@
 !
 !> \brief filter heavy data
 !
-!> \details
+!>
 !! input:    - params, heavy data array \n
-!! output:   - filtered heavy data array
-!! \n
+!! output:   - filtered heavy data array \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 27/03/17 - create

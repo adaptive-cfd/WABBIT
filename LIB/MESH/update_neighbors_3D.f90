@@ -10,7 +10,7 @@
 !>\brief update neighbor relations with light data, store neighbors in neighbor list (heavy data)
 !!       3D case
 !
-!> \details
+!> 
 !! input:    
 !!           - light data array
 !!           - params struct
@@ -52,6 +52,7 @@
 !! 27/01/17 - create
 !
 ! ********************************************************************************************
+!> \image html update_neighbors3d.png "Update Neighbors" width=400
 
 subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
 

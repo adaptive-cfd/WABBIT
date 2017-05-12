@@ -9,10 +9,11 @@
 !
 !> \brief write position communication matrix to file
 !
-!> \details
+!>
 !! input:    - current position com matrix \n
-!! output:   -
-!! \n
+!! output:   -                             \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 16/12/16 - create

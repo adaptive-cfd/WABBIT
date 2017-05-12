@@ -10,7 +10,7 @@
 !> \brief convert a integer i to binary b \n
 !! binary return as vector with length N
 !
-!> \details
+!>
 !! input:    
 !!           - integer to convert
 !!           - length of output vector

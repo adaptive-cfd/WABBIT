@@ -9,7 +9,7 @@
 !
 !> \brief synchronize ghosts nodes
 !
-!> \details
+!>
 !! input:    - params, light and heavy data \n
 !! output:   - heavy data array
 !

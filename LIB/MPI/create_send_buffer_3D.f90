@@ -9,7 +9,7 @@
 !
 !> \brief write send buffer with given com list
 !
-!> \details
+!>
 !! input:    
 !!           - heavy data array
 !!           - params struct

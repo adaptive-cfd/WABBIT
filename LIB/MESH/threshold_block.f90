@@ -8,35 +8,21 @@
 !> \author msr
 !
 !> \brief thresholding for all blocks
-!> \details
+!
+!> 
 !! The block thresholding is done with the restriction/prediction operators acting on the
-!! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed here.
-!! \n
+!! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed here. \n
+!! 
+!!
 !! input:    - params, light and heavy data, neighbor list \n
 !! output:   - light and heavy data arrays \n
+!!
 !!
 !! = log ======================================================================================
 !! \n
 !! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
-
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-! name: threshold_block.f90
-! version: 0.4
-! author: msr
-!
-! The block thresholding is done with the restriction/prediction operators acting on the
-! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed here.
-!
-! input:    - params, light and heavy data, neighbor list
-! output:   - light and heavy data arrays
-!
-! = log ======================================================================================
-!
-! 10/11/16 - switch to v0.4
-! ********************************************************************************************
+!> \image html threshold.png width=400
 
 subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 

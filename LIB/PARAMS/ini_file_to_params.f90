@@ -9,10 +9,11 @@
 !
 !> \brief distribute blocks at start => create light data array
 !
-!>  \details
+!>
 !! input:    - filename \n
-!! output:   - filled parameter struct
-!! \n
+!! output:   - filled parameter struct \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 25/01/17    - create \n

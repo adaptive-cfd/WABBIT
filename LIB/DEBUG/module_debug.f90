@@ -8,8 +8,8 @@
 !> \author msr
 !!
 !! \brief module for all debug subroutines
-!!
-!! \details
+!
+!>
 !! = log ======================================================================================
 !! \n
 !! 29/11/16 - create

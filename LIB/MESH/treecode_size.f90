@@ -9,7 +9,7 @@
 !
 !> \brief calculate treecode size, count elements which are not -1
 !
-!> \details
+!> 
 !! input:    
 !!           - treecode
 !!           - length of treecode input vector

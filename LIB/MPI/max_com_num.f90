@@ -9,7 +9,7 @@
 !
 !> \brief find max communication number
 !
-!> \details
+!>
 !! input:    
 !!           - com matrix line
 !!           - proc rank

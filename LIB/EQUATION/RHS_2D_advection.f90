@@ -9,10 +9,11 @@
 !
 !> \brief rhs for 2D advection equation, calculate velocity field with f_x_y_t subroutine
 !
-!> \details
+!>
 !> input:    - datafield, grid parameter, time, derivative order \n
-!! output:   - RHS(datafield)
-!! \n
+!! output:   - RHS(datafield) \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 20/04/17 - create

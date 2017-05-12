@@ -9,15 +9,17 @@
 !
 !> \brief save data main function, call write data routine
 !
-!> \details
+!>
 !! input:    
 !!           - time loop parameter
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
 !!
-!! output:   -
-!! \n
+!! output:   
+!!           -
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 07/11/16 - switch to v0.4 \n

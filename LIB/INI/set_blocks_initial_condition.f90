@@ -9,7 +9,7 @@
 !
 !> \brief This routine initializes the block data, i.e. it evaluates the initial condition on the grid
 !
-!> \details
+!>
 !! input:    
 !!           - parameter array
 !!           - light data array

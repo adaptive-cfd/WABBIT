@@ -9,10 +9,11 @@
 !
 !> \brief fill receive buffer
 !
-!> \details
+!>
 !! input:    -      \n
-!! output:   - filled receive buffer
-!! \n
+!! output:   - filled receive buffer \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 13/01/17 - create for v0.4

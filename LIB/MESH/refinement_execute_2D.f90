@@ -15,10 +15,11 @@
 !> \note The interpolation (or prediction) operator here is applied to a block EXCLUDING
 !! any ghost nodes.
 !
-!> \details
+!> \details 
 !! input:    - params, light and heavy data \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen

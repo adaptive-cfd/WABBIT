@@ -9,11 +9,13 @@
 !
 !> \brief debug planned mesh changes \n
 !! write file with future mesh level for all blocks \n
-!! write also future mesh level for all known neighbor blocks
-!! \n
+!! write also future mesh level for all known neighbor blocks \n
+!! 
+!!
 !! input:    - params, light data \n
-!! output:   - status of lgt_block synchronzation
-!! \n
+!! output:   - status of lgt_block synchronzation \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 29/11/16 - create

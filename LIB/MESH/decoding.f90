@@ -5,12 +5,18 @@
 ! ============================================================================================
 !> \name decoding.f90
 !> \version 0.5
+!
 !> \brief from the treecode (quad/octtree), go back to cartesian coordinates i,j,k
+!
+!>
 !! a word on normalization:
+!!
 !! the pair i,j is to be understood on the level the quaterny code k
 !! brings us to. That means a code XXX is within [1,8],[1,8] while a
 !! code XXXX is within [1,16],[1,16]
-!> \details
+!
+!>
+!!
 !! tested with [1] and other figures procuded by "Encoding"
 !! [1] Garagantini. An effective Way to Represent Quadtrees, Graphics and
 !! Image Processing (1982)

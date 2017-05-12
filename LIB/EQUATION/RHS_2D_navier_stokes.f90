@@ -9,10 +9,11 @@
 !
 !> \brief RHS for 2D navier stokes equation
 !
-!> \details
+!>
 !! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
-!! output:   - RHS(datafield)
-!! \n
+!! output:   - RHS(datafield) \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 08/12/16 - create

@@ -9,10 +9,11 @@
 !
 !> \brief 1D Filter subroutine
 !
-!> \details
+!>
 !! input:    - filter stencil, data array, position of value to filter \n
-!! output:   - filtered data
-!! \n
+!! output:   - filtered data \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 27/03/17 - create

@@ -9,10 +9,11 @@
 !
 !> \brief initialize sinus for 2D case
 !
-!> \details
+!>
 !! input:    - params \n
-!! output:   - light and heavy data arrays
-!! \n
+!! output:   - light and heavy data arrays \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 21/03/17 - create

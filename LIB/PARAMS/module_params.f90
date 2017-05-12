@@ -6,9 +6,13 @@
 !> \name module_params.f90
 !> \version 0.4
 !> \author msr
+!
 !> \brief params data structure, define all constant parameters for global use
+!
 !> \todo module actually only works for specific RHS, split between RHS parameters and program
 !!       parameters in future versions
+!
+!> \details
 !> = log ======================================================================================
 !! \n
 !! 04/11/16 - switch to v0.4, merge old block_params structure with new structure

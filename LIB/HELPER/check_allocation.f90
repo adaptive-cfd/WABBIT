@@ -10,10 +10,11 @@
 !> \brief convert an integer i to binary b \n
 !! binary return as vector with length N
 !
-!> \details
+!>
 !! input:    - allocation error \n
-!! output:   - stop program if error variable /= 0
-!! \n
+!! output:   - stop program if error variable /= 0  \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
 !! 25/01/17 - create

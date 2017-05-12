@@ -9,7 +9,7 @@
 !
 !> \brief unset refinement status in respect of min/max treelevel
 !
-!> \details
+!> 
 !! input:    
 !!           - light data
 !!           - min/max treelevel

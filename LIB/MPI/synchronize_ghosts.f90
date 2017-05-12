@@ -75,20 +75,10 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     !                       5   sender block neighborhood to receiver (dirs id)
     !                       6   difference between sender-receiver level
     ! dim 3: receiver proc rank
-    integer(kind=ik), allocatable       :: com_lists(:, :, :)
-
-    ! send/receive buffer, integer and real
-    integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
-    ! length of buffer array and column number in buffer, use for readability
-    integer(kind=ik)                    :: int_N, real_N, buffer_pos
+    integer(kind=ik), allocatable       :: com_lists(:, :, :), com_lists2(:, :, :)
 
     ! allocation error variable
     integer(kind=ik)                    :: allocate_error
-
-    ! number of communications, number of neighboring procs
-    integer(kind=ik)                    :: my_n_com, n_com, n_procs
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
@@ -97,7 +87,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! count the number of communications between procs
     ! row/column number encodes process rank + 1
     ! com matrix pos: position in send buffer
-    integer(kind=ik), allocatable       :: com_matrix(:,:), com_matrix_pos(:,:), my_com_matrix(:,:)
+    integer(kind=ik), allocatable       :: com_matrix(:,:), com_matrix_pos(:,:), my_com_matrix(:,:), &
+                                           com_matrix2(:,:), com_matrix_pos2(:,:), my_com_matrix2(:,:)
 
     ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
     integer(kind=ik)                                :: rmv_redundant
@@ -136,6 +127,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         stop
     end if
 
+    allocate( com_lists2( N*16, 6, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     ! allocate com matrix
     allocate( com_matrix(number_procs, number_procs), stat=allocate_error )
     !call check_allocation(allocate_error)
@@ -159,12 +158,39 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         stop
     end if
 
+    allocate( com_matrix2(number_procs, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+    allocate( com_matrix_pos2(number_procs, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+    allocate( my_com_matrix2(number_procs, number_procs), stat=allocate_error )
+    !call check_allocation(allocate_error)
+    if ( allocate_error /= 0 ) then
+        write(*,'(80("_"))')
+        write(*,*) "ERROR: memory allocation fails"
+        stop
+    end if
+
     ! reset com-list, com_plan, com matrix, receiver lists
     com_lists       = -1
+    com_lists2      = -1
 
     com_matrix      =  0
     com_matrix_pos  =  0
     my_com_matrix   =  0
+
+    com_matrix2     =  0
+    com_matrix_pos2 =  0
+    my_com_matrix2  =  0
 
 !    ! reset ghost nodes for all active blocks
 !    ! loop over all active blocks
@@ -197,7 +223,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! first: synchronize internal ghost nodes, create com_list for external communications
 
     ! copy internal nodes and create com_matrix/com_lists for external communications
-    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists )
+    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists, 1 )
+    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix2, com_lists2, 2 )
 
     ! end time
     sub_t1 = MPI_Wtime()
@@ -221,6 +248,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
     ! synchronize com matrix
     call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_com_matrix2, com_matrix2, number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! end time
     sub_t1 = MPI_Wtime()
@@ -239,216 +267,48 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if
 
+    ! symmetrize com matrix - choose max com number
+    do i = 1, number_procs
+        do j = i+1, number_procs
+            com_matrix(i,j) = max( com_matrix(i,j), com_matrix(j,i) )
+            com_matrix(j,i) = com_matrix(i,j)
+            com_matrix2(i,j) = max( com_matrix2(i,j), com_matrix2(j,i) )
+            com_matrix2(j,i) = com_matrix2(i,j)
+        end do
+    end do
+
     ! save com matrix
     if ( params%debug ) then
         call write_com_matrix( com_matrix )
+    end if
+    if ( params%debug ) then
+        call write_com_matrix( com_matrix2 )
     end if
 
     ! start time
     sub_t0 = MPI_Wtime()
 
-    ! max number of communications and neighboring procs - use for buffer allocation
-    ! every proc loop over com matrix line
-    call max_com_num( my_n_com, n_procs, com_matrix(rank+1,:), rank )
-
-    ! synchronize max com number, because if not:
-    ! RMA buffer displacement is not fixed, so we need synchronization there
-    call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
-
-    ! for proc without neighbors: set n_procs to 1
-    ! so we allocate arrays with second dimension=1
-    if (n_procs==0) n_procs = 1
-
-    ! next steps only for more than two procs
-    if ( number_procs > 1 ) then
-
-        ! ----------------------------------------------------------------------------------------
-        ! second: allocate memory for send/receive buffer
-        ! buffer size:
-        !               number of columns: number of neighboring procs
-        !               number of lines:
-        !                   int buffer  - max number of communications  * 3 + 1 (length of real buffer)
-        !                   real buffer - max number of communications * (Bs+g) * g * number of datafields
-        !                   for 3D: real_buffer * Bs
-        allocate( int_send_buffer( n_com * 3 + 1, n_procs ), stat=allocate_error )
-        !call check_allocation(allocate_error)
-        if ( allocate_error /= 0 ) then
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: memory allocation fails"
-            stop
-        end if
-        allocate( int_receive_buffer( n_com * 3 + 1, n_procs ), stat=allocate_error )
-        !call check_allocation(allocate_error)
-        if ( allocate_error /= 0 ) then
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: memory allocation fails"
-            stop
-        end if
-
-        if ( params%threeD_case ) then
-            ! 3D:
-            allocate( real_receive_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
-            allocate( real_send_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
-        else
-            ! 2D:
-            allocate( real_receive_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
-            allocate( real_send_buffer( n_com * (Bs+(g+rmv_redundant)) * (g+rmv_redundant) * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
-        end if
-
-!        ! reset buffer for debuggung
-!        if ( params%debug ) then
-!            real_send_buffer        = 7.0e9_rk
-!            real_receive_buffer     = 5.0e9_rk
-!        end if
-
-        ! ----------------------------------------------------------------------------------------
-        ! third: fill send buffer
-        ! int buffer:  store receiver block id, neighborhood and level difference (in order of neighbor proc rank, use com matrix)
-        ! real buffer: store block data (in order of neighbor proc rank, use com matrix)
-        ! first element of int buffer = length of real buffer (buffer_i)
-
-        ! reset my com matrix
-        my_com_matrix   =  0
-
-        ! fill send buffer and position communication matrix
-        call fill_send_buffer( params, hvy_block, com_lists, com_matrix(rank+1,:), rank, int_send_buffer, real_send_buffer )
-
-        ! calculate position matrix: position is column in send buffer, so simply count the number of communications
-        ! loop over all com_matrix elements
-        do i = 1, size(com_matrix_pos,1)
-            ! new line, means new proc: reset counter
-            k = 1
-            ! loop over communications
-            do j = 1, size(com_matrix_pos,1)
-                ! found external communication
-                if ( (com_matrix(i,j) /= 0) .and. (i /= j) ) then
-                    ! save com position
-                    com_matrix_pos(i,j) = k
-                    ! increase counter
-                    k = k + 1
-
-                end if
-            end do
-        end do
-
-        ! save position com matrix
-        if ( params%debug ) then
-            call write_com_matrix_pos( com_matrix_pos )
-        end if
-
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "synch. ghosts - fill send buffer" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "synch. ghosts - fill send buffer"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-        end if
-
-        ! start time
-        sub_t0 = MPI_Wtime()
-
-        ! ----------------------------------------------------------------------------------------
-        ! fourth: get data for receive buffer
-
-        ! communicate, fill receive buffer
-        call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos  )
-
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "synch. ghosts - RMA" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "synch. ghosts - RMA"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-        end if
-
-        ! start time
-        sub_t0 = MPI_Wtime()
-
-        ! ----------------------------------------------------------------------------------------
-        ! fifth: write receive buffer to heavy data
-
-        ! loop over corresponding com matrix line
-        do k = 1, number_procs
-
-            ! received data from proc k-1
-            if ( ( com_matrix(rank+1, k) > 0 ) .and. ( (rank+1) /= k ) ) then
-
-                ! set buffer position and calculate length if integer/real buffer
-                buffer_pos = com_matrix_pos(rank+1, k)
-                int_N  = com_matrix(rank+1, k) * 3 + 1
-                real_N = int_receive_buffer( 1, buffer_pos )
-
-                ! read received data
-                if ( params%threeD_case ) then
-                    ! 3D:
-                    call write_receive_buffer_3D(params, int_receive_buffer(2:int_N, buffer_pos), real_receive_buffer(1:real_N, buffer_pos), hvy_block )
-                else
-                    ! 2D:
-                    call write_receive_buffer_2D(params, int_receive_buffer(2:int_N, buffer_pos), real_receive_buffer(1:real_N, buffer_pos), hvy_block(:, :, 1, :, :) )
-                end if
-
-            end if
-
-        end do
-
-    end if
+    ! call external nodes synchronization
+    ! case 1
+    call synchronize_external_nodes(  params, hvy_block, com_lists, com_matrix )
+    ! case 2
+    call synchronize_external_nodes(  params, hvy_block, com_lists2, com_matrix2 )
 
     ! workaround: second internal synchronization to overwrite external redundant nodes
-    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists )
+    !call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists )
+    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists, 1 )
+    call synchronize_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix2, com_lists2, 2 )
 
     ! clean up
     deallocate( com_lists, stat=allocate_error )
+    deallocate( com_lists2, stat=allocate_error )
 
     deallocate( com_matrix, stat=allocate_error )
+    deallocate( com_matrix2, stat=allocate_error )
     deallocate( com_matrix_pos, stat=allocate_error )
+    deallocate( com_matrix_pos2, stat=allocate_error )
     deallocate( my_com_matrix, stat=allocate_error )
-
-    deallocate( int_send_buffer, stat=allocate_error )
-    deallocate( int_receive_buffer, stat=allocate_error )
-    deallocate( real_send_buffer, stat=allocate_error )
-    deallocate( real_receive_buffer, stat=allocate_error )
+    deallocate( my_com_matrix2, stat=allocate_error )
 
     ! end time
     sub_t1 = MPI_Wtime()

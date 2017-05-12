@@ -180,12 +180,12 @@ program main
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
 
-!    !---------------------------------------------------------------------------
-!    ! Unit tests
-!    !---------------------------------------------------------------------------
-!    ! perform a convergence test on ghost node sync'ing
-!    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-!    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    !---------------------------------------------------------------------------
+    ! Unit tests
+    !---------------------------------------------------------------------------
+    ! perform a convergence test on ghost node sync'ing
+    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !
 !    ! reset the grid: all blocks are inactive and empty
 !    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
@@ -237,6 +237,11 @@ program main
 
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+
+!        ! check redundant nodes
+!        if ( params%debug ) then
+!            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+!        end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then

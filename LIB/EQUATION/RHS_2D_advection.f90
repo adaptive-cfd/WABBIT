@@ -89,7 +89,7 @@ subroutine RHS_2D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
         do iy = g+1, Bs+g
 
             ! calculate coordinates form ix, iy
-            call coords_ix_iy( x, y, ix, iy, ddx, xx0 )
+            call coords_ix_iy( x, y, ix-g, iy-g, ddx, xx0 )
 
             ! calculate velocity, depends on x,y,t
             call f_x_y_t( u01, u02, x, y, time )
@@ -112,7 +112,7 @@ subroutine RHS_2D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
         do iy = g+1, Bs+g
 
             ! calculate coordinates form ix, iy
-            call coords_ix_iy( x, y, ix, iy, ddx, xx0 )
+            call coords_ix_iy( x, y, ix-g, iy-g, ddx, xx0 )
 
             ! calculate velocity, depends on x,y,t
             call f_x_y_t( u01, u02, x, y, time )
@@ -186,7 +186,7 @@ subroutine f_x_y_t( u01, u02, x, y, time )
     real(kind=rk)                  :: t_a
 
     ! set t end
-    t_a = 10.0_rk
+    t_a = 3.0_rk !10.0_rk
 
     ! calculate velocity
     !u01 = 1.0_rk

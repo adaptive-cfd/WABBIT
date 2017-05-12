@@ -176,12 +176,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                 do dF = 2, params%number_data_fields+1
                     if ( level_diff == 0 ) then
                         ! blocks on same level
-                        data_corner = hvy_block( g+2:g+1+g, Bs:Bs-1+g, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( g+2-rmv_redundant:g+1+g, Bs:Bs-1+g+rmv_redundant, dF, my_block )
 
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                            buffer_i                            = buffer_i + g
+                        do l = 1, g+rmv_redundant
+                            send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant(l, 1:g+rmv_redundant)
+                            buffer_i                            = buffer_i + g+rmv_redundant
                         end do
 
                     elseif ( level_diff == -1 ) then
@@ -225,12 +225,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         ! loop over all datafields
-                        data_corner = hvy_block( g+2:g+1+g, g+2:g+1+g, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( g+2-rmv_redundant:g+1+g, g+2-rmv_redundant:g+1+g, dF, my_block )
 
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                            buffer_i                            = buffer_i + g
+                        do l = 1, g+rmv_redundant
+                            send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant(l, 1:g+rmv_redundant)
+                            buffer_i                            = buffer_i + g+rmv_redundant
                         end do
 
                     elseif ( level_diff == -1 ) then
@@ -273,12 +273,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                 do dF = 2, params%number_data_fields+1
                     if ( level_diff == 0 ) then
                         ! blocks on same level
-                        data_corner = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( Bs:Bs-1+g+rmv_redundant, Bs:Bs-1+g+rmv_redundant, dF, my_block )
 
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                            buffer_i                            = buffer_i + g
+                        do l = 1, g+rmv_redundant
+                            send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant(l, 1:g+rmv_redundant)
+                            buffer_i                            = buffer_i + g+rmv_redundant
                         end do
 
                     elseif ( level_diff == -1 ) then
@@ -321,12 +321,12 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                 do dF = 2, params%number_data_fields+1
                     if ( level_diff == 0 ) then
                         ! blocks on same level
-                        data_corner = hvy_block( Bs:Bs-1+g, g+2:g+1+g, dF, my_block )
+                        data_corner_rmv_redundant = hvy_block( Bs:Bs-1+g+rmv_redundant, g+2-rmv_redundant:g+1+g, dF, my_block )
 
                         ! send data
-                        do l = 1, g
-                            send_buff(buffer_i:buffer_i+g-1)    = data_corner(l, 1:g)
-                            buffer_i                            = buffer_i + g
+                        do l = 1, g+rmv_redundant
+                            send_buff(buffer_i:buffer_i+g+rmv_redundant-1)    = data_corner_rmv_redundant(l, 1:g+rmv_redundant)
+                            buffer_i                            = buffer_i + g+rmv_redundant
                         end do
 
                     elseif ( level_diff == -1 ) then

@@ -44,6 +44,7 @@ contains
 
     ! ghost nodes synchronization
     include "synchronize_internal_nodes.f90"
+    include "synchronize_external_nodes.f90"
 
     ! coyp internal ghost nodes
     include "copy_ghost_nodes_2D.f90"

@@ -13,13 +13,13 @@
 !! It now goes through the list of blocks and looks for refinement or coarsening states that would
 !! result in an non-graded mesh. These mistakes are corrected, their status -1 or 0 is overwritten.
 !! The status +1 is always conserved (recall to call respect_min_max_treelevel before).
-!! 
+!!
 !!
 !! Since 04/2017, the new code checks all blocks that want to coarsen or remain, NOT the ones that
 !! want to refine, as was done in prototypes. The reason is MPI: I cannot easily set the flags of
 !! my neighbors, as they might reside on another proc.
-!! 
-!!  
+!!
+!!
 !! input:    - light data, neighbor list, list of active blocks(light data) \n
 !! output:   - light data array
 !!
@@ -50,7 +50,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> neighbor list
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
-
     !> active_block_list (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)

@@ -41,7 +41,7 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neifghbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
     !> list of active blocks (heavy data)

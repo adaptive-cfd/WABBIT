@@ -22,7 +22,7 @@
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
 !
-!> \details  
+!> \details
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
 !!
@@ -33,7 +33,7 @@
 !********************************************************************************************
 !> \image html adapt_mesh.png width=400
 
-subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator )
+subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -55,6 +55,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
@@ -113,33 +115,41 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
         endif
 
+!> \todo: check which of these calls to list generators are really necessary
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+        ! update list of sorted nunmerical treecodes, used for finding blocks
+        call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+        ! update neighbor relations
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+! until here???
 
         ! unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
 
         ! ensure completeness
-        call ensure_completeness( params, lgt_block, lgt_active, lgt_n )
+        call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         ! adapt the mesh
         if ( params%threeD_case ) then
             ! 3D:
-            call coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+            call coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         else
             ! 2D:
-            call coarse_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n )
+            call coarse_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n, lgt_sortednumlist )
 
         end if
 
+!> \todo: check which of these calls to list generators are really necessary
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
+        ! update list of sorted nunmerical treecodes, used for finding blocks
+        call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
         ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     end do
 
@@ -152,11 +162,13 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
+!> \todo: check which of these calls to list generators are really necessary
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
 end subroutine adapt_mesh

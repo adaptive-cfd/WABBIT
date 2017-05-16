@@ -10,14 +10,14 @@
 !> \brief reset grid, set all blocks to empty
 !
 !>
-!! input:    
+!! input:
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
 !!           - neighbor data array
 !!           - light and heavy active block list
 !!
-!! output:   
+!! output:
 !!           - filled user defined data structure for global params
 !!           - initialized light and heavy data arrays
 !!
@@ -29,7 +29,7 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, verbosity )
+subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, verbosity )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -54,6 +54,8 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)         :: hvy_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
     !> write output
     logical, intent(in)                     :: verbosity
 
@@ -79,6 +81,8 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     ! set refinement to 0
     lgt_block(:, params%max_treelevel+2) = 0
 
+    ! reset sorted list of numerical treecodes
+    lgt_sortednumlist = -1
 
     ! reset data
     hvy_block = 9.99e99_rk
@@ -88,5 +92,7 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     ! active lists
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+    
 end subroutine reset_grid

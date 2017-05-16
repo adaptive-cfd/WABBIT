@@ -122,9 +122,8 @@ subroutine ini_file_to_params( params, filename )
 !    call read_param(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
     ! read output write frequency
     call read_param(FILE, 'Time', 'write_freq', params%write_freq, 25 )
-
     ! read method to calculate time step
-    call read_param(FILE, 'Time', 'time_step_calc', params%time_step_method, "---" )
+    call read_param(FILE, 'Time', 'time_step_calc', params%time_step_method, "CFL_cond" )
     ! read value of fixed time step
     call read_param(FILE, 'Time', 'dt', params%dt, 1e-6_rk )
     ! read CFL number

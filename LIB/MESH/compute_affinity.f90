@@ -42,7 +42,7 @@ subroutine compute_affinity(params, my_block_list, hvy_neighbor, rank, rank_part
     !> light data array
     integer(kind=ik), intent(inout)     :: my_block_list(:, :)
 
-    !> heavy data array - neifghbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
     !> affinity list

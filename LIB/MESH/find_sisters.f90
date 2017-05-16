@@ -20,7 +20,7 @@
 !! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_active, lgt_n )
+subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,6 +43,8 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_activ
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: i
@@ -93,7 +95,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_activ
         all_treecodes(i,mother_level+1) = i-1
         ! look for the sisters in the list of blocks (light data), store their ID if found
         ! (-1 otherwise)
-        call does_block_exist( all_treecodes(i,:), lgt_block, params%max_treelevel, exists, lgt_sisters_id(i), lgt_active, lgt_n)
+        call does_block_exist( all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
       end if
     end do
 
@@ -106,7 +108,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_activ
       all_treecodes(i,mother_level+1) = i-1
       ! look for the sisters in the list of blocks (light data), store their ID if found
       ! (-1 otherwise)
-      call does_block_exist( all_treecodes(i,:), lgt_block, params%max_treelevel, exists, lgt_sisters_id(i), lgt_active, lgt_n)
+      call does_block_exist( all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
     end do
 
   end if

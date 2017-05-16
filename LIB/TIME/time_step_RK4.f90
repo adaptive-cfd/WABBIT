@@ -48,7 +48,7 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
-    !> heavy data array - neifghbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
     !> list of active blocks (heavy data)

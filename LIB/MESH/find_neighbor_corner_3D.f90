@@ -9,19 +9,19 @@
 !
 !> \brief find neighbor on block corner
 !
-!> \details  input:    
+!> \details  input:
 !!                   - heavy and light data id
 !!                   - light data array and max treelevel
 !!                   - direction for neighbor search
 !!                   - list of active blocks
 !!
-!!            output:   
+!!            output:
 !!                   - neighbor list array
 !!
 ! --------------------------------------------------------------------------------------------
 !> \details  neighbor codes: \n
 ! ---------------
-!> for imagination:  
+!> for imagination:
 !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
 !!                   - edge: boundary between two sides - use sides numbers for coding
 !!                   - corner: between three sides - so use all three sides numbers
@@ -52,7 +52,7 @@
 !
 ! ********************************************************************************************
 
-subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
+subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -76,8 +76,9 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-
-    !> heavy data array - neifghbor data
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! mesh level
@@ -220,7 +221,7 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
 
     ! proof existence of neighbor block and find light data id
-    call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
+    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
     if (exists) then
         ! neighbor on same level
@@ -231,8 +232,7 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
         ! neighbor could be one level down
         neighbor( level ) = -1
         ! proof existence of neighbor block
-        call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
-
+        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
         if ( exists .and. lvl_down_neighbor ) then
             ! neigbor is one level down
             hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
@@ -246,8 +246,7 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
-            call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
-
+            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
             if (exists) then
                 ! neigbor is one level up
                 hvy_neighbor( heavy_id, list_id ) = neighbor_light_id

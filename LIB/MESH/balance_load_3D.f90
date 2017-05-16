@@ -9,7 +9,7 @@
 !
 !> \brief balance the load
 !
-!> \details 
+!> \details
 !! input:    - params, light and heavy data, neighbor data, lists of active blocks \n
 !! output:   - light and heavy data arrays \n
 !!
@@ -68,9 +68,6 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
     ! block distribution lists
     integer(kind=ik), allocatable       :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
-
     ! loop variables
     integer(kind=ik)                    :: k, N, num_blocks, l, com_i, com_N, heavy_id, sfc_id
 
@@ -117,30 +114,13 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
     allocate( friends( 1:number_procs, 1:number_procs ))
 
     ! allocate com plan, maximal number of communications: every proc send every other proc something
-    allocate( com_plan( number_procs*(number_procs-1), 3 ), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( com_plan( number_procs*(number_procs-1), 3 ) )
     com_plan = -1
-
     ! allocate sfc com list, maximal number of communications: every proc send all of his blocks
-    allocate( sfc_com_list( number_procs*params%number_blocks, 3 ), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
     sfc_com_list = -1
-
     ! allocate space filling curve list, maximal number of elements = max number of blocks
-    allocate( sfc_list( 8**params%max_treelevel ), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( sfc_list( 8**params%max_treelevel ) )
 
     ! number of light data (since the light data is redunantly stored on all CPU,
     ! this number corresponds usually to the maximum number of blocks possible in
@@ -559,11 +539,11 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
 
     ! clean up
     deallocate( friends, affinity )
-    deallocate( opt_dist_list, stat=allocate_error )
-    deallocate( dist_list, stat=allocate_error )
-    deallocate( com_plan, stat=allocate_error )
-    deallocate( sfc_list, stat=allocate_error )
-    deallocate( sfc_com_list, stat=allocate_error )
+    deallocate( opt_dist_list )
+    deallocate( dist_list )
+    deallocate( com_plan )
+    deallocate( sfc_list )
+    deallocate( sfc_com_list )
 
     ! end time
     sub_t1 = MPI_Wtime()

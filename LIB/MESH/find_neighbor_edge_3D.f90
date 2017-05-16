@@ -10,20 +10,20 @@
 !> \brief find neighbor on block edge
 !
 !>
-!! input:    
+!! input:
 !!           - heavy and light data id
 !!           - light data array and max treelevel
 !!           - direction for neighbor search
 !!           - list of active blocks
 !!
-!! output:   
+!! output:
 !!           - neighbor list array
 !!
 !! \n
 !  --------------------------------------------------------------------------------------------
 !> neighbor codes: \n
-!  --------------- 
-!> for imagination: 
+!  ---------------
+!> for imagination:
 !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
 !!                   - edge: boundary between two sides - use sides numbers for coding
 !!                   - corner: between three sides - so use all three sides numbers
@@ -31,10 +31,10 @@
 !!                     so use this corner code in second part of neighbor code
 !!
 !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-!! edges:  '_12/___', '_13/___', '_14/___', '_15/___' 
-!!         '_62/___', '_63/___', '_64/___', '_65/___' 
+!! edges:  '_12/___', '_13/___', '_14/___', '_15/___'
+!!         '_62/___', '_63/___', '_64/___', '_65/___'
 !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-!! corner: '123/___', '134/___', '145/___', '152/___' 
+!! corner: '123/___', '134/___', '145/___', '152/___'
 !!         '623/___', '634/___', '645/___', '652/___' \n
 !!
 !! complete neighbor code array, 74 possible neighbor relations \n
@@ -56,7 +56,7 @@
 !
 ! ********************************************************************************************
 
-subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
+subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -80,8 +80,9 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-
-    !> heavy data array - neifghbor data
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(in)   :: lgt_sortednumlist(:,:)
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! auxiliary variables
@@ -394,7 +395,7 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
 
     ! proof existence of neighbor block and find light data id
-    call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
+    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
     if (exists) then
         ! neighbor on same level
@@ -405,7 +406,7 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
         ! neighbor could be one level down
         neighbor( level ) = -1
         ! proof existence of neighbor block
-        call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
+        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
         if ( exists .and. lvl_down_neighbor ) then
 
             ! neigbor is one level down
@@ -425,8 +426,7 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
                 ! proof existence of neighbor block
-                call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
-
+                call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
                 if (exists) then
                     ! neigbor is one level up
                     ! write data

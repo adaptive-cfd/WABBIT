@@ -6,13 +6,16 @@
 !> \name refine_mesh.f90
 !> \version 0.5
 !> \author msr, engels
+!> \brief Refine the mash (tag / interpolate / update lists)
 !
-!> \brief This routine first sets the refinement flag for all blocks to +1
+!> \details This routine first sets the refinement flag for all blocks to +1
 !! and then executes the refinement directly. Blocks that cannot be refined because they
 !! are already on the finest allowed level are unaltered.
 !!
 !! As the grid changes, active lists and neighbor relations are updated, and load balancing
 !! is applied.
+!!
+!! Note we assume, on call, that active lists / neighbor are up-to-date
 !
 !>
 !! input:    - params, light and heavy data \n
@@ -79,6 +82,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
         d = 2
     endif
 
+    ! reset refinement status to "stay"
+    do k = 1, lgt_n
+      lgt_block( lgt_active(k), Jmax+2 ) = 0
+    enddo
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -86,10 +93,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! start time
     sub_t0 = MPI_Wtime()
 
-    ! loop over the blocks and set their refinement status.
-    ! NOTE: refinement is an absolute statement, that means once set, the block will be refined
-    ! (which is not the case in block coarsening), it may even entrail other blocks in
-    ! its vicinity to be refined as well.
+    !> loop over the blocks and set their refinement status.
+    !! NOTE: refinement is an absolute statement, that means once set, the block will be refined
+    !! (which is not the case in block coarsening), it may even entrail other blocks in
+    !! its vicinity to be refined as well.
     select case (indicator)
         case ("everywhere")
           ! set status "refine" for all active blocks, which is just setting the

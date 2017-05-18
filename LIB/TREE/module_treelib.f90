@@ -2,8 +2,10 @@
 module module_treelib
 
   use module_precision
+  !> \todo: remove
+  use module_debug
 
-  integer, parameter :: maxdigits = 20
+  integer, parameter :: maxdigits = 16
   integer, parameter :: tsize = selected_int_kind(maxdigits)
 
 
@@ -22,13 +24,14 @@ contains
     N = size(treearray,1)
     treecode2int = 0
 
-    i = 1
-    do while (treearray(i) /= -1 .and. i<=N)
-      ! note zero i a bit tedious for comparison, as 0002 and 2 are the same
-      ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-      treecode2int = treecode2int + (10**i) * ( treearray(i) + 1 )
-      i = i + 1
+    do i = 1, N
+      if (treearray(i) >= 0) then
+        ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
+        ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
+        treecode2int = treecode2int + (10**(i-1)) * ( treearray(i) + 1 )
+      endif
     enddo
+
   end function
 
   !===============================================================================
@@ -444,11 +447,13 @@ end subroutine adjacent4
       integer(kind=ik)                    :: neighbor2(max_treelevel)
       ! loop variable
       integer(kind=ik)                    :: i
+      real(kind=rk)::sub_t0,sub_t1
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
 
       neighbor = -1
+      ! sub_t0 = MPI_wtime()
 
   !---------------------------------------------------------------------------------------------
   ! main body
@@ -553,6 +558,21 @@ end subroutine adjacent4
               call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
 
       end select
+
+      ! ! end time
+      ! sub_t1 = MPI_Wtime()
+      ! ! write time
+      !     ! find free or corresponding line
+      !     i = 1
+      !     do while ( debug%name_comp_time(i) /= "---" )
+      !         ! entry for current subroutine exists
+      !         if ( debug%name_comp_time(i) == "adjacent" ) exit
+      !         i = i + 1
+      !     end do
+      !     ! write time
+      !     debug%name_comp_time(i) = "adjacent"
+      !     debug%comp_time(i, 1)   = debug%comp_time(i, 1) + 1
+      !     debug%comp_time(i, 2)   = debug%comp_time(i, 2) + sub_t1 - sub_t0
 
   end subroutine adjacent_block_2D
 

@@ -10,13 +10,13 @@
 !> \brief save data main function, call write data routine
 !
 !>
-!! input:    
+!! input:
 !!           - time loop parameter
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
 !!
-!! output:   
+!! output:
 !!           -
 !!
 !!
@@ -27,7 +27,7 @@
 !
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
+subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -44,15 +44,13 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     !> user defined parameter structure
     type (type_params), intent(in)                  :: params
     !> light data array
-    integer(kind=ik), intent(in)                    :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)                 :: lgt_block(:, :)
     !> heavy data array - block data
-    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)                 :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)                 :: lgt_n
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)                 :: hvy_n
+    !> number of active blocks (light/heavy data)
+    integer(kind=ik), intent(inout)                 :: lgt_n, hvy_n
 
     ! loop variable
     integer(kind=ik)                                :: k
@@ -120,5 +118,4 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
     end if
-
 end subroutine save_data

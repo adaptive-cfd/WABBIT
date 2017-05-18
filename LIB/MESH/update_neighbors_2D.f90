@@ -92,6 +92,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     ! special case:
     ! if there is only one block => all neighbors are this block
     ! one block criteria: size of block_list should be one!
+    !> \todo Wouldn't lgt_n==1 be a better criterion for this exception?
     if ( size(lgt_block,1) == 1 ) then
         hvy_neighbor(1,1:8) = 1
     end if

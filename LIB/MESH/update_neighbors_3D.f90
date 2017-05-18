@@ -119,6 +119,8 @@ subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     ! special case:
     ! if there is only one block => all neighbors are this block
     ! one block criteria: size of block_list should be one!
+    !> \todo As for update neighbors 2D : I don't understand why lgt_n == 1 should
+    !! not be the correct condition here.
     if ( lgt_n == 1 ) then
         hvy_neighbor(1,1:26) = lgt_active(1)
     end if

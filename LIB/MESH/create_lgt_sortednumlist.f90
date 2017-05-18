@@ -51,15 +51,16 @@ subroutine create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_s
 
     ! sort list
     if (lgt_n > 1) then
-      call quicksort(lgt_sortednumlist, 1, lgt_n)
+      call quicksort(lgt_sortednumlist, 1, lgt_n, 2)
   endif
 end subroutine create_lgt_sortednumlist
 
 
 
-recursive subroutine quicksort(a, first, last)
+recursive subroutine quicksort(a, first, last, sortdim)
   implicit none
   integer(kind=tsize), intent(inout) ::  a(:,:)
+  integer(kind=ik), intent(in) :: sortdim
   integer(kind=tsize), dimension(2) :: x, t
   integer(kind=ik) :: first, last
   integer(kind=ik) :: i, j
@@ -67,11 +68,19 @@ recursive subroutine quicksort(a, first, last)
   x = a( (first+last) / 2 , 2)
   i = first
   j = last
+
+  ! if we've arrived at small lists, call interchange sort and return
+  if ( j-i < 6) then
+    call interchange_sort(a, first, last, sortdim)
+    return
+  endif
+
+  ! otherwise do recursive quicksort
   do
-     do while (a(i,2) < x(2))
+     do while (a(i,sortdim) < x(sortdim))
         i=i+1
      end do
-     do while (x(2) < a(j,2))
+     do while (x(sortdim) < a(j,sortdim))
         j=j-1
      end do
      if (i >= j) exit
@@ -79,6 +88,28 @@ recursive subroutine quicksort(a, first, last)
      i=i+1
      j=j-1
   end do
-  if (first < i-1) call quicksort(a, first, i-1)
-  if (j+1 < last)  call quicksort(a, j+1, last)
+  if (first < i-1) call quicksort(a, first, i-1, sortdim)
+  if (j+1 < last)  call quicksort(a, j+1, last, sortdim)
 end subroutine quicksort
+
+
+subroutine interchange_sort(a, left_end, right_end, sortdim)
+   implicit none
+   integer(kind=tsize), intent(inout) ::  a(:,:)
+   integer(kind=ik) :: left_end, right_end
+   integer(kind=ik), intent(in) :: sortdim
+   
+   integer(kind=ik) :: i, j
+   integer(kind=tsize), dimension(2) :: temp
+
+   do i = left_end, right_end - 1
+      do j = i+1, right_end
+         if (a(i,sortdim) > a(j,sortdim)) then
+            temp = a(i,:)
+            a(i,:) = a(j,:)
+            a(j,:) = temp
+         end if
+      end do
+   end do
+
+ end subroutine interchange_sort

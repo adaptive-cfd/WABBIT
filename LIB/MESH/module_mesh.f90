@@ -133,4 +133,8 @@ contains
     !
     include "create_lgt_sortednumlist.f90"
 
+    !
+    include "get_free_local_light_id.f90"
+    include "gather_blocks_on_proc.f90"
+
 end module module_mesh

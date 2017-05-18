@@ -20,10 +20,6 @@
 !! my neighbors, as they might reside on another proc.
 !!
 !!
-!! input:    - light data, neighbor list, list of active blocks(light data) \n
-!! output:   - light data array
-!!
-!!
 !! = log ======================================================================================
 !! \n
 !! 10/11/16 - switch to v0.4 \n

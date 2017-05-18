@@ -70,10 +70,8 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
     logical                             :: exists
     ! variable to show if there is a valid corner neighbor
     logical                             :: lvl_down_neighbor
-
     ! auxiliary variables
     integer(kind=ik)                    :: list_id, virt_code
-
     ! neighbor light data id
     integer(kind=ik)                    :: neighbor_light_id
 

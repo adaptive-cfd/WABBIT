@@ -60,9 +60,9 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
 
     max_treelevel = params%max_treelevel
     if (params%threeD_case) then
-      N_sisters = 7
+      N_sisters = 8
     else
-      N_sisters = 3
+      N_sisters = 4
     end if
     ! allocate the array which will hold the light ids of the sisters
     allocate( id(1:N_sisters) )
@@ -81,6 +81,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
         if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
             ! find sister IDs of the block we're looking at. If a sister is not found, -1
             ! is returned in the array id
+            ! NOTE: the array "id" also contains the block itself
             call find_sisters( params, lgt_active(k), id, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
             ! if all sisters exists, then the array should not contain values smaller
@@ -100,7 +101,8 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
                     lgt_block( id(l), max_treelevel+2 )  = -2
                   end do
                 end if
-
+            else
+              call error_msg("find_sisters: we did not find all sister blocks! (grid error!)")
             end if
         end if
     end do

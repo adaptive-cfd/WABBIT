@@ -131,7 +131,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
   treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
   refinement_execute_3D.f90 coarse_mesh_3D.f90 balance_load_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
-	find_sisters.f90 max_active_level.f90 min_active_level.f90 create_lgt_sortednumlist.f90
+	find_sisters.f90 max_active_level.f90 min_active_level.f90 create_lgt_sortednumlist.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

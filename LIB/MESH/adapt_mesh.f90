@@ -69,12 +69,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     real(kind=rk)                       :: r
 
 !---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
 ! variables initialization
   Jmax = params%max_treelevel
   lgt_n_old = 0
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -82,12 +80,12 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     ! is done here, no new blocks arise that could compromise the number of blocks -
     ! if it's constant, its because no more blocks are refined)
     do while ( lgt_n_old /= lgt_n )
-
         lgt_n_old = lgt_n
 
         ! check where to coarsen (refinement done with safety zone)
         if ( indicator == "threshold") then
-          ! use wavelet indicator to check where to coarsen
+          ! use wavelet indicator to check where to coarsen. threshold_block performs
+          ! the required ghost node sync and loops over all active blocks.
           call threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         elseif (indicator == "random") then
@@ -115,15 +113,14 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
         endif
 
-!> \todo: check which of these calls to list generators are really necessary
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+        ! hvy_active list is required for update_neighbors
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
         ! update list of sorted nunmerical treecodes, used for finding blocks
         call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
-        ! update neighbor relations
+        ! update neighbor relations, required for gradedness
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-! until here???
 
         ! unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
@@ -138,11 +135,11 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
         else
             ! 2D:
-            call coarse_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n, lgt_sortednumlist )
+            call coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         end if
 
-!> \todo: check which of these calls to list generators are really necessary
+        ! the following calls are indeed required (threshold->ghosts->neighbors->active)
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
@@ -153,7 +150,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
     end do
 
-    ! balance load
+    ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
+    ! they may have passed several level also. Now, the distribution of blocks may no longer
+    ! be balanced, so we have to balance load now
     if ( params%threeD_case ) then
         ! 3D:
         call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
@@ -162,7 +161,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
-!> \todo: check which of these calls to list generators are really necessary
+    ! load balancing destroys the lists again, so we have to create them one last time to
+    ! end on a valid mesh
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )

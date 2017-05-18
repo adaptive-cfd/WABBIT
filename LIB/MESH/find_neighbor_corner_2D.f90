@@ -14,13 +14,13 @@
 !! only on block corner (not additional on block side)
 !!    3. one level up: allways exact one neighbor
 !!
-!! input:   
+!! input:
 !!           - heavy and light data id
 !!           - light data array and max treelevel
 !!           - direction for neighbor search
 !!           - list of active blocks
 !!
-!!  output:   
+!!  output:
 !!           - neighbor list array
 !!
 ! -------------------------------------------------------------------------------------------------------------------------
@@ -33,7 +33,7 @@
 ! ********************************************************************************************
 !> \image html neighborhood.png "Neighborhood Relations in 2D" width=400
 
-subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n)
+subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -57,8 +57,9 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-
-    !> heavy data array - neifghbor data
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! mesh level
@@ -134,8 +135,7 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
     call adjacent_block_2D( my_treecode, neighbor, dir, level, max_treelevel)
 
     ! proof existence of neighbor block
-    call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
-
+    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
     if (exists) then
 
@@ -148,7 +148,7 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
         ! neighbor could be one level down
         neighbor( level ) = -1
         ! proof existence of neighbor block
-        call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
+        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
         if ( exists .and. lvl_down_neighbor ) then
             ! neigbor is one level down
@@ -163,7 +163,7 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! proof existence of neighbor block
-            call does_block_exist(neighbor, lgt_block, max_treelevel, exists, neighbor_light_id, lgt_active, lgt_n)
+            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
             if (exists) then
                 ! neigbor is one level up

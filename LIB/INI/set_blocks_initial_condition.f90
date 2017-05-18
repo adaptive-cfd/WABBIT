@@ -10,14 +10,14 @@
 !> \brief This routine initializes the block data, i.e. it evaluates the initial condition on the grid
 !
 !>
-!! input:    
+!! input:
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
 !!           - neighbor data array
 !!           - light and heavy active block list
 !!
-!! output:   
+!! output:
 !!           - filled user defined data structure for global params
 !!           - initialized light and heavy data arrays
 !!
@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 
-subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, adapt)
+subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -51,6 +51,8 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
   integer(kind=ik), intent(inout)      :: hvy_active(:)
   !> number of heavy and light active blocks
   integer(kind=ik), intent(inout)      :: hvy_n, lgt_n
+  !> sorted list of numerical treecodes, used for block finding
+  integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:)
   !> if .false. the code initializes on the coarsest grid, if .true. iterations
   !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
@@ -69,7 +71,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
     !---------------------------------------------------------------------------
     ! Create the first mesh on the coarsest treelevel
     !---------------------------------------------------------------------------
-    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, params%min_treelevel, .true. )
+    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true. )
 
     !---------------------------------------------------------------------------
     ! on the grid, evaluate the initial condition
@@ -88,7 +90,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
         ! push up the entire grid one level. TODO: It would be better to selectively
         ! go up one level where a refinement indicator tells us to do so, but in teh current code
         ! versions it is easier to use everywhere
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "everywhere"  )
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
 
         ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
         ! not, the detail coefficients for all blocks are zero. In the time stepper, this
@@ -98,7 +100,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
 
         ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
         ! adapt-mesh also performs neighbor and active lists updates
-        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
+        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold" )
 
         if (params%rank == 0) then
           write(*,'(" did one mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))

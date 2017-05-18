@@ -25,7 +25,7 @@
 !
 ! ********************************************************************************************
 
-subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_matrix, com_lists )
+subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_matrix, com_lists, synch_type )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -41,7 +41,7 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neifghbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
     !> list of active blocks (heavy data)
@@ -65,6 +65,10 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     !! count the number of communications between procs
     !! row/column number encodes process rank + 1
     integer(kind=ik), intent(inout)     :: com_matrix(:,:)
+
+    ! type of synchronization
+    integer(kind=ik), intent(in)        :: synch_type
+    logical                             :: synch
 
     ! loop variables
     integer(kind=ik)                    :: k, N, i, lgt_id, hvy_id, neighbor_num
@@ -156,68 +160,92 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
                 ! calculate the difference between block levels
                 level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
 
-                ! proof if neighbor internal or external
-                call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+                ! set synch
+                ! case 1:
+                ! case 2:
+                synch = .false.
+!                if ( (synch_type == 1) .and. ( (i <= 4) .or. (i > 8) ) .or. (level_diff /= 0) ) then
+!                    synch = .true.
+!                end if
+!                if ( (synch_type == 2) .and. ( (i > 4) .or. (i <= 8) ) .and. (level_diff == 0) ) then
+!                    synch = .true.
+!                end if
 
-                if ( rank == neighbor_rank ) then
-                    ! calculate internal heavy id
-                    call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
+                if ( (synch_type == 1) .and. ( (i <= 4)  .or. (level_diff == -1) ) ) then
+                    synch = .true.
+                end if
+                if ( (synch_type == 2) .and. (i > 4)  .and. (level_diff /= -1) ) then
+                    synch = .true.
+                end if
 
-                    ! internal neighbor -> copy ghost nodes
-                    if ( params%threeD_case ) then
-                        ! 3D:
-                        call copy_ghost_nodes_3D( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+                if (synch) then
+
+                    ! proof if neighbor internal or external
+                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+
+                    if ( rank == neighbor_rank ) then
+                        ! calculate internal heavy id
+                        call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
+
+                            ! internal neighbor -> copy ghost nodes
+                            if ( params%threeD_case ) then
+                                ! 3D:
+                                call copy_ghost_nodes_3D( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+                            else
+                                ! 2D:
+                                call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_active(k), hvy_id, i, level_diff )
+                            end if
+
+                            ! write communications matrix
+                            com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1
+
                     else
-                        ! 2D:
-                        call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_active(k), hvy_id, i, level_diff )
-                    end if
+                        ! neighbor heavy id
+                        call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
 
-                    ! write communications matrix
-                    com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1
+                        ! check neighbor proc rank
+                        if ( receiver_pos(neighbor_rank+1) == 0 ) then
+
+                            ! first communication with neighbor proc
+                            ! -------------------------------------------
+                            ! set list position, increase number of neighbor procs by 1
+                            receiver_N                      = receiver_N + 1
+                            ! save list pos
+                            receiver_pos(neighbor_rank+1)   = receiver_N
+                            ! save neighbor rank
+                            receiver_rank(receiver_N)       = neighbor_rank
+                            ! count communications - here: first one
+                            receiver_count(receiver_N)      = 1
+
+                            ! external neighbor -> new com_lists entry (first entry)
+                            com_lists( 1 , 1, neighbor_rank+1)  = rank
+                            com_lists( 1 , 2, neighbor_rank+1)  = neighbor_rank
+                            com_lists( 1 , 3, neighbor_rank+1)  = hvy_active(k)
+                            com_lists( 1 , 4, neighbor_rank+1)  = hvy_id
+                            com_lists( 1 , 5, neighbor_rank+1)  = i
+                            com_lists( 1 , 6, neighbor_rank+1)  = level_diff
+
+                        else
+
+                            ! additional communication with neighbor proc
+                            ! -------------------------------------------
+                            ! count communications - +1
+                            receiver_count( receiver_pos(neighbor_rank+1) )  = receiver_count( receiver_pos(neighbor_rank+1) ) + 1
+
+                            ! external neighbor -> new com_lists entry
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 1, neighbor_rank+1)  = rank
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 2, neighbor_rank+1)  = neighbor_rank
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 3, neighbor_rank+1)  = hvy_active(k)
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 4, neighbor_rank+1)  = hvy_id
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 5, neighbor_rank+1)  = i
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 6, neighbor_rank+1)  = level_diff
+
+                        end if
+
+                    end if
 
                 else
-                    ! neighbor heavy id
-                    call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
-
-                    ! check neighbor proc rank
-                    if ( receiver_pos(neighbor_rank+1) == 0 ) then
-
-                        ! first communication with neighbor proc
-                        ! -------------------------------------------
-                        ! set list position, increase number of neighbor procs by 1
-                        receiver_N                      = receiver_N + 1
-                        ! save list pos
-                        receiver_pos(neighbor_rank+1)   = receiver_N
-                        ! save neighbor rank
-                        receiver_rank(receiver_N)       = neighbor_rank
-                        ! count communications - here: first one
-                        receiver_count(receiver_N)      = 1
-
-                        ! external neighbor -> new com_lists entry (first entry)
-                        com_lists( 1 , 1, neighbor_rank+1)  = rank
-                        com_lists( 1 , 2, neighbor_rank+1)  = neighbor_rank
-                        com_lists( 1 , 3, neighbor_rank+1)  = hvy_active(k)
-                        com_lists( 1 , 4, neighbor_rank+1)  = hvy_id
-                        com_lists( 1 , 5, neighbor_rank+1)  = i
-                        com_lists( 1 , 6, neighbor_rank+1)  = level_diff
-
-                    else
-
-                        ! additional communication with neighbor proc
-                        ! -------------------------------------------
-                        ! count communications - +1
-                        receiver_count( receiver_pos(neighbor_rank+1) )  = receiver_count( receiver_pos(neighbor_rank+1) ) + 1
-
-                        ! external neighbor -> new com_lists entry
-                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 1, neighbor_rank+1)  = rank
-                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 2, neighbor_rank+1)  = neighbor_rank
-                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 3, neighbor_rank+1)  = hvy_active(k)
-                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 4, neighbor_rank+1)  = hvy_id
-                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 5, neighbor_rank+1)  = i
-                        com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 6, neighbor_rank+1)  = level_diff
-
-                    end if
-
+                    ! nothing to do
                 end if
 
             end if

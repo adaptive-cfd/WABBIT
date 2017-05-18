@@ -14,7 +14,7 @@
 !!
 !! input:    - params \n
 !! output:   -        \n
-!! 
+!!
 !!
 !! = log ======================================================================================
 !! \n
@@ -24,7 +24,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -47,18 +47,17 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik),  intent(inout)        :: lgt_active(:)
     !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
 
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
     ! number of active blocks (light data)
     integer(kind=ik)                        :: lgt_n
-
     ! loop variables
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
-
     ! process rank
     integer(kind=ik)                        :: rank, number_procs
-
     ! coordinates vectors
     real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
     ! spacing
@@ -136,14 +135,14 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, 2, .true. )
+    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
 
 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
-      call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
-      call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "random" )
+      call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+      call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
     end do
 
     if (params%rank == 0) then

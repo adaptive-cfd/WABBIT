@@ -21,7 +21,7 @@
 !            subroutines
 ! ********************************************************************************************
 
-subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -37,11 +37,12 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: k, dF, i, l, N, lgt_id, hvy_id, sister_rank
@@ -164,7 +165,7 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n )
                         i         = i + 1
                         me(level) = l-1
                         ! find block id
-                        call does_block_exist(me, lgt_block, maxtL, exists, lgt_id, lgt_active, lgt_n)
+                        call does_block_exist(me, exists, lgt_id, lgt_sortednumlist, lgt_n)
                         ! block exists
                         if (exists) then
                             id(i) = lgt_id

@@ -11,11 +11,11 @@
 !!        2D version
 !
 !> \details
-!! input:    
+!! input:
 !!           - light data array
 !!           - params struct
 !!
-!! output:   
+!! output:
 !!           - neighbor list array
 !!
 !! = log ======================================================================================
@@ -26,7 +26,7 @@
 ! ********************************************************************************************
 !> \image html update_neighbors.png "Update Neighbors" width=400
 
-subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist,  hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -39,11 +39,12 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
@@ -58,7 +59,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     integer(kind=ik)                    :: rank
 
     ! loop variable
-    integer(kind=ik)                    :: k, lgt_id
+    integer(kind=ik)                    :: k, lgt_id, i,j
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
@@ -102,22 +103,22 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
         ! north
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
         ! east
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
         ! south
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
         ! west
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
 
         ! northeast
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
         ! northwest
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
         ! southeast
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
         ! southwest
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_active, lgt_n)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
 
     end do
 

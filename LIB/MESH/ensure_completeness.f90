@@ -9,10 +9,10 @@
 !
 !> \brief sets refinement status to -2 for all sister blocks, if coarsening is possible
 !
-!> \details 
+!> \details
 !! input:    - light data array \n
 !! output:   - light data array
-!! 
+!!
 !!
 !! = log ======================================================================================
 !! \n
@@ -21,7 +21,7 @@
 ! ********************************************************************************************
 !> \image html completeness.png "Ensure Completeness" width=400
 
-subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
+subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -40,6 +40,8 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)
 
     ! max treelevel
     integer(kind=ik)                    :: max_treelevel
@@ -79,7 +81,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n )
         if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
             ! find sister IDs of the block we're looking at. If a sister is not found, -1
             ! is returned in the array id
-            call find_sisters( params, lgt_active(k), id, lgt_block, lgt_active, lgt_n )
+            call find_sisters( params, lgt_active(k), id, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
             ! if all sisters exists, then the array should not contain values smaller
             ! zero (-1 would mean not found)

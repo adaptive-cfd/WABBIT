@@ -10,14 +10,14 @@
 !> \brief Allocate grid data (light, heavy, neighbors, active lists etc), initialize
 !
 !>
-!! input:   
+!! input:
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
 !!           - neighbor data array
 !!           - light and heavy active block list
 !!
-!! output:   
+!! output:
 !!           - filled user defined data structure for global params
 !!           - initialized light and heavy data arrays
 !!
@@ -29,7 +29,7 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active)
+subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -50,8 +50,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
     !> list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
-    ! allocation error variable
-    integer(kind=ik)                                :: allocate_error
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
     ! local shortcuts:
     integer(kind=ik)                                :: Bs,g,dF,number_blocks, rank, number_procs
 
@@ -81,34 +81,24 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     if ( params%threeD_case ) then
         ! 3D:
         ! datafields + 1 -> first field for coordinates, ...
-        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
+        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, dF*5, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
+        allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, dF*5, number_blocks ) )
         ! 3D: maximal 74 neighbors per block
-        allocate( hvy_neighbor( params%number_blocks, 74 ), stat=allocate_error )
-        call check_allocation(allocate_error)
+        allocate( hvy_neighbor( params%number_blocks, 74 ) )
     else
         ! 2D:
         ! datafields + 1 -> first field for coordinates, ...
-        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
+        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        allocate( hvy_work( Bs+2*g, Bs+2*g, 1, dF*5, number_blocks ), stat=allocate_error )
-        call check_allocation(allocate_error)
-
+        allocate( hvy_work( Bs+2*g, Bs+2*g, 1, dF*5, number_blocks ) )
         ! 2D: maximal 16 neighbors per block
-        allocate( hvy_neighbor( params%number_blocks, 16 ), stat=allocate_error )
-        call check_allocation(allocate_error)
+        allocate( hvy_neighbor( params%number_blocks, 16 ) )
     end if
 
     ! allocate memory
-    allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2) )
+    allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
 
     ! reset data:
     ! all blocks are inactive, reset treecode
@@ -125,12 +115,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     hvy_neighbor = -1
 
     ! allocate active list
-    allocate( lgt_active( size(lgt_block, 1) ), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( lgt_active( size(lgt_block, 1) ) )
 
     ! note: 5th dimension in heavy data is block id
-    allocate( hvy_active( size(hvy_block, 5) ), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( hvy_active( size(hvy_block, 5) ) )
 
     if (rank == 0) then
       ! note we currently use 8byte per real and integer by default, so all the same bytes per point

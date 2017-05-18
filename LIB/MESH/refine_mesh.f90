@@ -10,11 +10,11 @@
 !> \brief This routine first sets the refinement flag for all blocks to +1
 !! and then executes the refinement directly. Blocks that cannot be refined because they
 !! are already on the finest allowed level are unaltered.
-!! 
+!!
 !! As the grid changes, active lists and neighbor relations are updated, and load balancing
 !! is applied.
 !
-!> 
+!>
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
 !! \n
@@ -26,7 +26,7 @@
 !! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator )
+subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -48,6 +48,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     integer(kind=ik), intent(inout)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(inout)        :: hvy_active(:)
     !> number of active blocks (heavy data)
@@ -159,9 +161,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! and do not have to ensure that the active list is up-to-date
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! balance load
     if ( params%threeD_case ) then
@@ -169,15 +172,16 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
         call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     else
         ! 2D:
-        call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        !call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist , hvy_active, hvy_n )
 
     ! end time
     sub_t1 = MPI_Wtime()

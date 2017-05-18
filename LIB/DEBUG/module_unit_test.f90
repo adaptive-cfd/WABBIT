@@ -54,4 +54,6 @@ contains
     ! spatial convergence order test
     include "unit_test_spatial_convergence_order.f90"
 
+    include "unit_test_treecode.f90"
+
 end module module_unit_test

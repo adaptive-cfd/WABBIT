@@ -11,11 +11,11 @@
 !
 !>
 !! = log ======================================================================================
-!! \n 
+!! \n
 !! 04/11/16 - switch to v0.4 \n
 !! 23/11/16 - use computing time array for simple performance tests \n
 !! 07/12/16 - now uses heavy work data array \n
-!! 25/01/17 - switch to 3D, v0.5 
+!! 25/01/17 - switch to 3D, v0.5
 ! ********************************************************************************************
 !> \image html rhs.png width=600
 !> \image html rhs.eps
@@ -87,6 +87,12 @@ program main
     !         saved data -> -1 ... no neighbor
     !                    -> light data id in corresponding column
     integer(kind=ik), allocatable       :: hvy_neighbor(:,:)
+
+    ! The following list contains the numerical treecode and the lightID for the active blocks
+    ! in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,
+    ! a treecode is an array and this is handy. for finding a block however, this is not true,
+    ! here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
+    integer(kind=tsize), allocatable    :: lgt_sortednumlist(:,:)
 
     ! list of active blocks (light data)
     integer(kind=ik), allocatable       :: lgt_active(:)
@@ -176,18 +182,20 @@ program main
     call ini_file_to_params( params, filename )
 
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
 
-!    !---------------------------------------------------------------------------
-!    ! Unit tests
-!    !---------------------------------------------------------------------------
-!    ! perform a convergence test on ghost node sync'ing
-!    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-!    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+    !---------------------------------------------------------------------------
+    ! Unit tests
+    !---------------------------------------------------------------------------
+    ! call unit_test_treecode( params )
+    ! stop
+    ! perform a convergence test on ghost node sync'ing
+    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !
 !    ! reset the grid: all blocks are inactive and empty
 !    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
@@ -201,7 +209,7 @@ program main
 !
 !        ! spatial convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-!        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 !        ! reset the grid: all blocks are inactive and empty
 !        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
 !
@@ -211,14 +219,15 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, .true.  )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, .true.  )
 
     ! create lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
@@ -233,11 +242,16 @@ program main
 
         ! refine everywhere
         if ( params%adapt_mesh ) then
-            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "everywhere" )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
 
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+
+!        ! check redundant nodes
+!        if ( params%debug ) then
+!            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+!        end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then
@@ -246,7 +260,7 @@ program main
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, "threshold" )
+            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold" )
         endif
 
         ! output on screen

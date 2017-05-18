@@ -10,7 +10,7 @@
 !> \brief coarse the mesh: \n
 !! every proc work on light data array
 !
-!> \details 
+!> \details
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
 !! \n
@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -36,11 +36,12 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: k, dF, i, l, N, lgt_id, hvy_id, sister_rank
@@ -60,10 +61,6 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     real(kind=rk), allocatable          :: new_data(:,:,:,:), send_receive_data(:,:,:)
     ! new coordinates vectors
     real(kind=rk), allocatable          :: new_coord_x(:), new_coord_y(:), new_coord_z(:), send_receive_coord(:)
-
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
-
     ! treecode varaible
     integer(kind=ik)                    :: me(params%max_treelevel), s1(params%max_treelevel), s2(params%max_treelevel), s3(params%max_treelevel), &
                                         s4(params%max_treelevel), s5(params%max_treelevel), s6(params%max_treelevel), s7(params%max_treelevel)
@@ -112,49 +109,16 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     g  = params%number_ghost_nodes
 
     ! allocate data array
-    allocate( new_data(Bs, Bs, Bs, params%number_data_fields), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( new_data(Bs, Bs, Bs, params%number_data_fields) )
 
     ! new coordinates vectors
-    allocate( new_coord_x(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_coord_y(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_coord_z(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( new_coord_x(Bs) )
+    allocate( new_coord_y(Bs) )
+    allocate( new_coord_z(Bs) )
 
     ! send/receive data and coordinates
-    allocate( send_receive_data(Bs, Bs, Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( send_receive_coord(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( send_receive_data(Bs, Bs, Bs) )
+    allocate( send_receive_coord(Bs) )
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -199,7 +163,7 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
                         i         = i + 1
                         me(level) = l-1
                         ! find block id
-                        call does_block_exist(me, lgt_block, maxtL, exists, lgt_id, lgt_active, lgt_n)
+                        call does_block_exist(me, exists, lgt_id, lgt_sortednumlist, lgt_n)
                         ! block exists
                         if (exists) then
                             id(i) = lgt_id
@@ -628,11 +592,11 @@ subroutine coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     end do
 
     ! clean up
-    deallocate( new_data, stat=allocate_error )
-    deallocate( new_coord_x, stat=allocate_error )
-    deallocate( new_coord_y, stat=allocate_error )
-    deallocate( send_receive_data, stat=allocate_error )
-    deallocate( send_receive_coord, stat=allocate_error )
+    deallocate( new_data )
+    deallocate( new_coord_x )
+    deallocate( new_coord_y )
+    deallocate( send_receive_data )
+    deallocate( send_receive_coord )
 
     ! end time
     sub_t1 = MPI_Wtime()

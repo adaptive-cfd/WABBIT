@@ -29,6 +29,8 @@ module module_mesh
     use module_interpolation
     ! use MPI module, since thrshold_block needs to synch ghosts
     use module_MPI
+    ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
+    use module_treelib
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -114,12 +116,11 @@ contains
 
     ! transfer treecode to 2D hilbert code
     include "treecode_to_hilbertcode_2D.f90"
-    
+
     ! transfer treecode to 3D hilbert code
     include "treecode_to_hilbertcode_3D.f90"
 
     ! goes back from a treecode to xyz cartesian coordinates
-    include "decoding.f90"
     include "get_block_spacing_origin.f90"
 
     ! find sisters to a given block
@@ -128,5 +129,8 @@ contains
     ! find globally coarsest / finest levels
     include "max_active_level.f90"
     include "min_active_level.f90"
+
+    !
+    include "create_lgt_sortednumlist.f90"
 
 end module module_mesh

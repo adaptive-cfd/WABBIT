@@ -15,7 +15,7 @@
 !> \note The interpolation (or prediction) operator here is applied to a block EXCLUDING
 !! any ghost nodes.
 !
-!> \details 
+!> \details
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays \n
 !!
@@ -64,10 +64,6 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     real(kind=rk), allocatable          :: new_data(:,:,:), data_predict_coarse(:,:), data_predict_fine(:,:)
     ! new coordinates vectors
     real(kind=rk), allocatable          :: new_coord_x(:), new_coord_y(:)
-
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
-
     ! free light/heavy data id
     integer(kind=ik)                    :: free_light_id, free_heavy_id
 
@@ -99,41 +95,11 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
-    allocate( data_predict_fine(2*Bs-1, 2*Bs-1), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( data_predict_coarse(Bs, Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
+    allocate( data_predict_fine(2*Bs-1, 2*Bs-1) )
+    allocate( data_predict_coarse(Bs, Bs) )
+    allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields) )
     ! new coordinates vectors
-    allocate( new_coord_x(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_coord_y(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( new_coord_x(Bs) , new_coord_y(Bs) )
 
     ! set light data list for working, only light data coresponding to proc are not zero
     my_lgt_block = 0
@@ -321,10 +287,10 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! clean up
-    deallocate( data_predict_fine, stat=allocate_error )
-    deallocate( data_predict_coarse, stat=allocate_error )
-    deallocate( new_data, stat=allocate_error )
-    deallocate( new_coord_x, stat=allocate_error )
-    deallocate( new_coord_y, stat=allocate_error )
+    deallocate( data_predict_fine )
+    deallocate( data_predict_coarse )
+    deallocate( new_data )
+    deallocate( new_coord_x )
+    deallocate( new_coord_y )
 
 end subroutine refinement_execute_2D

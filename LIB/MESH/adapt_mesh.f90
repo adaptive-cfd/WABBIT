@@ -64,7 +64,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
     ! loop variables
-    integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old
+    integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old, iteration
     ! random variable for coarsening
     real(kind=rk)                       :: r
 
@@ -72,7 +72,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 ! variables initialization
   Jmax = params%max_treelevel
   lgt_n_old = 0
-
+  iteration = 0
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -89,25 +89,27 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
           call threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         elseif (indicator == "random") then
-          ! randomly coarse some blocks. used for testing.
-          call init_random_seed()
-          ! unset all refinement flags
-          lgt_block( :,Jmax+2 ) = 0
-          ! only root rank sets the flag, then we sync. It is messy if all procs set a
-          ! random value which is not sync'ed
-          if (params%rank == 0) then
-            do j = 1, lgt_n
-              ! random number
-              call random_number(r)
-              ! set refinement status to coarsen
-              if ( r <= 0.25_rk ) then
-                  lgt_block( lgt_active(j), Jmax+2 ) = -1
-              end if
-            end do
+          ! randomly coarse some blocks. used for testing. note we tag for coarsening
+          ! only once in the first iteration.
+          if (iteration == 0) then
+            call init_random_seed()
+            ! unset all refinement flags
+            lgt_block( :,Jmax+2 ) = 0
+            ! only root rank sets the flag, then we sync. It is messy if all procs set a
+            ! random value which is not sync'ed
+            if (params%rank == 0) then
+              do j = 1, lgt_n
+                ! random number
+                call random_number(r)
+                ! set refinement status to coarsen
+                if ( r <= 0.25_rk ) then
+                    lgt_block( lgt_active(j), Jmax+2 ) = -1
+                end if
+              end do
+            endif
+            ! sync light data, as only root sets random coarsening
+            call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
           endif
-          ! sync light data, as only root sets random coarsening
-          call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
-
         else
             call error_msg("ERROR: unknown coarsening operator")
 
@@ -147,7 +149,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-
+        iteration = iteration + 1
     end do
 
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened

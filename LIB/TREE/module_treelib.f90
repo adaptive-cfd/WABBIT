@@ -2,8 +2,6 @@
 module module_treelib
 
   use module_precision
-  !> \todo: remove
-  use module_debug
 
   integer, parameter :: maxdigits = 16
   integer, parameter :: tsize = selected_int_kind(maxdigits)
@@ -447,13 +445,11 @@ end subroutine adjacent4
       integer(kind=ik)                    :: neighbor2(max_treelevel)
       ! loop variable
       integer(kind=ik)                    :: i
-      real(kind=rk)::sub_t0,sub_t1
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
 
       neighbor = -1
-      ! sub_t0 = MPI_wtime()
 
   !---------------------------------------------------------------------------------------------
   ! main body
@@ -558,22 +554,6 @@ end subroutine adjacent4
               call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
 
       end select
-
-      ! ! end time
-      ! sub_t1 = MPI_Wtime()
-      ! ! write time
-      !     ! find free or corresponding line
-      !     i = 1
-      !     do while ( debug%name_comp_time(i) /= "---" )
-      !         ! entry for current subroutine exists
-      !         if ( debug%name_comp_time(i) == "adjacent" ) exit
-      !         i = i + 1
-      !     end do
-      !     ! write time
-      !     debug%name_comp_time(i) = "adjacent"
-      !     debug%comp_time(i, 1)   = debug%comp_time(i, 1) + 1
-      !     debug%comp_time(i, 2)   = debug%comp_time(i, 2) + sub_t1 - sub_t0
-
   end subroutine adjacent_block_2D
 
 

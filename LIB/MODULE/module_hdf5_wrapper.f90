@@ -20,10 +20,11 @@
 !! |field      |     actual data (ALLOCATED!!!)                                   |
 !! |rared      |     lower bounds of memory portion hold by the CPU               |
 !! |rbred      |     upper bounds of memory portion hold by the CPU               |
-!!                   NOTE: rared and rbred are 1:3 arrays. if running on one proc
+!!                   \note rared and rbred are 1:3 arrays. if running on one proc
 !!                   they are rared=(/0,0,0/) rbred=(/nx-1,ny-1,nz-1/). If the data
 !!                   is distributed among procs, each proc has to indicate which
-!!                   portion of the array it holds
+!!                   portion of the array it holds \n
+!!
 !!
 !! |OUTPUT     |                                                                  |
 !! |-----------|------------------------------------------------------------------|

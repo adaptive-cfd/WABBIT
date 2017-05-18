@@ -17,7 +17,8 @@
 !! 07/12/16 - now uses heavy work data array \n
 !! 25/01/17 - switch to 3D, v0.5 
 ! ********************************************************************************************
-!> \image html program.png "WABBIT" width=600
+!> \image html rhs.png width=600
+!> \image html rhs.eps
 
 program main
 
@@ -226,7 +227,6 @@ program main
     ! main time loop
     !---------------------------------------------------------------------------
     do while ( time < params%time_max )
-
         iteration = iteration + 1
 
         !if (iteration== 1) params%adapt_mesh = .false.

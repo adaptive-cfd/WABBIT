@@ -7,9 +7,12 @@
 !> \version 0.4
 !> \author engels, msr
 !
-!> \brief compute friends table. 
-!> \details This is a (mpisize) x (mpisize) array of integers, and it counts
-!! how many neighbor relations the mpiranks have to each other mpirank. the matrix is
+!> \brief compute friends table. \n
+! 
+!> 
+!! This is a (mpisize) x (mpisize) array of integers, and it counts
+!! how many neighbor relations the mpiranks have to each other. 
+!! The matrix is
 !! (most of the time) symmetric, exceptions from symmetry can occur in the case of finer/coarser
 !! relations.
 !! In the friends array, we thus just know who's my most important neighbor. The array can look like this: (mpisize=4)
@@ -23,7 +26,8 @@
 !! \n
 !! input:    - params, neighbor lists \n
 !! output:   - friends table \n
-!
+!!
+!!
 !> = log ======================================================================================
 !! \n
 !! 28/11/16 - create

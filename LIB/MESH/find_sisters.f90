@@ -8,9 +8,9 @@
 !> author: engels
 !
 !> \brief To a given light id "my_id", find the 3 (2D) or 7 (3D) sister block that have a common mother
-!! block. They are returned in the sisters array.
+!! block. They are returned in the sisters array. \n
 !
-!> \details
+!>
 !! input:    - light data array \n
 !! output:   - light data array
 !!

@@ -37,7 +37,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - neifghbor data
+    !> heavy data array - neighbor data
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     !> list of active blocks (light data)

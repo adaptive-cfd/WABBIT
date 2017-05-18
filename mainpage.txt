@@ -3,7 +3,6 @@
 !> \image html program.png  width=600
 !> \section install_sec Installation
 !> \subsection step1 Clone from GitHub
-!! \n
 !! `git clone https://github.com/mario-sroka/WABBIT`
 !> \subsection step2 Run make
 !! choose compiler with FC option (to v0.2): \n
@@ -18,17 +17,17 @@
 !! \n
 !! `wabbit [2D|3D] [your_filename.ini]`
 !> \section important_sec About WABBIT
-!> \subsection treecode Treecodes in 2D/3D
-!! \image html treecode.png "Treecode in 2D" width=400
+!> \subsection treecode Treecode in 2D/3D
+!! \image html treecode2d.png "Treecode in 2D" width=400
 !! \image html treecode3d.png "Treecode in 3D" width=400
-!! \subsection data Data Structures
+!! \subsection data Data Structure
 !! \subsubsection light Light Data Array
 !! `integer(kind=ik) :: lgt_block(:,:)` \n
 !!
 !! m is the maximal mesh level
-!! |1 ... m | m+1       | m+2                 |
-!! |--------|-----------|---------------------|
-!! |treecode| mesh level| refinement status ()|
+!! |1 ... m |m+1       |                                                     m+2|
+!! |--------|----------|--------------------------------------------------------|
+!! |treecode|mesh level|refinement status (-1 coarsen / 0 no change / +1 refine)|
 !> \subsubsection heavy Heavy Data Arrays
 !! \paragraph block Block Data
 !! `real(kind=rk) :: hvy_block(:,:,:,:)` \n

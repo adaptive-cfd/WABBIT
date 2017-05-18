@@ -8,9 +8,8 @@
 !> \version 0.5
 !> \author msr
 !
-!> \brief find neighbor on block face
+!> \brief find neighbor on block face \n
 !
-!> \details
 !! input:
 !!           - heavy and light data id
 !!           - light data array and max treelevel

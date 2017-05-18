@@ -19,7 +19,8 @@
 !!           - light data array and max treelevel
 !!           - direction for neighbor search
 !!           - list of active blocks
-!! output:
+!!
+!! output:   
 !!           - neighbor list array
 !!
 ! -------------------------------------------------------------------------------------------------------------------------

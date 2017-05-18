@@ -8,13 +8,14 @@
 !> \author msr
 !
 !> \brief coarse the mesh: \n
-!! every proc work on light data array
+!! every proc work on light data array \n
 !
-!> \details
+!> 
 !! input:    - params, light and heavy data \n
-!! output:   - light and heavy data arrays
-!! \n
-!> = log ======================================================================================
+!! output:   - light and heavy data arrays \n
+!!
+!!
+!! = log ======================================================================================
 !! \n
 !! 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
 !            subroutines

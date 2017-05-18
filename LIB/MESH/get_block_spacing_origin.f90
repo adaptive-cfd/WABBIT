@@ -3,15 +3,15 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> name get_block_spacing_origin.f90
-!> version 0.5
-!> author engels
+!> \name get_block_spacing_origin.f90
+!> \version 0.5
+!> \author engels
 !
 !> \brief For any block lgt_id this routine computes, from the treecode stored in
 !! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
-!! and origin are 3D vectors, the third component being zero in a 2D case.
+!! and origin are 3D vectors, the third component being zero in a 2D case. \n
 !
-!> \details
+!> 
 !! input:    
 !!           - params
 !!           - lgt_id (this is the block we look at)

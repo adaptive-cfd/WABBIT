@@ -40,7 +40,7 @@ use module_treelib
     write(*,*) "===new lib==="
     t = MPI_wtime()
     do k = 1, kk
-            call encoding4( ix, iy, newtreecode, params%max_treelevel)
+            call encoding4( ix, iy, newtreecode)
             call decoding4(newtreecode, ix,iy,iz)
 
             call adjacent4_NESW( newtreecode, "__N", neighbor)

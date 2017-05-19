@@ -288,12 +288,12 @@ end subroutine adjacent4
 
 
 
-  subroutine encoding4( ix, iy, treecode, Jmax )
+  subroutine encoding4( ix, iy, treecode ) !, Jmax )
     implicit none
-    integer(kind=ik), intent(in) :: ix, iy, Jmax
+    integer(kind=ik), intent(in) :: ix, iy!, Jmax
     integer(kind=tsize), intent(out) :: treecode
     integer(kind=tsize) :: c, d, cl, dl, tl, j
-    integer(kind=ik) :: b(Jmax)
+    !integer(kind=ik) :: b(Jmax)
 
     ! following gargantini, we first require the binary representation of ix,iy
     ! note algorithm ENCODING in her paper requires us to loop down from the highest

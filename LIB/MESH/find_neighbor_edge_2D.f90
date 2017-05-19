@@ -34,7 +34,7 @@
 ! ********************************************************************************************
 !> \image html neighborhood.png "Neighborhood Relations in 2D" width=400
 
-subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -54,8 +54,6 @@ subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, d
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> direction for neighbor search
     character(len=3), intent(in)        :: dir
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     !> sorted list of numerical treecodes, used for block finding

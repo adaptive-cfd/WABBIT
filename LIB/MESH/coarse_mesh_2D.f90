@@ -97,7 +97,7 @@ subroutine coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_
 
               ! find all sisters (including the block in question, so four blocks)
               ! their light IDs are in "light_ids" and ordered by their last treecode-digit
-              call find_sisters( params, lgt_active(k), light_ids, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+              call find_sisters( params, lgt_active(k), light_ids, lgt_block, lgt_n, lgt_sortednumlist )
 
               ! gather all four sisters on the process "datarank". The light_ids are updated in the routine
               ! and they are still in the same order (0,1,2,3)-sister. It is just that they are now on one CPU

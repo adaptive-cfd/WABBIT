@@ -20,7 +20,7 @@
 !! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
-subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -41,8 +41,6 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_activ
     integer(kind=ik), intent(inout)     :: lgt_sisters_id(:)
     !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     !> sorted list of numerical treecodes, used for block finding

@@ -116,6 +116,9 @@ program main
     ! loop variable
     integer(kind=ik)                    :: k
 
+    ! status of nodes check: if true: stops program
+    logical                             :: stop_status, my_stop_status
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -248,10 +251,24 @@ program main
         ! advance in time
         call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
-!        ! check redundant nodes
-!        if ( params%debug ) then
-!            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-!        end if
+        ! check redundant nodes
+        if ( params%debug ) then
+            ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            ! check redundant nodes
+            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
+            ! barrier
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            ! synchronize stop status
+            call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+            ! stop programm if difference on redundant nodes
+            if (stop_status) then
+                ! save data
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+                ! stop program
+                stop
+            end if
+        end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then

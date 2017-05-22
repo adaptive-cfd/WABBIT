@@ -93,7 +93,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! start time
     sub_t0 = MPI_Wtime()
 
-    !> loop over the blocks and set their refinement status.
+    !> (a) loop over the blocks and set their refinement status.
     !! NOTE: refinement is an absolute statement, that means once set, the block will be refined
     !! (which is not the case in block coarsening), it may even entrail other blocks in
     !! its vicinity to be refined as well.
@@ -141,20 +141,20 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     end select
 
-    ! check if block has reached maximal level, if so, remove refinement flags
+    !> (b) check if block has reached maximal level, if so, remove refinement flags
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
 
-    ! ensure gradedness of mesh. If the refinement is done everywhere, there is
-    ! no way gradedness can be damaged, so we skip the call in this case. However,
-    ! in all other indicators, this step is very important.
+    !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
+    !! no way gradedness can be damaged, so we skip the call in this case. However,
+    !! in all other indicators, this step is very important.
     if ( indicator /= "everywhere") then
       call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
     endif
 
-    ! execute refinement, interpolate the new mesh. All blocks go one level up
-    ! except if they are already on the highest level.
-    ! FIXME: For consistency, it would be better to always refine (allowing one level
-    ! beyond maxlevel), but afterwards coarsen to fall back to maxlevel again
+    !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
+    !! except if they are already on the highest level.
+    !! FIXME: For consistency, it would be better to always refine (allowing one level
+    !! beyond maxlevel), but afterwards coarsen to fall back to maxlevel again
     if ( params%threeD_case ) then
         ! 3D:
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
@@ -163,9 +163,9 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
         call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
     end if
 
-    ! as the grid changed now with the refinement, we have to update the list of
-    ! active blocks so other routines can loop just over these active blocks
-    ! and do not have to ensure that the active list is up-to-date
+    !> (e) as the grid changed now with the refinement, we have to update the list of
+    !! active blocks so other routines can loop just over these active blocks
+    !! and do not have to ensure that the active list is up-to-date
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     ! update list of sorted nunmerical treecodes, used for finding blocks
@@ -173,22 +173,26 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    ! balance load
+    !> (f) balance load
     if ( params%threeD_case ) then
         ! 3D:
         call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
     else
         ! 2D:
-        !call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
-    ! update lists of active blocks (light and heavy data)
+    !> (g) update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist , hvy_active, hvy_n )
+
+
+!---------------------------------------------------------------------------------------------
+! End of routine
 
     ! end time
     sub_t1 = MPI_Wtime()

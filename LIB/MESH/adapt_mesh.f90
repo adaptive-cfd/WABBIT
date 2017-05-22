@@ -131,15 +131,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         ! adapt the mesh
-        if ( params%threeD_case ) then
-            ! 3D:
-            call coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
-
-        else
-            ! 2D:
-            call coarse_mesh_2D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
-
-        end if
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         ! the following calls are indeed required (threshold->ghosts->neighbors->active)
         ! update lists of active blocks (light and heavy data)

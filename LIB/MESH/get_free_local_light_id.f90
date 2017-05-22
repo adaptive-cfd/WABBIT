@@ -54,7 +54,7 @@ subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt
 
     ! first light of the mpirank we are looking at. Note mpirank is zero based but
     ! list is one based, so add 1
-    first_light_id = mpirank * params%number_blocks + 1
+    call proc_to_lgt_data_start_id( first_light_id, mpirank, params%number_blocks )
     last_light_id = first_light_id + (params%number_blocks - 1)
 
     if (present(lgt_n) .and. present(lgt_active)) then

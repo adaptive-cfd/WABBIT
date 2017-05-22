@@ -10,11 +10,13 @@
 !> \brief Gather a specified list of blocks on one specified CPU. Used for e.g. for block merging.
 !
 !> \details
-!! Gather all block specified in the list "lgt_blocks_to_gather" on one CPU, namely
-!! "gather_rank". It does not hurt if some or all block are already on the CPU. Note
-!! we keep the light data synchronized.
+!! This routine gathers all block specified in the list "lgt_blocks_to_gather" on one CPU, namely the CPU
+!! "gather_rank". It does not hurt if some or all block are already on the CPU, nothing is done in that case.
+!! Ghost nodes are transferred as well, works for 2D/3D data of any size and for any number of blocks to be transferred
+!! \n
+!! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
-!! Works for 2D/3D data of any size.
+!!
 !! Uses blocking communication.
 ! ********************************************************************************************
 subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt_blocks_to_gather )
@@ -60,8 +62,8 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               !------------------------
               ! get hvy id where to store the data
               call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, myrank, params%number_blocks )
-              npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 
+              npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
               call MPI_recv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, tag, MPI_COMM_WORLD, status, ierr)
 
           elseif ( myrank == owner_rank) then
@@ -74,6 +76,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
 
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
               call MPI_send( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, MPI_COMM_WORLD, status, ierr)
+
               ! delete old heavy data
               hvy_block(:,:,:,:,hvy_id) = 4.0e11_rk
           endif

@@ -3,7 +3,7 @@ module module_treelib
 
   use module_precision
 
-  integer, parameter :: maxdigits = 20
+  integer, parameter :: maxdigits = 16
   integer, parameter :: tsize = selected_int_kind(maxdigits)
 
 
@@ -22,13 +22,14 @@ contains
     N = size(treearray,1)
     treecode2int = 0
 
-    i = 1
-    do while (treearray(i) /= -1 .and. i<=N)
-      ! note zero i a bit tedious for comparison, as 0002 and 2 are the same
-      ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-      treecode2int = treecode2int + (10**i) * ( treearray(i) + 1 )
-      i = i + 1
+    do i = 1, N
+      if (treearray(i) >= 0) then
+        ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
+        ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
+        treecode2int = treecode2int + (10**(i-1)) * ( treearray(i) + 1 )
+      endif
     enddo
+
   end function
 
   !===============================================================================
@@ -287,12 +288,12 @@ end subroutine adjacent4
 
 
 
-  subroutine encoding4( ix, iy, treecode, Jmax )
+  subroutine encoding4( ix, iy, treecode ) !, Jmax )
     implicit none
-    integer(kind=ik), intent(in) :: ix, iy, Jmax
+    integer(kind=ik), intent(in) :: ix, iy!, Jmax
     integer(kind=tsize), intent(out) :: treecode
     integer(kind=tsize) :: c, d, cl, dl, tl, j
-    integer(kind=ik) :: b(Jmax)
+    !integer(kind=ik) :: b(Jmax)
 
     ! following gargantini, we first require the binary representation of ix,iy
     ! note algorithm ENCODING in her paper requires us to loop down from the highest
@@ -553,7 +554,6 @@ end subroutine adjacent4
               call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
 
       end select
-
   end subroutine adjacent_block_2D
 
 

@@ -10,27 +10,27 @@
 !> \brief write data of a single datafield dF at timestep iteration and time t
 !
 !>
-!! input:    
+!! input:
 !!           - time loop parameter
 !!           - datafield number
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
 !!
-!! output:   
+!! output:
 !!           -
 !!
 !!
 !! = log ======================================================================================
 !! \n
-!! 07/11/16 
+!! 07/11/16
 !!          - switch to v0.4
 !!
-!! 26/01/17 
+!! 26/01/17
 !!          - switch to 3D, v0.5
 !!          - add dirs_3D array for 3D neighbor codes
 !!
-!! 21/02/17 
+!! 21/02/17
 !!          - use parallel IO, write one data array with all data
 !
 ! ********************************************************************************************
@@ -91,9 +91,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
-
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3)
 
@@ -109,45 +106,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
-    allocate(actual_blocks_per_proc( 0:params%number_procs-1 ), stat=allocate_error)
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate (myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ), stat=allocate_error)
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate (coords_spacing(1:3, 1:hvy_n) , stat=allocate_error)
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate (coords_origin(1:3, 1:hvy_n), stat=allocate_error)
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate (block_treecode(1:params%max_treelevel, 1:hvy_n), stat=allocate_error)
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
+    allocate (myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
+    allocate (coords_spacing(1:3, 1:hvy_n) )
+    allocate (coords_origin(1:3, 1:hvy_n))
+    allocate (block_treecode(1:params%max_treelevel, 1:hvy_n))
 
     coords_origin = 7.0e6_rk
 
@@ -260,10 +223,10 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     call close_file_hdf5(file_id)
 
     ! clean up
-    deallocate(actual_blocks_per_proc, stat=allocate_error)
-    deallocate(myblockbuffer, stat=allocate_error)
-    deallocate(coords_origin, stat=allocate_error)
-    deallocate(coords_spacing, stat=allocate_error)
-    deallocate(block_treecode, stat=allocate_error)
+    deallocate(actual_blocks_per_proc)
+    deallocate(myblockbuffer)
+    deallocate(coords_origin)
+    deallocate(coords_spacing)
+    deallocate(block_treecode)
 
 end subroutine write_field

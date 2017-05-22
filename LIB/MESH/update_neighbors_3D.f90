@@ -119,6 +119,8 @@ subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     ! special case:
     ! if there is only one block => all neighbors are this block
     ! one block criteria: size of block_list should be one!
+    !> \todo As for update neighbors 2D : I don't understand why lgt_n == 1 should
+    !! not be the correct condition here.
     if ( lgt_n == 1 ) then
         hvy_neighbor(1,1:26) = lgt_active(1)
     end if
@@ -133,61 +135,61 @@ subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
 
             ! faces
             ! '1'-side
-            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__1/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__1/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '2'-side
-            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__2/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__2/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '3'-side
-            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__3/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__3/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '4'-side
-            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__4/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__4/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '5'-side
-            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__5/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__5/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '6'-side
-            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__6/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_face_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '__6/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
 
             ! edges
             ! '12'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_12/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_12/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '13'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_13/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_13/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '14'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_14/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_14/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '15'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_15/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_15/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '62'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_62/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_62/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '63'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_63/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_63/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '64'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_64/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_64/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '65'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_65/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_65/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '23'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_23/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_23/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '25'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_25/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_25/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '43'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_43/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_43/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '45'-edge
-            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_45/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_edge_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '_45/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
 
             ! corners
             ! '123'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '123/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '123/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '134'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '134/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '134/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '145'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '145/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '145/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '152'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '152/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '152/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '623'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '623/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '623/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '634'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '634/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '634/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '645'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '645/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '645/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
             ! '652'-corner
-            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '652/___', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+            call find_neighbor_corner_3D(hvy_active(k), lgt_id, lgt_block, max_treelevel, '652/___', hvy_neighbor, lgt_n, lgt_sortednumlist)
 
         end do
     end if

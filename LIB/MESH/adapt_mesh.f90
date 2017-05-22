@@ -64,17 +64,15 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
     ! loop variables
-    integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old
+    integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old, iteration
     ! random variable for coarsening
     real(kind=rk)                       :: r
-
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
   Jmax = params%max_treelevel
   lgt_n_old = 0
+  iteration = 0
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -82,48 +80,49 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     ! is done here, no new blocks arise that could compromise the number of blocks -
     ! if it's constant, its because no more blocks are refined)
     do while ( lgt_n_old /= lgt_n )
-
         lgt_n_old = lgt_n
 
         ! check where to coarsen (refinement done with safety zone)
         if ( indicator == "threshold") then
-          ! use wavelet indicator to check where to coarsen
+          ! use wavelet indicator to check where to coarsen. threshold_block performs
+          ! the required ghost node sync and loops over all active blocks.
           call threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
         elseif (indicator == "random") then
-          ! randomly coarse some blocks. used for testing.
-          call init_random_seed()
-          ! unset all refinement flags
-          lgt_block( :,Jmax+2 ) = 0
-          ! only root rank sets the flag, then we sync. It is messy if all procs set a
-          ! random value which is not sync'ed
-          if (params%rank == 0) then
-            do j = 1, lgt_n
-              ! random number
-              call random_number(r)
-              ! set refinement status to coarsen
-              if ( r <= 0.25_rk ) then
-                  lgt_block( lgt_active(j), Jmax+2 ) = -1
-              end if
-            end do
+          ! randomly coarse some blocks. used for testing. note we tag for coarsening
+          ! only once in the first iteration.
+          if (iteration == 0) then
+            call init_random_seed()
+            ! unset all refinement flags
+            lgt_block( :,Jmax+2 ) = 0
+            ! only root rank sets the flag, then we sync. It is messy if all procs set a
+            ! random value which is not sync'ed
+            if (params%rank == 0) then
+              do j = 1, lgt_n
+                ! random number
+                call random_number(r)
+                ! set refinement status to coarsen
+                if ( r <= 0.25_rk ) then
+                    lgt_block( lgt_active(j), Jmax+2 ) = -1
+                end if
+              end do
+            endif
+            ! sync light data, as only root sets random coarsening
+            call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
           endif
-          ! sync light data, as only root sets random coarsening
-          call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
-
         else
             call error_msg("ERROR: unknown coarsening operator")
 
         endif
 
-!> \todo: check which of these calls to list generators are really necessary
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
+        ! hvy_active list is required for update_neighbors
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
         ! update list of sorted nunmerical treecodes, used for finding blocks
         call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
-        ! update neighbor relations
+        ! update neighbor relations, required for gradedness
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-! until here???
 
         ! unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
@@ -132,17 +131,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         ! adapt the mesh
-        if ( params%threeD_case ) then
-            ! 3D:
-            call coarse_mesh_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
-        else
-            ! 2D:
-            call coarse_mesh_2D( params, lgt_block, hvy_block(:,:,1,:,:), lgt_active, lgt_n, lgt_sortednumlist )
-
-        end if
-
-!> \todo: check which of these calls to list generators are really necessary
+        ! the following calls are indeed required (threshold->ghosts->neighbors->active)
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
@@ -150,10 +141,12 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-
+        iteration = iteration + 1
     end do
 
-    ! balance load
+    ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
+    ! they may have passed several level also. Now, the distribution of blocks may no longer
+    ! be balanced, so we have to balance load now
     if ( params%threeD_case ) then
         ! 3D:
         call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
@@ -162,7 +155,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
-!> \todo: check which of these calls to list generators are really necessary
+    ! load balancing destroys the lists again, so we have to create them one last time to
+    ! end on a valid mesh
     ! update lists of active blocks (light and heavy data)
     call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     call create_hvy_active_list( lgt_block, hvy_active, hvy_n )

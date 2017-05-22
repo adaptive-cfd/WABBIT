@@ -92,8 +92,8 @@ contains
     include "ensure_completeness.f90"
 
     ! coarse mesh
-    include "coarse_mesh_2D.f90"
-    include "coarse_mesh_3D.f90"
+    include "coarse_mesh.f90"
+    include "merge_blocks.f90"
 
     ! balance the load
     include "balance_load_2D.f90"
@@ -132,5 +132,9 @@ contains
 
     !
     include "create_lgt_sortednumlist.f90"
+
+    !
+    include "get_free_local_light_id.f90"
+    include "gather_blocks_on_proc.f90"
 
 end module module_mesh

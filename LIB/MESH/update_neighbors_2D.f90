@@ -59,7 +59,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     integer(kind=ik)                    :: rank
 
     ! loop variable
-    integer(kind=ik)                    :: k, lgt_id, i,j
+    integer(kind=ik)                    :: k, lgt_id
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
@@ -92,8 +92,9 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     ! special case:
     ! if there is only one block => all neighbors are this block
     ! one block criteria: size of block_list should be one!
-    if ( size(lgt_block,1) == 1 ) then
-        hvy_neighbor(1,1:8) = 1
+    !> \todo Wouldn't lgt_n==1 be a better criterion for this exception?
+    if ( lgt_n == 1 ) then
+        hvy_neighbor(1,1:8) = lgt_active(1)
     end if
 
     ! loop over active heavy data blocks
@@ -103,22 +104,22 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
         ! north
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_n, lgt_sortednumlist)
         ! east
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_n, lgt_sortednumlist)
         ! south
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_n, lgt_sortednumlist)
         ! west
-        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_edge_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_n, lgt_sortednumlist)
 
         ! northeast
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_n, lgt_sortednumlist)
         ! northwest
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_n, lgt_sortednumlist)
         ! southeast
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_n, lgt_sortednumlist)
         ! southwest
-        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist)
+        call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_n, lgt_sortednumlist)
 
     end do
 

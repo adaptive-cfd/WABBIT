@@ -9,10 +9,10 @@
 !
 !> \brief thresholding for all blocks
 !
-!> 
+!>
 !! The block thresholding is done with the restriction/prediction operators acting on the
 !! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed here. \n
-!! 
+!!
 !!
 !! input:    - params, light and heavy data, neighbor list \n
 !! output:   - light and heavy data arrays \n
@@ -43,7 +43,6 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> neighbor list
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
@@ -57,25 +56,16 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank
-
     ! loop parameter
     integer(kind=ik)                    :: k, dF, i, j, l, N, lgt_id
-
     ! detail
     real(kind=rk)                       :: detail
-
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
-
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
-
     ! interpolation fields
     real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
-
     ! light data list for working
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block, 1), params%max_treelevel+2)
-
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
 
@@ -96,13 +86,10 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     rank         = params%rank
 
     ! allocate interpolation fields
-    allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ), stat=allocate_error )
-    call check_allocation(allocate_error)
-    allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
+    allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
     ! coarsened field is half block size + 1/2
-    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
 
     ! set light data list for working, only light data coresponding to proc are not zero
     my_lgt_block = 0
@@ -132,58 +119,60 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! loop over all active heavy data, note: light data need to synchronize after this step
     do k = 1, hvy_n
 
-        ! calculate light id
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+      ! calculate light id
+      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
-        ! reset detail
-        detail = 0.0_rk
+      ! reset detail
+      detail = 0.0_rk
 
-        ! loop over all datafields
-        do dF = 2, params%number_data_fields+1
+      ! loop over all datafields
+      do dF = 2, params%number_data_fields+1
+          if ( params%threeD_case ) then
+            ! ********** 3D **********
+            ! copy block data to array u1
+            u1(:,:,:) = hvy_block( :, :, :, dF, hvy_active(k) )
+            ! now, coarsen array u1 (restriction)
+            call restriction_3D( u1, u3 )  ! fine, coarse
+            ! then, re-interpolate to the initial level (prediciton)
+            call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
-            ! reset interpolation fields
-            u1        = hvy_block( :, :, :, dF, hvy_active(k) )
-            !u2        = 0.0_rk
-            !u3        = 0.0_rk
-
-            ! wavelet indicator
-            if ( params%threeD_case ) then
-
-                ! 3D:
-                call restriction_3D( u1, u3 )  ! fine, coarse
-                call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
-
-                ! calculate deatil
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
-                        do l = 1, Bs+2*g
-                            detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
-                        end do
-                    end do
+            ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+            ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+            do i = 1, Bs+2*g
+              do j = 1, Bs+2*g
+                do l = 1, Bs+2*g
+                  detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
                 end do
+              end do
+            end do
 
-            else
+          else
+            ! ********** 2D **********
+            ! copy block data to array u1
+            u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
+            ! now, coarsen array u1 (restriction)
+            call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
+            ! then, re-interpolate to the initial level (prediciton)
+            call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
 
-                ! 2D:
-                call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
-                call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+            ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+            ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+            do i = 1, Bs+2*g
+              do j = 1, Bs+2*g
+                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
+              end do
+            end do
 
-                ! calculate deatil
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
-                        detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
-                    end do
-                end do
+          end if
+      end do
 
-            end if
-
-        end do
-
-        ! threshold
-        if (detail < params%eps) then
-            ! coarsen block, -1
-            my_lgt_block( lgt_id, params%max_treelevel+2 ) = -1
-        end if
+      ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
+      ! the block is tagged as "wants to coarsen" by setting the tag -1
+      ! note gradedness and completeness may prevent it from actually going through with that
+      if (detail < params%eps) then
+        ! coarsen block, -1
+        my_lgt_block( lgt_id, params%max_treelevel+2 ) = -1
+      end if
 
     end do
 
@@ -214,8 +203,5 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     end if
 
     ! clean up
-    deallocate( u1, stat=allocate_error )
-    deallocate( u2, stat=allocate_error )
-    deallocate( u3, stat=allocate_error )
-
+    deallocate( u1, u2, u3 )
 end subroutine threshold_block

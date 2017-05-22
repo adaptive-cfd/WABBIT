@@ -10,11 +10,11 @@
 !> \brief transfer data with MPI non blocking subroutines
 !
 !>
-!! input:    
+!! input:
 !!           - send buffer
 !!           - com matrix and com position matrix
 !!
-!! output:   
+!! output:
 !!           - receive buffer
 !!
 !!
@@ -123,6 +123,7 @@ subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_rece
 
     end do
 
+    !> \todo Please check if waiting twice is really necessary
     ! synchronize non-blocking communications
     ! note: single status variable do not work with all compilers, so use MPI_STATUSES_IGNORE instead
     if (i>0) then

@@ -27,7 +27,7 @@ module module_params
     use module_convection_diffusion
     use module_navier_stokes
     ! ini file parser module
-    use module_ini_files_parser
+    use module_ini_files_parser_mpi
 
 !---------------------------------------------------------------------------------------------
 ! variables

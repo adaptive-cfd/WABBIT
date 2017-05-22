@@ -88,4 +88,7 @@ contains
     ! use this to initalize the memory for debugging:
     include "allocate_init_debugging.f90"
 
+    ! check all redundant nodes
+    include "check_redundant_nodes.f90"
+
 end module module_debug

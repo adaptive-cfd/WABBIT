@@ -42,7 +42,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, i, maxtl
+    integer(kind=ik)                    :: k, maxtl
     ! list of block ids, proc ranks
     integer(kind=ik), allocatable       :: light_ids(:)
     ! rank of proc to keep the coarsened data

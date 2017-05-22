@@ -10,9 +10,9 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_ini_files_parser.f90 module_hdf5_wrapper.f90 \
+MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
-	module_initial_conditions.f90 module_treelib.f90
+	module_initial_conditions.f90 module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90
 # physics modules
 MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
@@ -83,7 +83,7 @@ $(OBJDIR)/module_convection_diffusion.o: module_convection_diffusion.f90 $(OBJDI
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser.o \
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser_mpi.o \
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -93,6 +93,9 @@ $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o

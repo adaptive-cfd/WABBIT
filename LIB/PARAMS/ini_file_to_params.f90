@@ -118,8 +118,6 @@ subroutine ini_file_to_params( params, filename )
     !
     ! read time_max
     call read_param(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
-!    ! read CFL number
-!    call read_param(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
     ! read output write frequency
     call read_param(FILE, 'Time', 'write_freq', params%write_freq, 25 )
     ! read method to calculate time step
@@ -128,6 +126,17 @@ subroutine ini_file_to_params( params, filename )
     call read_param(FILE, 'Time', 'dt', params%dt, 1e-6_rk )
     ! read CFL number
     call read_param(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
+    ! order of Runge-Kutta-method
+    call read_param(FILE, 'Time', 'RK_order', params%order_RK, 4 )
+
+    allocate(params%butcher_table(params%order_RK + 1, params%order_RK +1, stat=allocate_error)
+    call check_allocation(allocate_error)
+
+    ! reset values, use as default values
+    params%butcher_table = 0.0_rk
+
+    ! read butcher table
+    call read_param(FILE, 'Time', 'butcher_table', params%butcher_table, params%butcher_table )
 
     !***************************************************************************
     ! read PHYSICS parameters

@@ -246,7 +246,7 @@ program main
         endif
 
         ! advance in time
-        call time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
 !        ! check redundant nodes
 !        if ( params%debug ) then

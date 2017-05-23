@@ -82,9 +82,6 @@ contains
     ! adapt the mesh
     include "adapt_mesh.f90"
 
-    ! threshold the blocks
-    include "threshold_block.f90"
-
     ! gradedness check
     include "ensure_gradedness.f90"
 

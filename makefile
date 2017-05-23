@@ -12,7 +12,8 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
-	module_initial_conditions.f90 module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90
+	module_initial_conditions.f90 module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
+	module_indicators.f90
 # physics modules
 MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
@@ -21,7 +22,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
-VPATH += :LIB/PARAMS:LIB/INI/INICONDS:LIB/TREE
+VPATH += :LIB/PARAMS:LIB/INI/INICONDS:LIB/TREE:LIB/INDICATORS
 
 # Set the default compiler if it's not already set
 FC = mpif90
@@ -126,8 +127,12 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	time_step_RK4.f90 filter_block.f90 filter_1D.f90 calculate_time_step.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o \
+	refinement_indicator.f90 coarsening_indicator.f90 threshold_block.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
-	$(OBJDIR)/module_MPI.o $(OBJDIR)/module_treelib.o \
+	$(OBJDIR)/module_MPI.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o \
 	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load_2D.f90 set_desired_num_blocks_per_rank.f90 \

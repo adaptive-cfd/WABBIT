@@ -37,6 +37,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
 !---------------------------------------------------------------------------------------------
 ! modules
+    use module_indicators
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -63,16 +64,17 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     integer(kind=ik), intent(inout)     :: hvy_n
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
+
     ! loop variables
-    integer(kind=ik)                    :: j, ierr, Jmax, lgt_n_old, iteration
+    integer(kind=ik)                    :: lgt_n_old, iteration
     ! random variable for coarsening
     real(kind=rk)                       :: r
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-  Jmax = params%max_treelevel
   lgt_n_old = 0
   iteration = 0
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -82,38 +84,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     do while ( lgt_n_old /= lgt_n )
         lgt_n_old = lgt_n
 
-        ! check where to coarsen (refinement done with safety zone)
-        if ( indicator == "threshold") then
-          ! use wavelet indicator to check where to coarsen. threshold_block performs
-          ! the required ghost node sync and loops over all active blocks.
-          call threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-
-        elseif (indicator == "random") then
-          ! randomly coarse some blocks. used for testing. note we tag for coarsening
-          ! only once in the first iteration.
-          if (iteration == 0) then
-            call init_random_seed()
-            ! unset all refinement flags
-            lgt_block( :,Jmax+2 ) = 0
-            ! only root rank sets the flag, then we sync. It is messy if all procs set a
-            ! random value which is not sync'ed
-            if (params%rank == 0) then
-              do j = 1, lgt_n
-                ! random number
-                call random_number(r)
-                ! set refinement status to coarsen
-                if ( r <= 0.25_rk ) then
-                    lgt_block( lgt_active(j), Jmax+2 ) = -1
-                end if
-              end do
-            endif
-            ! sync light data, as only root sets random coarsening
-            call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
-          endif
-        else
-            call error_msg("ERROR: unknown coarsening operator")
-
-        endif
+        !> (a) check where coarsening is possible
+        call coarsening_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration )
+        !> (b) check if block has reached maximal level, if so, remove refinement flags
+        call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
 
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )

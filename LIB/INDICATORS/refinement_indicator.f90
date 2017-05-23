@@ -26,7 +26,7 @@
 !! 23/05/2017 create
 ! ********************************************************************************************
 
-subroutine refinement_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
+subroutine refinement_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, indicator )
     implicit none
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
@@ -34,20 +34,12 @@ subroutine refinement_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)        :: lgt_active(:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_n
+    integer(kind=ik), intent(inout)     :: lgt_n
     !> how to choose blocks for refinement
-    character(len=*), intent(in)           :: indicator
+    character(len=*), intent(in)        :: indicator
 
     ! local variables
     integer(kind=ik) :: k, Jmax, max_blocks, d, ierr

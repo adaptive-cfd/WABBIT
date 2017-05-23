@@ -77,7 +77,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     sub_t0 = MPI_Wtime()
 
     !> (a) loop over the blocks and set their refinement status.
-    call refinement_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
+    call refinement_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, indicator )
 
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )

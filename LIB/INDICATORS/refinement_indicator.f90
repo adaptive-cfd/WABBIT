@@ -67,7 +67,7 @@ subroutine refinement_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n
 
 
     !> (a) loop over the blocks and set their refinement status.
-    !! NOTE: refinement is an absolute statement, that means once set, the block will be refined
+    !! \note refinement is an absolute statement, that means once set, the block will be refined
     !! (which is not the case in block coarsening), it may even entrail other blocks in
     !! its vicinity to be refined as well.
     select case (indicator)

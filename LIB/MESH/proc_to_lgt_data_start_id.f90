@@ -49,7 +49,7 @@ subroutine proc_to_lgt_data_start_id( lgt_start, rank, N )
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
+    ! Note zero-based MPIRANK so we add the 1 here:
     lgt_start = rank*N + 1
 
 end subroutine proc_to_lgt_data_start_id

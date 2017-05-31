@@ -82,9 +82,6 @@ contains
     ! adapt the mesh
     include "adapt_mesh.f90"
 
-    ! threshold the blocks
-    include "threshold_block.f90"
-
     ! gradedness check
     include "ensure_gradedness.f90"
 
@@ -92,8 +89,8 @@ contains
     include "ensure_completeness.f90"
 
     ! coarse mesh
-    include "coarse_mesh_2D.f90"
-    include "coarse_mesh_3D.f90"
+    include "coarse_mesh.f90"
+    include "merge_blocks.f90"
 
     ! balance the load
     include "balance_load_2D.f90"

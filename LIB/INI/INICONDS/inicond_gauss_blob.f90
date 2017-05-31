@@ -17,14 +17,14 @@
 !!
 !! = log ======================================================================================
 !! \n
-!! 04/11/16 
-!!          - switch to v0.4 
+!! 04/11/16
+!!          - switch to v0.4
 !!
-!! 26/01/17 
-!!          - use process rank from params struct 
-!!          - use v0.5 hvy data array 
+!! 26/01/17
+!!          - use process rank from params struct
+!!          - use v0.5 hvy data array
 !!
-!! 04/04/17 
+!! 04/04/17
 !!          - rewrite to work only on blocks, no large datafield required
 !
 ! ********************************************************************************************
@@ -41,9 +41,9 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
     real(kind=rk), intent(in) :: x0(1:3),dx(1:3)
 
     ! auxiliary variable for gauss pulse
-    real(kind=rk)                           :: mux, muy, x ,y, sigma
+    real(kind=rk)                           :: mux, muy, muz, x, z ,y, sigma
     ! loop variables
-    integer(kind=ik)                        :: ix, iy
+    integer(kind=ik)                        :: ix, iy, iz
     ! grid
     integer(kind=ik)                        :: Bs, g
 
@@ -57,27 +57,51 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
 ! main body
 
     ! place pulse in the center of the domain
-    mux = 0.5_rk * params%Lx;
-    !muy = 0.5_rk * params%Ly;
-    muy = 0.5_rk * params%Ly;
+    mux = 0.5_rk * params%Lx
+    muy = 0.5_rk * params%Ly
+    muz = 0.5_rk * params%Lz
 
     ! pulse width
     !sigma     = 0.1e-2_rk * params%Lx * params%Ly
     sigma     = 0.01
 
-    ! create gauss pulse
-    do ix = g+1,Bs+g
-      do iy = g+1,Bs+g
-        ! compute x,y coordinates from spacing and origin
-        x = dble(ix-(g+1)) * dx(1) + x0(1)
-        y = dble(iy-(g+1)) * dx(2) + x0(2)
-        ! shift to new gauss blob center
-        call shift_x_y( x, y, params%Lx,params%Ly )
-        ! set actual inicond gauss blob
-        ! FIXME: df=2 ...
-        u(ix,iy,1,2) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
+    if (params%threeD_case) then
+      sigma = 0.05*params%Lx
+      ! 3D case
+      ! create gauss pulse
+      do ix = g+1,Bs+g
+        do iy = g+1,Bs+g
+          do iz = g+1,Bs+g
+            ! compute x,y coordinates from spacing and origin
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            z = dble(iz-(g+1)) * dx(3) + x0(3)
+            ! shift to new gauss blob center
+            ! call shift_x_y( x, y, params%Lx,params%Ly )
+            ! set actual inicond gauss blob
+            ! FIXME: df=2 ...
+            u(ix,iy,iz,2) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / sigma )
+          end do
+        end do
       end do
-    end do
+
+    else
+
+      ! 2D case
+      ! create gauss pulse
+      do ix = g+1,Bs+g
+        do iy = g+1,Bs+g
+          ! compute x,y coordinates from spacing and origin
+          x = dble(ix-(g+1)) * dx(1) + x0(1)
+          y = dble(iy-(g+1)) * dx(2) + x0(2)
+          ! shift to new gauss blob center
+          call shift_x_y( x, y, params%Lx,params%Ly )
+          ! set actual inicond gauss blob
+          ! FIXME: df=2 ...
+          u(ix,iy,1,2) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
+        end do
+      end do
+  endif
 
 end subroutine inicond_gauss_blob
 

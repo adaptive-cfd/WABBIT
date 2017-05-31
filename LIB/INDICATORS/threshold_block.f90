@@ -181,10 +181,6 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     lgt_block = 0
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
-    ! ------------------------------------------------------------------------------------
-    ! fifth: check if block has reached maximal level
-    call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-
     ! end time
     sub_t1 = MPI_Wtime()
     ! write time

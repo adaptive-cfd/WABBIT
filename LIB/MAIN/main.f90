@@ -272,7 +272,7 @@ program main
         end if
 
         ! filter
-        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then
+        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
             call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
         end if
 

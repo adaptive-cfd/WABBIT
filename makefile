@@ -123,7 +123,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o \
-	time_step_RK4.f90 filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 calculate_RK_input.f90
+	time_step_RK4.f90 filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 save_data_t.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
@@ -157,9 +157,9 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit
 
-doc:
-	doxygen docu_configuration
-	firefox documentation/output/html/index.html
+docu:
+	doxygen doc_configuration
+	firefox doc/output/html/index.html
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

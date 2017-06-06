@@ -17,7 +17,7 @@
 !! 07/12/16 - now uses heavy work data array \n
 !! 25/01/17 - switch to 3D, v0.5
 ! ********************************************************************************************
-!> \image html rhs.png width=600
+!> \image html rhs.svg width=600
 !> \image html rhs.eps
 
 program main
@@ -197,18 +197,18 @@ program main
     ! call unit_test_treecode( params )
     ! stop
     ! perform a convergence test on ghost node sync'ing
-    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+!    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !
 !    ! reset the grid: all blocks are inactive and empty
-!    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
+!    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
-!    if ( params%debug ) then
+    if ( params%debug ) then
 !        ! time stepper convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-!        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist)
 !        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
+        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
 !        ! spatial convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
@@ -216,7 +216,7 @@ program main
 !        ! reset the grid: all blocks are inactive and empty
 !        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
 !
-!    end if
+    end if
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -251,24 +251,24 @@ program main
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
-        ! check redundant nodes
-        if ( params%debug ) then
-            ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-            ! check redundant nodes
-            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
-            ! barrier
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            ! synchronize stop status
-            call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
-            ! stop programm if difference on redundant nodes
-            if (stop_status) then
-                ! save data
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-                ! stop program
-                stop
-            end if
-        end if
+        ! ! check redundant nodes
+        ! if ( params%debug ) then
+        !     ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
+        !     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        !     ! check redundant nodes
+        !     call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
+        !     ! barrier
+        !     call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        !     ! synchronize stop status
+        !     call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+        !     ! stop programm if difference on redundant nodes
+        !     if (stop_status) then
+        !         ! save data
+        !         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+        !         ! stop program
+        !         stop
+        !     end if
+        ! end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then

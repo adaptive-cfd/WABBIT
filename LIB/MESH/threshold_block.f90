@@ -22,7 +22,7 @@
 !! \n
 !! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
-!> \image html threshold.png width=400
+!> \image html threshold.svg width=400
 
 subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 

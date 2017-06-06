@@ -24,7 +24,7 @@
 !! 27/01/17 - use process rank from params struct
 !
 ! ********************************************************************************************
-!> \image html update_neighbors.png "Update Neighbors" width=400
+!> \image html update_neighbors2D.svg "Update Neighbors" width=400
 
 subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist,  hvy_active, hvy_n)
 

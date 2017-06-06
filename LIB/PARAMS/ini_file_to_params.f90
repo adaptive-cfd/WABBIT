@@ -40,7 +40,7 @@ subroutine ini_file_to_params( params, filename )
     integer(kind=ik)                                :: number_procs
     ! inifile structure
     type(inifile)                                   :: FILE
-    ! maximum memory avalable on all cpus
+    ! maximum memory available on all cpus
     real(kind=rk)                                   :: maxmem
     ! power used for dimensionality (d=2 or d=3)
     integer(kind=ik)                                :: d,i
@@ -99,18 +99,10 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_method, "CFL_cond" )
     ! read value of fixed time step
     call read_param_mpi(FILE, 'Time', 'dt', params%dt, 1e-6_rk )
-    ! order of Runge-Kutta-method
-    call read_param(FILE, 'Time', 'RK_order', params%order_RK, 4 )
-
-    allocate(params%butcher_table(params%order_RK + 1, params%order_RK +1, stat=allocate_error)
-    call check_allocation(allocate_error)
-
-    ! reset values, use as default values
-    params%butcher_table = 0.0_rk
-
-    ! read butcher table
-    call read_param(FILE, 'Time', 'butcher_table', params%butcher_table, params%butcher_table )
+    ! read CFL number
     call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
+    ! read butcher tableau
+    call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau )
 
     !***************************************************************************
     ! read PHYSICS parameters

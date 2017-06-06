@@ -36,8 +36,8 @@
 !! 25/01/17 - create
 ! ********************************************************************************************
 !
-!> \image html hilbert.png "A Path taken by the Hilbert Curve in 2D" width=300
-!>  \image latex hilbert.eps "A Path taken by the Hilbert Curve in 2D"
+!> \image html hilbert.svg "A Path taken by the Hilbert Curve in 2D" width=300
+!> \image latex hilbert.eps "A Path taken by the Hilbert Curve in 2D"
 
 subroutine treecode_to_hilbertcode_2D(treecode, hilbertcode, n)
 

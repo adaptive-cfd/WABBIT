@@ -24,7 +24,7 @@
 !! 02/05/17 - create 
 ! ********************************************************************************************
 !
-!> \image html 3dhilbert.png "The 12 Basic Patterns for the Hilbert Curve in 3D" width=400
+!> \image html 3dhilbert.svg "The 12 Basic Patterns for the Hilbert Curve in 3D" width=400
 !> \image latex 3dhilbert.eps "The 12 Basic Patterns for the Hilbert Curve in 3D"
 
 subroutine treecode_to_hilbertcode_3D(treecode, hilbertcode, n)

@@ -19,7 +19,7 @@
 !! 10/11/16 - switch to v0.4 \n
 !! 05/04/17 - works for 2D and 3D data and uses readable find_sisters routine.
 ! ********************************************************************************************
-!> \image html completeness.png "Ensure Completeness" width=400
+!> \image html completeness.svg "Ensure Completeness" width=400
 
 subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 

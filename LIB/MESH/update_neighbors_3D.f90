@@ -52,7 +52,7 @@
 !! 27/01/17 - create
 !
 ! ********************************************************************************************
-!> \image html update_neighbors3d.png "Update Neighbors" width=400
+!> \image html update_neighbors3D.svg "Update Neighbors" width=400
 
 subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
 

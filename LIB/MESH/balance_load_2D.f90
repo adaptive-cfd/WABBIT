@@ -19,7 +19,8 @@
 !! 16/11/2016  - Avoid some communication by more carefully distributing the excess blocks \n
 !! 05/12/2016  - add space filling curve distribution \n
 !
-!> \image html balancing.png "Load balancing" width=400
+!> \image html balancing.svg "Load balancing" width=400
+!> \image html load_balancing.svg "Load balancing" width=300
 ! ********************************************************************************************
 
 subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)

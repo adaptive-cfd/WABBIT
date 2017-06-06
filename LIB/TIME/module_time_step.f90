@@ -46,7 +46,10 @@ contains
     ! time step
     include "time_step_RK4.f90"
     include "time_stepper.f90"
-    include "calculate_RK_input.f90"
+    include "set_RK_input.f90"
+    include "RHS_wrapper.f90"
+    include "final_stage_RK.f90"
+    include "save_data_t.f90"
 
     ! filter
     include "filter_block.f90"

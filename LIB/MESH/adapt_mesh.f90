@@ -31,7 +31,7 @@
 !! 10/11/16 - switch to v0.4
 ! ==========================================================================================
 !********************************************************************************************
-!> \image html adapt_mesh.png width=400
+!> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
 

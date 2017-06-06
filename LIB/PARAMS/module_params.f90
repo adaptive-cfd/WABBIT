@@ -47,10 +47,8 @@ module module_params
         character(len=80)                           :: time_step_method
         ! data writing frequency
         integer(kind=ik)                            :: write_freq
-        ! order of Runge-Kutta method
-        integer(kind=ik)                            :: order_RK
-        ! butcher table for Runge-Kutta method
-        real(kind=rk), dimension(:), allocatable    :: butcher_table
+        ! butcher tableau containing coefficients for Runge-Kutta method
+        real(kind=rk), dimension(:,:), allocatable  :: butcher_tableau
 
         ! threshold for wavelet indicator
         real(kind=rk)                               :: eps

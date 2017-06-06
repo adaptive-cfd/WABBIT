@@ -1,0 +1,57 @@
+!> \mainpage (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nsects in (T)urbulence
+!> \section intro_sec Introduction
+!> \image html rhs.svg  width=600
+!> \section install_sec Installation
+!> \subsection step1 Clone from GitHub
+!! `git clone https://github.com/mario-sroka/WABBIT`
+!> \subsection step2 Run make
+!! choose compiler with FC option (to v0.2): \n
+!! \n
+!! `make FC=[gfortran|ifort]` \n
+!! \n
+!! choose compiler with FC option (from v0.3): \n
+!! \n
+!! `make FC=[mpif90]` \n
+!> \subsection step3 Run WABBIT
+!! customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name: \n
+!! \n
+!! `wabbit [2D|3D] [your_filename.ini]`
+!> \section important_sec About WABBIT
+!> \subsection treecode Treecode in 2D/3D
+!! \image html treecode2d.svg "Treecode in 2D" width=400
+!! \image html treecode3d.svg "Treecode in 3D" width=400
+!! \subsection data Data Structure
+!! \subsubsection light Light Data Array
+!! `integer(kind=ik) :: lgt_block(:,:)` \n
+!!
+!! m is the maximal mesh level
+!! |1 ... m |m+1       |                                                     m+2|
+!! |--------|----------|--------------------------------------------------------|
+!! |treecode|mesh level|refinement status (-1 coarsen / 0 no change / +1 refine)|
+!> \subsubsection heavy Heavy Data Arrays
+!! \paragraph block Block Data
+!! `real(kind=rk) :: hvy_block(:,:,:,:)` \n
+!!
+!! This array is used for load balancing data exchange. \n
+!!
+!! |dimension 1,2               |dimension 3| dimension 4|
+!! |----------------------------|-----------|------------|
+!! |node data (with ghost nodes)|datafield  |block id    |
+!!
+!! \paragraph work Work Data
+!! `real(kind=rk) :: hvy_work(:,:,:,:)` \n
+!!
+!! This array is not used for data exchange. \n
+!!
+!! |dimension 1,2               |dimension 3             | dimension 4|
+!! |----------------------------|------------------------|------------|
+!! |node data (with ghost nodes)|RK stage and datafield  |block id    |
+!!
+!! \paragraph neighbor Neighbor Data
+!! `real(kind=rk) :: hvy_neighbor(:,:)` \n
+!!
+!! |1 ... m                                      |
+!! |---------------------------------------------|
+!! |neighbor block row number in light data array|
+!!
+!> \subsection neighborhood Neighborhood Relations

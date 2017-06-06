@@ -425,8 +425,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
     g     = params%number_ghost_nodes
 
     ! set error threshold
-    !eps = 1e-12_rk
-    eps = 1e-16_rk
+    eps = 1e-12_rk
+    !eps = 1e-16_rk
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -451,8 +451,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -475,8 +475,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -499,8 +499,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -523,8 +523,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -545,8 +545,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                     if (stop_status) then
                         ! do nothing
                     else
-                        hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                        hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                        hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                        hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                         stop_status = .true.
                     end if
                 end if
@@ -566,8 +566,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                     if (stop_status) then
                         ! do nothing
                     else
-                        hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                        hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                        hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                        hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                         stop_status = .true.
                     end if
                 end if
@@ -587,8 +587,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                     if (stop_status) then
                         ! do nothing
                     else
-                        hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                        hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                        hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                        hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                         stop_status = .true.
                     end if
                 end if
@@ -608,8 +608,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                     if (stop_status) then
                         ! do nothing
                     else
-                        hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                        hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                        hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                        hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                         stop_status = .true.
                     end if
                 end if
@@ -631,8 +631,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -652,8 +652,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -676,8 +676,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -697,8 +697,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -721,8 +721,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -742,8 +742,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -766,8 +766,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -787,8 +787,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -812,8 +812,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -833,8 +833,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -857,8 +857,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -878,8 +878,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -902,8 +902,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -923,8 +923,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -947,8 +947,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -968,8 +968,8 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, receiver_id ) = real( params%rank, kind=rk)
-                            hvy_block( :, :, dF, sender_id ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, receiver_id ) = real( neighborhood, kind=rk)
+                            hvy_block( :, :, dF, sender_id ) = real( neighborhood, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -1910,7 +1910,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -1932,7 +1932,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -1954,7 +1954,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -1976,7 +1976,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -1998,7 +1998,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -2020,7 +2020,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -2042,7 +2042,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -2064,7 +2064,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                         if (stop_status) then
                             ! do nothing
                         else
-                            hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                            hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                             stop_status = .true.
                         end if
                     end if
@@ -2089,7 +2089,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2112,7 +2112,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2138,7 +2138,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2161,7 +2161,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2187,7 +2187,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2210,7 +2210,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2236,7 +2236,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2259,7 +2259,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2285,7 +2285,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2308,7 +2308,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2334,7 +2334,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2357,7 +2357,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2383,7 +2383,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2406,7 +2406,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2432,7 +2432,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if
@@ -2455,7 +2455,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                             if (stop_status) then
                                 ! do nothing
                             else
-                                hvy_block( :, :, dF, my_block ) = real( params%rank, kind=rk)
+                                hvy_block( :, :, dF, my_block ) = real( my_dir, kind=rk)
                                 stop_status = .true.
                             end if
                         end if

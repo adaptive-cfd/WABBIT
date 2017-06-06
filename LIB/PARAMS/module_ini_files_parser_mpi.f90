@@ -94,15 +94,6 @@ contains
     logical, intent(in) :: verbose
     integer :: mpirank, mpicode
 
-    logical :: exists
-
-    ! check if the specified file exists
-    inquire ( file=file, exist=exists )
-    if ( exists .eqv. .false.) then
-      write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
-      call MPI_abort(MPI_COMM_WORLD, 86552, mpicode)
-    endif
-
     ! fetch my process id
     call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
 

@@ -137,7 +137,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! the grid is modified
     call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
 
-
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
@@ -158,7 +157,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! the entire test procedure is repeated for a bunch of frequencies, which is
     ! equivalent to using different block sizes, but way easier to program.
     ! These frequencies are tested:
-    frequ=(/1.0_rk, 2.0_rk, 4.0_rk, 8.0_rk, 16.0_rk, 32.0_rk/)
+    frequ=(/1.0_rk , 2.0_rk, 4.0_rk, 8.0_rk, 16.0_rk, 32.0_rk/)
 
     ! loop over frequencies
     do ifrequ = 1 , size(frequ)

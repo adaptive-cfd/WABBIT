@@ -3,29 +3,28 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name synchronize_internal_nodes.f90
+!> \name create_external_com_list.f90
 !> \version 0.5
 !> \author msr
 !
-!> \brief synchronize internal ghosts nodes, create com matrix and com list for external communication
+!> \brief create com matrix and com list for external communications
+!!  check mesh level and synch stages
 !
 !>
 !! input:    
-!!           - params, light and heavy data
+!!           - params, light
 !!
 !! output:   
-!!           - heavy data
 !!           - com matrix
 !!           - com lists for external synchronization
 !!
 !! = log ======================================================================================
 !! \n
-!! 12/01/17 - create from old synchronize ghost routine \n
-!! 31/01/17 - switch to 3D, v0.5
+!! 19/05/17 - create
 !
 ! ********************************************************************************************
 
-subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_matrix, com_lists, synch_type )
+subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_active, hvy_n, com_matrix, com_lists, synch_stage )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -39,8 +38,6 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -66,12 +63,11 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     !! row/column number encodes process rank + 1
     integer(kind=ik), intent(inout)     :: com_matrix(:,:)
 
-    ! type of synchronization
-    integer(kind=ik), intent(in)        :: synch_type
-    logical                             :: synch
+    !> stage of synchronization
+    integer(kind=ik), intent(in)        :: synch_stage
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, i, lgt_id, hvy_id, neighbor_num
+    integer(kind=ik)                    :: k, N, i, lgt_id, hvy_id, neighbor_num, neighborhood
 
     ! grid parameter
     integer(kind=ik)                    :: g, Bs
@@ -92,8 +88,8 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     integer(kind=ik), allocatable       :: receiver_pos(:), receiver_rank(:), receiver_count(:)
     integer(kind=ik)                    :: receiver_N
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
+    ! synch switch
+    logical                             :: synch
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -112,32 +108,17 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     number_procs    = params%number_procs
 
     ! receiver lists
-    allocate( receiver_pos( number_procs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( receiver_rank( number_procs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( receiver_count( number_procs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( receiver_pos( number_procs) )
+    allocate( receiver_rank( number_procs) )
+    allocate( receiver_count( number_procs) )
 
     ! reset
     receiver_pos    =  0
     receiver_rank   = -1
     receiver_count  =  0
     receiver_N      =  0
+
+    synch = .false.
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -158,48 +139,69 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
                 ! calculate light id
                 call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
                 ! calculate the difference between block levels
+                ! here: sender (me) - receiver (neighbor)
+                ! if +1 -> sender on finer level
                 level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
+                !level_diff = lgt_block( neighbor_light_id, params%max_treelevel+1 ) - lgt_block( lgt_id, params%max_treelevel+1 )
 
-                ! set synch
-                ! case 1:
-                ! case 2:
+                ! proof if neighbor internal or external
+                call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+
+                ! check synch stage
+                ! stage 1: level +1
+                ! stage 2: level 0
+                ! stage 3: level -1
+                ! stage 4: special
                 synch = .false.
-!                if ( (synch_type == 1) .and. ( (i <= 4) .or. (i > 8) ) .or. (level_diff /= 0) ) then
-!                    synch = .true.
-!                end if
-!                if ( (synch_type == 2) .and. ( (i > 4) .or. (i <= 8) ) .and. (level_diff == 0) ) then
-!                    synch = .true.
-!                end if
-
-                if ( (synch_type == 1) .and. ( (i <= 4)  .or. (level_diff == -1) ) ) then
+                if ( (synch_stage == 1) .and. (level_diff == 1) ) then
                     synch = .true.
                 end if
-                if ( (synch_type == 2) .and. (i > 4)  .and. (level_diff /= -1) ) then
+                if ( (synch_stage == 2) .and. (level_diff == 0) ) then
                     synch = .true.
+                end if
+                if ( (synch_stage == 3) .and. (level_diff == -1) ) then
+                    synch = .true.
+                end if
+
+                if ( (synch_stage == 4) .and. (level_diff == 0) ) then
+                    ! neighborhood NE
+                    if ( i == 5 ) then
+                        if ( (hvy_neighbor( hvy_active(k), 9) /= -1) .or. (hvy_neighbor( hvy_active(k), 13) /= -1) ) then
+                            synch = .true.
+                        end if
+                    end if
+                    ! neighborhood NW
+                    if ( i == 6 ) then
+                        if ( (hvy_neighbor( hvy_active(k), 10) /= -1) .or. (hvy_neighbor( hvy_active(k), 15) /= -1) ) then
+                            synch = .true.
+                        end if
+                    end if
+                    ! neighborhood SE
+                    if ( i == 7 ) then
+                        if ( (hvy_neighbor( hvy_active(k), 11) /= -1) .or. (hvy_neighbor( hvy_active(k), 14) /= -1) ) then
+                            synch = .true.
+                        end if
+                    end if
+                    ! neighborhood SW
+                    if ( i == 8 ) then
+                        if ( (hvy_neighbor( hvy_active(k), 12) /= -1) .or. (hvy_neighbor( hvy_active(k), 16) /= -1) ) then
+                            synch = .true.
+                        end if
+                    end if
                 end if
 
                 if (synch) then
 
-                    ! proof if neighbor internal or external
-                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+                    neighborhood = i !0
 
                     if ( rank == neighbor_rank ) then
-                        ! calculate internal heavy id
-                        call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, rank, N )
-
-                            ! internal neighbor -> copy ghost nodes
-                            if ( params%threeD_case ) then
-                                ! 3D:
-                                call copy_ghost_nodes_3D( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
-                            else
-                                ! 2D:
-                                call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_active(k), hvy_id, i, level_diff )
-                            end if
-
-                            ! write communications matrix
-                            com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1
+                        ! internal neighbor
+                        ! write communications matrix
+                        com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1
 
                     else
+                        ! external neighbor
+
                         ! neighbor heavy id
                         call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
 
@@ -222,7 +224,7 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
                             com_lists( 1 , 2, neighbor_rank+1)  = neighbor_rank
                             com_lists( 1 , 3, neighbor_rank+1)  = hvy_active(k)
                             com_lists( 1 , 4, neighbor_rank+1)  = hvy_id
-                            com_lists( 1 , 5, neighbor_rank+1)  = i
+                            com_lists( 1 , 5, neighbor_rank+1)  = neighborhood !i
                             com_lists( 1 , 6, neighbor_rank+1)  = level_diff
 
                         else
@@ -237,15 +239,13 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
                             com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 2, neighbor_rank+1)  = neighbor_rank
                             com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 3, neighbor_rank+1)  = hvy_active(k)
                             com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 4, neighbor_rank+1)  = hvy_id
-                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 5, neighbor_rank+1)  = i
+                            com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 5, neighbor_rank+1)  = neighborhood !i
                             com_lists( receiver_count( receiver_pos(neighbor_rank+1) ) , 6, neighbor_rank+1)  = level_diff
 
                         end if
 
                     end if
 
-                else
-                    ! nothing to do
                 end if
 
             end if
@@ -260,8 +260,8 @@ subroutine synchronize_internal_nodes(  params, lgt_block, hvy_block, hvy_neighb
     end do
 
     ! clean up
-    deallocate( receiver_pos, stat=allocate_error )
-    deallocate( receiver_rank, stat=allocate_error )
-    deallocate( receiver_count, stat=allocate_error )
+    deallocate( receiver_pos )
+    deallocate( receiver_rank )
+    deallocate( receiver_count )
 
-end subroutine synchronize_internal_nodes
+end subroutine create_external_com_list

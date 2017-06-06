@@ -413,11 +413,17 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                     ! set k2 step
                     hvy_work( :, :, :, (dF-2)*5+3, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
+!                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+3, hvy_active(k) ), &
+!                                                      xx0(1:2), &
+!                                                      ddx(1:2), &
+!                                                      g, Bs, &
+!                                                      time, &
+!                                                      params%order_discretization  )
                     call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+3, hvy_active(k) ), &
                                                       xx0(1:2), &
                                                       ddx(1:2), &
                                                       g, Bs, &
-                                                      time, &
+                                                      time+dt/2.0_rk, &
                                                       params%order_discretization  )
 
                 end do
@@ -576,11 +582,17 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                     ! set k3 step
                     hvy_work( :, :, :, (dF-2)*5+4, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
+!                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+4, hvy_active(k) ), &
+!                                                      xx0(1:2), &
+!                                                      ddx(1:2), &
+!                                                      g, Bs, &
+!                                                      time, &
+!                                                      params%order_discretization  )
                     call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+4, hvy_active(k) ), &
                                                       xx0(1:2), &
                                                       ddx(1:2), &
                                                       g, Bs, &
-                                                      time, &
+                                                      time+dt/2.0_rk, &
                                                       params%order_discretization  )
 
                 end do
@@ -739,11 +751,17 @@ subroutine time_step_RK4( time, params, lgt_block, hvy_block, hvy_work, hvy_neig
                     ! set k4 step
                     hvy_work( :, :, :, (dF-2)*5+5, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                     ! RHS
+!                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+5, hvy_active(k) ), &
+!                                                      xx0(1:2), &
+!                                                      ddx(1:2), &
+!                                                      g, Bs, &
+!                                                      time, &
+!                                                      params%order_discretization  )
                     call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+5, hvy_active(k) ), &
                                                       xx0(1:2), &
                                                       ddx(1:2), &
                                                       g, Bs, &
-                                                      time, &
+                                                      time+dt, &
                                                       params%order_discretization  )
 
                 end do

@@ -197,7 +197,8 @@ program main
     ! call unit_test_treecode( params )
     ! stop
     ! perform a convergence test on ghost node sync'ing
-!    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+
     ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !
 !    ! reset the grid: all blocks are inactive and empty
@@ -271,7 +272,7 @@ program main
         ! end if
 
         ! filter
-        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no-filter") then
+        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
             call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
         end if
 

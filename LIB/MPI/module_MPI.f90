@@ -44,12 +44,14 @@ contains
     include "synchronize_ghosts.f90"
 
     ! ghost nodes synchronization
-    include "synchronize_internal_nodes.f90"
-    include "synchronize_external_nodes.f90"
+    include "create_external_com_list.f90"
 
     ! coyp internal ghost nodes
     include "copy_ghost_nodes_2D.f90"
     include "copy_ghost_nodes_3D.f90"
+
+    ! redundant nodes subroutine - use to ensure correct order of ghost nodes synch
+    include "copy_redundant_nodes_2D.f90"
 
     ! write send buffer
     include "create_send_buffer_2D.f90"
@@ -78,5 +80,8 @@ contains
     include "isend_irecv_data.f90"
 
     include "blocks_per_mpirank.f90"
+
+    ! routine to reset ghost nodes to uniform number (for debuging)
+    include "reset_ghost_nodes.f90"
 
 end module module_MPI

@@ -64,8 +64,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: Bs, g
     ! interpolation fields
     real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
-    ! light data list for working
-    integer(kind=ik)                    :: my_lgt_block( size(lgt_block, 1), params%max_treelevel+2)
+    ! light data (refinement status column) list for working
+    integer(kind=ik), allocatable       :: my_refinement_status(:)
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
@@ -97,9 +97,10 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! coarsened field is half block size + 1/2
     allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
 
-    ! set light data list for working, only light data coresponding to proc are not zero
-    my_lgt_block = 0
-    my_lgt_block( rank*N+1: rank*N+N, :) = lgt_block( rank*N+1: rank*N+N, :)
+    allocate( my_refinement_status( size(lgt_block, 1)) )
+
+    my_refinement_status = 0
+    my_refinement_status( rank*N+1: rank*N+N ) = lgt_block( rank*N+1: rank*N+N, params%max_treelevel+2)
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -180,18 +181,18 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
       ! note gradedness and completeness may prevent it from actually going through with that
       if (detail < params%eps) then
         ! coarsen block, -1
-        my_lgt_block( lgt_id, params%max_treelevel+2 ) = -1
+        my_refinement_status( lgt_id ) = -1
       end if
 
     end do
 
     ! ------------------------------------------------------------------------------------
     ! fourth: synchronize light data
-    lgt_block = 0
-    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    lgt_block(:,params%max_treelevel+2) = 0
+    call MPI_Allreduce(my_refinement_status, lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! clean up
-    deallocate( u1, u2, u3 )
+    deallocate( u1, u2, u3, my_refinement_status )
 
     ! end time
     sub_t1 = MPI_Wtime()

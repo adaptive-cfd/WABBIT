@@ -119,6 +119,9 @@ program main
     ! status of nodes check: if true: stops program
     logical                             :: stop_status, my_stop_status
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -139,6 +142,9 @@ program main
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     ! determinate process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+
+    ! start time
+    sub_t0 = MPI_Wtime()
 
     ! save MPI data in params struct
     params%rank         = rank
@@ -199,17 +205,17 @@ program main
     ! perform a convergence test on ghost node sync'ing
     call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
-    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+!    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !
 !    ! reset the grid: all blocks are inactive and empty
 !    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
-    if ( params%debug ) then
+!    if ( params%debug ) then
 !        ! time stepper convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist)
+!        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist)
 !        ! reset the grid: all blocks are inactive and empty
-        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
 !        ! spatial convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
@@ -217,7 +223,7 @@ program main
 !        ! reset the grid: all blocks are inactive and empty
 !        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
 !
-    end if
+!    end if
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -236,13 +242,30 @@ program main
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "init_data" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "init_data"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+    end if
+
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
     do while ( time < params%time_max )
-        iteration = iteration + 1
 
-        !if (iteration== 1) params%adapt_mesh = .false.
+        ! new iteration
+        iteration = iteration + 1
 
         ! refine everywhere
         if ( params%adapt_mesh ) then
@@ -252,24 +275,47 @@ program main
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
 
-        ! ! check redundant nodes
-        ! if ( params%debug ) then
-        !     ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-        !     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-        !     ! check redundant nodes
-        !     call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
-        !     ! barrier
-        !     call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        !     ! synchronize stop status
-        !     call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
-        !     ! stop programm if difference on redundant nodes
-        !     if (stop_status) then
-        !         ! save data
-        !         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        !         ! stop program
-        !         stop
-        !     end if
-        ! end if
+        ! check redundant nodes
+        if ( params%debug ) then
+            ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+            ! start time
+            sub_t0 = MPI_Wtime()
+
+            ! check redundant nodes
+            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
+
+            ! barrier
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            ! synchronize stop status
+            call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+
+            ! end time
+            sub_t1 = MPI_Wtime()
+            ! write time
+            if ( params%debug ) then
+                ! find free or corresponding line
+                k = 1
+                do while ( debug%name_comp_time(k) /= "---" )
+                    ! entry for current subroutine exists
+                    if ( debug%name_comp_time(k) == "check_redundant_nodes" ) exit
+                    k = k + 1
+                end do
+                ! write time
+                debug%name_comp_time(k) = "check_redundant_nodes"
+                debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+                debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+            end if
+
+            ! stop programm if difference on redundant nodes
+            if (stop_status) then
+                ! save data
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+                ! stop program
+                stop
+            end if
+        end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
@@ -364,6 +410,9 @@ program main
                 k = k + 1
 
             end do
+
+            write(*, '("sum: ", 2x,f12.3)', advance='yes') sum(debug%comp_time(:,2))
+
         end if
 
     end if

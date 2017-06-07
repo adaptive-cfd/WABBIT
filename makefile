@@ -127,7 +127,7 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	time_step_RK4.f90 filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 save_data_t.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o \
+$(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o \
 	refinement_indicator.f90 coarsening_indicator.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

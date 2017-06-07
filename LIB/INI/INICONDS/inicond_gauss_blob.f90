@@ -62,7 +62,7 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
     muz = 0.5_rk * params%Lz
 
     ! pulse width
-    sigma     = 0.1e-2_rk * params%Lx * params%Ly
+    sigma     = 1e-2_rk * params%Lx * params%Ly
     !sigma     = 0.01
 
     if (params%threeD_case) then

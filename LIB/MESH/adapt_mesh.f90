@@ -66,14 +66,23 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     character(len=*), intent(in)        :: indicator
 
     ! loop variables
-    integer(kind=ik)                    :: lgt_n_old, iteration
+    integer(kind=ik)                    :: lgt_n_old, iteration, k
     ! random variable for coarsening
     real(kind=rk)                       :: r
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-  lgt_n_old = 0
-  iteration = 0
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
+    time_sum = 0.0_rk
+
+    lgt_n_old = 0
+    iteration = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -82,10 +91,19 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are refined)
     do while ( lgt_n_old /= lgt_n )
+
         lgt_n_old = lgt_n
+
+        ! end time
+        sub_t1 = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
 
         !> (a) check where coarsening is possible
         call coarsening_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration )
+
+        ! start time
+        sub_t0 = MPI_Wtime()
+
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
         !> (c) unmark blocks that cannot be coarsened due to gradedness
@@ -105,7 +123,12 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         iteration = iteration + 1
+
     end do
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    time_sum = time_sum + (sub_t1 - sub_t0)
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
@@ -118,6 +141,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
+    ! start time
+    sub_t0 = MPI_Wtime()
+
     !> load balancing destroys the lists again, so we have to create them one last time to
     !! end on a valid mesh
     !! update lists of active blocks (light and heavy data)
@@ -127,5 +153,23 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+    ! end time
+    sub_t1 = MPI_Wtime()
+    time_sum = time_sum + (sub_t1 - sub_t0)
+    ! write time
+    if ( params%debug ) then
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == "adapt_mesh (w/o load balanc./thresh.)" ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = "adapt_mesh (w/o load balanc./thresh.)"
+        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
+    end if
 
 end subroutine adapt_mesh

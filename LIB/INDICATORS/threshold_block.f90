@@ -66,14 +66,20 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
     ! light data list for working
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block, 1), params%max_treelevel+2)
+
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
+    time_sum = 0.0_rk
 
     ! block number
     N = params%number_blocks
@@ -98,9 +104,12 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! end time
+    sub_t1 = MPI_Wtime()
+    time_sum = time_sum + (sub_t1 - sub_t0)
+
     ! ------------------------------------------------------------------------------------
     ! first: synchronize ghost nodes - thresholding on block with ghost nodes
-
     ! synchronize ghostnodes
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -181,23 +190,25 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     lgt_block = 0
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
+    ! clean up
+    deallocate( u1, u2, u3 )
+
     ! end time
     sub_t1 = MPI_Wtime()
+    time_sum = time_sum + (sub_t1 - sub_t0)
     ! write time
     if ( params%debug ) then
         ! find free or corresponding line
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "treshold_block (w/o ghost synch.)" ) exit
+            if ( debug%name_comp_time(k) == "threshold_block (w/o ghost synch.)" ) exit
             k = k + 1
         end do
         ! write time
-        debug%name_comp_time(k) = "treshold_block (w/o ghost synch.)"
+        debug%name_comp_time(k) = "threshold_block (w/o ghost synch.)"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
     end if
 
-    ! clean up
-    deallocate( u1, u2, u3 )
 end subroutine threshold_block

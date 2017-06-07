@@ -97,11 +97,14 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
-    allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)), stat=allocate_error)
-    call check_allocation(allocate_error)
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
+    allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)), stat=allocate_error)
+    call check_allocation(allocate_error)
 
     ! reset dx
     my_dx = 9.0e9_rk
@@ -121,9 +124,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! ----------------------------------------------------------------------------------------
     ! calculate time step

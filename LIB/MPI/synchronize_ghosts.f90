@@ -112,7 +112,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik), allocatable       :: com_lists(:, :, :)
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
     ! communications matrix:
     ! count the number of communications between procs
@@ -138,6 +138,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+
+    time_sum = 0.0_rk
 
     N = params%number_blocks
 
@@ -179,9 +184,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! start time
-    sub_t0 = MPI_Wtime()
-
     ! synchronize in three stages
     ! stage 1: neighbors with level diff 0, -1
     ! stage 2: neighbors with level diff +1
@@ -194,6 +196,12 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         com_matrix      =  0
         com_matrix_pos  =  0
         my_com_matrix   =  0
+
+        ! end time
+        sub_t1 = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+        ! start time
+        sub_t0 = MPI_Wtime()
 
         ! ----------------------------------------------------------------------------------------
         ! first: create com matrix and com list for external communications
@@ -233,6 +241,26 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! for proc without neighbors: set n_procs to 1
         ! so we allocate arrays with second dimension=1
         if (n_procs==0) n_procs = 1
+
+        ! end time
+        sub_t1 = MPI_Wtime()
+        ! write time
+        if ( params%debug ) then
+            ! find free or corresponding line
+            k = 1
+            do while ( debug%name_comp_time(k) /= "---" )
+                ! entry for current subroutine exists
+                if ( debug%name_comp_time(k) == "synch. ghosts - com matrix" ) exit
+                k = k + 1
+            end do
+            ! write time
+            debug%name_comp_time(k) = "synch. ghosts - com matrix"
+            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
+        end if
+
+        ! start time
+        sub_t0 = MPI_Wtime()
 
         ! next steps only for more than two procs
         if ( number_procs > 1 ) then
@@ -294,6 +322,26 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos  )
 
         end if
+
+        ! end time
+        sub_t1 = MPI_Wtime()
+        ! write time
+        if ( params%debug ) then
+            ! find free or corresponding line
+            k = 1
+            do while ( debug%name_comp_time(k) /= "---" )
+                ! entry for current subroutine exists
+                if ( debug%name_comp_time(k) == "synch. ghosts - communication" ) exit
+                k = k + 1
+            end do
+            ! write time
+            debug%name_comp_time(k) = "synch. ghosts - communication"
+            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
+        end if
+
+        ! start time
+        sub_t0 = MPI_Wtime()
 
         ! ----------------------------------------------------------------------------------------
         ! fifth: write ghost nodes
@@ -643,6 +691,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
     ! end time
     sub_t1 = MPI_Wtime()
+    time_sum = time_sum + (sub_t1 - sub_t0)
     ! write time
     if ( params%debug ) then
         ! find free or corresponding line
@@ -655,7 +704,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! write time
         debug%name_comp_time(k) = "synch. ghosts"
         debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
     end if
 
 end subroutine synchronize_ghosts

@@ -411,6 +411,7 @@ program main
 
             end do
 
+            write(*,'(80("_"))')
             write(*, '("sum: ", 2x,f12.3)', advance='yes') sum(debug%comp_time(:,2))
 
         end if

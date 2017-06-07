@@ -65,9 +65,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! refinement status change
     integer(kind=ik)                    :: refine_change( size(lgt_block,1) ), my_refine_change( size(lgt_block,1) )
 
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
-
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
     integer(kind=ik)                    :: neighbor_num
@@ -94,9 +91,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! we repeat the ensure_gradedness procedure until this flag is .false. since as long
     ! as the grid changes due to gradedness requirements, we have to check it again
@@ -240,25 +234,5 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         counter = counter + 1
         if (counter == 10) call error_msg("ERROR: unable to build a graded mesh")
     end do ! end do of repeat procedure until grid_changed==.false.
-
-
-
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "ensure_gradedness" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "ensure_gradedness"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
 
 end subroutine ensure_gradedness

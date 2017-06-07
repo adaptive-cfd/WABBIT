@@ -49,8 +49,6 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
     integer(kind=ik)                    :: k, l, N_sisters, status
     ! sister ids
     integer(kind=ik), allocatable       :: id(:)
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -70,9 +68,6 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! loop over all active blocks
     do k = 1, lgt_n
@@ -111,23 +106,5 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
 
     ! NOTE: this routine runs redundantly on all procs - they all do the same. That means
     ! by consequence that the light data here does not have to be synchronized.
-
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "ensure_completeness" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "ensure_completeness"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
 
 end subroutine ensure_completeness

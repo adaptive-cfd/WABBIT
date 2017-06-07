@@ -62,8 +62,9 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     character(len=*), intent(in)           :: indicator
 
     ! cpu time variables for running time calculation
-    real(kind=rk)    :: sub_t0, sub_t1
-    integer(kind=ik) :: k
+    real(kind=rk)                           :: sub_t0, sub_t1
+    integer(kind=ik)                        :: k
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -111,30 +112,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    !> (f) balance load
-    if ( params%threeD_case ) then
-        ! 3D:
-        call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
-    else
-        ! 2D:
-        call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-    end if
-
-    !> (g) update lists of active blocks (light and heavy data)
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist , hvy_active, hvy_n )
-
-
 !---------------------------------------------------------------------------------------------
 ! End of routine
 
     ! end time
     sub_t1 = MPI_Wtime()
-
     ! write time
     if ( params%debug ) then
         ! find free or corresponding line

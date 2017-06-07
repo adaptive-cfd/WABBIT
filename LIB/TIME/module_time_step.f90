@@ -44,7 +44,6 @@ module module_time_step
 contains
 
     ! time step
-    include "time_step_RK4.f90"
     include "time_stepper.f90"
     include "set_RK_input.f90"
     include "RHS_wrapper.f90"

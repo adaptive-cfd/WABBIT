@@ -47,14 +47,11 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), allocatable       :: light_ids(:)
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! start time
-    sub_t0 = MPI_Wtime()
     maxtL = params%max_treelevel
 
     if (params%threeD_case) then
@@ -96,24 +93,6 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
         endif
     end do
 
-
     deallocate( light_ids )
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "coarse_mesh" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "coarse_mesh"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
 
 end subroutine coarse_mesh

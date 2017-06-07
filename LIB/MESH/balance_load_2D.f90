@@ -52,8 +52,8 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! send/receive buffer, note: size is equal to block data array, because if a block want to send all his data
-    real(kind=rk)                       :: buffer_data( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) )
-    integer(kind=ik)                    :: buffer_light( params%number_blocks )
+    real(kind=rk), allocatable          :: buffer_data( :, :, :, : )
+    integer(kind=ik), allocatable       :: buffer_light( : )
 
     ! light data list for working
     integer(kind=ik)                    :: my_block_list( size(lgt_block, 1), params%max_treelevel+2)
@@ -132,6 +132,10 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
     ! allocate space filling curve list, maximal number of elements = max number of blocks
     allocate( sfc_list( 4**params%max_treelevel ) )
+
+    ! allocate buffer arrays here
+    allocate( buffer_data( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) ) )
+    allocate( buffer_light( params%number_blocks ) )
 
     ! number of light data (since the light data is redunantly stored on all CPU,
     ! this number corresponds usually to the maximum number of blocks possible in
@@ -702,6 +706,8 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     deallocate( com_plan )
     deallocate( sfc_list )
     deallocate( sfc_com_list )
+    deallocate( buffer_data )
+    deallocate( buffer_light )
 
     ! end time
     sub_t1 = MPI_Wtime()

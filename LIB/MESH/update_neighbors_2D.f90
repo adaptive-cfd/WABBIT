@@ -61,9 +61,6 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     ! loop variable
     integer(kind=ik)                    :: k, lgt_id
 
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
-
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -85,9 +82,6 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! special case:
     ! if there is only one block => all neighbors are this block
@@ -122,22 +116,5 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
         call find_neighbor_corner_2D( hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_n, lgt_sortednumlist)
 
     end do
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "update_neighbors" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "update_neighbors"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
 
 end subroutine update_neighbors_2D

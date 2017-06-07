@@ -200,8 +200,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! end time
         sub_t1 = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
-        ! start time
-        sub_t0 = MPI_Wtime()
 
         ! ----------------------------------------------------------------------------------------
         ! first: create com matrix and com list for external communications

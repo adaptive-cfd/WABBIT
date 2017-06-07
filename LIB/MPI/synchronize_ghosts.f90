@@ -163,23 +163,19 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     rank         = params%rank
     number_procs = params%number_procs
 
-    ! allocate local com_lists
-    allocate( com_lists( N*16, 6, number_procs) )
+    ! allocate local com_lists, use number of active heavy blocks for calculation
+    ! of maximum number of entrys, max entrys: every active block has only external
+    ! neighbors, note: max neighbor num 2D: 12, 3D: todo!
+    allocate( com_lists( hvy_n*12, 6, number_procs) )
     ! allocate com matrix
     allocate( com_matrix(number_procs, number_procs) )
     allocate( com_matrix_pos(number_procs, number_procs) )
     allocate( my_com_matrix(number_procs, number_procs) )
 
-    ! reset com-list, com_plan, com matrix, receiver lists
-    com_lists       = -1
-    com_matrix      =  0
-    com_matrix_pos  =  0
-    my_com_matrix   =  0
-
-    ! reset ghost nodes for all active blocks
-    if ( params%debug ) then
-        call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
-    end if
+!    ! reset ghost nodes for all active blocks
+!    if ( params%debug ) then
+!        call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
+!    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body

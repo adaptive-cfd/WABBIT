@@ -156,7 +156,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3)
 
     ! reset send/receive buffer
-    buffer_data = 9.0e9_rk
+    !buffer_data = 9.0e9_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body

@@ -104,8 +104,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+
         !> (c) unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
+
         !> (d) ensure completeness
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
@@ -116,8 +118,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! update lists of active blocks (light and heavy data)
         call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
         call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
+
         ! update list of sorted nunmerical treecodes, used for finding blocks
         call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         iteration = iteration + 1

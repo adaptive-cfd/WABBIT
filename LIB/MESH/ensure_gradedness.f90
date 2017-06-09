@@ -26,6 +26,7 @@
 !! 23/11/16 - rework complete subroutine: use list of active blocks, procs works now on light data \n
 !! 03/02/17 - insert neighbor_num variable to use subroutine for 2D and 3D data \n
 !! 05/04/17 - Improvement: Ensure a graded mesh in any case, not only in the coarsen states (which was done before)
+!! 09/06/17 - speed up with switching to 8bit integer for working arrays, shorten send/receive buffer
 !
 ! ********************************************************************************************
 
@@ -62,8 +63,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! status of grid changing
     logical                             :: grid_changed
 
-    ! refinement status change
-    integer(kind=ik)                    :: refine_change( size(lgt_block,1) ), my_refine_change( size(lgt_block,1) )
+    ! refinement status change, send/receive buffer, use 8bit integers
+    integer(kind=1), allocatable        :: refine_change( : ), my_refine_change( : )
 
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
@@ -74,6 +75,9 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! allocate buffers, uses number of light data as maximum number for array length
+    allocate( refine_change(lgt_n), my_refine_change(lgt_n) )
 
     N = params%number_blocks
     max_treelevel = params%max_treelevel
@@ -103,8 +107,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
         ! -------------------------------------------------------------------------------------
         ! first: every proc loop over the light data and calculate the refinement status change
-        my_refine_change = -999999
-        refine_change = -99999
+        my_refine_change = -99
+        refine_change = -99
 
         do k = 1, lgt_n
 
@@ -140,7 +144,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                   ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
                                   ! I have at least to stay on my level.
                                   ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                  my_refine_change( lgt_active(k) ) = max( 0, my_refine_change( lgt_active(k) ) )
+                                  my_refine_change( k ) = max( 0_1, my_refine_change( k ) )
                               end if
                         elseif (mylevel - neighbor_level == 1) then
                               ! neighbor on lower level
@@ -157,17 +161,17 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                               if ( neighbor_status == +1) then
                                   ! ... so I also have to refine (not only can I NOT coarsen, I actually
                                   ! have to refine!)
-                                  my_refine_change( lgt_active(k) ) = +1
+                                  my_refine_change( k ) = +1
                               elseif ( neighbor_status == 0) then
                                   ! neighbor wants to stay and I want to coarsen, but
                                   ! I cannot do that (there would be two levels between us)
                                   ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                  my_refine_change( lgt_active(k) ) = max( 0, my_refine_change( lgt_active(k) ) )
+                                  my_refine_change( k ) = max( 0_1, my_refine_change( k ) )
                               elseif ( neighbor_status == -1) then
                                   ! neighbor wants to coarsen, which is what I want too,
                                   ! so we both would just go up one level together - that's fine
                                   ! FIXME: I have no idea why the following line is required.
-                                  my_refine_change( lgt_active(k) ) = max( 0, my_refine_change( lgt_active(k) ) )
+                                  my_refine_change( k ) = max( 0_1, my_refine_change( k ) )
                               end if
                         else
                           call error_msg("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
@@ -197,7 +201,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                               ! my neighbor is one level finer
                               if (neighbor_status == +1) then
                                 ! neighbor refines (and we cannot inhibt that) so I HAVE TO do so as well
-                                my_refine_change( lgt_active(k) ) = +1
+                                my_refine_change( k ) = +1
                               end if
                             else
                               call error_msg("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
@@ -208,12 +212,13 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             end if ! mpi responsibile for block
         end do ! loop over blocks
 
+
         ! second: synchronize local refinement changes.
         ! Now all procs have looked at their blocks, and they may have modified their blocks
         ! (remove coarsen states, force refinement through neighbors). None of the procs had to
         ! touch the neighboring blocks, there can be no MPI conflicts.
         ! So we can simply snynchronize and know what changes have to be made
-        call MPI_Allreduce(my_refine_change, refine_change, size(lgt_block,1), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(my_refine_change, refine_change, lgt_n, MPI_INTEGER1, MPI_MAX, MPI_COMM_WORLD, ierr)
 
         ! -------------------------------------------------------------------------------------
         ! third: change light data and set grid_changed status
@@ -221,9 +226,9 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         do k = 1, lgt_n
             lgt_id = lgt_active(k)
             ! refinement status changed
-            if ( refine_change(lgt_id) > -999 ) then
+            if ( refine_change(k) > -99 ) then
                 ! change light data
-                lgt_block( lgt_id, max_treelevel+2 ) = max( lgt_block( lgt_id, max_treelevel+2 ), refine_change(lgt_id) )
+                lgt_block( lgt_id, max_treelevel+2 ) = max( lgt_block( lgt_id, max_treelevel+2 ), refine_change(k) )
                 ! set grid status since if we changed something, we have to repeat the entire process
                 grid_changed = .true.
             end if
@@ -233,6 +238,10 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! avoid infinite loops
         counter = counter + 1
         if (counter == 10) call error_msg("ERROR: unable to build a graded mesh")
+
     end do ! end do of repeat procedure until grid_changed==.false.
+
+    ! clean up
+    deallocate( refine_change, my_refine_change )
 
 end subroutine ensure_gradedness

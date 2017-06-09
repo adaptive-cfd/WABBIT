@@ -26,14 +26,12 @@
 !! 23/05/2017 create
 ! ********************************************************************************************
 
-subroutine refinement_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, indicator )
+subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
     implicit none
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)

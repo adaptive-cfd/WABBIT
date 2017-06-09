@@ -67,8 +67,6 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
     ! loop variables
     integer(kind=ik)                    :: lgt_n_old, iteration, k
-    ! random variable for coarsening
-    real(kind=rk)                       :: r
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum

@@ -163,7 +163,7 @@ contains
 
     type(inifile), intent(inout) :: PARAMS
     character(len=*) :: file ! this is the file we read the PARAMS from
-    character(len=maxcolumns) :: dummy, line
+    character(len=maxcolumns) :: line
     logical, optional, intent(in) :: verbose
 
     integer :: io_error, i
@@ -315,7 +315,7 @@ contains
       else
         !-- the value is given in gridpoints (e.g. thickness=5*dx)
         read (value(1:index(value,'*dx')-1),*) params_real
-        params_real = params_real*dx
+        params_real = params_real*real(dx,kind=4)
         write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
 
         if ( lattice_spacing_set .eqv. .false.) then

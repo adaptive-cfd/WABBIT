@@ -273,13 +273,14 @@ contains
   ! Output:
   !       params_vector: this is the parameter you were looking for
   !-------------------------------------------------------------------------------
-  subroutine param_matrix_mpi (PARAMS, section, keyword, matrix)
+  subroutine param_matrix_mpi (PARAMS, section, keyword, matrix, defaultvalue)
     implicit none
     ! Contains the ascii-params file
     type(inifile), intent(inout) :: PARAMS
     character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
     character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
     real(kind=rk), allocatable, intent(out) :: matrix(:,:)
+    real(kind=rk), intent(in)               :: defaultvalue(:,:)
 
     integer :: n,m
     integer :: mpicode
@@ -290,7 +291,7 @@ contains
 
     ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
     if (mpirank==0) then
-      call read_param (PARAMS, section, keyword, matrix)
+      call read_param (PARAMS, section, keyword, matrix, defaultvalue)
       n = size(matrix,1)
       m = size(matrix,2)
     endif

@@ -183,15 +183,14 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! only one datafield
         params_loc%number_data_fields   = 1
         ! choose diffusion coefficient and convection velocity
-        if (allocated(params_loc%physics%u0)) then
-            params_loc%physics%nu = 0.0_rk
-            params_loc%physics%u0 = (/1.0_rk, 0.5_rk/)
-        else
+        if (.not. allocated(params_loc%physics%u0)) then
             allocate(params_loc%physics%u0(2))
-            allocate(params_loc%physics%nu(1))
-            params_loc%physics%nu = 0.0_rk
-            params_loc%physics%u0 = (/1.0_rk, 0.5_rk/)
         end if
+        if (.not. allocated(params_loc%physics%nu)) then
+           allocate(params_loc%physics%nu(1))
+        end if
+        params_loc%physics%nu = 0.0_rk
+        params_loc%physics%u0 = (/1.0_rk, 0.5_rk/)
     end if
 
     ! set dt parameter

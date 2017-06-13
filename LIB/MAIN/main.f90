@@ -214,7 +214,7 @@ program main
 !        ! time stepper convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
 !        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist)
-!        ! reset the grid: all blocks are inactive and empty
+        ! reset the grid: all blocks are inactive and empty
 !        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
 !        ! spatial convergence order

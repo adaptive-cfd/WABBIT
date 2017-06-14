@@ -162,7 +162,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !! be balanced, so we have to balance load now
     if ( params%threeD_case ) then
         ! 3D:
-        call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n )
+        call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
     else
         ! 2D:
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )

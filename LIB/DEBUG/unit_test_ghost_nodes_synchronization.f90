@@ -24,7 +24,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -49,6 +49,12 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
+
+    ! communication lists:
+    integer(kind=ik), intent(inout)         :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    integer(kind=ik), intent(inout)         :: com_matrix(:,:,:)
 
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
@@ -140,8 +146,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
-      call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
-      call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+        ! refine some blocks
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+        ! random adapt some blocks
+        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, com_matrix )
     end do
 
     if (params%rank == 0) then
@@ -200,7 +208,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n,:,:,:), com_matrix, .true. )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

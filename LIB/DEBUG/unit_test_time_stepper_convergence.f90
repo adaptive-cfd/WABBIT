@@ -21,7 +21,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -47,6 +47,12 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
 
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+
     ! local user defined parameter structure - use to change settings
     type (type_params)                      :: params_loc
 
@@ -56,7 +62,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     integer(kind=ik)                        :: lgt_n
 
     ! loop variables
-    integer(kind=ik)                        :: k, l, lgt_id, hvy_id
+    integer(kind=ik)                        :: k, l, lgt_id, hvy_id, max_neighbors
 
     ! process rank
     integer(kind=ik)                        :: rank
@@ -286,8 +292,17 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         !-----------------------------------------------------------------------
         ! time stepper
         !-----------------------------------------------------------------------
+        ! max neighbor num, \todo move max neighbor num to params struct
+        if ( params%threeD_case ) then
+            ! 3D
+            max_neighbors = 74
+        else
+            ! 2D
+            max_neighbors = 12
+        end if
+
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix )
         end do
 
         if ( idt == 1 ) then

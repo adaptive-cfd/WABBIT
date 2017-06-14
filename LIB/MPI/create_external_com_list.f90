@@ -197,7 +197,7 @@ subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_activ
                     if ( rank == neighbor_rank ) then
                         ! internal neighbor
                         ! write communications matrix
-                        com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1
+                        !com_matrix(rank+1, rank+1) = com_matrix(rank+1, rank+1) + 1
 
                     else
                         ! external neighbor
@@ -256,7 +256,8 @@ subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_activ
     ! write my com matrix, loop over number of receiver procs, write counted communications
     do k = 1, receiver_N
         ! write matrix
-        com_matrix( rank+1, receiver_rank(k)+1 ) = receiver_count( receiver_pos( receiver_rank(k)+1 ) )
+        !com_matrix( rank+1, receiver_rank(k)+1 ) = receiver_count( receiver_pos( receiver_rank(k)+1 ) )
+        com_matrix( receiver_rank(k)+1, rank+1 ) = receiver_count( receiver_pos( receiver_rank(k)+1 ) )
     end do
 
     ! clean up

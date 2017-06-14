@@ -56,7 +56,7 @@
 !
 ! ********************************************************************************************
 
-subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, grid_changed )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -80,6 +80,9 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
+    ! grid stay fixed between two synch calls, so use old com_lists and com_matrix
+    logical, intent(in)                 :: grid_changed
+
     ! loop variables
     integer(kind=ik)                    :: k, N, i, j, neighbor_num, synch_stage, hvy_id, lgt_id, neighbor_light_id, neighborhood, com_number
 
@@ -100,25 +103,19 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik)                    :: number_procs
 
     ! communication lists:
-    ! dim 1: list elements
-    ! dim 2: columns
-    !                       1   rank of sender process
-    !                       2   rank of receiver process
-    !                       3   sender block heavy data id
-    !                       4   receiver block heavy data id
-    !                       5   sender block neighborhood to receiver (dirs id)
-    !                       6   difference between sender-receiver level
-    ! dim 3: receiver proc rank
-    integer(kind=ik), allocatable       :: com_lists(:, :, :)
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
     ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+
+    ! communications matrix:
     ! count the number of communications between procs
     ! row/column number encodes process rank + 1
     ! com matrix pos: position in send buffer
-    integer(kind=ik), allocatable       :: com_matrix(:,:), my_com_matrix(:,:), com_matrix_pos(:,:)
+    integer(kind=ik), allocatable       :: my_com_matrix(:,:), com_matrix_pos(:,:)
 
     ! send/receive buffer, integer and real
     integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -166,9 +163,9 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! allocate local com_lists, use number of active heavy blocks for calculation
     ! of maximum number of entrys, max entrys: every active block has only external
     ! neighbors, note: max neighbor num 2D: 12, 3D: todo!
-    allocate( com_lists( hvy_n*12, 6, number_procs) )
+    !allocate( com_lists( hvy_n*12, 6, number_procs) )
     ! allocate com matrix
-    allocate( com_matrix(number_procs, number_procs) )
+    !allocate( com_matrix(number_procs, number_procs) )
     allocate( com_matrix_pos(number_procs, number_procs) )
     allocate( my_com_matrix(number_procs, number_procs) )
 
@@ -180,6 +177,12 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! reset com-list, com_plan, com matrix, receiver lists
+    if (grid_changed) then
+        com_lists       = -99
+        com_matrix      =  0
+    end if
+
     ! synchronize in three stages
     ! stage 1: neighbors with level diff 0, -1
     ! stage 2: neighbors with level diff +1
@@ -188,49 +191,75 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     do synch_stage = 1, 4
 
         ! reset com-list, com_plan, com matrix, receiver lists
-        com_lists       = -99
-        com_matrix      =  0
         com_matrix_pos  =  0
         my_com_matrix   =  0
 
         ! end time
         sub_t1 = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
+        ! start time
+        sub_t0 = MPI_Wtime()
 
-        ! ----------------------------------------------------------------------------------------
-        ! first: create com matrix and com list for external communications
-        ! output depends on synch stage
-        ! ----------------------------------------------------------------------------------------
-        call create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists, synch_stage )
+        ! next steps only if the grid has changed
+        if (grid_changed) then
 
-        ! ----------------------------------------------------------------------------------------
-        ! second: synchronize com matrix
-        ! ----------------------------------------------------------------------------------------
-        call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+            ! ----------------------------------------------------------------------------------------
+            ! first: create com matrix and com list for external communications
+            ! output depends on synch stage
+            ! ----------------------------------------------------------------------------------------
+            call create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix(:,:), com_lists(:,:,:,synch_stage), synch_stage )
 
-        ! symmetrize com matrix - choose max com number
-        do i = 1, number_procs
-            do j = i+1, number_procs
-                com_matrix(i,j) = max( com_matrix(i,j), com_matrix(j,i) )
-                com_matrix(j,i) = com_matrix(i,j)
+            ! end time
+            sub_t1 = MPI_Wtime()
+            ! write time
+            if ( params%debug ) then
+                ! find free or corresponding line
+                k = 1
+                do while ( debug%name_comp_time(k) /= "---" )
+                    ! entry for current subroutine exists
+                    if ( debug%name_comp_time(k) == "synch. ghosts - external list" ) exit
+                    k = k + 1
+                end do
+                ! write time
+                debug%name_comp_time(k) = "synch. ghosts - external list"
+                debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+                debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
+            end if
+
+            ! start time
+            sub_t0 = MPI_Wtime()
+
+            ! ----------------------------------------------------------------------------------------
+            ! second: synchronize com matrix
+            ! ----------------------------------------------------------------------------------------
+            call MPI_Allreduce(my_com_matrix, com_matrix(:,:,synch_stage), number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+            ! symmetrize com matrix - choose max com number
+            do i = 1, number_procs
+                do j = i+1, number_procs
+                    com_matrix(i,j,synch_stage) = max( com_matrix(i,j,synch_stage), com_matrix(j,i,synch_stage) )
+                    com_matrix(j,i,synch_stage) = com_matrix(i,j,synch_stage)
+                end do
             end do
-        end do
 
-        ! save com matrix
-        if ( params%debug ) then
-            call write_com_matrix( com_matrix )
         end if
+
+!        ! save com matrix
+!        if ( params%debug ) then
+!            call write_com_matrix( com_matrix )
+!        end if
 
         ! ----------------------------------------------------------------------------------------
         ! third: fill send buffer
         ! max number of communications and neighboring procs - use for buffer allocation
         ! every proc loop over com matrix line
         ! ----------------------------------------------------------------------------------------
-        call max_com_num( my_n_com, n_procs, com_matrix(rank+1,:), rank )
+        call max_com_num( my_n_com, n_procs, com_matrix(rank+1,:,synch_stage), rank )
 
         ! synchronize max com number, because if not:
         ! RMA buffer displacement is not fixed, so we need synchronization there
-        call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+        !call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+        n_com = maxval(com_matrix(:,:,synch_stage))
 
         ! for proc without neighbors: set n_procs to 1
         ! so we allocate arrays with second dimension=1
@@ -290,7 +319,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! first element of int buffer = length of real buffer (buffer_i)
 
             ! fill send buffer and position communication matrix
-            call fill_send_buffer( params, hvy_block, com_lists, com_matrix(rank+1,:), rank, int_send_buffer, real_send_buffer )
+            call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer )
 
             ! ----------------------------------------------------------------------------------------
             ! fourth: send/receive data
@@ -303,7 +332,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 ! loop over communications
                 do j = 1, size(com_matrix_pos,1)
                     ! found external communication
-                    if ( (com_matrix(i,j) /= 0) .and. (i /= j) ) then
+                    if ( (com_matrix(i,j,synch_stage) /= 0) .and. (i /= j) ) then
                         ! save com position
                         com_matrix_pos(i,j) = k
                         ! increase counter
@@ -313,7 +342,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             end do
 
             ! communicate, fill receive buffer
-            call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos  )
+            call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix(:,:,synch_stage), com_matrix_pos  )
 
         end if
 
@@ -447,7 +476,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                 int_start = 2
 
                                 ! calculate com number
-                                do com_number = 2, com_matrix(rank+1, neighbor_rank+1) * 3 + 1, 3
+                                do com_number = 2, com_matrix(rank+1, neighbor_rank+1, synch_stage) * 3 + 1, 3
                                     if ( int_receive_buffer( com_number, buffer_pos ) == -99 ) exit
                                 end do
                                 com_number = com_number - 3
@@ -581,7 +610,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                 ! calculate com number
                                 if ( int_receive_buffer( 1, buffer_pos ) /= -99 ) then
                                     ! receive buffer is not empty
-                                    do com_number = 2, com_matrix(rank+1, neighbor_rank+1) * 3 + 1, 3
+                                    do com_number = 2, com_matrix(rank+1, neighbor_rank+1, synch_stage) * 3 + 1, 3
                                         if ( int_receive_buffer( com_number, buffer_pos ) == -99 ) exit
                                     end do
                                     com_number = com_number - 3
@@ -678,8 +707,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     end do
 
     ! clean up
-    deallocate( com_lists )
-    deallocate( com_matrix )
+    !deallocate( com_lists )
+    !deallocate( com_matrix )
     deallocate( com_matrix_pos )
     deallocate( my_com_matrix )
 

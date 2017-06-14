@@ -26,7 +26,8 @@
 !! 23/05/2017 create
 ! ********************************************************************************************
 
-subroutine coarsening_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration )
+subroutine coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
+
     implicit none
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
@@ -34,8 +35,7 @@ subroutine coarsening_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
@@ -82,7 +82,7 @@ subroutine coarsening_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt
       case ("threshold")
         ! use wavelet indicator to check where to coarsen. threshold_block performs
         ! the required ghost node sync and loops over all active blocks.
-        call threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        call threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n)
 
       case ("random")
         ! randomly coarse some blocks. used for testing. note we tag for coarsening

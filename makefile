@@ -113,7 +113,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	set_blocks_initial_condition.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
 	inicond_vorticity_filaments.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
 	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90 allocate_grid.f90 reset_grid.f90 \
-	$(OBJDIR)/module_initial_conditions.o set_inicond_all_blocks.f90
+	$(OBJDIR)/module_initial_conditions.o set_inicond_all_blocks.f90 allocate_com_arrays.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\

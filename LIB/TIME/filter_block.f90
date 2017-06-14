@@ -21,7 +21,7 @@
 !
 ! ********************************************************************************************
 
-subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -45,6 +45,12 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
 
     ! loop variables
     integer(kind=ik)                    :: k, i, j, l, dF, N_dF
@@ -151,7 +157,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     end if
 
     ! synchronize ghostnodes
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false. )
 
     ! start time
     sub_t0 = MPI_Wtime()

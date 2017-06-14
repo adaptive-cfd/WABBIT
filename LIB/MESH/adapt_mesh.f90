@@ -33,7 +33,7 @@
 !********************************************************************************************
 !> \image html adapt_mesh.svg width=400
 
-subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
+subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -65,11 +65,20 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
 
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+
     ! loop variables
-    integer(kind=ik)                    :: lgt_n_old, iteration, k
+    integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
+
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -81,6 +90,14 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
     lgt_n_old = 0
     iteration = 0
+
+    if ( params%threeD_case ) then
+        ! 3D
+        max_neighbors = 74
+    else
+        ! 2D
+        max_neighbors = 12
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -97,7 +114,24 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         time_sum = time_sum + (sub_t1 - sub_t0)
 
         !> (a) check where coarsening is possible
-        call coarsening_indicator( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration )
+        ! ------------------------------------------------------------------------------------
+        ! first: synchronize ghost nodes - thresholding on block with ghost nodes
+        ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
+        ! synchronize only for thresholding
+
+        ! end time
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        sub_t1 = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+
+        if ( indicator == "threshold" ) then
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true. )
+        end if
+
+        ! start time
+        sub_t0 = MPI_Wtime()
+
+        call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
         ! start time
         sub_t0 = MPI_Wtime()

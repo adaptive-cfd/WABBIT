@@ -117,20 +117,14 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
-        ! synchronize only for thresholding
 
         ! end time
         call MPI_Barrier(MPI_COMM_WORLD, ierr)
         sub_t1 = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
 
-        if ( indicator == "threshold" ) then
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true. )
-        end if
-
-        ! start time
-        sub_t0 = MPI_Wtime()
-
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true. )
+        ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
         ! start time
@@ -150,11 +144,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
         ! the following calls are indeed required (threshold->ghosts->neighbors->active)
         ! update lists of active blocks (light and heavy data)
-        call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-        call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-
         ! update list of sorted nunmerical treecodes, used for finding blocks
-        call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
@@ -183,10 +174,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !> load balancing destroys the lists again, so we have to create them one last time to
     !! end on a valid mesh
     !! update lists of active blocks (light and heavy data)
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 

@@ -190,10 +190,8 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
 
   ! as the grid has changed (we created it here), we now update the heavy and light
   ! active lists, as well as neighbor relations.
-  call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-  call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
   ! update list of sorted nunmerical treecodes, used for finding blocks
-  call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+  call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
   ! update neighbor relations
   call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 

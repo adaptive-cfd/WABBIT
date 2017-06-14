@@ -166,7 +166,12 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     my_lgt_block = int(lgt_block( rank*N + 1 : rank*N + N, :), kind=1)
 
     ! reset max heavy id, use current max id
-    heavy_max = maxval(hvy_active)
+    if ( hvy_n > 0 ) then
+        ! proc has active heavy data
+        heavy_max = maxval(hvy_active)
+    else
+        heavy_max = 0
+    end if
 
     ! reset send/receive buffer
     !buffer_data = 9.0e9_rk

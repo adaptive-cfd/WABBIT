@@ -310,7 +310,7 @@ program main
         if ( params%debug ) then
 
             ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false. )
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false. )
 
             ! start time
             sub_t0 = MPI_Wtime()

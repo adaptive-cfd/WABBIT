@@ -73,7 +73,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik)                        :: Bs, g, Ds, number_blocks
     real(kind=rk)                           :: Lx, Ly, Lz
     ! data dimensionality
-    integer(kind=ik)                        :: d, dF
+    integer(kind=ik)                        :: d, dF, max_neighbors
     ! frequency of sin functions for testing:
     real(kind=rk)                           :: frequ(1:6)
     integer(kind=ik)                        :: ifrequ
@@ -82,8 +82,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
     ! MPI error variable
     integer(kind=ik)                        :: ierr
-
-
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -102,8 +100,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! set data dimension
     if ( params%threeD_case ) then
         d = 3
+        max_neighbors = 74
     else
         d = 2
+        max_neighbors = 12
     endif
 
 !---------------------------------------------------------------------------------------------
@@ -208,7 +208,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n,:,:,:), com_matrix, .true. )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true. )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

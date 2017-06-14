@@ -7,12 +7,14 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief set input for RK
+!> \brief set input for Runge Kutta time stepper
 !
 !>
-!! gives back the input for the RHS (from which at the end the next time step is computed). 
-!! k_j = RHS(u_n+sum(a_jl*k_l)) (e.g. u_n + dt*(a31*k1+a32*k2) ), so this routine is in charge
-!! of setting the input u_n + sum(a_jl*k_l) and saving it in the hvy_work and hvy_block array
+!! gives back the input for the RHS (from which in the final stage the next time step is computed).\n 
+!!
+!! k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_jl*k_l)) (e.g. k3 = RHS(t+dt*c_3, data_field(t) + dt*(a31*k1+a32*k2)) ) \n
+!!
+!! This routine is in charge of setting the input and saving it in the hvy_work and hvy_block array \n
 !!
 !! input:    
 !!           - time step dt
@@ -25,14 +27,14 @@
 !!           - heavy_work array
 !!
 !!
-!! butcher table
+!! butcher table, e.g.
 !!
-!! |  |            |
-!! |--|------------|
-!! |0 | 0   0   0  |
-!! |c2| a21 0   0  |
-!! |c3| a31 a32 0  |
-!! |  | b1  b2  b3 |
+!! |   |    |    |   |
+!! |---|----|----|---|
+!! | 0 | 0  | 0  |  0|
+!! |c2 | a21| 0  |  0|
+!! |c3 | a31| a32|  0|
+!! | 0 | b1 | b2 | b3|
 !!
 !!
 !! = log ======================================================================================
@@ -86,9 +88,7 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
     select case(params%physics_type)
 
         case('2D_convection_diffusion')
-            ! new input for k-coefficients
-            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. rhs(u_n + dt*(a31*k1+a32*k2) ))
-            ! first: k_j = u_n + ...
+            ! first: k_j = RHS(data_field(t) + ...
             do dF = 2, N_dF+1
                 do k = 1, hvy_n
                     hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) )
@@ -102,8 +102,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                     do dF = 2, N_dF+1
                         ! loop over all active heavy data blocks 
                         do k = 1, hvy_n
-                            ! new input for k-coefficients
-                            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. k_3 = rhs(u_n + dt*(a_31*k_1+a_32*k_2)) )
+                            ! new input for computation of k-coefficients
+                            ! k_j = RHS(data_field(t) + sum(a_jl*k_l))
                             hvy_block( :, :, :, dF, hvy_active(k)) = hvy_block( :, :, :, dF, hvy_active(k)) + dt * rk_coeffs(l) * hvy_work( :, :, :, (dF-2)*5+l, hvy_active(k))
                         end do
                     end do
@@ -111,9 +111,7 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
             end do
 
         case('2D_navier_stokes')
-            ! new input for k-coefficients
-            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. u_n + dt*(a31*k1+a32*k2) )
-            ! first: k_j = u_n + ...
+            ! first: k_j = RHS(data_field(t) + ...
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
@@ -124,17 +122,15 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                 else
                     ! loop over all active heavy data blocks 
                     do k = 1, hvy_n
-                        ! new input for k-coefficients
-                        ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. k_3 = rhs(u_n + dt*(a_31*k_1+a_32*k_2)) )
+                        ! new input for computation of k-coefficients
+                        ! k_j = RHS(data_field(t) + sum(a_jl*k_l))
                         hvy_block( :, :, :, 2:N_dF+1, hvy_active(k)) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k)) + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
                     end do
                 end if
             end do
 
         case('3D_convection_diffusion')
-            ! new input for k-coefficients
-            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. u_n + dt*(a31*k1+a32*k2) )
-            ! first: k_j = u_n + ...
+            ! first: k_j = RHS(data_field(t) + ...
             do dF = 2, N_dF+1
                 do k = 1, hvy_n
                     hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) )
@@ -148,8 +144,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                     do dF = 2, N_dF+1
                         ! loop over all active heavy data blocks 
                         do k = 1, hvy_n
-                            ! new input for k-coefficients
-                            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. k_3 = rhs(u_n + dt*(a_31*k_1+a_32*k_2)) )
+                            ! new input for computation of k-coefficients
+                            ! k_j = RHS(data_field(t) + sum(a_jl*k_l))
                             hvy_block( :, :, :, dF, hvy_active(k)) = hvy_block( :, :, :, dF, hvy_active(k)) + dt * rk_coeffs(l) * hvy_work( :, :, :, (dF-2)*5+l, hvy_active(k))
                         end do
                     end do
@@ -157,9 +153,7 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
             end do
 
         case('3D_navier_stokes')
-            ! new input for k-coefficients
-            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. u_n + dt*(a31*k1+a32*k2) )
-            ! first: k_j = u_n + ...
+            ! first: k_j = RHS(data_field(t) + ..
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 hvy_block( :, :, :, 2:N_dF+1, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
@@ -170,17 +164,15 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                 else
                     ! loop over all active heavy data blocks 
                     do k = 1, hvy_n
-                        ! new input for k-coefficients
-                        ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. k_3 = rhs(u_n + dt*(a_31*k_1+a_32*k_2)) )
+                        ! new input for computation of k-coefficients
+                        ! k_j = RHS(data_field(t) + sum(a_jl*k_l))
                         hvy_block( :, :, :, 2:N_dF+1, hvy_active(k)) = hvy_block( :, :, :, 2:N_dF+1, hvy_active(k)) + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
                     end do
                 end if
             end do
 
         case('2D_advection')
-            ! new input for k-coefficients
-            ! k_j = rhs(u_n + dt*sum(a_jl*k_l)) (e.g. u_n + dt*(a31*k1+a32*k2) )
-            ! first: k_j = u_n + ...
+            ! first: k_j = RHS(data_field(t) + ..
             do dF = 2, N_dF+1
                 do k = 1, hvy_n
                     hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-2)*5+1, hvy_active(k) )
@@ -194,8 +186,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                     do dF = 2, N_dF+1
                         ! loop over all active heavy data blocks 
                         do k = 1, hvy_n
-                            ! new input for k-coefficients
-                            ! k_j = rhs(u_n+sum(a_jl*k_l)) (e.g. k_3 = rhs(u_n + dt*(a_31*k_1+a_32*k_2)) )
+                            ! new input for computation of k-coefficients
+                            ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l)) (time-dependent rhs, input for time is set in RHS_wrapper)
                             hvy_block( :, :, :, dF, hvy_active(k)) = hvy_block( :, :, :, dF, hvy_active(k)) + dt * rk_coeffs(l) * hvy_work( :, :, :, (dF-2)*5+l, hvy_active(k))
                         end do
                     end do

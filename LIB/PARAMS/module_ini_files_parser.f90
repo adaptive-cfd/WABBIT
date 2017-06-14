@@ -586,14 +586,16 @@ contains
   ! Output:
   !       params_int: this is the parameter you were looking for
   !-------------------------------------------------------------------------------
-  subroutine param_matrix(PARAMS, section, keyword, matrix)
+  subroutine param_matrix(PARAMS, section, keyword, matrix, defaultvalue)
     implicit none
     ! Contains the ascii-params file
     type(inifile), intent(inout) :: PARAMS
     character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
     character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+    real(kind=rk), intent(in)    :: defaultvalue(:,:)
     real(kind=rk), allocatable, intent(out) :: matrix(:,:)
     character(len=maxcolumns) ::  value    ! returns the value
+    character(len=29)         :: defaultmessage
     integer :: i, j, matrixcols, matrixlines
     integer :: index1, index2
     logical :: foundsection
@@ -691,11 +693,21 @@ contains
     end if
     end do ! loop over lines
 
+  ! section not found, use default value
+  if (.not. allocated(matrix)) then
+      allocate ( matrix(size(defaultvalue,1),size(defaultvalue,2)))
+      !value = trim(adjustl(defaultvalue))//" (THIS IS THE DEFAULT VALUE!)"
+      defaultmessage = " (THIS IS THE DEFAULT VALUE!)"
+      matrix = defaultvalue
+  else
+      defaultmessage = ''
+  end if
 
   ! in verbose mode, inform about what we did
   if (verbosity) then
-    write(*,'(" read ",A,"::",A," as Matrix of size ",i4," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
-  endif
+         write(*,'(" read ",A,"::",A," as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
+  end if
+
 end subroutine param_matrix
 
 

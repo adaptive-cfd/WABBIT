@@ -23,13 +23,14 @@
 !! output:   
 !!           - hvy_work 
 !!
-!! butcher table
-!! |   |            |
-!! |---|------------|
-!! |c1 | a11 0     0|
-!! |c2 | a21 a22   0|
-!! |c3 | a31 a32 a33|
-!! |c4 | b1  b2   b3|
+!! butcher table, e.g.
+!!
+!! |   |    |    |   |
+!! |---|----|----|---|
+!! | 0 | 0  | 0  |  0|
+!! |c2 | a21| 0  |  0|
+!! |c3 | a31| a32|  0|
+!! | 0 | b1 | b2 | b3|
 !!
 !!
 !! = log ======================================================================================
@@ -101,7 +102,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
             do dF = 2, N_dF+1
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
-                    ! copy ghost nodes to hvy_work (could also copy only this entry??)
+                    ! copy ghost nodes to hvy_work
                     hvy_work( :, :, :, (dF-2)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                     ! convert given hvy_id to lgt_id for block spacing routine
@@ -121,7 +122,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
        case('2D_navier_stokes')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
-                ! copy ghost nodes to hvy_work (could also copy only this entry??)
+                ! copy ghost nodes to hvy_work
                 hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 2:N_dF+1, hvy_active(k) )
 
                 ! convert given hvy_id to lgt_id for block spacing routine
@@ -141,7 +142,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
            do dF = 2, N_dF+1
                ! loop over all active heavy data blocks
                do k = 1, hvy_n
-                   ! copy ghost nodes to hvy_work (could also copy only this entry??)
+                   ! copy ghost nodes to hvy_work
                    hvy_work( :, :, :, (dF-2)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                    ! convert given hvy_id to lgt_id for block spacing routine
@@ -162,7 +163,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
        case('3D_navier_stokes')
            ! loop over all active heavy data blocks
            do k = 1, hvy_n
-               ! copy ghost nodes to hvy_work (could also copy only this entry??)
+               ! copy ghost nodes to hvy_work
                hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 2:N_dF+1, hvy_active(k) )
 
                ! convert given hvy_id to lgt_id for block spacing routine
@@ -182,7 +183,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
             do dF = 2, N_dF+1
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
-                    ! copy ghost nodes to hvy_work (could also copy only this entry??)
+                    ! copy ghost nodes to hvy_work
                     hvy_work( :, :, :, (dF-2)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                     ! convert given hvy_id to lgt_id for block spacing routine
@@ -192,6 +193,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                     
                     ! RHS (compute k-coefficients)
+                    ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l)) (time-dependent rhs)
                     call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+j+1, hvy_active(k) ), &
                                        x0(1:2), dx(1:2), g, Bs, &
                                        time + rk_coeff*dt, &

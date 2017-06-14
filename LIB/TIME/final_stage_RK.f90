@@ -10,6 +10,9 @@
 !> \brief final stage of Runge-Kutta time step. Gives back data field  at t+dt
 !
 !>
+!! for the RK4 the final stage looks like this: \n
+!! data_field(t+dt) = data_field(t) + dt*(b1*k1 + b2*k2 + b3*k3 + b4*k4)
+!! 
 !! input:    
 !!           - params
 !!           - heavy data
@@ -19,14 +22,15 @@
 !! output:
 !!           - hvy_work 
 !!
-!! butcher table
 !!
-!! |   |            |
-!! |---|------------|
-!! |c1 | a11 0     0|
-!! |c2 | a21 a22   0|
-!! |c3 | a31 a32 a33|
-!! |0  | b1  b2   b3|
+!! butcher table, e.g.
+!!
+!! |   |    |    |   |
+!! |---|----|----|---|
+!! | 0 | 0  | 0  |  0|
+!! |c2 | a21| 0  |  0|
+!! |c3 | a31| a32|  0|
+!! | 0 | b1 | b2 | b3|
 !!
 !!
 !! = log ======================================================================================

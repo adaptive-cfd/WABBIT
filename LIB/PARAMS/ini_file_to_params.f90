@@ -101,8 +101,13 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Time', 'dt', params%dt, 1e-6_rk )
     ! read CFL number
     call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
-    ! read butcher tableau
-    call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau )
+    ! read butcher tableau (set default value to RK4)
+    call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, &
+    reshape((/ 0.0_rk, 0.5_rk, 0.5_rk, 1.0_rk, 0.0_rk, &
+    0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk, &
+    0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
+    0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
+    0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
     !***************************************************************************
     ! read PHYSICS parameters

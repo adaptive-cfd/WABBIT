@@ -1,3 +1,33 @@
+
+Skip to content
+This repository
+
+    Pull requests
+    Issues
+    Marketplace
+    Gist
+
+    @mario-sroka
+
+3
+0
+
+    1
+
+mario-sroka/WABBIT
+Code
+Issues 1
+Pull requests 0
+Projects 0
+Wiki
+Settings
+WABBIT/LIB/DEBUG/unit_test_time_stepper_convergence.f90
+42dfbb6 21 hours ago
+@SophieMutzel SophieMutzel fix bug in unit_test_time_stepper, add default value to read_param_ma…
+@SophieMutzel
+@mario-sroka
+@tommy-engels
+353 lines (290 sloc) 13.3 KB
 !> \file
 !> \callgraph
 ! ********************************************************************************************
@@ -21,7 +51,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix )
+subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -47,12 +77,6 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
 
-    ! communication lists:
-    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
-
-    ! communications matrix:
-    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-
     ! local user defined parameter structure - use to change settings
     type (type_params)                      :: params_loc
 
@@ -62,7 +86,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     integer(kind=ik)                        :: lgt_n
 
     ! loop variables
-    integer(kind=ik)                        :: k, l, lgt_id, hvy_id, max_neighbors
+    integer(kind=ik)                        :: k, l, lgt_id, hvy_id
 
     ! process rank
     integer(kind=ik)                        :: rank
@@ -189,15 +213,14 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! only one datafield
         params_loc%number_data_fields   = 1
         ! choose diffusion coefficient and convection velocity
-        if (allocated(params_loc%physics%u0)) then
-            params_loc%physics%nu = 0.0_rk
-            params_loc%physics%u0 = (/1.0_rk, 0.5_rk/)
-        else
+        if (.not. allocated(params_loc%physics%u0)) then
             allocate(params_loc%physics%u0(2))
-            allocate(params_loc%physics%nu(1))
-            params_loc%physics%nu = 0.0_rk
-            params_loc%physics%u0 = (/1.0_rk, 0.5_rk/)
         end if
+        if (.not. allocated(params_loc%physics%nu)) then
+           allocate(params_loc%physics%nu(1))
+        end if
+        params_loc%physics%nu = 0.0_rk
+        params_loc%physics%u0 = (/1.0_rk, 0.5_rk/)
     end if
 
     ! set dt parameter
@@ -292,17 +315,8 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         !-----------------------------------------------------------------------
         ! time stepper
         !-----------------------------------------------------------------------
-        ! max neighbor num, \todo move max neighbor num to params struct
-        if ( params%threeD_case ) then
-            ! 3D
-            max_neighbors = 74
-        else
-            ! 2D
-            max_neighbors = 12
-        end if
-
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
         end do
 
         if ( idt == 1 ) then

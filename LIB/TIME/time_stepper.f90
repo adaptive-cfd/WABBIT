@@ -10,6 +10,9 @@
 !> \brief time step main function
 !
 !>
+!! data_field(t) = data_field(t) + sum(b_j*k_j) 
+!! with k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_ji*k_i))         \n
+!!
 !! input:    
 !!           - time variable
 !!           - params
@@ -24,13 +27,15 @@
 !! physics: \n
 ! --------
 !> - convection/diffusion: works only for one datafield \n
-!! butcher table
-!! |   |            |
-!! |---|------------|
-!! | 0 | 0   0     0|
-!! |c2 | a21 0     0|
-!! |c3 | a31 a32   0|
-!! | 0 | b1  b2   b3|
+!!
+!! butcher table, e.g.
+!!
+!! |   |    |    |   |
+!! |---|----|----|---|
+!! | 0 | 0  | 0  |  0|
+!! |c2 | a21| 0  |  0|
+!! |c3 | a31| a32|  0|
+!! | 0 | b1 | b2 | b3|
 !!
 !!
 !! = log ======================================================================================
@@ -38,7 +43,7 @@
 !! 08/11/16 - switch to v0.4 \n
 !! 07/12/16 - now uses heavy work data array and work for different physics \n
 !! 31/01/17 - switch to 3D, v0.5 \n
-!! 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method
+!! 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method (up to RK of order 4)
 !
 ! ********************************************************************************************
 

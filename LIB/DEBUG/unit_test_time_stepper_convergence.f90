@@ -1,33 +1,3 @@
-
-Skip to content
-This repository
-
-    Pull requests
-    Issues
-    Marketplace
-    Gist
-
-    @mario-sroka
-
-3
-0
-
-    1
-
-mario-sroka/WABBIT
-Code
-Issues 1
-Pull requests 0
-Projects 0
-Wiki
-Settings
-WABBIT/LIB/DEBUG/unit_test_time_stepper_convergence.f90
-42dfbb6 21 hours ago
-@SophieMutzel SophieMutzel fix bug in unit_test_time_stepper, add default value to read_param_ma…
-@SophieMutzel
-@mario-sroka
-@tommy-engels
-353 lines (290 sloc) 13.3 KB
 !> \file
 !> \callgraph
 ! ********************************************************************************************
@@ -51,7 +21,7 @@ WABBIT/LIB/DEBUG/unit_test_time_stepper_convergence.f90
 !
 ! ********************************************************************************************
 
-subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -76,6 +46,11 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
+
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
 
     ! local user defined parameter structure - use to change settings
     type (type_params)                      :: params_loc
@@ -316,7 +291,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! time stepper
         !-----------------------------------------------------------------------
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix )
         end do
 
         if ( idt == 1 ) then

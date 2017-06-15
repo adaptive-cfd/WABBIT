@@ -88,8 +88,11 @@ subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_activ
     integer(kind=ik), allocatable       :: receiver_pos(:), receiver_rank(:), receiver_count(:)
     integer(kind=ik)                    :: receiver_N
 
+    integer(kind=ik), allocatable       :: sender_pos(:), sender_rank(:), sender_count(:)
+    integer(kind=ik)                    :: sender_N
+
     ! synch switch
-    logical                             :: synch
+    logical                             :: synch, sender_synch
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -112,13 +115,23 @@ subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_activ
     allocate( receiver_rank( number_procs) )
     allocate( receiver_count( number_procs) )
 
+    allocate( sender_pos( number_procs) )
+    allocate( sender_rank( number_procs) )
+    allocate( sender_count( number_procs) )
+
     ! reset
     receiver_pos    =  0
     receiver_rank   = -1
     receiver_count  =  0
     receiver_N      =  0
 
+    sender_pos    =  0
+    sender_rank   = -1
+    sender_count  =  0
+    sender_N      =  0
+
     synch = .false.
+    sender_synch = .false.
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -153,39 +166,62 @@ subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_activ
                 ! stage 3: level -1
                 ! stage 4: special
                 synch = .false.
+                sender_synch = .false.
+
+                ! stage 1
                 if ( (synch_stage == 1) .and. (level_diff == 1) ) then
+                    ! block send data
                     synch = .true.
-                end if
-                if ( (synch_stage == 2) .and. (level_diff == 0) ) then
-                    synch = .true.
-                end if
-                if ( (synch_stage == 3) .and. (level_diff == -1) ) then
-                    synch = .true.
+                elseif ( (synch_stage == 1) .and. (level_diff == -1) ) then
+                    ! neighbor send data
+                    sender_synch = .true.
                 end if
 
+                ! stage 2
+                if ( (synch_stage == 2) .and. (level_diff == 0) ) then
+                    ! block send data
+                    synch = .true.
+                    ! neighbor send data
+                    sender_synch = .true.
+                end if
+
+                ! stage 3
+                if ( (synch_stage == 3) .and. (level_diff == -1) ) then
+                    ! block send data
+                    synch = .true.
+                elseif ( (synch_stage == 3) .and. (level_diff == 1) ) then
+                    ! neighbor send data
+                    sender_synch = .true.
+                end if
+
+                ! stage 4
                 if ( (synch_stage == 4) .and. (level_diff == 0) ) then
                     ! neighborhood NE
                     if ( i == 5 ) then
                         if ( (hvy_neighbor( hvy_active(k), 9) /= -1) .or. (hvy_neighbor( hvy_active(k), 13) /= -1) ) then
                             synch = .true.
+                            sender_synch = .true.
                         end if
                     end if
                     ! neighborhood NW
                     if ( i == 6 ) then
                         if ( (hvy_neighbor( hvy_active(k), 10) /= -1) .or. (hvy_neighbor( hvy_active(k), 15) /= -1) ) then
                             synch = .true.
+                            sender_synch = .true.
                         end if
                     end if
                     ! neighborhood SE
                     if ( i == 7 ) then
                         if ( (hvy_neighbor( hvy_active(k), 11) /= -1) .or. (hvy_neighbor( hvy_active(k), 14) /= -1) ) then
                             synch = .true.
+                            sender_synch = .true.
                         end if
                     end if
                     ! neighborhood SW
                     if ( i == 8 ) then
                         if ( (hvy_neighbor( hvy_active(k), 12) /= -1) .or. (hvy_neighbor( hvy_active(k), 16) /= -1) ) then
                             synch = .true.
+                            sender_synch = .true.
                         end if
                     end if
                 end if
@@ -248,16 +284,51 @@ subroutine create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_activ
 
                 end if
 
+                ! neighbor send data
+                if (sender_synch) then
+                    if ( rank == neighbor_rank ) then
+                        ! internal neighbor
+                        ! nothind to do
+                    else
+                        ! external neighbor
+                        ! check neighbor proc rank
+                        if ( sender_pos(neighbor_rank+1) == 0 ) then
+
+                            ! first communication with neighbor proc
+                            ! -------------------------------------------
+                            ! set list position, increase number of neighbor procs by 1
+                            sender_N                      = sender_N + 1
+                            ! save list pos
+                            sender_pos(neighbor_rank+1)   = sender_N
+                            ! save neighbor rank
+                            sender_rank(sender_N)       = neighbor_rank
+                            ! count communications - here: first one
+                            sender_count(sender_N)      = 1
+                        else
+                            ! additional communication with neighbor proc
+                            ! -------------------------------------------
+                            ! count communications - +1
+                            sender_count( sender_pos(neighbor_rank+1) )  = sender_count( sender_pos(neighbor_rank+1) ) + 1
+                        end if
+                    end if
+
+                end if
+
             end if
         end do
 
     end do
 
-    ! write my com matrix, loop over number of receiver procs, write counted communications
+    ! write my com matrix column, loop over number of receiver procs, write counted communications
     do k = 1, receiver_N
         ! write matrix
-        !com_matrix( rank+1, receiver_rank(k)+1 ) = receiver_count( receiver_pos( receiver_rank(k)+1 ) )
         com_matrix( receiver_rank(k)+1, rank+1 ) = receiver_count( receiver_pos( receiver_rank(k)+1 ) )
+    end do
+
+    ! write my com matrix line, loop over number of sender procs, write counted communications
+    do k = 1, sender_N
+        ! write matrix
+        com_matrix( rank+1, sender_rank(k)+1 ) = sender_count( sender_pos( sender_rank(k)+1 ) )
     end do
 
     ! clean up

@@ -47,7 +47,7 @@
 !
 ! ********************************************************************************************
 
-subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix )
+subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -75,6 +75,8 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
 
     ! communication lists:
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
@@ -177,7 +179,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true. )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix, .true. )
 
     ! restart time
     sub_t0 = MPI_Wtime()
@@ -199,7 +201,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false.)
+        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix, .false.)
 
         ! restart time
         sub_t0 = MPI_Wtime()

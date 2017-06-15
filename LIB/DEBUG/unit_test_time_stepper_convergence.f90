@@ -291,7 +291,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! time stepper
         !-----------------------------------------------------------------------
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix )
         end do
 
         if ( idt == 1 ) then

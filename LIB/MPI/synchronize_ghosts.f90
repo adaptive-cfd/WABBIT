@@ -56,7 +56,7 @@
 !
 ! ********************************************************************************************
 
-subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, grid_changed )
+subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix, grid_changed )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -80,6 +80,9 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
+    ! number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
+
     ! grid stay fixed between two synch calls, so use old com_lists and com_matrix
     logical, intent(in)                 :: grid_changed
 
@@ -95,8 +98,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! grid parameter
     integer(kind=ik)                    :: g, Bs
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank, neighbor_rank
     ! number of processes
@@ -115,7 +116,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! count the number of communications between procs
     ! row/column number encodes process rank + 1
     ! com matrix pos: position in send buffer
-    integer(kind=ik), allocatable       :: my_com_matrix(:,:), com_matrix_pos(:,:)
+    integer(kind=ik), allocatable       :: com_matrix_pos(:,:)
 
     ! send/receive buffer, integer and real
     integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -160,14 +161,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     rank         = params%rank
     number_procs = params%number_procs
 
-    ! allocate local com_lists, use number of active heavy blocks for calculation
-    ! of maximum number of entrys, max entrys: every active block has only external
-    ! neighbors, note: max neighbor num 2D: 12, 3D: todo!
-    !allocate( com_lists( hvy_n*12, 6, number_procs) )
-    ! allocate com matrix
-    !allocate( com_matrix(number_procs, number_procs) )
+    ! allocate com position matrix
     allocate( com_matrix_pos(number_procs, number_procs) )
-    allocate( my_com_matrix(number_procs, number_procs) )
 
 !    ! reset ghost nodes for all active blocks
 !    if ( params%debug ) then
@@ -192,7 +187,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         ! reset com-list, com_plan, com matrix, receiver lists
         com_matrix_pos  =  0
-        my_com_matrix   =  0
 
         ! end time
         sub_t1 = MPI_Wtime()
@@ -207,32 +201,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! first: create com matrix and com list for external communications
             ! output depends on synch stage
             ! ----------------------------------------------------------------------------------------
-            call create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix(:,:), com_lists(:,:,:,synch_stage), synch_stage )
-
-            ! end time
-            sub_t1 = MPI_Wtime()
-            ! write time
-            if ( params%debug ) then
-                ! find free or corresponding line
-                k = 1
-                do while ( debug%name_comp_time(k) /= "---" )
-                    ! entry for current subroutine exists
-                    if ( debug%name_comp_time(k) == "synch. ghosts - external list" ) exit
-                    k = k + 1
-                end do
-                ! write time
-                debug%name_comp_time(k) = "synch. ghosts - external list"
-                debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-                debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-            end if
-
-            ! start time
-            sub_t0 = MPI_Wtime()
-
-            ! ----------------------------------------------------------------------------------------
-            ! second: synchronize com matrix
-            ! ----------------------------------------------------------------------------------------
-            call MPI_Allreduce(my_com_matrix, com_matrix(:,:,synch_stage), number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+            call create_external_com_list(  params, lgt_block, hvy_neighbor, hvy_active, hvy_n, com_matrix(:,:,synch_stage), com_lists(:,:,:,synch_stage), synch_stage )
 
             ! symmetrize com matrix - choose max com number
             do i = 1, number_procs
@@ -256,10 +225,16 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! ----------------------------------------------------------------------------------------
         call max_com_num( my_n_com, n_procs, com_matrix(rank+1,:,synch_stage), rank )
 
-        ! synchronize max com number, because if not:
-        ! RMA buffer displacement is not fixed, so we need synchronization there
-        !call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
-        n_com = maxval(com_matrix(:,:,synch_stage))
+        ! assume global number of communications
+        ! needed for buffer allocation
+        ! guess number of blocks per proc times maximum number of neighbors
+        if ( params%threeD_case ) then
+            ! 3D:
+            n_com = lgt_n/number_procs*74
+        else
+            ! 2D:
+            n_com = lgt_n/number_procs*12
+        end if
 
         ! for proc without neighbors: set n_procs to 1
         ! so we allocate arrays with second dimension=1
@@ -273,11 +248,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             k = 1
             do while ( debug%name_comp_time(k) /= "---" )
                 ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "synch. ghosts - com matrix" ) exit
+                if ( debug%name_comp_time(k) == "synch. ghosts - com list/matrix" ) exit
                 k = k + 1
             end do
             ! write time
-            debug%name_comp_time(k) = "synch. ghosts - com matrix"
+            debug%name_comp_time(k) = "synch. ghosts - com list/matrix"
             debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
             debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
         end if
@@ -385,7 +360,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                     call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
                     ! calculate the difference between block levels
                     ! note: level diff is calculated sender-receiver, here the receiver looks at his neighbor
-                    !level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
                     level_diff = lgt_block( neighbor_light_id, params%max_treelevel+1 ) - lgt_block( lgt_id, params%max_treelevel+1 )
 
                     ! proof if neighbor internal or external
@@ -453,7 +427,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                     !call copy_ghost_nodes_3D( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
                                 else
                                     ! 2D:
-                                    !call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_active(k), hvy_id, i, level_diff )
                                     call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_id, hvy_active(k), neighborhood, level_diff )
                                 end if
 
@@ -579,7 +552,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                 ! 3D:
                             else
                                 ! 2D:
-                                !call copy_redundant_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_active(k), hvy_id, i, level_diff, hvy_neighbor )
                                 call copy_redundant_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_id, hvy_active(k), neighborhood, level_diff, hvy_neighbor )
                             end if
 
@@ -707,10 +679,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     end do
 
     ! clean up
-    !deallocate( com_lists )
-    !deallocate( com_matrix )
     deallocate( com_matrix_pos )
-    deallocate( my_com_matrix )
 
     ! end time
     sub_t1 = MPI_Wtime()

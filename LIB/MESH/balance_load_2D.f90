@@ -168,7 +168,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! reset max heavy id, use current max id
     if ( hvy_n > 0 ) then
         ! proc has active heavy data
-        heavy_max = maxval(hvy_active)
+        heavy_max = maxval(hvy_active(1:hvy_n))
     else
         heavy_max = 0
     end if

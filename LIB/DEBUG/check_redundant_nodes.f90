@@ -154,7 +154,7 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     end do
 
     ! call external nodes synchronization
-    !call check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop_status )
+    call check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop_status )
 
     ! clean up
     deallocate( com_lists, stat=allocate_error )

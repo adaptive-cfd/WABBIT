@@ -439,25 +439,25 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
                                             select case ( int_receive_buffer( j, buffer_pos ) )
                                                 case(1:4)
-                                                    real_start = real_start + Bs*g
+                                                    real_start = real_start + Bs*g*params%number_data_fields
                                                 case(5:8)
                                                     if ( int_receive_buffer( j+1, buffer_pos ) == 1 ) then
                                                         ! case +1
-                                                        real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)
+                                                        real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)*params%number_data_fields
                                                     elseif ( int_receive_buffer( j+1, buffer_pos ) == -1 ) then
                                                         ! case -1
-                                                        real_start = real_start + g*g
+                                                        real_start = real_start + g*g*params%number_data_fields
                                                     else
                                                         ! case 0
-                                                        real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)
+                                                        real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)*params%number_data_fields
                                                     end if
                                                 case(9:16)
                                                     if ( int_receive_buffer( j+1, buffer_pos ) /= -1 ) then
                                                         ! case +1
-                                                        real_start = real_start + (g+rmv_redundant)*(Bs+1)/2
+                                                        real_start = real_start + (g+rmv_redundant)*((Bs+1)/2)*params%number_data_fields
                                                     else
                                                         ! case -1
-                                                        real_start = real_start + (Bs+g)*g
+                                                        real_start = real_start + (Bs+g)*g*params%number_data_fields
                                                     end if
                                             end select
                                         end if
@@ -592,7 +592,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                             select case ( int_receive_buffer( j, buffer_pos ) )
                                                 case(5:8)
                                                     ! case 0
-                                                    real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)
+                                                    real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)*params%number_data_fields
                                             end select
                                         end if
 

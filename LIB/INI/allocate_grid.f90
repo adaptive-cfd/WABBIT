@@ -53,7 +53,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                :: Bs, g, dF, number_blocks, rank, number_procs, buffer_N
+    integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs, buffer_N
 
     ! send/receive buffer, integer and real
     integer(kind=ik), allocatable, intent(out)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -78,9 +78,9 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
     ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
     if ( params%threeD_case ) then
-        buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * dF
+        buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * N_dF
     else
-        buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * dF
+        buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * N_dF
     end if
 
 !---------------------------------------------------------------------------------------------

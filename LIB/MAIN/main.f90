@@ -114,13 +114,40 @@ program main
     character(len=80)                   :: filename
 
     ! loop variable
-    integer(kind=ik)                    :: k
+    integer(kind=ik)                    :: k, max_neighbors
 
     ! status of nodes check: if true: stops program
     logical                             :: stop_status, my_stop_status
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1
+
+    ! allocate com lists and com matrix here
+    ! communication lists:
+    ! dim 1: list elements
+    ! dim 2: columns
+    !                       1   rank of sender process
+    !                       2   rank of receiver process
+    !                       3   sender block heavy data id
+    !                       4   receiver block heavy data id
+    !                       5   sender block neighborhood to receiver (dirs id)
+    !                       6   difference between sender-receiver level
+    ! dim 3: receiver proc rank
+    ! dim 4: synch stage
+    integer(kind=ik), allocatable       :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    ! count the number of communications between procs
+    ! row/column number encodes process rank + 1
+    ! com matrix pos: position in send buffer
+    ! dim 3: synch stage
+    integer(kind=ik), allocatable       :: com_matrix(:,:,:)
+
+    ! send/receive buffer, integer and real
+    ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
+    ! large numbers of processes and blocks per process
+    integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -191,11 +218,14 @@ program main
     call ini_file_to_params( params, filename )
 
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
+
+    ! allocate communication arrays
+    call allocate_com_arrays(params, com_lists, com_matrix)
 
     !---------------------------------------------------------------------------
     ! Unit tests
@@ -203,17 +233,17 @@ program main
     ! call unit_test_treecode( params )
     ! stop
     ! perform a convergence test on ghost node sync'ing
-    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
 !
-!    ! reset the grid: all blocks are inactive and empty
-!    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! reset the grid: all blocks are inactive and empty
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
     if ( params%debug ) then
 !        ! time stepper convergence order
 !        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist)
+        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist, , com_lists, com_matrix)
         ! reset the grid: all blocks are inactive and empty
         call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !
@@ -229,18 +259,25 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, .true.  )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, .true., com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
     ! create lists of active blocks (light and heavy data)
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+
+    ! max neighbor num, \todo move max neighbor num to params struct
+    if ( params%threeD_case ) then
+        ! 3D
+        max_neighbors = 74
+    else
+        ! 2D
+        max_neighbors = 12
+    end if
 
     ! end time
     sub_t1 = MPI_Wtime()
@@ -273,12 +310,13 @@ program main
         endif
 
         ! advance in time
-        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
         ! check redundant nodes
         if ( params%debug ) then
+
             ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
             ! start time
             sub_t0 = MPI_Wtime()
@@ -319,12 +357,12 @@ program main
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end if
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold" )
+            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         endif
 
         ! output on screen

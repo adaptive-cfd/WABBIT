@@ -52,6 +52,7 @@ contains
     include "allocate_grid.f90"
     include "reset_grid.f90"
     include "create_equidistant_base_mesh.f90"
+    include "allocate_com_arrays.f90"
 
 
     ! initial block distribution - 2D case

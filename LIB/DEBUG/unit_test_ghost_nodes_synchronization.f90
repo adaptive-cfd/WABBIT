@@ -24,7 +24,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -50,6 +50,16 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
 
+    ! communication lists:
+    integer(kind=ik), intent(inout)         :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    integer(kind=ik), intent(inout)         :: com_matrix(:,:,:)
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
     ! number of active blocks (light data)
@@ -67,7 +77,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik)                        :: Bs, g, Ds, number_blocks
     real(kind=rk)                           :: Lx, Ly, Lz
     ! data dimensionality
-    integer(kind=ik)                        :: d, dF
+    integer(kind=ik)                        :: d, dF, max_neighbors
     ! frequency of sin functions for testing:
     real(kind=rk)                           :: frequ(1:6)
     integer(kind=ik)                        :: ifrequ
@@ -76,8 +86,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
     ! MPI error variable
     integer(kind=ik)                        :: ierr
-
-
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -96,8 +104,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! set data dimension
     if ( params%threeD_case ) then
         d = 3
+        max_neighbors = 74
     else
         d = 2
+        max_neighbors = 12
     endif
 
 !---------------------------------------------------------------------------------------------
@@ -140,8 +150,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
-      call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
-      call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+        ! refine some blocks
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+        ! random adapt some blocks
+        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     end do
 
     if (params%rank == 0) then
@@ -200,7 +212,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

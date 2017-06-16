@@ -47,7 +47,7 @@
 !
 ! ********************************************************************************************
 
-subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -75,6 +75,16 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: k, lgt_id, d, j
@@ -158,12 +168,14 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     end if
 
     ! time measurement without ghost nodes synchronization
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
     sub_t1   = MPI_Wtime()
     time_sum = time_sum + (sub_t1 - sub_t0)
 
     ! synchronize ghost nodes
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    
+    ! first ghost nodes synchronization, so grid has changed
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+
     ! restart time
     sub_t0 = MPI_Wtime()
     
@@ -178,12 +190,14 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
         
         ! time measurement without ghost nodes synchronization
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         sub_t1   = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
 
         ! synchronize ghost nodes for new input
-        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-        
+        ! further ghost nodes synchronization, fixed grid
+        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+
         ! restart time
         sub_t0 = MPI_Wtime()
 

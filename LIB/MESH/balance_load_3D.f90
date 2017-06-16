@@ -21,7 +21,7 @@
 !> \image html balancing.svg "Load balancing" width=300
 !> \image html load_balancing.svg "Load balancing" width=300
 
-subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
+subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -42,6 +42,8 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! send/receive buffer, note: size is equal to block data array, because if a block want to send all his data
     real(kind=rk)                       :: buffer_data( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4), size(hvy_block,5) )
@@ -85,7 +87,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
     real(kind=rk)                       :: sub_t0, sub_t1
 
     ! space filling curve list
-    integer(kind=ik), allocatable       :: sfc_list(:), sfc_com_list(:,:)
+    integer(kind=ik), allocatable       :: sfc_sorted_list(:,:), sfc_com_list(:,:)
 
     ! hilbert code
     integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
@@ -121,7 +123,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
     allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
     sfc_com_list = -1
     ! allocate space filling curve list, maximal number of elements = max number of blocks
-    allocate( sfc_list( 8**params%max_treelevel ) )
+    allocate( sfc_sorted_list( lgt_n, 2 ) )
 
     ! number of light data (since the light data is redunantly stored on all CPU,
     ! this number corresponds usually to the maximum number of blocks possible in
@@ -152,7 +154,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
         case("sfc_z")
 
             ! current block distribution
-            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
+            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
             ! write debug infos: current distribution list
             if ( params%debug ) then
                 call write_block_distribution( dist_list )
@@ -162,16 +164,23 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
             ! first: calculate space filling curve
             !---------------------------------------------------------------------------------
             ! reset old lists
-            sfc_list  = -1
             dist_list = 0
 
             ! loop over active blocks
             do k = 1, lgt_n
                 ! calculate sfc position
                 call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
-                ! fill sfc list with light data id
-                sfc_list(sfc_id+1) = lgt_active(k)
+
+                ! fill sfc list
+                sfc_sorted_list(k, 1) = sfc_id
+                sfc_sorted_list(k, 2) = lgt_active(k)
+
             end do
+
+            ! sort sfc_list
+            if (lgt_n > 1) then
+                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 2)
+            end if
 
             !---------------------------------------------------------------------------------
             ! second: distribute all blocks
@@ -196,33 +205,30 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
 
             com_i = 1
             ! loop over sfc_list
-            do k = 1, size(sfc_list,1)
-                ! sfc element is active
-                if ( sfc_list(k) /= -1 ) then
+            do k = 1, lgt_n
 
-                    ! process with heavy data
-                    call lgt_id_to_proc_rank( proc_data_id, sfc_list(k), params%number_blocks )
+                ! process with heavy data
+                call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 
-                    ! data has to send
-                    if ( proc_dist_id /= proc_data_id ) then
-                        ! create com plan
-                        sfc_com_list(com_i, 1) = proc_data_id
-                        sfc_com_list(com_i, 2) = proc_dist_id
-                        sfc_com_list(com_i, 3) = sfc_list(k)
-                        com_i = com_i + 1
+                ! data has to send
+                if ( proc_dist_id /= proc_data_id ) then
+                    ! create com plan
+                    sfc_com_list(com_i, 1) = proc_data_id
+                    sfc_com_list(com_i, 2) = proc_dist_id
+                    sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)
+                    com_i = com_i + 1
 
-                    else
-                        ! nothing to do, block is allready on correct proc
-
-                    end if
-
-                    ! next scf element, so check proc id, switch if last block is distributed
-                    dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
-                    if ( dist_list( proc_dist_id+1 ) == 0 ) then
-                        proc_dist_id = proc_dist_id + 1
-                    end if
+                else
+                    ! nothing to do, block is allready on correct proc
 
                 end if
+
+                ! next scf element, so check proc id, switch if last block is distributed
+                dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
+                if ( dist_list( proc_dist_id+1 ) == 0 ) then
+                    proc_dist_id = proc_dist_id + 1
+                end if
+
             end do
 
             ! stop load balancing, if nothing to do
@@ -342,7 +348,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
  case("sfc_hilbert")
 
             ! current block distribution
-            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
+            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
             ! write debug infos: current distribution list
             if ( params%debug ) then
                 call write_block_distribution( dist_list )
@@ -353,18 +359,26 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
             !---------------------------------------------------------------------------------
 
             ! reset old lists
-            sfc_list  = -1
             dist_list = 0
 
             ! loop over active blocks
             do k = 1, lgt_n
-               ! transfer treecode to hilbertcode
-               call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
-               ! calculate sfc position from hilbertcode
-               call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
-               ! fill sfc list with light data id
-               sfc_list(sfc_id+1) = lgt_active(k)
+                ! transfer treecode to hilbertcode
+                call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                ! calculate sfc position from hilbertcode
+                call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
+
+                ! fill sfc list
+                sfc_sorted_list(k, 1) = sfc_id
+                sfc_sorted_list(k, 2) = lgt_active(k)
+
             end do
+
+            ! sort sfc_list
+            if (lgt_n > 1) then
+                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 2)
+            end if
+
             !---------------------------------------------------------------------------------
             ! second: distribute all blocks
             !---------------------------------------------------------------------------------
@@ -388,33 +402,30 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
 
             com_i = 1
             ! loop over sfc_list
-            do k = 1, size(sfc_list,1)
-                ! sfc element is active
-                if ( sfc_list(k) /= -1 ) then
+            do k = 1, lgt_n
 
-                    ! process with heavy data
-                    call lgt_id_to_proc_rank( proc_data_id, sfc_list(k), params%number_blocks )
+                ! process with heavy data
+                call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 
-                    ! data has to send
-                    if ( proc_dist_id /= proc_data_id ) then
-                        ! create com plan
-                        sfc_com_list(com_i, 1) = proc_data_id
-                        sfc_com_list(com_i, 2) = proc_dist_id
-                        sfc_com_list(com_i, 3) = sfc_list(k)
-                        com_i = com_i + 1
+                ! data has to send
+                if ( proc_dist_id /= proc_data_id ) then
+                    ! create com plan
+                    sfc_com_list(com_i, 1) = proc_data_id
+                    sfc_com_list(com_i, 2) = proc_dist_id
+                    sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)
+                    com_i = com_i + 1
 
-                    else
-                        ! nothing to do, block is allready on correct proc
-
-                    end if
-
-                    ! next scf element, so check proc id, switch if last block is distributed
-                    dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
-                    if ( dist_list( proc_dist_id+1 ) == 0 ) then
-                        proc_dist_id = proc_dist_id + 1
-                    end if
+                else
+                    ! nothing to do, block is allready on correct proc
 
                 end if
+
+                ! next scf element, so check proc id, switch if last block is distributed
+                dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
+                if ( dist_list( proc_dist_id+1 ) == 0 ) then
+                    proc_dist_id = proc_dist_id + 1
+                end if
+
             end do
 
             ! stop load balancing, if nothing to do
@@ -543,7 +554,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n)
     deallocate( opt_dist_list )
     deallocate( dist_list )
     deallocate( com_plan )
-    deallocate( sfc_list )
+    deallocate( sfc_sorted_list )
     deallocate( sfc_com_list )
 
     ! end time

@@ -24,7 +24,7 @@
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
-subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+subroutine threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -41,8 +41,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> neighbor list
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
+
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
@@ -104,18 +103,6 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! end time
-    sub_t1 = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-
-    ! ------------------------------------------------------------------------------------
-    ! first: synchronize ghost nodes - thresholding on block with ghost nodes
-    ! synchronize ghostnodes
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! ------------------------------------------------------------------------------------
     ! second: clear old refinement status

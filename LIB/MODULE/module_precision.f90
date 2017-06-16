@@ -31,6 +31,9 @@ module module_precision
 
     integer, parameter, public      :: int_prec=selected_int_kind(8)
 
+    integer, parameter, public      :: maxdigits = 16
+    integer, parameter, public      :: tsize = selected_int_kind(maxdigits)
+
     integer, parameter, public      :: rk=dble_prec
     integer, parameter, public      :: ik=int_prec
 

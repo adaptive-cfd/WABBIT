@@ -113,7 +113,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	set_blocks_initial_condition.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
 	inicond_vorticity_filaments.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
 	inicond_richtmyer_meshkov.f90 inicond_shear_layer.f90 allocate_grid.f90 reset_grid.f90 \
-	$(OBJDIR)/module_initial_conditions.o set_inicond_all_blocks.f90
+	$(OBJDIR)/module_initial_conditions.o set_inicond_all_blocks.f90 allocate_com_arrays.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
@@ -133,14 +133,14 @@ $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
 	$(OBJDIR)/module_MPI.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o \
-	create_lgt_active_list.f90 create_hvy_active_list.f90 update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
+	update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load_2D.f90 set_desired_num_blocks_per_rank.f90 \
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
-  treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
-  refinement_execute_3D.f90 balance_load_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
-	find_sisters.f90 max_active_level.f90 min_active_level.f90 create_lgt_sortednumlist.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90 \
-	merge_blocks.f90
+    treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
+    refinement_execute_3D.f90 balance_load_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
+	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90 \
+	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

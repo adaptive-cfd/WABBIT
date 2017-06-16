@@ -44,11 +44,8 @@ module module_mesh
 
 contains
 
-    ! create list of active blocks (light data)
-    include "create_lgt_active_list.f90"
-
-    ! create list of active blocks (heavy data)
-    include "create_hvy_active_list.f90"
+    ! create all active (lgt/hvy) lists, create also sorted lgt data list
+    include "create_active_and_sorted_lists.f90"
 
     ! update neighbors, 2D/3D
     include "update_neighbors.f90"
@@ -128,10 +125,8 @@ contains
     include "min_active_level.f90"
 
     !
-    include "create_lgt_sortednumlist.f90"
-
-    !
     include "get_free_local_light_id.f90"
     include "gather_blocks_on_proc.f90"
+    include "quicksort.f90"
 
 end module module_mesh

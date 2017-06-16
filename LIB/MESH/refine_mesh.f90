@@ -105,10 +105,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !> (e) as the grid changed now with the refinement, we have to update the list of
     !! active blocks so other routines can loop just over these active blocks
     !! and do not have to ensure that the active list is up-to-date
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 

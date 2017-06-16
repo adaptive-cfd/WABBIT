@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_active, lgt_n)
+subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -36,13 +36,19 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     !> block distribution lists
     integer(kind=ik), intent(out)       :: dist_list(:), opt_dist_list(:)
 
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer                             :: k, num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks, ierr
+    integer                             :: num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks
+
+    ! dist list send buffer
+    integer(kind=ik)                    :: my_dist_list(params%number_procs)
+
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -51,29 +57,25 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
 ! variables initialization
 
     ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    rank = params%rank
 
     ! determinate process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    number_procs = params%number_procs
 
     dist_list = 0
+    my_dist_list = 0
     opt_dist_list = 0
+
+    my_dist_list(rank+1) = hvy_n
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
     ! count number of active blocks and current block distribution
-    do k = 1, lgt_n
-        ! count block for proc corresponing to light data
-        ! the array dist_list has the length of the number of mpi procs and holds the number
-        ! of blocks used on this process. From the light data ID "k", we can compute the mpirank
-        ! of the process holding the block "proc_id"
-        call lgt_id_to_proc_rank( proc_id, lgt_active(k), params%number_blocks )
-        dist_list( proc_id + 1 ) = dist_list( proc_id + 1 ) + 1
-    end do
+    call MPI_Allreduce(my_dist_list, dist_list, number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! count global number of blocks on all mpiranks
-    num_blocks = sum(dist_list)
+    num_blocks = lgt_n
 
     ! optimal distribution of blocks per mpirank. The simple division of "num_blocks" by "number_procs" actually
     ! yields a double (since it is not guaranteed that all mpiranks hold the exact same number of blocks)

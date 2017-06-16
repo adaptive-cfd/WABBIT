@@ -88,11 +88,11 @@ subroutine write_debug_times( iteration )
         ! write name
         write(99, '(a)', advance='no') debug%name_comp_time(k)
         ! write number of calls
-        write(99, '(2x,i3)', advance='no') int(debug%comp_time(k,1))
+        write(99, '(2x,i5)', advance='no') int(debug%comp_time(k,1))
         ! write global number of calls
-        write(99, '(2x,i5)', advance='no') int(debug%comp_time(k,3))
+        write(99, '(2x,i7)', advance='no') int(debug%comp_time(k,3))
         ! write time
-        write(99, '(2x,f9.6)', advance='no') debug%comp_time(k,2)
+        write(99, '(2x,f12.6)', advance='no') debug%comp_time(k,2)
         ! write global time
         write(99, '(2x,f12.6)', advance='no') debug%comp_time(k,4)
         ! next line
@@ -103,7 +103,7 @@ subroutine write_debug_times( iteration )
     end do
 
     write(99,'(80("-"))')
-    write(99, '("iteration: ", i6)', advance='no') iteration
+    write(99, '("iteration: ", i7)', advance='no') iteration
     write(99,*)
 
     ! close file

@@ -90,9 +90,10 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     hvy_neighbor = -1
     ! as the grid has changed (we deleted it here), we now update the heavy and light
     ! active lists
-    call create_lgt_active_list( lgt_block, lgt_active, lgt_n )
-    call create_hvy_active_list( lgt_block, hvy_active, hvy_n )
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_lgt_sortednumlist( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+    ! set number of active blocks to maximum number, to reset everything
+    lgt_n = size(lgt_active,1)
+    hvy_n = size(hvy_active,1)
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     
 end subroutine reset_grid

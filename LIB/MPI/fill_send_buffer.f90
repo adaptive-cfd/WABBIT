@@ -163,6 +163,9 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
 
             end do
 
+            ! mark end of int send buffer, to avoid reseting
+            int_send_buffer(int_pos, column_pos) = -99
+
             ! third: increase column number
             ! ------------------------------------
             column_pos = column_pos + 1

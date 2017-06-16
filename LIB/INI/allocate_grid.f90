@@ -29,7 +29,7 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist)
+subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -53,7 +53,11 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs
+    integer(kind=ik)                                :: Bs, g, dF, number_blocks, rank, number_procs, buffer_N
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), allocatable, intent(out)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), allocatable, intent(out)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -67,6 +71,18 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     g               = params%number_ghost_nodes
     N_dF            = params%number_data_fields
     number_procs    = params%number_procs
+
+    ! synchronize buffer length
+    ! assume: all blocks are used, all blocks have external neighbors,
+    ! max neighbor number: 2D = 12, 3D = 56
+    ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
+    ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
+    if ( params%threeD_case ) then
+        buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * dF
+    else
+        buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * dF
+    end if
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -99,6 +115,14 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     ! allocate memory
     allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2) )
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
+
+    ! allocate synch buffer
+    !allocate( int_send_buffer( number_blocks*3+1, number_procs) )
+    !allocate( int_receive_buffer( number_blocks*3+1, number_procs) )
+    allocate( int_send_buffer( 1000, number_procs) )
+    allocate( int_receive_buffer( 1000, number_procs) )
+    allocate( real_send_buffer( buffer_N, number_procs) )
+    allocate( real_receive_buffer( buffer_N, number_procs) )
 
     ! reset data:
     ! all blocks are inactive, reset treecode

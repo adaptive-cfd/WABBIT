@@ -3,10 +3,6 @@ module module_treelib
 
   use module_precision
 
-  integer, parameter :: maxdigits = 16
-  integer, parameter :: tsize = selected_int_kind(maxdigits)
-
-
 contains
 
   !===============================================================================

@@ -230,10 +230,10 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! guess number of blocks per proc times maximum number of neighbors
         if ( params%threeD_case ) then
             ! 3D:
-            n_com = lgt_n/number_procs*74
+            n_com = (1+lgt_n/number_procs)*74
         else
             ! 2D:
-            n_com = lgt_n/number_procs*12
+            n_com = (1+lgt_n/number_procs)*12
         end if
 
         ! for proc without neighbors: set n_procs to 1

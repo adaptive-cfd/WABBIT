@@ -136,7 +136,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
       detail = 0.0_rk
 
       ! loop over all datafields
-      do dF = 2, params%number_data_fields+1
+      do dF = 1, params%number_data_fields
           if ( params%threeD_case ) then
             ! ********** 3D **********
             ! copy block data to array u1

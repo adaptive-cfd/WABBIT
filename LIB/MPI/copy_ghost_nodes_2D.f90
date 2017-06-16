@@ -107,7 +107,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     hvy_block( Bs+g+1:Bs+g+g, g+1:Bs+g, dF, receiver_id ) = hvy_block( g+2:g+1+g, g+1:Bs+g, dF, sender_id )
                 end do
 
@@ -123,7 +123,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     hvy_block( g+1:Bs+g, 1:g, dF, receiver_id ) = hvy_block( g+1:Bs+g, Bs:Bs-1+g, dF, sender_id )
                 end do
 
@@ -139,7 +139,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     hvy_block( 1:g, g+1:Bs+g, dF, receiver_id ) = hvy_block( Bs:Bs-1+g, g+1:Bs+g, dF, sender_id )
                 end do
 
@@ -155,7 +155,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     hvy_block( g+1:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( g+1:Bs+g, g+2:g+1+g, dF, sender_id )
                 end do
 
@@ -171,7 +171,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! blocks on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, 1:g+rmv_redundant, dF, receiver_id ) = hvy_block( g+2-rmv_redundant:g+1+g, Bs:Bs-1+g+rmv_redundant, dF, sender_id )
                     hvy_block( Bs+g+1:Bs+g+g, 1:g, dF, receiver_id ) = hvy_block( g+2:g+1+g, Bs:Bs-1+g, dF, sender_id )
                 end do
@@ -179,7 +179,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == -1 ) then
                 ! sender one level down
                 ! interpolate data
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to refine
                     data_corner = hvy_block( g+1:g+g, Bs+1:Bs+g, dF, sender_id )
                     ! interpolate data
@@ -193,7 +193,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1) then
                 ! sender one level up
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( Bs+g+1:Bs+g+g, 1:g, dF, receiver_id ) = hvy_block( g+3:g+1+g+g:2, Bs-g:Bs-2+g:2, dF, sender_id )
                     hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, 1:g+rmv_redundant, dF, receiver_id ) = hvy_block( g+3-rmv_redundant*2:g+1+g+g:2, Bs-g:Bs-2+rmv_redundant*2+g:2, dF, sender_id )
                 end do
@@ -210,7 +210,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! blocks on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, Bs+g+1-rmv_redundant:Bs+g+g, dF, receiver_id ) = hvy_block( g+2-rmv_redundant:g+1+g, g+2-rmv_redundant:g+1+g, dF, sender_id )
                     hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( g+2:g+1+g, g+2:g+1+g, dF, sender_id )
                 end do
@@ -218,7 +218,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == -1 ) then
                 ! sender one level down
                 ! interpolate data
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to refine
                     data_corner = hvy_block( g+1:g+g, g+1:g+g, dF, sender_id )
                     ! interpolate data
@@ -232,7 +232,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1) then
                 ! sender one level up
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( g+3:g+1+g+g:2, g+3:g+1+g+g:2, dF, sender_id )
                     hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, Bs+g+1-rmv_redundant:Bs+g+g, dF, receiver_id ) = hvy_block( g+3-rmv_redundant*2:g+1+g+g:2, g+3-rmv_redundant*2:g+1+g+g:2, dF, sender_id )
                 end do
@@ -249,7 +249,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! blocks on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( 1:g+rmv_redundant, 1:g+rmv_redundant, dF, receiver_id ) = hvy_block( Bs:Bs-1+g+rmv_redundant, Bs:Bs-1+g+rmv_redundant, dF, sender_id )
                     hvy_block( 1:g, 1:g, dF, receiver_id ) = hvy_block( Bs:Bs-1+g, Bs:Bs-1+g, dF, sender_id )
                 end do
@@ -257,7 +257,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == -1 ) then
                 ! sender one level down
                 ! interpolate data
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to refine
                     data_corner = hvy_block( Bs+1:Bs+g, Bs+1:Bs+g, dF, sender_id )
                     ! interpolate data
@@ -271,7 +271,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1) then
                 ! sender one level up
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( 1:g, 1:g, dF, receiver_id ) = hvy_block( Bs-g:Bs-2+g:2, Bs-g:Bs-2+g:2, dF, sender_id )
                     hvy_block( 1:g+rmv_redundant, 1:g+rmv_redundant, dF, receiver_id ) = hvy_block( Bs-g:Bs-2+rmv_redundant*2+g:2, Bs-g:Bs-2+rmv_redundant*2+g:2, dF, sender_id )
                 end do
@@ -288,7 +288,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == 0 ) then
                 ! blocks on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( 1:g+rmv_redundant, Bs+g+1-rmv_redundant:Bs+g+g, dF, receiver_id ) = hvy_block( Bs:Bs-1+g+rmv_redundant, g+2-rmv_redundant:g+1+g, dF, sender_id )
                     hvy_block( 1:g, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( Bs:Bs-1+g, g+2:g+1+g, dF, sender_id )
                 end do
@@ -296,7 +296,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == -1 ) then
                 ! sender one level down
                 ! interpolate data
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to refine
                     data_corner = hvy_block( Bs+1:Bs+g, g+1:g+g, dF, sender_id )
                     ! interpolate data
@@ -310,7 +310,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1) then
                 ! sender one level up
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( 1:g, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( Bs-g:Bs-2+g:2, g+3:g+1+g+g:2, dF, sender_id )
                     hvy_block( 1:g+rmv_redundant, Bs+g+1-rmv_redundant:Bs+g+g, dF, receiver_id ) = hvy_block( Bs-g:Bs-2+rmv_redundant*2+g:2, g+3-rmv_redundant*2:g+1+g+g:2, dF, sender_id )
                 end do
@@ -327,7 +327,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, sender_id )
                     data_edge = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, sender_id )
@@ -341,7 +341,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( Bs+g+1:Bs+g+g, g+(Bs+1)/2:Bs+g, dF, receiver_id ) = hvy_block( g+3:3*g+1:2, g+1:Bs+g:2, dF, sender_id )
                     hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, g+(Bs+1)/2:Bs+g, dF, receiver_id ) = hvy_block( g+3-rmv_redundant*2:3*g+1:2, g+1:Bs+g:2, dF, sender_id )
                 end do
@@ -358,7 +358,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, sender_id )
                     data_edge = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, sender_id )
@@ -371,7 +371,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( Bs+g+1:Bs+g+g, g+1:g+(Bs+1)/2, dF, receiver_id ) = hvy_block( g+3:3*g+1:2, g+1:Bs+g:2, dF, sender_id )
                     hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, g+1:g+(Bs+1)/2, dF, receiver_id ) = hvy_block( g+3-rmv_redundant*2:3*g+1:2, g+1:Bs+g:2, dF, sender_id )
                 end do
@@ -388,7 +388,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, sender_id )
                     data_edge = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, sender_id )
@@ -402,7 +402,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( 1:g, g+(Bs+1)/2:Bs+g, dF, receiver_id ) = hvy_block( Bs-g:Bs+g-2:2, g+1:Bs+g:2, dF, sender_id )
                     hvy_block( 1:g+rmv_redundant, g+(Bs+1)/2:Bs+g, dF, receiver_id ) = hvy_block( Bs-g:Bs+g-2+rmv_redundant*2:2, g+1:Bs+g:2, dF, sender_id )
                 end do
@@ -419,7 +419,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, sender_id )
                     data_edge = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, sender_id )
@@ -433,7 +433,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( 1:g, g+1:g+(Bs+1)/2, dF, receiver_id ) = hvy_block( Bs-g:Bs+g-2:2, g+1:Bs+g:2, dF, sender_id )
                     hvy_block( 1:g+rmv_redundant, g+1:g+(Bs+1)/2, dF, receiver_id ) = hvy_block( Bs-g:Bs+g-2+rmv_redundant*2:2, g+1:Bs+g:2, dF, sender_id )
                 end do
@@ -450,7 +450,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, (Bs+1)/2+g/2:Bs+g, dF, sender_id )
                     data_edge = hvy_block( g+1:(Bs+1)/2+g+g, (Bs+1)/2:Bs+g, dF, sender_id )
@@ -464,7 +464,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( g+1:g+(Bs+1)/2, 1:g, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, Bs-g:Bs+g-2:2, dF, sender_id )
                     hvy_block( g+1:g+(Bs+1)/2, 1:g+rmv_redundant, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, Bs-g:Bs+g-2+rmv_redundant*2:2, dF, sender_id )
                 end do
@@ -481,7 +481,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, (Bs+1)/2+g/2:Bs+g, dF, sender_id )
                     data_edge = hvy_block( (Bs+1)/2:Bs+g, (Bs+1)/2:Bs+g, dF, sender_id )
@@ -495,7 +495,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( g+(Bs+1)/2:Bs+g, 1:g, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, Bs-g:Bs+g-2:2, dF, sender_id )
                     hvy_block( g+(Bs+1)/2:Bs+g, 1:g+rmv_redundant, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, Bs-g:Bs+g-2+rmv_redundant*2:2, dF, sender_id )
                 end do
@@ -512,7 +512,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( g+1:(Bs+1)/2+g/2+g, g+1:(Bs+1)/2+g/2+g, dF, sender_id )
                     data_edge = hvy_block( g+1:(Bs+1)/2+g+g, g+1:(Bs+1)/2+g+g, dF, sender_id )
@@ -525,7 +525,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( g+1:g+(Bs+1)/2, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, g+3:3*g+1:2, dF, sender_id )
                     hvy_block( g+1:g+(Bs+1)/2, Bs+g+1-rmv_redundant:Bs+g+g, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, g+3-rmv_redundant*2:3*g+1:2, dF, sender_id )
                 end do
@@ -542,7 +542,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     ! data to interpolate
                     !data_edge = hvy_block( (Bs+1)/2+g/2:Bs+g, g+1:(Bs+1)/2+g/2+g, dF, sender_id )
                     data_edge = hvy_block( (Bs+1)/2:Bs+g, g+1:(Bs+1)/2+g+g, dF, sender_id )
@@ -556,7 +556,7 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     !hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+1:Bs+g+g, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, g+3:3*g+1:2, dF, sender_id )
                     hvy_block( g+(Bs+1)/2:Bs+g, Bs+g+1-rmv_redundant:Bs+g+g, dF, receiver_id ) = hvy_block( g+1:Bs+g:2, g+3-rmv_redundant*2:3*g+1:2, dF, sender_id )
                 end do

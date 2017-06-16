@@ -157,15 +157,15 @@
 !       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 !       ! set the initial condition on this block
 !       ! copy result of upsampling
-!       hvy_work(:,:,:,1,hvy_id) = hvy_block(:,:,:,2,hvy_id)
+!       hvy_work(:,:,:,1,hvy_id) = hvy_block(:,:,:,1,hvy_id)
 !       call initial_condition_on_block_wrapper( params, hvy_block(:,:,:,:,hvy_id), x0, dx, "sin2d" )
 !
-!       my_error_l2 = my_error_l2 + sqrt(sum( (hvy_work(:,:,:,1,hvy_id) - hvy_block(:,:,:,2,hvy_id))**2  ))
-!       my_error_linf = max( my_error_linf,  maxval( (hvy_work(:,:,:,1,hvy_id) - hvy_block(:,:,:,2,hvy_id)) ) )
+!       my_error_l2 = my_error_l2 + sqrt(sum( (hvy_work(:,:,:,1,hvy_id) - hvy_block(:,:,:,1,hvy_id))**2  ))
+!       my_error_linf = max( my_error_linf,  maxval( (hvy_work(:,:,:,1,hvy_id) - hvy_block(:,:,:,1,hvy_id)) ) )
 !
 !
-!       my_norm_l2 = my_norm_l2 + sqrt( sum( (hvy_block(:,:,:,2,hvy_id))**2 ) )
-!       my_norm_linf = max( my_norm_linf, maxval( abs((hvy_block(:,:,:,2,hvy_id))) ) )
+!       my_norm_l2 = my_norm_l2 + sqrt( sum( (hvy_block(:,:,:,1,hvy_id))**2 ) )
+!       my_norm_linf = max( my_norm_linf, maxval( abs((hvy_block(:,:,:,1,hvy_id))) ) )
 !
 !     enddo
 !

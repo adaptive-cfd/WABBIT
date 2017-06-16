@@ -106,8 +106,8 @@ subroutine inicond_zeros( params, lgt_block, hvy_block )
     end if
 
     ! write heavy data for other datafields, copy first datafield
-    do k = 3, dF+1
-        hvy_block( :, :, :, k, : ) = hvy_block( :, :, :, 2, : )
+    do k = 2, dF
+        hvy_block( :, :, :, k, : ) = hvy_block( :, :, :, 1, : )
     end do
 
     ! clean up

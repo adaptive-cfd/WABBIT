@@ -109,7 +109,7 @@ subroutine copy_redundant_nodes_2D( params, hvy_block, sender_id, receiver_id, n
                 ! check existence of half-side neighbor
                 if ( (hvy_neighbor( sender_id, 9) /= -1) .or. (hvy_neighbor( sender_id, 13) /= -1) ) then
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         hvy_block( Bs+g:Bs+g+g, 1:g+1, dF, receiver_id ) = hvy_block( g+1:g+1+g, Bs:Bs+g, dF, sender_id )
                     end do
                 end if
@@ -129,7 +129,7 @@ subroutine copy_redundant_nodes_2D( params, hvy_block, sender_id, receiver_id, n
                 ! check existence of half-side neighbor
                 if ( (hvy_neighbor( sender_id, 10) /= -1) .or. (hvy_neighbor( sender_id, 15) /= -1) ) then
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         hvy_block( Bs+g:Bs+g+g, Bs+g:Bs+g+g, dF, receiver_id ) = hvy_block( g+1:g+1+g, g+1:g+1+g, dF, sender_id )
                     end do
                 end if
@@ -149,7 +149,7 @@ subroutine copy_redundant_nodes_2D( params, hvy_block, sender_id, receiver_id, n
                 ! check existence of half-side neighbor
                 if ( (hvy_neighbor( sender_id, 11) /= -1) .or. (hvy_neighbor( sender_id, 14) /= -1) ) then
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         hvy_block( 1:g+1, 1:g+1, dF, receiver_id ) = hvy_block( Bs:Bs+g, Bs:Bs+g, dF, sender_id )
                     end do
                 end if
@@ -169,7 +169,7 @@ subroutine copy_redundant_nodes_2D( params, hvy_block, sender_id, receiver_id, n
                 ! check existence of half-side neighbor
                 if ( (hvy_neighbor( sender_id, 12) /= -1) .or. (hvy_neighbor( sender_id, 16) /= -1) ) then
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         hvy_block( 1:g+1, Bs+g:Bs+g+g, dF, receiver_id ) = hvy_block( Bs:Bs+g, g+1:g+1+g, dF, sender_id )
                     end do
                 end if

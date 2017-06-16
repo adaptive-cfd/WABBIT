@@ -79,8 +79,7 @@ subroutine inicond_sphere( params, u, x0, dx)
                 r = sqrt( (x-mux)**2 + (y-muy)**2 + (z-muz)**2 )
 
                 ! set actual inicond sphere
-                ! FIXME: df=2 ...
-                u(ix,iy,iz,2) = abs( 0.5_rk * (tanh( sigma * (r-w) ) - 1.0_rk) )
+                u(ix,iy,iz,1) = abs( 0.5_rk * (tanh( sigma * (r-w) ) - 1.0_rk) )
 
             end do
         end do

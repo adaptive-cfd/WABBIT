@@ -49,7 +49,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, N, dF, i, lgt_id
+    integer(kind=ik)                    :: k, N, dF, lgt_id
     ! light id start
     integer(kind=ik)                    :: my_light_start
 
@@ -62,8 +62,6 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     integer(kind=ik)                    :: Bs, g
     ! data fields for interpolation
     real(kind=rk), allocatable          :: new_data(:,:,:,:), data_predict_coarse(:,:,:), data_predict_fine(:,:,:)
-    ! new coordinates vectors
-    real(kind=rk), allocatable          :: new_coord_x(:), new_coord_y(:), new_coord_z(:)
 
     ! allocation error variable
     integer(kind=ik)                    :: allocate_error
@@ -120,28 +118,6 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
         stop
     end if
 
-    ! new coordinates vectors
-    allocate( new_coord_x(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_coord_y(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( new_coord_z(Bs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
     ! set light data list for working, only light data coresponding to proc are not zero
     my_lgt_block = 0
     my_lgt_block( my_light_start+1: my_light_start+N, :) = lgt_block( my_light_start+1: my_light_start+N, :)
@@ -165,14 +141,14 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
             ! loop over all data fields
-            do dF = 2, params%number_data_fields+1
+            do dF = 1, params%number_data_fields
                 ! reset data
                 data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
                 !data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_3D(data_predict_coarse, data_predict_fine, params%order_predictor)
                 ! save new data
-                new_data(:,:,:,dF-1) = data_predict_fine
+                new_data(:,:,:,dF) = data_predict_fine
             end do
 
             ! ------------------------------------------------------------------------------------------------------
@@ -194,25 +170,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, 1:Bs, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, 1:Bs, dF)
             end do
 
             !--------------------------
@@ -232,25 +192,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, 1:Bs, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, 1:Bs, dF)
             end do
 
             !--------------------------
@@ -270,25 +214,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, 1:Bs, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, 1:Bs, dF)
             end do
 
             !--------------------------
@@ -308,25 +236,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, 1:Bs, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, 1:Bs, dF)
             end do
 
             !--------------------------
@@ -346,25 +258,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, Bs:2*Bs-1, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, Bs:2*Bs-1, dF)
             end do
 
             !--------------------------
@@ -384,25 +280,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, Bs:2*Bs-1, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, Bs:2*Bs-1, dF)
             end do
 
             !--------------------------
@@ -422,25 +302,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, 1:(Bs-1)/2+1, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, Bs:2*Bs-1, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, Bs:2*Bs-1, dF)
             end do
 
             !--------------------------
@@ -460,25 +324,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! reset refinement status
             my_lgt_block( free_light_id, params%max_treelevel+2 ) = 0
 
-            ! interpolate new coordinates
-            new_coord_x(1:Bs:2) = hvy_block( 1, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_y(1:Bs:2) = hvy_block( 2, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-            new_coord_z(1:Bs:2) = hvy_block( 3, (Bs-1)/2+1:Bs, 1, 1, hvy_active(k) )
-
-            do i = 2, Bs, 2
-                new_coord_x(i)  = ( new_coord_x(i-1) + new_coord_x(i+1) ) / 2.0_rk
-                new_coord_y(i)  = ( new_coord_y(i-1) + new_coord_y(i+1) ) / 2.0_rk
-                new_coord_z(i)  = ( new_coord_z(i-1) + new_coord_z(i+1) ) / 2.0_rk
-            end do
-
-            ! save coordinates
-            hvy_block( 1, 1:Bs, 1, 1, free_heavy_id ) = new_coord_x
-            hvy_block( 2, 1:Bs, 1, 1, free_heavy_id ) = new_coord_y
-            hvy_block( 3, 1:Bs, 1, 1, free_heavy_id ) = new_coord_z
-
             ! save interpolated data, loop over all datafields
-            do dF = 2, params%number_data_fields+1
-                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, Bs:2*Bs-1, dF-1)
+            do dF = 1, params%number_data_fields
+                hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, Bs:2*Bs-1, dF)
             end do
 
         end if
@@ -493,8 +341,5 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     deallocate( data_predict_fine, stat=allocate_error )
     deallocate( data_predict_coarse, stat=allocate_error )
     deallocate( new_data, stat=allocate_error )
-    deallocate( new_coord_x, stat=allocate_error )
-    deallocate( new_coord_y, stat=allocate_error )
-    deallocate( new_coord_z, stat=allocate_error )
 
 end subroutine refinement_execute_3D

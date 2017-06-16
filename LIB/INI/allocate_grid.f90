@@ -53,7 +53,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                :: Bs,g,dF,number_blocks, rank, number_procs
+    integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -65,7 +65,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     number_blocks   = params%number_blocks
     Bs              = params%number_block_nodes
     g               = params%number_ghost_nodes
-    dF              = params%number_data_fields
+    N_dF            = params%number_data_fields
     number_procs    = params%number_procs
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -80,18 +80,18 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:
-        ! datafields + 1 -> first field for coordinates, ...
-        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, dF+1, number_blocks ) )
+        ! datafields
+        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, N_dF, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, dF*5, number_blocks ) )
+        allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*5, number_blocks ) )
         ! 3D: maximal 74 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 74 ) )
     else
         ! 2D:
-        ! datafields + 1 -> first field for coordinates, ...
-        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, dF+1, number_blocks ) )
+        ! datafields
+        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        allocate( hvy_work( Bs+2*g, Bs+2*g, 1, dF*5, number_blocks ) )
+        allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*5, number_blocks ) )
         ! 2D: maximal 16 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 16 ) )
     end if
@@ -127,7 +127,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
       write(*,'("INIT: TOTAL memory footprint is ",g15.3,"GB")') &
       (size(hvy_block)+size(hvy_work)+size(lgt_block)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))*8.0_rk*real(number_procs,kind=rk)/1000.0_rk/1000.0_rk/1000.0_rk
 
-      write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, dF
+      write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
       write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
       write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
     endif

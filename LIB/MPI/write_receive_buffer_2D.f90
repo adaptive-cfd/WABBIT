@@ -147,7 +147,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
         select case(my_dir)
             ! '__N'
             case(1)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         hvy_block( Bs+g+l, g+1:Bs+g, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                         buffer_i                                         = buffer_i + Bs
@@ -156,7 +156,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__E'
             case(2)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         hvy_block( g+1:Bs+g, g+1-l, dF , my_block)      = recv_buff(buffer_i:buffer_i+Bs-1)
                         buffer_i                                         = buffer_i + Bs
@@ -165,7 +165,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__S'
             case(3)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         hvy_block( g+1-l, g+1:Bs+g, dF, my_block )      = recv_buff(buffer_i:buffer_i+Bs-1)
                         buffer_i                                         = buffer_i + Bs
@@ -174,7 +174,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__W'
             case(4)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         hvy_block( g+1:Bs+g, Bs+g+l, dF, my_block )     = recv_buff(buffer_i:buffer_i+Bs-1)
                         buffer_i                                         = buffer_i + Bs
@@ -183,7 +183,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_NE'
             case(5)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -219,7 +219,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_NW'
             case(6)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -255,7 +255,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_SE'
             case(7)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -291,7 +291,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_SW'
             case(8)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -327,7 +327,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'NNE'
             case(9)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -357,7 +357,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'NNW'
             case(10)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -386,7 +386,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'SSE'
             case(11)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -415,7 +415,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'SSW'
             case(12)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -444,7 +444,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'ENE'
             case(13)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -474,7 +474,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'ESE'
             case(14)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -504,7 +504,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'WNW'
             case(15)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -533,7 +533,7 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
 
             ! 'WSW'
             case(16)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data

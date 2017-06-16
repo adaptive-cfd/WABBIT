@@ -26,7 +26,7 @@
 !
 ! ********************************************************************************************
 
-subroutine new_block_heavy( params, hvy_block, heavy_id, phi, coord_x, coord_y, coord_z)
+subroutine new_block_heavy( params, hvy_block, heavy_id, phi)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -44,9 +44,6 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi, coord_x, coord_y, 
 
     !> input data
     real(kind=rk), intent(in)           :: phi(:, :, :)
-
-    !> coordinate vectors
-    real(kind=rk), intent(in)           :: coord_x(:), coord_y(:), coord_z(:)
 
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
@@ -67,25 +64,20 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi, coord_x, coord_y, 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! save coordinates in field 1 of heavy data array
-    hvy_block( 1, 1:Bs, 1, 1, heavy_id )              = coord_x
-    hvy_block( 2, 1:Bs, 1, 1, heavy_id )              = coord_y
-    hvy_block( 3, 1:Bs, 1, 1, heavy_id )              = coord_z
-
     if ( params%threeD_case ) then
         ! 3D:
-        ! save data in first datafield (second field)
-        hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2, heavy_id )      = phi(:, :, :)
+        ! save data in first datafield
+        hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, heavy_id )      = phi(:, :, :)
 
     else
         ! 2D:
-        ! save data in first datafield (second field)
-        hvy_block( g+1:Bs+g, g+1:Bs+g, 1, 2, heavy_id )             = phi(:, :, 1)
+        ! save data in first datafield
+        hvy_block( g+1:Bs+g, g+1:Bs+g, 1, 1, heavy_id )             = phi(:, :, 1)
 
     end if
 
     ! reset all other datafields
-    do k = 3, dF
+    do k = 2, dF
         hvy_block( :, :, :, k, heavy_id )                          = 0.0_rk
     end do
 

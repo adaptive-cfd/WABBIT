@@ -71,27 +71,25 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! start time
     sub_t0 = MPI_Wtime()
 
-    ! FIXME DF
-    ! real datafields start at datafield 2
-    do k = 2, params%number_data_fields+1
+    do k = 1, params%number_data_fields
 
         ! file name depends on variable names
         select case(params%physics_type)
             case('2D_convection_diffusion')
                 ! select corresponding datafield name
-                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k-1))), nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k))), nint(time * 1.0e6_rk)
             case('2D_navier_stokes')
                 ! select corresponding datafield name
-                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k))), nint(time * 1.0e6_rk)
             case('3D_convection_diffusion')
                 ! select corresponding datafield name
-                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k-1))), nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k))), nint(time * 1.0e6_rk)
             case('3D_navier_stokes')
                 ! select corresponding datafield name
-                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k-1))), nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k))), nint(time * 1.0e6_rk)
             case('2D_advection')
                 ! select corresponding datafield name
-                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k-1))), nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics%names(k))), nint(time * 1.0e6_rk)
             case default
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: physics type is unknown - can not save data"

@@ -141,13 +141,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
         call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
         ! find smallest dx of active blocks
         my_dx = min(my_dx, minval(ddx(1:d)) )
-
-        ! HACK repair first datafield, as we're about to remove it
-        hvy_block(:,:,:,1,hvy_active(k)) = 0.0_rk
-        hvy_block(1,2,:,1,hvy_active(k)) = ddx(1)
-        hvy_block(2,2,:,1,hvy_active(k)) = ddx(2)
-        hvy_block(3,2,:,1,hvy_active(k)) = ddx(3)
-
     end do
 
     ! find globally smallest dx

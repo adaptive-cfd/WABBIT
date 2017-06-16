@@ -48,12 +48,12 @@ subroutine calculate_time_step( params, dx, dt )
         case('CFL_cond')
             ! calculate time step, loop over all data fields
             if ( params%threeD_case ) then
-                do dF = 2, N_dF+1
-                    dt = minval((/dt, params%CFL * dx / norm2( params%physics%u0((dF-2)*2 + 1 : (dF-2)*2 + 3 )) /))
+                do dF = 1, N_dF
+                    dt = minval((/dt, params%CFL * dx / norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 3 )) /))
                 end do
             else
-                do dF = 2, N_dF+1
-                    dt = minval((/dt, params%CFL * dx / norm2( params%physics%u0((dF-2)*2 + 1 : (dF-2)*2 + 2 )) /))
+                do dF = 1, N_dF
+                    dt = minval((/dt, params%CFL * dx / norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 2 )) /))
                 end do
             end if
     end select

@@ -156,7 +156,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__1/___'
             case(1)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, Bs
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1:Bs+g, Bs+g-i, dF, my_block )
@@ -167,7 +167,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__2/___'
             case(2)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, Bs
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1+i, g+1:Bs+g, dF, my_block )
@@ -178,7 +178,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__3/___'
             case(3)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, Bs
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+j, g+1:Bs+g, dF, my_block )
@@ -189,7 +189,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__4/___'
             case(4)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, Bs
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, Bs+g-i, g+1:Bs+g, dF, my_block )
@@ -200,7 +200,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__5/___'
             case(5)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, Bs
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+j, g+1:Bs+g, dF, my_block )
@@ -211,7 +211,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__6/___'
             case(6)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, Bs
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+j, g+1:Bs+g, g+1+i, dF, my_block )
@@ -222,7 +222,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_12/___'
             case(7)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1+i, Bs+g-j, dF, my_block )
@@ -233,7 +233,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_13/___'
             case(8)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1:Bs+g, Bs+g-j, dF, my_block )
@@ -244,7 +244,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_14/___'
             case(9)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-i, Bs+g-j, dF, my_block )
@@ -255,7 +255,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_15/___'
             case(10)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1:Bs+g, Bs+g-j, dF, my_block )
@@ -266,7 +266,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_62/___'
             case(11)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1+i, g+1+j, dF, my_block )
@@ -277,7 +277,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_63/___'
             case(12)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1:Bs+g, g+1+j, dF, my_block )
@@ -288,7 +288,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_64/___'
             case(13)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-i, g+1+j, dF, my_block )
@@ -299,7 +299,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_65/___'
             case(14)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1:Bs+g, g+1+j, dF, my_block )
@@ -310,7 +310,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_23/___'
             case(15)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, g+1+j, g+1:Bs+g, dF, my_block )
@@ -321,7 +321,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_25/___'
             case(16)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, g+1+j, g+1:Bs+g, dF, my_block )
@@ -332,7 +332,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_43/___'
             case(17)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-i, Bs+g-j, g+1:Bs+g, dF, my_block )
@@ -343,7 +343,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_45/___'
             case(18)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do i = 1, g
                         do j = 1, g
                             send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1+i, Bs+g-j, g+1:Bs+g, dF, my_block )
@@ -354,7 +354,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '123/___'
             case(19)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -409,7 +409,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '134/___'
             case(20)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -464,7 +464,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '145/___'
             case(21)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -519,7 +519,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '152/___'
             case(22)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -574,7 +574,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '623/___'
             case(23)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -629,7 +629,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '634/___'
             case(24)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -684,7 +684,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '645/___'
             case(25)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -739,7 +739,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '652/___'
             case(26)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == 0 ) then
                         ! blocks on same level
@@ -794,7 +794,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__1/123'
             case(27)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -833,7 +833,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__1/134'
             case(28)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -872,7 +872,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__1/145'
             case(29)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -911,7 +911,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__1/152'
             case(30)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -950,7 +950,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__2/123'
             case(31)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -989,7 +989,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__2/623'
             case(32)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1028,7 +1028,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__2/152'
             case(33)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1067,7 +1067,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__2/652'
             case(34)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1105,7 +1105,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__3/123'
             case(35)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1144,7 +1144,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__3/623'
             case(36)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1183,7 +1183,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__3/134'
             case(37)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1222,7 +1222,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__3/634'
             case(38)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1261,7 +1261,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__4/134'
             case(39)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1300,7 +1300,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__4/634'
             case(40)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1339,7 +1339,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__4/145'
             case(41)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1378,7 +1378,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__4/645'
             case(42)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1417,7 +1417,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__5/145'
             case(43)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1456,7 +1456,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__5/645'
             case(44)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1495,7 +1495,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__5/152'
             case(45)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1534,7 +1534,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__5/652'
             case(46)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1572,7 +1572,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__6/623'
             case(47)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1611,7 +1611,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__6/634'
             case(48)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1650,7 +1650,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__6/645'
             case(49)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1689,7 +1689,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '__6/652'
             case(50)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1727,7 +1727,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_12/123'
             case(51)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1766,7 +1766,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_12/152'
             case(52)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1806,7 +1806,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_13/123'
             case(53)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1846,7 +1846,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_13/134'
             case(54)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1885,7 +1885,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_14/134'
             case(55)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1924,7 +1924,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_14/145'
             case(56)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -1964,7 +1964,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_15/145'
             case(57)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2003,7 +2003,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_15/152'
             case(58)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2043,7 +2043,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
              ! '_62/623'
             case(59)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2082,7 +2082,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_62/652'
             case(60)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2121,7 +2121,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_63/623'
             case(61)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2161,7 +2161,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_63/634'
             case(62)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2200,7 +2200,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_64/634'
             case(63)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2239,7 +2239,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_64/645'
             case(64)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2279,7 +2279,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_65/645'
             case(65)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2318,7 +2318,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_65/652'
             case(66)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2357,7 +2357,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_23/123'
             case(67)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2396,7 +2396,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_23/623'
             case(68)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2436,7 +2436,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_25/152'
             case(69)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2475,7 +2475,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_25/652'
             case(70)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2514,7 +2514,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_43/134'
             case(71)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2553,7 +2553,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_43/634'
             case(72)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2593,7 +2593,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_45/145'
             case(73)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level
@@ -2632,7 +2632,7 @@ subroutine create_send_buffer_3D(params, hvy_block, com_list, com_number, send_b
 
             ! '_45/645'
             case(74)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     if ( level_diff == -1 ) then
                         ! sender on lower level

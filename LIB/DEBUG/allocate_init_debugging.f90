@@ -11,14 +11,14 @@ subroutine allocate_init_debugging(params)
   if ( params%debug ) then
 
       ! allocate array for time measurements - data
-      allocate( debug%comp_time( 20, 4 ), stat=allocate_error )
+      allocate( debug%comp_time( 30, 4 ), stat=allocate_error )
       call check_allocation(allocate_error)
 
       ! reset times
       debug%comp_time = 0.0_rk
 
       ! allocate array for time measurements - names
-      allocate( debug%name_comp_time( 20 ), stat=allocate_error )
+      allocate( debug%name_comp_time( 320 ), stat=allocate_error )
       call check_allocation(allocate_error)
 
       ! reset names

@@ -117,10 +117,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
 
     ! allocate synch buffer
-    !allocate( int_send_buffer( number_blocks*3+1, number_procs) )
-    !allocate( int_receive_buffer( number_blocks*3+1, number_procs) )
-    allocate( int_send_buffer( 1000, number_procs) )
-    allocate( int_receive_buffer( 1000, number_procs) )
+    allocate( int_send_buffer( number_blocks*3+1, number_procs) )
+    allocate( int_receive_buffer( number_blocks*3+1, number_procs) )
     allocate( real_send_buffer( buffer_N, number_procs) )
     allocate( real_receive_buffer( buffer_N, number_procs) )
 

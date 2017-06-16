@@ -21,7 +21,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix )
+subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -48,9 +48,13 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
 
     ! communication lists:
-    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+    integer(kind=ik), intent(inout)         :: com_lists(:, :, :, :)
     ! communications matrix:
-    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+    integer(kind=ik), intent(inout)         :: com_matrix(:,:,:)
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)         :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)            :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! local user defined parameter structure - use to change settings
     type (type_params)                      :: params_loc
@@ -291,7 +295,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! time stepper
         !-----------------------------------------------------------------------
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end do
 
         if ( idt == 1 ) then

@@ -53,10 +53,11 @@
 !! 31/01/17 - switch to 3D, v0.5 \n
 !! 12/04/17 - redundant ghost nodes workaround
 !! 19/05/17 - switch to new synchronization routine (correct redundant nodes handling)
+!! 16/06/17 - allocate all send/receive buffer in ini step -> huge performance boost
 !
 ! ********************************************************************************************
 
-subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix, grid_changed )
+subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -79,9 +80,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-
-    ! number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
 
     ! grid stay fixed between two synch calls, so use old com_lists and com_matrix
     logical, intent(in)                 :: grid_changed
@@ -119,17 +117,17 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik), allocatable       :: com_matrix_pos(:,:)
 
     ! send/receive buffer, integer and real
-    integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! number of communications, number of neighboring procs
-    integer(kind=ik)                    :: my_n_com, n_com, n_procs
+    integer(kind=ik)                     :: my_n_com, n_procs
 
     ! indexes of buffer array and column number in buffer, use for readability
-    integer(kind=ik)                    :: int_start, real_start, buffer_pos, real_N
+    integer(kind=ik)                     :: int_start, real_start, buffer_pos, real_N
 
     ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
-    integer(kind=ik)                    :: rmv_redundant
+    integer(kind=ik)                     :: rmv_redundant
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -225,17 +223,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! ----------------------------------------------------------------------------------------
         call max_com_num( my_n_com, n_procs, com_matrix(rank+1,:,synch_stage), rank )
 
-        ! assume global number of communications
-        ! needed for buffer allocation
-        ! guess number of blocks per proc times maximum number of neighbors
-        if ( params%threeD_case ) then
-            ! 3D:
-            n_com = (1+lgt_n/number_procs)*74
-        else
-            ! 2D:
-            n_com = (1+lgt_n/number_procs)*12
-        end if
-
         ! for proc without neighbors: set n_procs to 1
         ! so we allocate arrays with second dimension=1
         if (n_procs==0) n_procs = 1
@@ -262,30 +249,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         ! next steps only for more than two procs
         if ( number_procs > 1 ) then
-
-            ! ----------------------------------------------------------------------------------------
-            ! allocate memory for send/receive buffer
-            ! buffer size:
-            !               number of columns: number of neighboring procs
-            !               number of lines:
-            !                   int buffer  - max number of communications  * 3 + 1 (length of real buffer)
-            !                   real buffer - max number of communications * (Bs+g) * g * number of datafields
-            !                   for 3D: real_buffer * Bs
-            allocate( int_send_buffer( n_com * 3 + 1, n_procs ) )
-            allocate( int_receive_buffer( n_com * 3 + 1, n_procs ) )
-
-            int_receive_buffer = -99
-            int_send_buffer = -99
-
-            if ( params%threeD_case ) then
-                ! 3D:
-                allocate( real_receive_buffer( n_com * (Bs+(g+1)) * (g+1) * Bs * params%number_data_fields, n_procs ) )
-                allocate( real_send_buffer( n_com * (Bs+(g+1)) * (g+1) * Bs * params%number_data_fields, n_procs ) )
-            else
-                ! 2D:
-                allocate( real_receive_buffer( n_com * (Bs+(g+1)) * (g+1) * params%number_data_fields, n_procs ) )
-                allocate( real_send_buffer( n_com * (Bs+(g+1)) * (g+1) * params%number_data_fields, n_procs ) )
-            end if
 
             ! ----------------------------------------------------------------------------------------
             ! fill send buffer
@@ -667,14 +630,6 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 end if
             end do
         end do
-
-        ! clean up
-        if ( number_procs > 1 ) then
-            deallocate( int_send_buffer )
-            deallocate( int_receive_buffer )
-            deallocate( real_send_buffer )
-            deallocate( real_receive_buffer )
-        end if
 
     end do
 

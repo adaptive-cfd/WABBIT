@@ -110,11 +110,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! communications matrix:
     integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
 
-    ! communications matrix:
-    ! count the number of communications between procs
-    ! row/column number encodes process rank + 1
-    ! com matrix pos: position in send buffer
-    integer(kind=ik), allocatable       :: com_matrix_pos(:,:)
+    ! communications position: position in send buffer
+    integer(kind=ik), allocatable       :: com_pos(:)
 
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -164,7 +161,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     number_procs = params%number_procs
 
     ! allocate com position matrix
-    allocate( com_matrix_pos(number_procs, number_procs) )
+    allocate( com_pos(number_procs) )
 
 !    ! reset ghost nodes for all active blocks
 !    if ( params%debug ) then
@@ -188,7 +185,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     do synch_stage = 1, 4
 
         ! reset com-list, com_plan, com matrix, receiver lists
-        com_matrix_pos  =  0
+        com_pos  =  0
 
         call MPI_Barrier(MPI_COMM_WORLD, ierr)
         ! end time
@@ -288,26 +285,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
             ! ----------------------------------------------------------------------------------------
             ! fourth: send/receive data
-            ! calculate position matrix: position is column in send buffer, so simply count the number of communications
-            ! loop over all com_matrix elements
+            ! positon in send buffer is calculated in fill receive buffer subroutine
             ! ----------------------------------------------------------------------------------------
-            do i = 1, size(com_matrix_pos,1)
-                ! new line, means new proc: reset counter
-                k = 1
-                ! loop over communications
-                do j = 1, size(com_matrix_pos,1)
-                    ! found external communication
-                    if ( (com_matrix(i,j,synch_stage) /= 0) .and. (i /= j) ) then
-                        ! save com position
-                        com_matrix_pos(i,j) = k
-                        ! increase counter
-                        k = k + 1
-                    end if
-                end do
-            end do
 
             ! communicate, fill receive buffer
-            call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix(:,:,synch_stage), com_matrix_pos  )
+            call fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix(:,:,synch_stage), com_pos  )
 
         end if
 
@@ -428,7 +410,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                 call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
 
                                 ! position in receiver buffer array
-                                buffer_pos = com_matrix_pos(rank+1, neighbor_rank+1)
+                                buffer_pos = com_pos(neighbor_rank+1)
+
                                 ! length of real buffer
                                 real_N = int_receive_buffer( 1, buffer_pos )
 
@@ -553,7 +536,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                             call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
 
                             ! position in receiver buffer array
-                            buffer_pos = com_matrix_pos(rank+1, neighbor_rank+1)
+                            buffer_pos = com_pos(neighbor_rank+1)
 
                             ! next steps only if there is at least one communication
                             ! means: buffer_pos > 0
@@ -662,7 +645,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     end do
 
     ! clean up
-    deallocate( com_matrix_pos )
+    deallocate( com_pos )
 
     call MPI_Barrier(MPI_COMM_WORLD, ierr)
     ! end time

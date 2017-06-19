@@ -310,7 +310,7 @@ program main
         endif
 
         ! advance in time
-        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !        ! check redundant nodes
 !        if ( params%debug ) then

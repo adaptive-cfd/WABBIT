@@ -76,7 +76,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors
+    integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors, n_com
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
@@ -97,10 +97,12 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
     if ( params%threeD_case ) then
         ! 3D
-        max_neighbors = 74
+        max_neighbors = 56
+        n_com = 56*(1+lgt_n/params%number_procs)*3+1
     else
         ! 2D
         max_neighbors = 12
+        n_com = 12*(1+lgt_n/params%number_procs)*3+1
     end if
 
 !---------------------------------------------------------------------------------------------
@@ -127,7 +129,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         sub_t1 = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
 
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer( 1:n_com, : ), int_receive_buffer( 1:n_com, : ), real_send_buffer, real_receive_buffer )
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 

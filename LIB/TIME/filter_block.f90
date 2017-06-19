@@ -21,7 +21,7 @@
 !
 ! ********************************************************************************************
 
-subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -45,6 +45,8 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n
 
     ! communication lists:
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
@@ -57,7 +59,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, i, j, l, dF, N_dF
+    integer(kind=ik)                    :: k, i, j, l, dF, N_dF, n_com
 
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
@@ -88,6 +90,14 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     g     = params%number_ghost_nodes
 
     N_dF  = params%number_data_fields
+
+    if ( params%threeD_case ) then
+        ! 3D
+        n_com = 56*(1+lgt_n/params%number_procs)*3+1
+    else
+        ! 2D
+        n_com = 12*(1+lgt_n/params%number_procs)*3+1
+    end if
 
     ! initialize stencils
     stencil_5  = (/ -1.0_rk/ 16.0_rk, &
@@ -161,7 +171,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     end if
 
     ! synchronize ghostnodes
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer( 1:n_com, : ), int_receive_buffer( 1:n_com, : ), real_send_buffer, real_receive_buffer )
 
     ! start time
     sub_t0 = MPI_Wtime()

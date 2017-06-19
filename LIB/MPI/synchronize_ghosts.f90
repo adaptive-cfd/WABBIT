@@ -259,6 +259,26 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! fill send buffer and position communication matrix
             call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer )
 
+            ! end time
+            sub_t1 = MPI_Wtime()
+            ! write time
+            if ( params%debug ) then
+                ! find free or corresponding line
+                k = 1
+                do while ( debug%name_comp_time(k) /= "---" )
+                    ! entry for current subroutine exists
+                    if ( debug%name_comp_time(k) == "synch. ghosts - fill send buffer" ) exit
+                    k = k + 1
+                end do
+                ! write time
+                debug%name_comp_time(k) = "synch. ghosts - fill send buffer"
+                debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+                debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
+            end if
+
+            ! start time
+            sub_t0 = MPI_Wtime()
+
             ! ----------------------------------------------------------------------------------------
             ! fourth: send/receive data
             ! calculate position matrix: position is column in send buffer, so simply count the number of communications

@@ -62,7 +62,7 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     ! loop over all active blocks
     do k = 1, hvy_n
         ! loop over all datafields
-        do dF = 2, params%number_data_fields+1
+        do dF = 1, params%number_data_fields
             ! reset ghost nodes
             if ( params%threeD_case ) then
                 ! 3D:
@@ -74,10 +74,10 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
                 hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
             else
                 ! 2D:
-                hvy_block(1:g, :, 1, 2, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(Bs+g+1:Bs+2*g, :, 1, 2, hvy_active(k) ) = 9.0e9_rk
-                hvy_block(:, 1:g, 1, 2, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(:, Bs+g+1:Bs+2*g, 1, 2, hvy_active(k) ) = 9.0e9_rk
+                hvy_block(1:g, :, 1, 1, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(Bs+g+1:Bs+2*g, :, 1, 1, hvy_active(k) ) = 9.0e9_rk
+                hvy_block(:, 1:g, 1, 1, hvy_active(k) )           = 9.0e9_rk
+                hvy_block(:, Bs+g+1:Bs+2*g, 1, 1, hvy_active(k) ) = 9.0e9_rk
             end if
         end do
     end do

@@ -109,19 +109,19 @@ subroutine inicond_richtmyer_meshkov( params, lgt_block, hvy_block )
     end if
 
     ! second: write heavy data for other datafields
-    do k = 3, dF+1
-        hvy_block( :, :, :, k, : ) = hvy_block( :, :, :, 2, : )
+    do k = 2, dF
+        hvy_block( :, :, :, k, : ) = hvy_block( :, :, :, 1, : )
     end do
 
     ! navier stokes physics:
     ! set gauss blob + 1[bar] in datafield 6 (assume pressure)
     ! set velocity to zero and density to 1
     if ( params%physics_type == '3D_navier_stokes' ) then
-        hvy_block( :, :, :, 2, : ) = 1.0_rk
+        hvy_block( :, :, :, 1, : ) = 1.0_rk
+        hvy_block( :, :, :, 2, : ) = 0.0_rk
         hvy_block( :, :, :, 3, : ) = 0.0_rk
         hvy_block( :, :, :, 4, : ) = 0.0_rk
-        hvy_block( :, :, :, 5, : ) = 0.0_rk
-        hvy_block( :, :, :, 6, : ) = 1.0_rk
+        hvy_block( :, :, :, 5, : ) = 1.0_rk
     end if
 
     ! clean up

@@ -157,7 +157,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__1/___'
             case(1)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, Bs
@@ -169,7 +169,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__2/___'
             case(2)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, Bs
@@ -181,7 +181,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__3/___'
             case(3)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, Bs
@@ -193,7 +193,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__4/___'
             case(4)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, Bs
@@ -205,7 +205,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__5/___'
             case(5)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, Bs
@@ -217,7 +217,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__6/___'
             case(6)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, Bs
@@ -229,7 +229,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_12/___'
             case(7)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -241,7 +241,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_13/___'
             case(8)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -253,7 +253,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_14/___'
             case(9)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -265,7 +265,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_15/___'
             case(10)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -277,7 +277,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_62/___'
             case(11)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -289,7 +289,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_63/___'
             case(12)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -301,7 +301,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_64/___'
             case(13)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -313,7 +313,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_65/___'
             case(14)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -325,7 +325,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_23/___'
             case(15)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -337,7 +337,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_25/___'
             case(16)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -349,7 +349,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_43/___'
             case(17)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -361,7 +361,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_45/___'
             case(18)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
 
                     do i = 1, g
                         do j = 1, g
@@ -373,7 +373,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '123/___'
             case(19)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -400,7 +400,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '134/___'
             case(20)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -427,7 +427,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '145/___'
             case(21)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -454,7 +454,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '152/___'
             case(22)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -479,7 +479,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '623/___'
             case(23)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -507,7 +507,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '634/___'
             case(24)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -535,7 +535,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '645/___'
             case(25)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -563,7 +563,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '652/___'
             case(26)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 1 ) then
                         ! sender one level up -> need non-uniform mesh correction
                         ! receive data
@@ -589,7 +589,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__1/123'
             case(27)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -623,7 +623,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__1/134'
             case(28)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -657,7 +657,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__1/145'
             case(29)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -691,7 +691,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__1/152'
             case(30)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -725,7 +725,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__2/123'
             case(31)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -759,7 +759,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__2/623'
             case(32)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -793,7 +793,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__2/152'
             case(33)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -827,7 +827,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__2/652'
             case(34)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -861,7 +861,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__3/123'
             case(35)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -895,7 +895,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__3/623'
             case(36)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -929,7 +929,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__3/134'
             case(37)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -963,7 +963,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__3/634'
             case(38)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -997,7 +997,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__4/134'
             case(39)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1031,7 +1031,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__4/634'
             case(40)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1065,7 +1065,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__4/145'
             case(41)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1099,7 +1099,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__4/645'
             case(42)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1133,7 +1133,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__5/145'
             case(43)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1167,7 +1167,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__5/645'
             case(44)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1201,7 +1201,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__5/152'
             case(45)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1235,7 +1235,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__5/652'
             case(46)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1269,7 +1269,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__6/623'
             case(47)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1303,7 +1303,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__6/634'
             case(48)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1337,7 +1337,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__6/645'
             case(49)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1371,7 +1371,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '__6/652'
             case(50)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1405,7 +1405,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_12/123'
             case(51)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1438,7 +1438,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                 end do
             ! '_12/152'
             case(52)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1472,7 +1472,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_13/123'
             case(53)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1506,7 +1506,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_13/134'
             case(54)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1540,7 +1540,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_14/134'
             case(55)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1574,7 +1574,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_14/145'
             case(56)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1608,7 +1608,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_15/145'
             case(57)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1642,7 +1642,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_15/152'
             case(58)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1676,7 +1676,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
              ! '_62/623'
             case(59)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1710,7 +1710,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_62/652'
             case(60)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1744,7 +1744,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_63/623'
             case(61)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1778,7 +1778,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_63/634'
             case(62)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1812,7 +1812,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_64/634'
             case(63)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1846,7 +1846,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_64/645'
             case(64)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1880,7 +1880,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_65/645'
             case(65)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1914,7 +1914,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_65/652'
             case(66)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1948,7 +1948,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_23/123'
             case(67)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -1982,7 +1982,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_23/623'
             case(68)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -2016,7 +2016,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_25/152'
             case(69)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -2050,7 +2050,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_25/652'
             case(70)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -2084,7 +2084,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_43/134'
             case(71)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -2119,7 +2119,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_43/634'
             case(72)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -2154,7 +2154,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_45/145'
             case(73)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data
@@ -2188,7 +2188,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
 
             ! '_45/645'
             case(74)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! receive data

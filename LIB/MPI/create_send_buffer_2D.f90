@@ -137,7 +137,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
         select case(my_dir)
             ! '__N'
             case(1)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+l+1, g+1:Bs+g, dF, my_block )
                         buffer_i                            = buffer_i + Bs
@@ -146,7 +146,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '__E'
             case(2)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g-l, dF, my_block )
                         buffer_i                            = buffer_i + Bs
@@ -155,7 +155,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '__S'
             case(3)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g-l, g+1:Bs+g, dF, my_block )
                         buffer_i                            = buffer_i + Bs
@@ -164,7 +164,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '__W'
             case(4)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     do l = 1, g
                         send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+l+1, dF, my_block )
                         buffer_i                            = buffer_i + Bs
@@ -173,7 +173,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '_NE'
             case(5)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         data_corner_rmv_redundant = hvy_block( g+2-rmv_redundant:g+1+g, Bs:Bs-1+g+rmv_redundant, dF, my_block )
@@ -221,7 +221,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '_NW'
             case(6)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         ! loop over all datafields
@@ -270,7 +270,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '_SE'
             case(7)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         data_corner_rmv_redundant = hvy_block( Bs:Bs-1+g+rmv_redundant, Bs:Bs-1+g+rmv_redundant, dF, my_block )
@@ -318,7 +318,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! '_SW'
             case(8)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == 0 ) then
                         ! blocks on same level
                         data_corner_rmv_redundant = hvy_block( Bs:Bs-1+g+rmv_redundant, g+2-rmv_redundant:g+1+g, dF, my_block )
@@ -366,7 +366,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'NNE'
             case(9)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -400,7 +400,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'NNW'
             case(10)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -433,7 +433,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'SSE'
             case(11)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -466,7 +466,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'SSW'
             case(12)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -499,7 +499,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'ENE'
             case(13)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -533,7 +533,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'ESE'
             case(14)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -566,7 +566,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'WNW'
             case(15)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate
@@ -597,7 +597,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
 
             ! 'WSW'
             case(16)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! data to interpolate

@@ -440,7 +440,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:Bs+g, dF, receiver_id ) - &
                                            hvy_block( g+1, g+1:Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -464,7 +464,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g, g+1, dF, receiver_id ) - &
                                            hvy_block( g+1:Bs+g, Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -488,7 +488,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1, g+1:Bs+g, dF, receiver_id ) - &
                                            hvy_block( Bs+g, g+1:Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -512,7 +512,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == 0 ) then
                 ! sender/receiver on same level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g, Bs+g, dF, receiver_id ) - &
                                            hvy_block( g+1:Bs+g, g+1, dF, sender_id ) ))**2 )
                     ! check error
@@ -534,7 +534,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
         ! '_NE'
         case(5)
             ! loop over all datafields
-            do dF = 2, params%number_data_fields+1
+            do dF = 1, params%number_data_fields
                 diff_norm = sqrt((( hvy_block( Bs+g, g+1, dF, receiver_id ) - &
                                        hvy_block( g+1, Bs+g, dF, sender_id ) ))**2 )
                 ! check error
@@ -555,7 +555,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
         ! '_NW'
         case(6)
             ! loop over all datafields
-            do dF = 2, params%number_data_fields+1
+            do dF = 1, params%number_data_fields
                 diff_norm = sqrt((( hvy_block( Bs+g, Bs+g, dF, receiver_id ) - &
                                        hvy_block( g+1, g+1, dF, sender_id ) ))**2 )
                 ! check error
@@ -576,7 +576,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
         ! '_SE'
         case(7)
             ! loop over all datafields
-            do dF = 2, params%number_data_fields+1
+            do dF = 1, params%number_data_fields
                 diff_norm = sqrt((( hvy_block( g+1, g+1, dF, receiver_id ) - &
                                        hvy_block( Bs+g, Bs+g, dF, sender_id ) ))**2 )
                 ! check error
@@ -597,7 +597,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
         ! '_SW'
         case(8)
             ! loop over all datafields
-            do dF = 2, params%number_data_fields+1
+            do dF = 1, params%number_data_fields
                 diff_norm = sqrt((( hvy_block( g+1, Bs+g, dF, receiver_id ) - &
                                        hvy_block( Bs+g, g+1, dF, sender_id ) ))**2 )
                 ! check error
@@ -620,7 +620,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:Bs+g:2, dF, receiver_id ) - &
                                        hvy_block( g+1, (Bs+1)/2+g:Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -641,7 +641,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( Bs+g, g+(Bs+1)/2:Bs+g, dF, receiver_id ) - &
                                        hvy_block( g+1, g+1:Bs+g:2, dF, sender_id ) ))**2 )
                     ! check error
@@ -665,7 +665,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:Bs+g:2, dF, receiver_id ) - &
                                        hvy_block( g+1, g+1:(Bs+1)/2+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -686,7 +686,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:g+(Bs+1)/2, dF, receiver_id ) - &
                                        hvy_block( g+1, g+1:Bs+g:2, dF, sender_id ) ))**2 )
                     ! check error
@@ -710,7 +710,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1, g+1:Bs+g:2, dF, receiver_id ) - &
                                        hvy_block( Bs+g, (Bs+1)/2+g:Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -731,7 +731,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1, g+(Bs+1)/2:Bs+g, dF, receiver_id ) - &
                                        hvy_block( Bs+g, g+1:Bs+g:2, dF, sender_id ) ))**2 )
                     ! check error
@@ -755,7 +755,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1, g+1:Bs+g:2, dF, receiver_id ) - &
                                        hvy_block( Bs+g, g+1:(Bs+1)/2+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -776,7 +776,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1, g+1:g+(Bs+1)/2, dF, receiver_id ) - &
                                        hvy_block( Bs+g, g+1:Bs+g:2, dF, sender_id ) ))**2 )
                     ! check error
@@ -801,7 +801,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, g+1, dF, receiver_id ) - &
                                        hvy_block( g+1:(Bs+1)/2+g, Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -822,7 +822,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:g+(Bs+1)/2, g+1, dF, receiver_id ) - &
                                        hvy_block( g+1:Bs+g:2, Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -846,7 +846,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, g+1, dF, receiver_id ) - &
                                        hvy_block( g+(Bs+1)/2:Bs+g, Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -867,7 +867,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+(Bs+1)/2:Bs+g, g+1, dF, receiver_id ) - &
                                        hvy_block( g+1:Bs+g:2, Bs+g, dF, sender_id ) ))**2 )
                     ! check error
@@ -891,7 +891,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, Bs+g, dF, receiver_id ) - &
                                        hvy_block( g+1:(Bs+1)/2+g, g+1, dF, sender_id ) ))**2 )
                     ! check error
@@ -912,7 +912,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:g+(Bs+1)/2, Bs+g, dF, receiver_id ) - &
                                        hvy_block( g+1:Bs+g:2, g+1, dF, sender_id ) ))**2 )
                     ! check error
@@ -936,7 +936,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             if ( level_diff == -1 ) then
                 ! sender on lower level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, Bs+g, dF, receiver_id ) - &
                                        hvy_block( g+(Bs+1)/2:Bs+g, g+1, dF, sender_id ) ))**2 )
                     ! check error
@@ -957,7 +957,7 @@ subroutine check_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neig
             elseif ( level_diff == 1 ) then
                 ! sender on higher level
                 ! loop over all datafields
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+(Bs+1)/2:Bs+g, Bs+g, dF, receiver_id ) - &
                                        hvy_block( g+1:Bs+g:2, g+1, dF, sender_id ) ))**2 )
                     ! check error
@@ -1458,63 +1458,63 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
         select case(my_dir)
             ! '__N'
             case(1)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1, g+1:Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '__E'
             case(2)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '__S'
             case(3)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( Bs+g, g+1:Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '__W'
             case(4)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i:buffer_i+Bs-1)   = hvy_block( g+1:Bs+g, g+1, dF, my_block )
                     buffer_i                            = buffer_i + Bs
                 end do
 
             ! '_NE'
             case(5)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i)                 = hvy_block( g+1, Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + 1
                 end do
 
             ! '_NW'
             case(6)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i)                 = hvy_block( g+1, g+1, dF, my_block )
                     buffer_i                            = buffer_i + 1
                 end do
 
             ! '_SE'
             case(7)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i)                 = hvy_block( Bs+g, Bs+g, dF, my_block )
                     buffer_i                            = buffer_i + 1
                 end do
 
             ! '_SW'
             case(8)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     send_buff(buffer_i)                 = hvy_block( Bs+g, g+1, dF, my_block )
                     buffer_i                            = buffer_i + 1
                 end do
 
             ! 'NNE'
             case(9)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1532,7 +1532,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'NNW'
             case(10)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1550,7 +1550,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'SSE'
             case(11)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1568,7 +1568,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'SSW'
             case(12)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1586,7 +1586,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'ENE'
             case(13)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1604,7 +1604,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'ESE'
             case(14)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1622,7 +1622,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'WNW'
             case(15)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1640,7 +1640,7 @@ subroutine create_send_buffer_2D_check_redundant(params, hvy_block, com_list, co
 
             ! 'WSW'
             case(16)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     if ( level_diff == -1 ) then
                         ! sender on lower level
                         ! send data
@@ -1896,7 +1896,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
         select case(my_dir)
             ! '__N'
             case(1)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+Bs-1) ))**2 )
 
@@ -1918,7 +1918,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '__E'
             case(2)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+Bs-1) ))**2 )
 
@@ -1940,7 +1940,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '__S'
             case(3)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1, g+1:Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+Bs-1) ))**2 )
 
@@ -1962,7 +1962,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '__W'
             case(4)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+Bs-1) ))**2 )
 
@@ -1984,7 +1984,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '_NE'
             case(5)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt((( hvy_block( Bs+g, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i) ))**2 )
 
@@ -2006,7 +2006,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '_NW'
             case(6)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt((( hvy_block( Bs+g, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i) ))**2 )
 
@@ -2028,7 +2028,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '_SE'
             case(7)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt((( hvy_block( g+1, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i) ))**2 )
 
@@ -2050,7 +2050,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
 
             ! '_SW'
             case(8)
-                do dF = 2, params%number_data_fields+1
+                do dF = 1, params%number_data_fields
                     diff_norm = sqrt((( hvy_block( g+1, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i) ))**2 )
 
@@ -2075,7 +2075,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:Bs+g:2, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2098,7 +2098,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( Bs+g, g+(Bs+1)/2:Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2124,7 +2124,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:Bs+g:2, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2147,7 +2147,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( Bs+g, g+1:g+(Bs+1)/2, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2173,7 +2173,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1, g+1:Bs+g:2, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2196,7 +2196,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1, g+(Bs+1)/2:Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2222,7 +2222,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1, g+1:Bs+g:2, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2245,7 +2245,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1, g+1:g+(Bs+1)/2, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2271,7 +2271,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2294,7 +2294,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1:g+(Bs+1)/2, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2320,7 +2320,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2343,7 +2343,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+(Bs+1)/2:Bs+g, g+1, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2369,7 +2369,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2392,7 +2392,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1:g+(Bs+1)/2, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2418,7 +2418,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 if ( level_diff == -1 ) then
                     ! sender on lower level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+1:Bs+g:2, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 
@@ -2441,7 +2441,7 @@ subroutine write_receive_buffer_2D_check_redundant(params, int_buffer, recv_buff
                 elseif ( level_diff == 1 ) then
                     ! sender on higher level
                     ! loop over all datafields
-                    do dF = 2, params%number_data_fields+1
+                    do dF = 1, params%number_data_fields
                         diff_norm = sqrt(sum(( hvy_block( g+(Bs+1)/2:Bs+g, Bs+g, dF, my_block ) - &
                                            recv_buff(buffer_i:buffer_i+(Bs+1)/2-1) ))**2 )
 

@@ -219,10 +219,10 @@
 !         ! calculate f(x,y,z) for first datafield
 !         if ( params_loc%threeD_case ) then
 !             ! 3D:
-!             call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, 1.0_rk )
+!             call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, 1.0_rk )
 !         else
 !             ! 2D:
-!             call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, 1.0_rk  )
+!             call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_active(k)), Bs, g, Lx, Ly, 1.0_rk  )
 !         end if
 !
 !     end do
@@ -240,7 +240,7 @@
 !     !-----------------------------------------------------------------------
 !     ! save result, loop over all active blocks
 !     do k = 1, hvy_n
-!         hvy_old(:, :, :, 1, :)  = hvy_block(:, :, :, 2, :)
+!         hvy_old(:, :, :, 1, :)  = hvy_block(:, :, :, 1, :)
 !         lgt_old                 = lgt_block
 !         lgt_active_old          = lgt_active
 !         lgt_n_old               = lgt_n
@@ -302,10 +302,10 @@
 !             ! calculate f(x,y,z) for first datafield
 !             if ( params_loc%threeD_case ) then
 !                 ! 3D:
-!                 call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, 1.0_rk )
+!                 call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, 1.0_rk )
 !             else
 !                 ! 2D:
-!                 call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, 1.0_rk  )
+!                 call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_active(k)), Bs, g, Lx, Ly, 1.0_rk  )
 !             end if
 !
 !         end do
@@ -348,7 +348,7 @@
 !                 ! old heavy id
 !                 call lgt_id_to_hvy_id( hvy_id_old, lgt_id_old, rank, params_loc%number_blocks )
 !
-!                 my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, k) )**2 ) )
+!                 my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, k) )**2 ) )
 !                 my_norm = my_norm  + sqrt(sum(( hvy_old(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, k) )**2 ))
 !
 !             end do
@@ -366,7 +366,7 @@
 !                 call lgt_id_to_hvy_id( hvy_id_old, lgt_id_old, rank, params_loc%number_blocks )
 !
 !                 ! calc error
-!                 my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, 1, 2, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, 1, 1, hvy_id_old) )**2 ) )
+!                 my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, 1, 1, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, 1, 1, hvy_id_old) )**2 ) )
 !                 my_norm = my_norm  + sqrt(sum(( hvy_old(g+1:Bs+g, g+1:Bs+g, 1, 1, hvy_id_old) )**2 ))
 !
 !             end do

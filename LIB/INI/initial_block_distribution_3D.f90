@@ -71,9 +71,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
     ! loop variables
     integer(kind=ik)                    :: i, j, k, l
 
-    ! domain coordinate vectors
-    real(kind=rk), allocatable          :: coord_x(:), coord_y(:), coord_z(:)
-
     ! heavy and light data id
     integer(kind=ik)                    :: heavy_id, light_id
 
@@ -102,31 +99,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
 
     ! allocate block to proc list
     allocate( block_proc_list( number_procs ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    ! allocate domain coordinate vectors
-    allocate( coord_x( Ds ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( coord_y( Ds ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( coord_z( Ds ), stat=allocate_error )
     !call check_allocation(allocate_error)
     if ( allocate_error /= 0 ) then
         write(*,'(80("_"))')
@@ -178,13 +150,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
         block_proc_list(1:mod(num_blocks, number_procs)) = (num_blocks - mod(num_blocks, number_procs))/number_procs + 1
     end if
 
-    ! calculate domain coordinate vectors
-    do i = 1, Ds
-        coord_x(i) = (i-1) * Lx / (Ds-1)
-        coord_y(i) = (i-1) * Ly / (Ds-1)
-        coord_z(i) = (i-1) * Lz / (Ds-1)
-    end do
-
     ! create block-tree
     k = 1
     do i = 1, num_blocks_x
@@ -210,12 +175,7 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
                                          hvy_block, &
                                          heavy_id, &
                                          !phi( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 , (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1, (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ), &
-                                         phi( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 , (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1, (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ), &
-                                         !coord_x( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
-                                         !coord_y( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
-                                         coord_x( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 ), &
-                                         coord_y( (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1 ), &
-                                         coord_z( (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ) )
+                                         phi( (j-1)*(Bs-1) + 1 : j*(Bs-1) + 1 , (i-1)*(Bs-1) + 1 : i*(Bs-1) + 1, (l-1)*(Bs-1) + 1 : l*(Bs-1) + 1 ))
 
                 end if
 
@@ -239,9 +199,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
 
     ! clean up
     deallocate( block_proc_list, stat=allocate_error )
-    deallocate( coord_x, stat=allocate_error )
-    deallocate( coord_y, stat=allocate_error )
-    deallocate( coord_z, stat=allocate_error )
     deallocate( treecode, stat=allocate_error )
 
 end subroutine initial_block_distribution_3D

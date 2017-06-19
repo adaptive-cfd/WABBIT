@@ -196,18 +196,18 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
           ! calculate f(x,y,z) for first datafield
           if ( params%threeD_case ) then
             ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
           else
             ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
+            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
           end if
 
         end do
 
         ! now the entire grid (incl ghost nodes) holds the exact solution: make a
-        ! copy of the grid for later comparison, but use work arrays ususally used for RK4 substages
+        ! copy of the grid for later comparison, but use work arrays usually used for RK4 substages
         ! so no additional memory is used.
-        hvy_work(:,:,:,1,:) = hvy_block(:,:,:,2,:)
+        hvy_work(:,:,:,1,:) = hvy_block(:,:,:,1,:)
 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
@@ -223,7 +223,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
         ! loop over all active blocks and compute their error
         do k = 1, hvy_n
-          my_error = my_error + sqrt(sum((hvy_block(:,:,:,2,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k)))**2 ))
+          my_error = my_error + sqrt(sum((hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k)))**2 ))
           my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k)))**2 ))
         end do
 

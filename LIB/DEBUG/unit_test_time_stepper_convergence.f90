@@ -214,13 +214,6 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         call get_block_spacing_origin( params_loc, lgt_id, lgt_block, xx0, ddx )
         ! find smallest dx of active blocks
         my_dx = min(my_dx, minval(ddx(1:d)) )
-
-        ! HACK repair first datafield, as we're about to remove it
-        hvy_block(:,:,:,1,hvy_active(k)) = 0.0_rk
-        hvy_block(1,2,:,1,hvy_active(k)) = ddx(1)
-        hvy_block(2,2,:,1,hvy_active(k)) = ddx(2)
-        hvy_block(3,2,:,1,hvy_active(k)) = ddx(3)
-
     end do
 
     ! find globally smallest dx
@@ -283,10 +276,10 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
             ! calculate f(x,y,z) for first datafield
             if ( params_loc%threeD_case ) then
                 ! 3D:
-                call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 2, hvy_active(k)), Bs, g, Lx, Ly, Lz, 1.0_rk )
+                call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, 1.0_rk )
             else
                 ! 2D:
-                call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 2, hvy_active(k)), Bs, g, Lx, Ly, 1.0_rk  )
+                call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_active(k)), Bs, g, Lx, Ly, 1.0_rk  )
             end if
 
         end do
@@ -304,7 +297,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
             !-----------------------------------------------------------------------
             ! save result, loop over all active blocks
             do k = 1, hvy_n
-                hvy_old(:, :, :, 1, k) = hvy_block(:, :, :, 2, hvy_active(k))
+                hvy_old(:, :, :, 1, k) = hvy_block(:, :, :, 1, hvy_active(k))
             end do
 
             error(idt) = 0.0_rk
@@ -321,15 +314,15 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
             if ( params_loc%threeD_case ) then
                 ! 3D:
                 do k = 1, hvy_n
-                    my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, k) )**2 ) )
+                    my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, k) )**2 ) )
                     my_norm = my_norm  + sqrt(sum(( hvy_old(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, k) )**2 ))
                 end do
             else
                 ! 2D:
                 do k = 1, hvy_n
-                    my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, 1, 2, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, 1, 1, k) )**2 ) )
+                    my_error = my_error + sqrt( sum( ( hvy_block(g+1:Bs+g, g+1:Bs+g, 1, 1, hvy_active(k)) - hvy_old(g+1:Bs+g, g+1:Bs+g, 1, 1, k) )**2 ) )
                     my_norm = my_norm  + sqrt(sum(( hvy_old(g+1:Bs+g, g+1:Bs+g, 1, 1, k) )**2 ))
-                    !my_error = my_error + sqrt( sum( ( hvy_block(:, :, 1, 2, hvy_active(k)) - hvy_old(:, :, 1, 1, k) )**2 ) )
+                    !my_error = my_error + sqrt( sum( ( hvy_block(:, :, 1, 1, hvy_active(k)) - hvy_old(:, :, 1, 1, k) )**2 ) )
                     !my_norm = my_norm  + sqrt(sum(( hvy_old(:, :, 1, 1, k) )**2 ))
                 end do
             end if

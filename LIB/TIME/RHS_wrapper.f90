@@ -99,11 +99,11 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
         case('2D_convection_diffusion')
             ! loop over all data fields
-            do dF = 2, N_dF+1
+            do dF = 1, N_dF
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                     ! copy ghost nodes to hvy_work
-                    hvy_work( :, :, :, (dF-2)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-1)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                     ! convert given hvy_id to lgt_id for block spacing routine
                     call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
@@ -112,10 +112,10 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                     
                     ! RHS (compute k-coefficients)
-                    call RHS_2D_convection_diffusion( hvy_work( :, :, 1, (dF-2)*5+j+1, hvy_active(k) ), &
+                    call RHS_2D_convection_diffusion( hvy_work( :, :, 1, (dF-1)*5+j+1, hvy_active(k) ), &
                                       dx(1), dx(2), g, Bs, &
-                                      params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), &
-                                      params%physics%nu( (dF-1) ), params%order_discretization  )                             
+                                      params%physics%u0( (dF-1)*2 + 1 ), params%physics%u0( (dF-1)*2 + 2 ), &
+                                      params%physics%nu(dF), params%order_discretization  )                             
                  end do
             end do
 
@@ -123,7 +123,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 ! copy ghost nodes to hvy_work
-                hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 2:N_dF+1, hvy_active(k) )
+                hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 1:N_dF, hvy_active(k) )
 
                 ! convert given hvy_id to lgt_id for block spacing routine
                 call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
@@ -139,11 +139,11 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
        case('3D_convection_diffusion')
            ! loop over all data fields
-           do dF = 2, N_dF+1
+           do dF = 1, N_dF
                ! loop over all active heavy data blocks
                do k = 1, hvy_n
                    ! copy ghost nodes to hvy_work
-                   hvy_work( :, :, :, (dF-2)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
+                   hvy_work( :, :, :, (dF-1)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                    ! convert given hvy_id to lgt_id for block spacing routine
                    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
@@ -152,11 +152,11 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                    call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                     
                    ! RHS (compute k-coefficients)
-                   call RHS_3D_convection_diffusion( hvy_work( :, :, 1, (dF-2)*5+j+1, hvy_active(k) ), &
+                   call RHS_3D_convection_diffusion( hvy_work( :, :, 1, (dF-1)*5+j+1, hvy_active(k) ), &
                                      dx(1), dx(2), dx(3), g, Bs, &
-                                     params%physics%u0( (dF-2)*2 + 1 ), params%physics%u0( (dF-2)*2 + 2 ), &
-                                     params%physics%u0( (dF-2)*2 + 3 ), &
-                                     params%physics%nu( (dF-1) ), params%order_discretization  )                             
+                                     params%physics%u0( (dF-1)*2 + 1 ), params%physics%u0( (dF-1)*2 + 2 ), &
+                                     params%physics%u0( (dF-1)*2 + 3 ), &
+                                     params%physics%nu(dF), params%order_discretization  )                             
                 end do
            end do
 
@@ -164,7 +164,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
            ! loop over all active heavy data blocks
            do k = 1, hvy_n
                ! copy ghost nodes to hvy_work
-               hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 2:N_dF+1, hvy_active(k) )
+               hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 1:N_dF, hvy_active(k) )
 
                ! convert given hvy_id to lgt_id for block spacing routine
                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
@@ -180,11 +180,11 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
        case('2D_advection')
            ! loop over all data fields
-            do dF = 2, N_dF+1
+            do dF = 1, N_dF
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                     ! copy ghost nodes to hvy_work
-                    hvy_work( :, :, :, (dF-2)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
+                    hvy_work( :, :, :, (dF-1)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                     ! convert given hvy_id to lgt_id for block spacing routine
                     call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
@@ -194,7 +194,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                     
                     ! RHS (compute k-coefficients)
                     ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l)) (time-dependent rhs)
-                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-2)*5+j+1, hvy_active(k) ), &
+                    call RHS_2D_advection( hvy_work( :, :, 1, (dF-1)*5+j+1, hvy_active(k) ), &
                                        x0(1:2), dx(1:2), g, Bs, &
                                        time + rk_coeff*dt, &
                                        params%order_discretization  )                             

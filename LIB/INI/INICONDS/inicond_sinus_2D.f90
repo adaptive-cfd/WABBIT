@@ -59,8 +59,7 @@ subroutine inicond_sinus_2D( params, u, x0, dx )
         x = dble(ix-(g+1)) * dx(1) + x0(1)
         y = dble(iy-(g+1)) * dx(2) + x0(2)
         ! set actual inicond sinus2d
-        ! FIXME: df=2 ...
-        u(ix,iy,1,2) = sin(1.0_rk*2.0_rk*pi*x/params%Lx)*sin(2.0_rk*pi*y/params%Ly)
+        u(ix,iy,1,1) = sin(1.0_rk*2.0_rk*pi*x/params%Lx)*sin(2.0_rk*pi*y/params%Ly)
       end do
     end do
 

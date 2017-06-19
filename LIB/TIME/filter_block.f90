@@ -180,7 +180,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     select case(params%filter_type)
         case('explicit_5pt')
             ! loop over all datafields
-            do dF = 2, N_dF+1
+            do dF = 1, N_dF
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
 
@@ -227,7 +227,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
         case('explicit_7pt')
             ! loop over all datafields
-            do dF = 2, N_dF+1
+            do dF = 1, N_dF
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
 
@@ -274,7 +274,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
         case('explicit_9pt')
             ! loop over all datafields
-            do dF = 2, N_dF+1
+            do dF = 1, N_dF
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
 
@@ -321,7 +321,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
         case('explicit_11pt')
             ! loop over all datafields
-            do dF = 2, N_dF+1
+            do dF = 1, N_dF
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
 

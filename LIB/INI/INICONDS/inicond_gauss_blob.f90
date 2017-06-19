@@ -79,8 +79,7 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
             ! shift to new gauss blob center
             ! call shift_x_y( x, y, params%Lx,params%Ly )
             ! set actual inicond gauss blob
-            ! FIXME: df=2 ...
-            u(ix,iy,iz,2) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / sigma )
+            u(ix,iy,iz,1) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / sigma )
           end do
         end do
       end do
@@ -97,8 +96,7 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
           ! shift to new gauss blob center
           call shift_x_y( x, y, params%Lx,params%Ly )
           ! set actual inicond gauss blob
-          ! FIXME: df=2 ...
-          u(ix,iy,1,2) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
+          u(ix,iy,1,1) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
         end do
       end do
   endif

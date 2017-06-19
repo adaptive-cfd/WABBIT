@@ -75,7 +75,7 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
     !call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! phi is on first datafield, save heavy data
-    Ux = hvy_block( :, :, 2, : )
+    Ux = hvy_block( :, :, 1, : )
 
     ! ----------------------------------------------------------------------------------------
     ! reset data
@@ -97,10 +97,10 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
     !call initial_block_distribution( params, lgt_block, hvy_block, phi )
 
     ! phi is now on first field, write to right position
-    hvy_block( :, :, 4, : ) = hvy_block( :, :, 2, : )
+    hvy_block( :, :, 3, : ) = hvy_block( :, :, 1, : )
 
     ! write Ux velocity
-    hvy_block( :, :, 3, : ) = Ux
+    hvy_block( :, :, 2, : ) = Ux
 
     ! clean up
     deallocate( phi, stat=allocate_error )

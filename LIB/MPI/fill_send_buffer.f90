@@ -91,14 +91,9 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
     ! column number of send buffer, position in integer buffer
     integer(kind=ik)                                :: column_pos, int_pos
 
-    ! send buffer for one proc
-    real(kind=rk), allocatable                      :: proc_send_buffer(:)
-
-    ! allocation error variable
-    integer(kind=ik)                                :: allocate_error
-
     ! index of send buffer, return from create_send_buffer subroutine
     integer(kind=ik)                                :: buffer_i
+
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -108,15 +103,6 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
 
     ! reset column number
     column_pos = 1
-
-    ! allocate proc send buffer, size = line size of real send buffer
-    allocate( proc_send_buffer( size(real_send_buffer,1) ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -133,14 +119,12 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
             ! write real send buffer for proc k
             if ( params%threeD_case ) then
                 ! 3D:
-                call create_send_buffer_3D(params, hvy_block, com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), proc_send_buffer, buffer_i)
+                call create_send_buffer_3D(params, hvy_block, com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), real_send_buffer( :, column_pos ), buffer_i)
             else
                 ! 2D:
-                call create_send_buffer_2D(params, hvy_block(:, :, 1, :, :), com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), proc_send_buffer, buffer_i)
+                call create_send_buffer_2D(params, hvy_block(:, :, 1, :, :), com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), real_send_buffer( :, column_pos ), buffer_i)
             end if
 
-            ! real buffer entry
-            real_send_buffer( 1 : buffer_i, column_pos ) = proc_send_buffer( 1 : buffer_i )
 
             ! second: integer data
             ! --------------------
@@ -173,8 +157,5 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
         end if
 
     end do
-
-    ! clean up
-    deallocate( proc_send_buffer, stat=allocate_error )
 
 end subroutine fill_send_buffer

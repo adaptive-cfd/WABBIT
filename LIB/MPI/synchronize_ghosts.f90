@@ -129,12 +129,16 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
     integer(kind=ik)                     :: rmv_redundant
 
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
     ! start time
     sub_t0 = MPI_Wtime()
 
@@ -186,6 +190,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! reset com-list, com_plan, com matrix, receiver lists
         com_matrix_pos  =  0
 
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         ! end time
         sub_t1 = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
@@ -227,6 +232,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! so we allocate arrays with second dimension=1
         if (n_procs==0) n_procs = 1
 
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         ! end time
         sub_t1 = MPI_Wtime()
         ! write time
@@ -259,6 +265,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! fill send buffer and position communication matrix
             call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer )
 
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
             ! end time
             sub_t1 = MPI_Wtime()
             ! write time
@@ -304,6 +311,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         end if
 
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         ! end time
         sub_t1 = MPI_Wtime()
         ! write time
@@ -656,6 +664,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! clean up
     deallocate( com_matrix_pos )
 
+    call MPI_Barrier(MPI_COMM_WORLD, ierr)
     ! end time
     sub_t1 = MPI_Wtime()
     time_sum = time_sum + (sub_t1 - sub_t0)

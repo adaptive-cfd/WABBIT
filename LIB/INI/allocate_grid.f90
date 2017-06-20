@@ -53,7 +53,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs, buffer_N
+    integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs, buffer_N, buffer_N_int
 
     ! send/receive buffer, integer and real
     integer(kind=ik), allocatable, intent(out)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -79,8 +79,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
     if ( params%threeD_case ) then
         buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * N_dF
+        buffer_N_int = number_blocks * 56 * 3
     else
         buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * N_dF
+        buffer_N_int = number_blocks * 12 * 3
     end if
 
 !---------------------------------------------------------------------------------------------
@@ -117,8 +119,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
 
     ! allocate synch buffer
-    allocate( int_send_buffer( number_blocks*3+1, number_procs) )
-    allocate( int_receive_buffer( number_blocks*3+1, number_procs) )
+    allocate( int_send_buffer( buffer_N_int, number_procs) )
+    allocate( int_receive_buffer( buffer_N_int, number_procs) )
     allocate( real_send_buffer( buffer_N, number_procs) )
     allocate( real_receive_buffer( buffer_N, number_procs) )
 

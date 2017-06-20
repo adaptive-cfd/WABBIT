@@ -50,7 +50,7 @@
 !
 ! ********************************************************************************************
 
-subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -78,8 +78,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: lgt_n
 
     ! communication lists:
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
@@ -92,7 +90,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, lgt_id, d, j, n_com
+    integer(kind=ik)                    :: k, lgt_id, d, j
 
     ! time step, dx
     real(kind=rk)                       :: dt, dx, my_dx
@@ -140,15 +138,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! set rk_coeffs
     rk_coeffs = params%butcher_tableau
 
-    ! number of coms
-    if ( params%threeD_case ) then
-        ! 3D:
-        n_com = 56*(1+lgt_n/params%number_procs)*3+1
-    else
-        ! 2D:
-        n_com = 12*(1+lgt_n/params%number_procs)*3+1
-    end if
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -186,7 +175,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer( 1:n_com, : ), int_receive_buffer( 1:n_com, : ), real_send_buffer, real_receive_buffer )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
     ! restart time
     sub_t0 = MPI_Wtime()
@@ -208,7 +197,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer( 1:n_com, : ), int_receive_buffer( 1:n_com, : ), real_send_buffer, real_receive_buffer)
+        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
         ! restart time
         sub_t0 = MPI_Wtime()

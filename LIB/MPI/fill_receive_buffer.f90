@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_pos )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -42,7 +42,8 @@ subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_r
 
     !> communications matrix: neighboring proc rank
     !! com matrix pos: position in send buffer
-    integer(kind=ik), intent(in)        :: com_matrix(:,:), com_matrix_pos(:,:)
+    integer(kind=ik), intent(in)        :: com_matrix(:,:)
+    integer(kind=ik), intent(inout)     :: com_pos(:)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -57,15 +58,15 @@ subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_r
 
         ! use RMA with lock/unlock synchronization, use MPI_Get
         case('RMA_lock_unlock_get')
-            call RMA_lock_unlock_get_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            !call RMA_lock_unlock_get_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_pos )
 
         ! use RMA with lock/unlock synchronization, use MPI_Put
         case('RMA_lock_unlock_put')
-            call RMA_lock_unlock_put_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            !call RMA_lock_unlock_put_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_pos )
 
         ! use non-blocking isend/irecv
         case('Non_blocking_Isend_Irecv')
-            call isend_irecv_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_matrix_pos )
+            call isend_irecv_data( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix, com_pos )
 
         case default
             write(*,'(80("_"))')

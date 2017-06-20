@@ -11,7 +11,7 @@
 !
 !>
 !! The block thresholding is done with the restriction/prediction operators acting on the
-!! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed here. \n
+!! entire block \n
 !!
 !!
 !! input:    - params, light and heavy data, neighbor list \n
@@ -24,7 +24,7 @@
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
-subroutine threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n)
+subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -42,10 +42,6 @@ subroutine threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
 
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
@@ -64,10 +60,18 @@ subroutine threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
     ! interpolation fields
     real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
     ! light data (refinement status column) list for working
-    integer(kind=ik), allocatable       :: my_refinement_status(:)
+    integer(kind=1), allocatable       :: my_refinement_status(:)
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
+
+    ! send/receive buffer for data synchronization
+    integer(kind=1), allocatable        :: my_lgt_block_send_buffer(:), my_lgt_block_receive_buffer(:)
+
+    ! maximum heavy id, use to synchronize reduced light data array, sum of heavy blocks, start of send buffer
+    integer(kind=ik)                    :: heavy_max, block_sum, buffer_start
+    ! list of max heavy ids, use to build send/receive buffer
+    integer(kind=ik)                    :: proc_heavy_max(params%number_procs), my_proc_heavy_max(params%number_procs)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -96,20 +100,12 @@ subroutine threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
     ! coarsened field is half block size + 1/2
     allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
 
-    allocate( my_refinement_status( size(lgt_block, 1)) )
+    allocate( my_refinement_status( hvy_n ) )
 
     my_refinement_status = 0
-    my_refinement_status( rank*N+1: rank*N+N ) = lgt_block( rank*N+1: rank*N+N, params%max_treelevel+2)
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! ------------------------------------------------------------------------------------
-    ! second: clear old refinement status
-    ! set status "no refine/coarse" for all active blocks
-    do k = 1, lgt_n
-        lgt_block( lgt_active(k), params%max_treelevel+2 ) = 0
-    end do
 
     ! ------------------------------------------------------------------------------------
     ! third: calculate detail and set new refinement status
@@ -168,18 +164,53 @@ subroutine threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
       ! note gradedness and completeness may prevent it from actually going through with that
       if (detail < params%eps) then
         ! coarsen block, -1
-        my_refinement_status( lgt_id ) = -1
+        my_refinement_status( k ) = -1
       end if
 
     end do
 
     ! ------------------------------------------------------------------------------------
     ! fourth: synchronize light data
-    lgt_block(:,params%max_treelevel+2) = 0
-    call MPI_Allreduce(my_refinement_status, lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    ! set array for max heavy ids
+    my_proc_heavy_max = 0
+    heavy_max = maxval(hvy_active)
+    if (heavy_max == -1) heavy_max = 0
+    my_proc_heavy_max(rank+1) = heavy_max
+
+    ! synchronize array
+    call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+    ! for readability, calc sum of all max heavy ids
+    block_sum = sum(proc_heavy_max)
+
+    ! now we can allocate send/receive buffer arrays
+    allocate( my_lgt_block_send_buffer( block_sum ), my_lgt_block_receive_buffer( block_sum ) )
+
+    ! reset send buffer
+    my_lgt_block_send_buffer = 0
+    buffer_start = sum(proc_heavy_max(1:rank))
+    do k = 1, hvy_n
+        my_lgt_block_send_buffer( buffer_start + hvy_active(k) ) = my_refinement_status(k)
+    end do
+
+    ! synchronize light data
+    call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum, MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+    ! write synchronized light data
+    ! loop over number of procs and reset lgt_block array
+    do k = 1, params%number_procs
+        ! proc k-1 has send data
+        if ( proc_heavy_max(k) /= 0 ) then
+            ! write received light data
+            lgt_block( (k-1)*N+1 : (k-1)*N + proc_heavy_max(k), params%max_treelevel+2 ) =  my_lgt_block_receive_buffer( sum(proc_heavy_max(1:k-1))+1 : sum(proc_heavy_max(1:k-1))+proc_heavy_max(k) )
+        else
+            ! nothing to do
+        end if
+    end do
 
     ! clean up
     deallocate( u1, u2, u3, my_refinement_status )
+    deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer )
 
     ! end time
     sub_t1 = MPI_Wtime()

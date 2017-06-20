@@ -82,7 +82,7 @@ subroutine coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n
       case ("threshold")
         ! use wavelet indicator to check where to coarsen. threshold_block performs
         ! the required ghost node sync and loops over all active blocks.
-        call threshold_block( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n)
+        call threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
       case ("random")
         ! randomly coarse some blocks. used for testing. note we tag for coarsening

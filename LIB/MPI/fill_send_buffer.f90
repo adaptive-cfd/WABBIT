@@ -94,8 +94,6 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
     ! send buffer for one proc
     real(kind=rk), allocatable                      :: proc_send_buffer(:)
 
-    ! allocation error variable
-    integer(kind=ik)                                :: allocate_error
 
     ! index of send buffer, return from create_send_buffer subroutine
     integer(kind=ik)                                :: buffer_i
@@ -110,14 +108,7 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
     column_pos = 1
 
     ! allocate proc send buffer, size = line size of real send buffer
-    allocate( proc_send_buffer( size(real_send_buffer,1) ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
+    allocate( proc_send_buffer( size(real_send_buffer,1) )  )
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -175,6 +166,6 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
     end do
 
     ! clean up
-    deallocate( proc_send_buffer, stat=allocate_error )
+    deallocate( proc_send_buffer  )
 
 end subroutine fill_send_buffer

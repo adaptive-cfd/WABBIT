@@ -48,7 +48,6 @@ subroutine inicond_sinus_3D( params, lgt_block, hvy_block )
     integer(kind=ik)                        :: rank
 
     ! allocation error variable
-    integer(kind=ik)                        :: allocate_error
 
     ! auxiliary variable for gauss pulse
     real(kind=rk)                           :: x ,y, z
@@ -72,8 +71,7 @@ subroutine inicond_sinus_3D( params, lgt_block, hvy_block )
     !-----------------------------------------------------------------------------------------
 
     ! allocate memory
-    allocate( phi( Ds, Ds, Ds), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( phi( Ds, Ds, Ds)  )
 
     ! create sin
     do i = 1, Ds
@@ -108,6 +106,6 @@ subroutine inicond_sinus_3D( params, lgt_block, hvy_block )
     call initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
 
     ! clean up
-    deallocate( phi, stat=allocate_error )
+    deallocate( phi  )
 
 end subroutine inicond_sinus_3D

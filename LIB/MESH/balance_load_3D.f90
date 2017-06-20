@@ -8,6 +8,7 @@
 !> \author msr
 !
 !> \brief balance the load
+!> \image html balancing.svg "Load balancing" width=400
 !
 !> \details
 !! input:    - params, light and heavy data, neighbor data, lists of active blocks \n
@@ -18,8 +19,7 @@
 !! 09/02/17    - create
 !
 ! ********************************************************************************************
-!> \image html balancing.svg "Load balancing" width=300
-!> \image html load_balancing.svg "Load balancing" width=300
+!> \image html load_balancing.svg  width=500
 
 subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
 

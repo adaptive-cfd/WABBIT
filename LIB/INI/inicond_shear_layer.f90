@@ -49,8 +49,6 @@ subroutine inicond_shear_layer( params, lgt_block, hvy_block )
     ! process rank
     integer(kind=ik)                        :: rank
 
-    ! allocation error variable
-    integer(kind=ik)                        :: allocate_error
 
     ! auxiliary variable for gauss pulse
     real(kind=rk)                           :: mux, x, sigma, w, r, num
@@ -80,8 +78,7 @@ subroutine inicond_shear_layer( params, lgt_block, hvy_block )
     !-----------------------------------------------------------------------------------------
 
     ! allocate memory
-    allocate( phi( Ds, Ds, Ds), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( phi( Ds, Ds, Ds)  )
 
     ! location of shear layer
     mux = 0.5_rk * Lx;
@@ -158,6 +155,6 @@ subroutine inicond_shear_layer( params, lgt_block, hvy_block )
     end if
 
     ! clean up
-    deallocate( phi, stat=allocate_error )
+    deallocate( phi  )
 
 end subroutine inicond_shear_layer

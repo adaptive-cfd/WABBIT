@@ -56,8 +56,6 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
     ! number of processes
     integer(kind=ik)                    :: number_procs
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
 
     ! grid parameters (domain size, block size, number of ghost nodes, grid sizes)
     integer(kind=ik)                    :: Ds, Bs, g
@@ -98,23 +96,9 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
     max_treelevel   = params%max_treelevel
 
     ! allocate block to proc list
-    allocate( block_proc_list( number_procs ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
+    allocate( block_proc_list( number_procs )  )
     ! allocate treecode
-    allocate( treecode( params%max_treelevel ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
+    allocate( treecode( params%max_treelevel )  )
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -198,7 +182,7 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
     end do
 
     ! clean up
-    deallocate( block_proc_list, stat=allocate_error )
-    deallocate( treecode, stat=allocate_error )
+    deallocate( block_proc_list  )
+    deallocate( treecode  )
 
 end subroutine initial_block_distribution_3D

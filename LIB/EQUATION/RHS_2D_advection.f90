@@ -13,7 +13,6 @@
 !> input:    - datafield, grid parameter, time, derivative order \n
 !! output:   - RHS(datafield) \n
 !!
-!!
 !! = log ======================================================================================
 !! \n
 !! 20/04/17 - create
@@ -136,7 +135,8 @@ subroutine RHS_2D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
       stop
     end if
 
-    ! return (TODO: DO NOT OVERWRITE?)
+    ! return
+    ! \todo DO NOT OVERWRITE?
     phi = rhs
 
     do ix = 1, Bs+2*g

@@ -28,6 +28,8 @@
 !!                   - block on higher/lower level: block shares face/edge and one unique corner,
 !!                     so use this corner code in second part of neighbor code
 !!
+!! \image html neighborcode.svg "Neighborcode 3D" width=250
+!!
 !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
 !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
 !!         '_62/___', '_63/___', '_64/___', '_65/___' \n

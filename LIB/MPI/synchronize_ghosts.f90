@@ -35,11 +35,11 @@
 !!                note: reiceived buffer includes all data, and write routine can handle this, but
 !!                at this point we work onm one specific block, maybe later we can switch back to old
 !!                internal/external handling
-!!  \todo TODO: rework ghost nodes writing routine to avoid receive buffer searching
+!!  \todo rework ghost nodes writing routine to avoid receive buffer searching
 !!  stage 4 handling:
 !!      - external neighbor: check condition in com list creation - then send/receive data as before
 !!      - internal neighbor: use new copy_redundant_nodes subroutine
-!!  \todo TODO: if possible use same copy ghost nodes routine for all 4 stages
+!!  \todo if possible use same copy ghost nodes routine for all 4 stages
 !!
 !>
 !! input:    - params, light and heavy data \n

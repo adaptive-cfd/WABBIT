@@ -53,12 +53,15 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   !> write output
   logical, intent(in)                 :: verbosity
 
+  ! MPI error variable
+  integer(kind=ik)                    :: ierr
+  
   ! loop control variables in space
   integer(kind=ik)                    :: ix, iy, iz, icpu, nx, ny, nz
 
   integer(kind=ik)                    :: num_blocks, number_procs
-  integer(kind=ik)                    :: allocate_error
   integer(kind=ik)                    :: d
+
   ! on my section, which is the first and last light id?
   integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, heavy_id
   integer(kind=ik),allocatable        :: blocks_per_rank_list(:)
@@ -185,7 +188,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   allocate ( my_lgt_block(1:size(lgt_block,1),1:size(lgt_block,2)) )
   my_lgt_block = lgt_block
   lgt_block = 0
-  call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, allocate_error)
+  call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
   deallocate( my_lgt_block )
 
   ! as the grid has changed (we created it here), we now update the heavy and light

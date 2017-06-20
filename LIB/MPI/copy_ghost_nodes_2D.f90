@@ -63,8 +63,6 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
     ! interpolation variables
     real(kind=rk), dimension(:,:), allocatable      :: data_corner, data_corner_fine, data_edge, data_edge_fine
 
-    ! allocation error variable
-    integer(kind=ik)                                :: allocate_error
 
     ! variable for non-uniform mesh correction: remove redundant node between fine->coarse blocks
     integer(kind=ik)                                :: rmv_redundant
@@ -87,16 +85,12 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    allocate( data_corner( g, g), stat=allocate_error )
-    call check_allocation(allocate_error)
-    allocate( data_corner_fine( 2*g-1, 2*g-1), stat=allocate_error )
-    call check_allocation(allocate_error)
-    !allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
-    allocate( data_edge( (Bs+1)/2 + g, (Bs+1)/2 + g), stat=allocate_error )
-    call check_allocation(allocate_error)
-    !allocate( data_edge_fine( Bs+g, Bs+g), stat=allocate_error )
-    allocate( data_edge_fine( Bs+2*g, Bs+2*g), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( data_corner( g, g)  )
+    allocate( data_corner_fine( 2*g-1, 2*g-1)  )
+    !allocate( data_edge( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2)  )
+    allocate( data_edge( (Bs+1)/2 + g, (Bs+1)/2 + g)  )
+    !allocate( data_edge_fine( Bs+g, Bs+g)  )
+    allocate( data_edge_fine( Bs+2*g, Bs+2*g)  )
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -571,9 +565,9 @@ subroutine copy_ghost_nodes_2D( params, hvy_block, sender_id, receiver_id, neigh
     end select
 
     ! clean up
-    deallocate( data_corner, stat=allocate_error )
-    deallocate( data_corner_fine, stat=allocate_error )
-    deallocate( data_edge, stat=allocate_error )
-    deallocate( data_edge_fine, stat=allocate_error )
+    deallocate( data_corner  )
+    deallocate( data_corner_fine  )
+    deallocate( data_edge  )
+    deallocate( data_edge_fine  )
 
 end subroutine copy_ghost_nodes_2D

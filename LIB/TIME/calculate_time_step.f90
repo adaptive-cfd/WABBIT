@@ -35,6 +35,9 @@ subroutine calculate_time_step( params, dx, dt )
     ! loop variables
     integer(kind=ik)                    :: dF, N_dF
 
+    ! norm of vector u
+    real(kind=rk)                       :: norm_u
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -49,11 +52,17 @@ subroutine calculate_time_step( params, dx, dt )
             ! calculate time step, loop over all data fields
             if ( params%threeD_case ) then
                 do dF = 1, N_dF
-                    dt = minval((/dt, params%CFL * dx / norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 3 )) /))
+                    norm_u = norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 3 ))
+                    ! check for zero velocity to avoid divison by zero
+                    if (norm_u < 1e-12_rk) norm_u = 9e9_rk
+                    dt = minval((/dt, params%CFL * dx / norm_u /))
                 end do
             else
                 do dF = 1, N_dF
-                    dt = minval((/dt, params%CFL * dx / norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 2 )) /))
+                    norm_u = norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 2 ))
+                    ! check for zero velocity to avoid divison by zero
+                    if (norm_u < 1e-12_rk) norm_u = 9e9_rk
+                    dt = minval((/dt, params%CFL * dx / norm_u /))
                 end do
             end if
     end select

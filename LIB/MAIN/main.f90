@@ -10,6 +10,7 @@
 !> \brief main program, init all data, start time loop, output on screen during program run
 !
 !>
+!! 
 !! = log ======================================================================================
 !! \n
 !! 04/11/16 - switch to v0.4 \n
@@ -68,10 +69,8 @@ program main
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( field_1, 2:number_data_fields+1)
+    !                   -> dim 4: data type ( 1:number_data_fields)
     ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
-    !           field_1 (to save mixed data):   line 1: x coordinates
-    !                                           line 2: y coordinates
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )

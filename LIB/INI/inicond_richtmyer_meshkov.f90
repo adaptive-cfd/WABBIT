@@ -49,8 +49,6 @@ subroutine inicond_richtmyer_meshkov( params, lgt_block, hvy_block )
     ! process rank
     integer(kind=ik)                        :: rank
 
-    ! allocation error variable
-    integer(kind=ik)                        :: allocate_error
 
     ! loop variables
     integer(kind=ik)                        :: k
@@ -77,8 +75,7 @@ subroutine inicond_richtmyer_meshkov( params, lgt_block, hvy_block )
     !-----------------------------------------------------------------------------------------
 
     ! allocate memory
-    allocate( phi( Ds, Ds, Ds), stat=allocate_error )
-    call check_allocation(allocate_error)
+    allocate( phi( Ds, Ds, Ds)  )
 
     phi = 0.0_rk
 
@@ -125,6 +122,6 @@ subroutine inicond_richtmyer_meshkov( params, lgt_block, hvy_block )
     end if
 
     ! clean up
-    deallocate( phi, stat=allocate_error )
+    deallocate( phi  )
 
 end subroutine inicond_richtmyer_meshkov

@@ -49,8 +49,6 @@ subroutine inicond_zeros( params, lgt_block, hvy_block )
     ! number of datafields
     integer(kind=ik)                        :: dF
 
-    ! allocation error variable
-    integer(kind=ik)                        :: allocate_error
 
     ! loop variables
     integer(kind=ik)                        :: k
@@ -73,12 +71,10 @@ subroutine inicond_zeros( params, lgt_block, hvy_block )
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:
-        allocate( phi( Ds, Ds, Ds), stat=allocate_error )
-        call check_allocation(allocate_error)
+        allocate( phi( Ds, Ds, Ds)  )
     else
         ! 2D:
-        allocate( phi( Ds, Ds, 1), stat=allocate_error )
-        call check_allocation(allocate_error)
+        allocate( phi( Ds, Ds, 1)  )
     end if
 
 
@@ -111,7 +107,7 @@ subroutine inicond_zeros( params, lgt_block, hvy_block )
     end do
 
     ! clean up
-    deallocate( phi, stat=allocate_error )
+    deallocate( phi  )
 
 
 end subroutine inicond_zeros

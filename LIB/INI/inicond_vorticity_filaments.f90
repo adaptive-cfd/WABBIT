@@ -39,8 +39,6 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
     ! field from file
     real(kind=rk), allocatable              :: phi(:, :), Ux(:, :, :)
 
-    ! allocation error variable
-    integer(kind=ik)                        :: allocate_error
 
     ! file IO error variable
     integer(kind=ik)                        :: io_error
@@ -49,8 +47,8 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
 ! variables initialization
 
     ! allocate memory
-    allocate( phi( params%number_domain_nodes, params%number_domain_nodes), stat=allocate_error )
-    allocate( Ux( size(hvy_block,1), size(hvy_block,2), size(hvy_block,4)), stat=allocate_error )
+    allocate( phi( params%number_domain_nodes, params%number_domain_nodes)  )
+    allocate( Ux( size(hvy_block,1), size(hvy_block,2), size(hvy_block,4))  )
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -103,7 +101,7 @@ subroutine inicond_vorticity_filaments(params, lgt_block, hvy_block)
     hvy_block( :, :, 2, : ) = Ux
 
     ! clean up
-    deallocate( phi, stat=allocate_error )
-    deallocate( Ux, stat=allocate_error )
+    deallocate( phi  )
+    deallocate( Ux  )
 
 end subroutine inicond_vorticity_filaments

@@ -10,8 +10,11 @@
 !> \brief time step main function
 !
 !>
+!! Runge-Kutta: \n
 !! data_field(t) = data_field(t) + sum(b_j*k_j) 
 !! with k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_ji*k_i))         \n
+!!
+!! \image html time_step.svg "Time-stepper" width=300
 !!
 !! input:    
 !!           - time variable
@@ -109,7 +112,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable          :: rk_coeffs(:,:)
 
-    integer(kind=ik)                    :: allocate_error
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -120,8 +122,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! start time
     sub_t0 = MPI_Wtime()
 
-    allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)), stat=allocate_error)
-    call check_allocation(allocate_error)
+    allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
 
     ! reset dx
     my_dx = 9.0e9_rk
@@ -241,6 +242,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
         debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
     end if
 
-    deallocate(rk_coeffs, stat=allocate_error)
+    deallocate(rk_coeffs )
 
 end subroutine time_stepper

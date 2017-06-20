@@ -73,8 +73,6 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     ! dim 3: receiver proc rank
     integer(kind=ik), allocatable       :: com_lists(:, :, :)
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
 
     ! communications matrix:
     ! count the number of communications between procs
@@ -99,30 +97,12 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     number_procs = params%number_procs
 
     ! allocate local com_lists
-    allocate( com_lists( N*16, 6, number_procs), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( com_lists( N*16, 6, number_procs)  )
 
     ! allocate com matrix
-    allocate( com_matrix(number_procs, number_procs), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( com_matrix(number_procs, number_procs)  )
 
-    allocate( my_com_matrix(number_procs, number_procs), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( my_com_matrix(number_procs, number_procs)  )
 
     ! reset com-list, com_plan, com matrix, receiver lists
     com_lists       = -1
@@ -157,9 +137,9 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     call check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop_status )
 
     ! clean up
-    deallocate( com_lists, stat=allocate_error )
-    deallocate( com_matrix, stat=allocate_error )
-    deallocate( my_com_matrix, stat=allocate_error )
+    deallocate( com_lists  )
+    deallocate( com_matrix  )
+    deallocate( my_com_matrix  )
 
 end subroutine check_redundant_nodes
 
@@ -231,8 +211,6 @@ subroutine check_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hv
     integer(kind=ik), allocatable       :: receiver_pos(:), receiver_rank(:), receiver_count(:)
     integer(kind=ik)                    :: receiver_N
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -251,26 +229,11 @@ subroutine check_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hv
     number_procs    = params%number_procs
 
     ! receiver lists
-    allocate( receiver_pos( number_procs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( receiver_pos( number_procs)  )
 
-    allocate( receiver_rank( number_procs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( receiver_rank( number_procs)  )
 
-    allocate( receiver_count( number_procs), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( receiver_count( number_procs)  )
 
     ! reset
     receiver_pos    =  0
@@ -375,9 +338,9 @@ subroutine check_internal_nodes(  params, lgt_block, hvy_block, hvy_neighbor, hv
     end do
 
     ! clean up
-    deallocate( receiver_pos, stat=allocate_error )
-    deallocate( receiver_rank, stat=allocate_error )
-    deallocate( receiver_count, stat=allocate_error )
+    deallocate( receiver_pos  )
+    deallocate( receiver_rank  )
+    deallocate( receiver_count  )
 
 end subroutine check_internal_nodes
 
@@ -1037,8 +1000,6 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
     ! length of buffer array and column number in buffer, use for readability
     integer(kind=ik)                    :: int_N, real_N, buffer_pos
 
-    ! allocation error variable
-    integer(kind=ik)                    :: allocate_error
 
     ! number of communications, number of neighboring procs
     integer(kind=ik)                    :: my_n_com, n_com, n_procs
@@ -1062,13 +1023,7 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
     rank         = params%rank
     number_procs = params%number_procs
 
-    allocate( com_matrix_pos(number_procs, number_procs), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( com_matrix_pos(number_procs, number_procs)  )
 
     com_matrix_pos  =  0
 
@@ -1098,53 +1053,22 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
         !                   int buffer  - max number of communications  * 3 + 1 (length of real buffer)
         !                   real buffer - max number of communications * (Bs+g) * g * number of datafields
         !                   for 3D: real_buffer * Bs
-        allocate( int_send_buffer( n_com * 3 + 1, n_procs ), stat=allocate_error )
-        !call check_allocation(allocate_error)
-        if ( allocate_error /= 0 ) then
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: memory allocation fails"
-            stop
-        end if
-        allocate( int_receive_buffer( n_com * 3 + 1, n_procs ), stat=allocate_error )
-        !call check_allocation(allocate_error)
-        if ( allocate_error /= 0 ) then
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: memory allocation fails"
-            stop
-        end if
+        allocate( int_send_buffer( n_com * 3 + 1, n_procs )  )
+
+        allocate( int_receive_buffer( n_com * 3 + 1, n_procs )  )
 
         if ( params%threeD_case ) then
             ! 3D:
-            allocate( real_receive_buffer( n_com * (Bs+g) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
-            allocate( real_send_buffer( n_com * (Bs+g) * Bs * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
+            allocate( real_receive_buffer( n_com * (Bs+g) * Bs * params%number_data_fields, n_procs )  )
+
+            allocate( real_send_buffer( n_com * (Bs+g) * Bs * params%number_data_fields, n_procs )  )
+
         else
             ! 2D:
-            allocate( real_receive_buffer( n_com * (Bs+g) * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
-            allocate( real_send_buffer( n_com * (Bs+g) * params%number_data_fields, n_procs ), stat=allocate_error )
-            !call check_allocation(allocate_error)
-            if ( allocate_error /= 0 ) then
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: memory allocation fails"
-                stop
-            end if
+            allocate( real_receive_buffer( n_com * (Bs+g) * params%number_data_fields, n_procs )  )
+
+            allocate( real_send_buffer( n_com * (Bs+g) * params%number_data_fields, n_procs )  )
+
         end if
 
         ! ----------------------------------------------------------------------------------------
@@ -1210,12 +1134,12 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
     end if
 
     ! clean up
-    deallocate( com_matrix_pos, stat=allocate_error )
+    deallocate( com_matrix_pos  )
 
-    deallocate( int_send_buffer, stat=allocate_error )
-    deallocate( int_receive_buffer, stat=allocate_error )
-    deallocate( real_send_buffer, stat=allocate_error )
-    deallocate( real_receive_buffer, stat=allocate_error )
+    deallocate( int_send_buffer  )
+    deallocate( int_receive_buffer  )
+    deallocate( real_send_buffer  )
+    deallocate( real_receive_buffer  )
 
 end subroutine check_external_nodes
 
@@ -1314,8 +1238,6 @@ subroutine fill_send_buffer_for_redundant_check( params, hvy_block, com_lists, c
     ! send buffer for one proc
     real(kind=rk), allocatable                      :: proc_send_buffer(:)
 
-    ! allocation error variable
-    integer(kind=ik)                                :: allocate_error
 
     ! index of send buffer, return from create_send_buffer subroutine
     integer(kind=ik)                                :: buffer_i
@@ -1330,13 +1252,7 @@ subroutine fill_send_buffer_for_redundant_check( params, hvy_block, com_lists, c
     column_pos = 1
 
     ! allocate proc send buffer, size = line size of real send buffer
-    allocate( proc_send_buffer( size(real_send_buffer,1) ), stat=allocate_error )
-    !call check_allocation(allocate_error)
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( proc_send_buffer( size(real_send_buffer,1) )  )
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -1392,7 +1308,7 @@ subroutine fill_send_buffer_for_redundant_check( params, hvy_block, com_lists, c
     end do
 
     ! clean up
-    deallocate( proc_send_buffer, stat=allocate_error )
+    deallocate( proc_send_buffer  )
 
 end subroutine fill_send_buffer_for_redundant_check
 

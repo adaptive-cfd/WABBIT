@@ -1154,8 +1154,6 @@ end subroutine adjacent4
       real(kind=rk)                   :: Jn
       integer(kind=ik)                :: N, l
 
-      ! allocation error variable
-      integer(kind=ik)                :: allocate_error
 
       ! auxiliary vectors
       integer(kind=ik), allocatable   :: c(:), d(:), e(:), c_flip(:), d_flip(:), e_flip(:)
@@ -1178,54 +1176,12 @@ end subroutine adjacent4
   ! main body
 
       ! allocate auxiliary vectors
-      allocate( c(N), stat=allocate_error)
-      !call check_allocation(allocate_error)
-      if ( allocate_error /= 0 ) then
-          write(*,'(80("_"))')
-          write(*,*) "ERROR: memory allocation fails"
-          stop
-      end if
-
-      allocate( d(N), stat=allocate_error)
-      !call check_allocation(allocate_error)
-      if ( allocate_error /= 0 ) then
-          write(*,'(80("_"))')
-          write(*,*) "ERROR: memory allocation fails"
-          stop
-      end if
-
-      allocate( e(N), stat=allocate_error)
-      !call check_allocation(allocate_error)
-      if ( allocate_error /= 0 ) then
-          write(*,'(80("_"))')
-          write(*,*) "ERROR: memory allocation fails"
-          stop
-      end if
-
-      allocate( c_flip(N), stat=allocate_error)
-      !call check_allocation(allocate_error)
-      if ( allocate_error /= 0 ) then
-          write(*,'(80("_"))')
-          write(*,*) "ERROR: memory allocation fails"
-          stop
-      end if
-
-      allocate( d_flip(N), stat=allocate_error)
-      !call check_allocation(allocate_error)
-      if ( allocate_error /= 0 ) then
-          write(*,'(80("_"))')
-          write(*,*) "ERROR: memory allocation fails"
-          stop
-      end if
-
-      allocate( e_flip(N), stat=allocate_error)
-      !call check_allocation(allocate_error)
-      if ( allocate_error /= 0 ) then
-          write(*,'(80("_"))')
-          write(*,*) "ERROR: memory allocation fails"
-          stop
-      end if
-
+      allocate( c(N) )
+      allocate( d(N) )
+      allocate( e(N) )
+      allocate( c_flip(N) )
+      allocate( d_flip(N) )
+      allocate( e_flip(N) )
       ! convert block coordinates into binary numbers
       call int_to_binary(i-1, N, c_flip)
       call int_to_binary(j-1, N, d_flip)
@@ -1241,12 +1197,12 @@ end subroutine adjacent4
       treecode(1:N) = e*4 + d*2 + c
 
       ! clean up
-      deallocate( c, stat=allocate_error)
-      deallocate( d, stat=allocate_error)
-      deallocate( e, stat=allocate_error)
-      deallocate( c_flip, stat=allocate_error)
-      deallocate( d_flip, stat=allocate_error)
-      deallocate( e_flip, stat=allocate_error)
+      deallocate( c )
+      deallocate( d )
+      deallocate( e )
+      deallocate( c_flip )
+      deallocate( d_flip )
+      deallocate( e_flip )
 
   end subroutine encoding_3D
 

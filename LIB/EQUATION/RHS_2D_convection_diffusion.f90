@@ -126,7 +126,8 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_d
       stop
     end if
 
-    ! return (TODO: DO NOT OVERWRITE?)
+    ! return 
+    ! \todo DO NOT OVERWRITE?
     phi = rhs
 
     do ix = 1, Bs+2*g

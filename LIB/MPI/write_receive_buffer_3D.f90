@@ -84,8 +84,6 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
     ! interpolation variables
     real(kind=rk), dimension(:,:,:), allocatable    :: data_corner, data_corner_fine, data_face, data_face_fine
 
-    ! allocation error variable
-    integer(kind=ik)                                :: allocate_error
 
     ! com list elements
     integer(kind=ik)                                :: my_block, my_dir, level_diff
@@ -115,31 +113,10 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
         rmv_redundant = 0
     end if
 
-    allocate( data_corner( g, g, g), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-    allocate( data_corner_fine( 2*g-1, 2*g-1, 2*g-1), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-
-    allocate( data_face( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2, (Bs+1)/2 + g/2), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
-    allocate( data_face_fine( Bs+g, Bs+g, Bs+g), stat=allocate_error )
-    if ( allocate_error /= 0 ) then
-        write(*,'(80("_"))')
-        write(*,*) "ERROR: memory allocation fails"
-        stop
-    end if
+    allocate( data_corner( g, g, g) )
+    allocate( data_corner_fine( 2*g-1, 2*g-1, 2*g-1) )
+    allocate( data_face( (Bs+1)/2 + g/2, (Bs+1)/2 + g/2, (Bs+1)/2 + g/2) )
+    allocate( data_face_fine( Bs+g, Bs+g, Bs+g))
 
     buffer_i         = 1
 
@@ -2225,9 +2202,9 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
     end do
 
     ! clean up
-    deallocate( data_corner, stat=allocate_error )
-    deallocate( data_corner_fine, stat=allocate_error )
-    deallocate( data_face, stat=allocate_error )
-    deallocate( data_face_fine, stat=allocate_error )
+    deallocate( data_corner  )
+    deallocate( data_corner_fine  )
+    deallocate( data_face  )
+    deallocate( data_face_fine  )
 
 end subroutine write_receive_buffer_3D

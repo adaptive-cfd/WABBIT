@@ -288,6 +288,9 @@ subroutine ini_file_to_params( params, filename )
     ! initial condition
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
+    ! width of initial condition (e.g. Gauss-Blob, depends on Lx and Ly)
+    call read_param_mpi(FILE, 'Physics', 'inicond_width', params%inicond_width, 1e-2_rk)
+
     !***************************************************************************
     ! read DISCRETIZATION parameters
     !
@@ -313,8 +316,18 @@ subroutine ini_file_to_params( params, filename )
     !***************************************************************************
     ! read DEBUG parameters
     !
-    ! discretization order
+    ! debug flag
     call read_param_mpi(FILE, 'Debug', 'debug', params%debug, .true. )
+    ! unit test time_stepper flag
+    call read_param_mpi(FILE, 'Debug', 'test_time_stepper', params%test_time_stepper, .false.)
+    ! unit test spatial flag
+    call read_param_mpi(FILE, 'Debug', 'test_spatial', params%test_spatial, .false.)
+    ! unit test ghost nodes synchronization flag
+    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
+    ! unit test wavelet compression flag
+    call read_param_mpi(FILE, 'Debug', 'test_wavelet_comp', params%test_wavelet_comp, .false.)
+    ! unit test treecode flag
+    call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
 
     !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,

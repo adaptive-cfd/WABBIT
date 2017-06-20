@@ -19,7 +19,7 @@
 !! 02/12/16 - create
 ! ********************************************************************************************
 
-subroutine write_debug_times( iteration )
+subroutine write_debug_times( iteration, params )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,9 +31,10 @@ subroutine write_debug_times( iteration )
 
     !> iteration
     integer(kind=ik), intent(in)        :: iteration
+    
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank
 
@@ -55,7 +56,7 @@ subroutine write_debug_times( iteration )
 ! variables initialization
 
     ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    rank = params%rank
 
 !---------------------------------------------------------------------------------------------
 ! main body

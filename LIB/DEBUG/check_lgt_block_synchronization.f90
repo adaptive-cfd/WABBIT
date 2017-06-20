@@ -54,8 +54,8 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! determine process rank
+    rank = params%rank
 
     ! light data start id
     call proc_to_lgt_data_start_id( lgt_start, rank, params%number_blocks )

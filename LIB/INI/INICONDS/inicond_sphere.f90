@@ -60,7 +60,7 @@ subroutine inicond_sphere( params, u, x0, dx)
     muz = 0.5_rk * params%Lz;
 
     ! sphere boundary (layer) width
-    sigma     = 20.0_rk / params%Lx
+    sigma = params%inicond_width / params%Lx
 
     ! sphere width
     w = 0.0004_rk * params%Lx

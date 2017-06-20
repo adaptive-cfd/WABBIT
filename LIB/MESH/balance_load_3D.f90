@@ -157,7 +157,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
             call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
             ! write debug infos: current distribution list
             if ( params%debug ) then
-                call write_block_distribution( dist_list )
+                call write_block_distribution( dist_list, params )
             end if
 
             !---------------------------------------------------------------------------------
@@ -351,7 +351,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
             call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
             ! write debug infos: current distribution list
             if ( params%debug ) then
-                call write_block_distribution( dist_list )
+                call write_block_distribution( dist_list, params )
             end if
 
             !---------------------------------------------------------------------------------

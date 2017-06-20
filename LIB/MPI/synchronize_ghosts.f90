@@ -219,7 +219,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
 !        ! save com matrix
 !        if ( params%debug ) then
-!            call write_com_matrix( com_matrix )
+!            call write_com_matrix( com_matrix, params )
 !        end if
 
         ! ----------------------------------------------------------------------------------------

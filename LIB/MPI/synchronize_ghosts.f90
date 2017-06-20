@@ -135,11 +135,13 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    ! start time
-    sub_t0 = MPI_Wtime()
+    if ( params%debug ) then
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        ! start time
+        sub_t0 = MPI_Wtime()
 
-    time_sum = 0.0_rk
+        time_sum = 0.0_rk
+    end if
 
     N = params%number_blocks
 
@@ -187,12 +189,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! reset com-list, com_plan, com matrix, receiver lists
         com_pos  =  0
 
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! end time
-        sub_t1 = MPI_Wtime()
-        time_sum = time_sum + (sub_t1 - sub_t0)
-        ! start time
-        sub_t0 = MPI_Wtime()
+        if ( params%debug ) then
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            ! end time
+            sub_t1 = MPI_Wtime()
+            time_sum = time_sum + (sub_t1 - sub_t0)
+            ! start time
+            sub_t0 = MPI_Wtime()
+        end if
 
         ! next steps only if the grid has changed
         if (grid_changed) then
@@ -229,11 +233,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! so we allocate arrays with second dimension=1
         if (n_procs==0) n_procs = 1
 
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
         if ( params%debug ) then
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            ! end time
+            sub_t1 = MPI_Wtime()
+            ! write time
             ! find free or corresponding line
             k = 1
             do while ( debug%name_comp_time(k) /= "---" )
@@ -262,11 +266,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! fill send buffer and position communication matrix
             call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer )
 
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            ! end time
-            sub_t1 = MPI_Wtime()
-            ! write time
             if ( params%debug ) then
+                call MPI_Barrier(MPI_COMM_WORLD, ierr)
+                ! end time
+                sub_t1 = MPI_Wtime()
+                ! write time
                 ! find free or corresponding line
                 k = 1
                 do while ( debug%name_comp_time(k) /= "---" )
@@ -293,11 +297,11 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         end if
 
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
         if ( params%debug ) then
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            ! end time
+            sub_t1 = MPI_Wtime()
+            ! write time
             ! find free or corresponding line
             k = 1
             do while ( debug%name_comp_time(k) /= "---" )
@@ -647,12 +651,12 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! clean up
     deallocate( com_pos )
 
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    ! end time
-    sub_t1 = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-    ! write time
     if ( params%debug ) then
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        ! end time
+        sub_t1 = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+        ! write time
         ! find free or corresponding line
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )

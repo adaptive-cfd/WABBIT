@@ -187,7 +187,7 @@ subroutine f_x_y_t( u01, u02, x, y, time )
     real(kind=rk)                  :: t_a
 
     ! set t end
-    t_a = 3.0_rk !10.0_rk
+    t_a = 10.0_rk
 
     ! calculate velocity
     !u01 = 1.0_rk

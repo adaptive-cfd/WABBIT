@@ -63,8 +63,8 @@ subroutine write_future_mesh_lvl( params, lgt_block, hvy_neighbor, lgt_active, l
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! determine process rank
+    rank = params%rank
 
     ! light data start id
     call proc_to_lgt_data_start_id( lgt_start, rank, params%number_blocks )

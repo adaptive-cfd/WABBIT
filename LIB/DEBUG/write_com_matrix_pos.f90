@@ -19,7 +19,7 @@
 !! 16/12/16 - create
 ! ********************************************************************************************
 
-subroutine write_com_matrix_pos( com_matrix )
+subroutine write_com_matrix_pos( com_matrix, params )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,9 +31,9 @@ subroutine write_com_matrix_pos( com_matrix )
 
     !> iteration
     integer(kind=ik), intent(in)        :: com_matrix(:, :)
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank
 
@@ -51,8 +51,8 @@ subroutine write_com_matrix_pos( com_matrix )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! determine process rank
+    rank = params%rank
 
 !---------------------------------------------------------------------------------------------
 ! main body

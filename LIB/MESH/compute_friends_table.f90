@@ -73,8 +73,10 @@ subroutine compute_friends_table(params, hvy_neighbor, friends, hvy_active, hvy_
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    ! determine process rank
+    rank = params%rank
+    ! determine process number
+    number_procs = params%number_procs
 
     ! We need the buffer for the friends array:
     allocate( friends_loc( 1:number_procs, 1:number_procs ))

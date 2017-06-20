@@ -164,9 +164,9 @@ program main
 
     ! init mpi
     call MPI_Init(ierr)
-    ! determinate process rank
+    ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! determinate process number
+    ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
 
     ! start time
@@ -229,30 +229,37 @@ program main
     !---------------------------------------------------------------------------
     ! Unit tests
     !---------------------------------------------------------------------------
-    ! call unit_test_treecode( params )
-    ! stop
-    ! perform a convergence test on ghost node sync'ing
-    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-!    ! call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-!
-    ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-!
-    if ( params%debug ) then
-!        ! time stepper convergence order
-!        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-!        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-!        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-!
-!        ! spatial convergence order
-!        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-!        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
-!        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, .true. )
-!
+    if (params%test_treecode) then
+       call unit_test_treecode( params )
+       stop
     end if
+    ! perform a convergence test on ghost node sync'ing
+    if (params%test_ghost_nodes_synch) then
+        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    end if
+
+!    if (params%test_wavelet_comp) then
+!        call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
+        ! reset the grid: all blocks are inactive and empty
+!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+!    end if
+
+    if ( params%test_time_stepper ) then
+        ! time stepper convergence order
+        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
+        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        ! reset the grid: all blocks are inactive and empty
+        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    end if
+
+!    if (params%test_spatial) then
+        ! spatial convergence order
+        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
+!        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+        ! reset the grid: all blocks are inactive and empty
+!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+!    end if
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -385,7 +392,7 @@ program main
             debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
             debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
             ! write debug infos to file
-            call write_debug_times( iteration )
+            call write_debug_times( iteration, params )
             ! reset loop values
             debug%comp_time(:,1) = 0.0_rk
             debug%comp_time(:,2) = 0.0_rk
@@ -403,7 +410,7 @@ program main
         debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
         debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
         ! write debug infos to file
-        call write_debug_times( iteration )
+        call write_debug_times( iteration, params )
     end if
 
     ! MPI Barrier before program ends

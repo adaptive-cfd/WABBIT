@@ -19,7 +19,7 @@
 !! 05/12/16 - create
 ! ********************************************************************************************
 
-subroutine write_block_distribution( dist_list )
+subroutine write_block_distribution( dist_list, params )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,9 +31,9 @@ subroutine write_block_distribution( dist_list )
 
     !> iteration
     integer(kind=ik), intent(in)        :: dist_list(:)
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank
 
@@ -51,8 +51,8 @@ subroutine write_block_distribution( dist_list )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! determinate process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    ! determine process rank
+    rank = params%rank
 
 !---------------------------------------------------------------------------------------------
 ! main body

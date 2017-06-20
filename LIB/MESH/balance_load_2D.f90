@@ -190,7 +190,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
             ! write debug infos: distribution list
             !if ( params%debug ) then
-                call write_block_distribution( dist_list )
+                call write_block_distribution( dist_list, params )
             !end if
 
             ! at this point, we know how many blocks a mpirank has: "dist_list(myrank)"
@@ -336,7 +336,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
             ! write debug infos: current distribution list
             if ( params%debug ) then
-                call write_block_distribution( dist_list )
+                call write_block_distribution( dist_list, params )
             end if
 
             !---------------------------------------------------------------------------------
@@ -557,7 +557,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
             ! write debug infos: current distribution list
             if ( params%debug ) then
-                call write_block_distribution( dist_list )
+                call write_block_distribution( dist_list, params )
             end if
 
             !---------------------------------------------------------------------------------

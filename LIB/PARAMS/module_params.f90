@@ -65,6 +65,8 @@ module module_params
         character(len=80)                           :: boundary_cond
         ! initial condition
         character(len=80)                           :: initial_cond
+        ! width of the initial condition (e.g. Gauss blob)
+        real(kind=rk)                               :: inicond_width
 
         ! grid parameter
         integer(kind=ik)                            :: number_domain_nodes
@@ -121,6 +123,16 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test params struct
         logical                                     :: unit_test
+        ! unit test ghost nodes synchronization flag
+        logical                                     :: test_ghost_nodes_synch
+        ! unit test time_stepper convergence flag
+        logical                                     :: test_time_stepper
+        ! unit test spatial convergence flag
+        logical                                     :: test_spatial
+        ! unit test wavelet compression
+        logical                                     :: test_wavelet_comp
+        ! unit test treecode flag
+        logical                                     :: test_treecode
 
         ! -------------------------------------------------------------------------------------
         ! filter

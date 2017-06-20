@@ -1,0 +1,310 @@
+\listfiles
+
+% allgem. Dokumentenformat
+\documentclass[a4paper,11pt,headsepline]{scrartcl}
+
+% weitere Pakete
+% Grafiken aus PNG Dateien einbinden
+\usepackage{graphicx}
+
+% deutsche Silbentrennung
+\usepackage[english]{babel}
+
+% Eurozeichen einbinden
+\usepackage[right]{eurosym}
+
+% Umlaute unter UTF8 nutzen
+\usepackage[utf8]{inputenc}
+
+% Zeichenencoding
+\usepackage[T1]{fontenc}
+
+\usepackage{lmodern}
+\usepackage{fix-cm}
+
+
+% Unterstützung für Schriftarten
+%\newcommand{\changefont}[3]{ 
+%\fontfamily{#1} \fontseries{#2} \fontshape{#3} \selectfont}
+
+% Paket für Seitenrandabständex und Einstellung für Seitenränder
+\usepackage{geometry}
+\geometry{left=3.5cm, right=2cm, top=2.5cm, bottom=3cm}
+
+% Paket für Boxen im Text
+\usepackage{fancybox}
+
+% bricht lange URLs "schoen" um
+\usepackage[hyphens,obeyspaces,spaces]{url}
+
+% Paket für Textfarben
+\usepackage{color}
+
+% Mathematische Symbole importieren
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage[intlimits]{amsmath}
+\newtheorem{satz}{Satz}%[section]
+% auf jeder Seite eine Überschrift (alt, zentriert)
+%\pagestyle{headings}
+
+% erzeugt Inhaltsverzeichnis mit Querverweisen zu den Kapiteln (PDF Version)
+%\usepackage[bookmarksnumbered,pdftitle={\titleDocument},hyperfootnotes=false]{hyperref} 
+%\hypersetup{colorlinks, citecolor=red, linkcolor=blue, urlcolor=black}
+%\hypersetup{colorlinks, citecolor=black, linkcolor= black, urlcolor=black}
+
+% neue Kopfzeilen mit fancypaket
+\usepackage{fancyhdr} %Paket laden
+\pagestyle{fancy} %eigener Seitenstil
+\fancyhf{} %alle Kopf- und Fußzeilenfelder bereinigen
+\fancyhead[L]{\nouppercase{\leftmark}} %Kopfzeile links
+\fancyhead[C]{} %zentrierte Kopfzeile
+\fancyhead[R]{\thepage} %Kopfzeile rechts
+\renewcommand{\headrulewidth}{0.4pt} %obere Trennlinie
+%\fancyfoot[C]{\thepage} %Seitennummer
+%\renewcommand{\footrulewidth}{0.4pt} %untere Trennlinie
+
+% für Tabellen
+\usepackage{array}
+
+% Runde Klammern für Zitate
+%\usepackage[numbers,round]{natbib}
+
+% Festlegung Art der Zitierung - Havardmethode: Abkuerzung Autor + Jahr
+%\usepackage{bibgerm}
+%\usepackage{natbib}
+\bibliographystyle{gerplain}
+\usepackage{cite}
+% Schaltet den zusätzlichen Zwischenraum ab, den LaTeX normalerweise nach einem Satzzeichen einfügt.
+%\frenchspacing
+
+% Paket für Zeilenabstand
+\usepackage{setspace}
+
+% für Bildbezeichner
+%\usepackage{capt-of}
+
+% für Stichwortverzeichnis
+\usepackage{makeidx}
+
+% für Listings
+\usepackage{listings}
+\lstset{numbers=left, numberstyle=\tiny, numbersep=5pt, keywordstyle=\color{black}\bfseries, stringstyle=\ttfamily,showstringspaces=false,basicstyle=\footnotesize,captionpos=b}
+\lstset{language=java}
+
+% Indexerstellung
+\makeindex
+
+% Abkürzungsverzeichnis
+\usepackage[german]{nomencl}
+\let\abbrev\nomenclature
+
+% Abkürzungsverzeichnis LiveTex Version
+\renewcommand{\nomname}{Abkürzungsverzeichnis}
+\setlength{\nomlabelwidth}{.25\hsize}
+\renewcommand{\nomlabel}[1]{#1 \dotfill}
+\setlength{\nomitemsep}{-\parsep}
+\makenomenclature
+%\makeglossary
+
+%SOPHIES SACHEN
+\usepackage{textcomp}
+\usepackage{eurosym}
+\usepackage{amsthm}
+\usepackage[intlimits]{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+%\usepackage{dsfont}
+%\usepackage{mathbbol}
+%\usepackage{paralist}
+%\usepackage[utf8]{inputenc}
+%\usepackage{graphicx}
+%\usepackage{subfig}
+%\usepackage[T1]{fontenc} 
+%\usepackage{biblatex}
+%\usepackage{bibgerm}
+%\usepackage{indentfirst}
+%\usepackage{caption}
+%\usepackage{boxedminipage}
+%\usepackage{empheq}
+%\usepackage{algorithmicx}
+%\usepackage[ruled]{algorithm}
+%    \usepackage{algpseudocode}
+%  \interfootnotelinepenalty=10000  
+%    \usepackage[T1]{fontenc}    
+%\usepackage{framed}
+%\usepackage{enumitem} 
+%\usepackage[]{color}
+%\definecolor{DarkGreen}{rgb}{0.1,0.7,0.3}   %define a custom color
+%\newcommand{\cblue}[1]{\textcolor{blue}{#1}}
+%\newcommand{\cred}[1]{\textcolor{red}{#1}}
+%\newcommand{\cgreen}[1]{\textcolor{DarkGreen}{#1}} 
+\newcommand{\mb}{\mathbf}
+\newcommand*\widefbox[1]{\fbox{\hspace{7em}#1\hspace{9em}}}
+
+\newcommand{\diff}{\ \mathrm{d}}
+%\usepackage{epigraph}
+
+\renewcaptionname{english}{\figurename}{\textsc{Figure}}
+\renewcaptionname{english}{\tablename}{\textsc{Table}}
+%\textwidth 16.5cm \textheight 22cm 
+\oddsidemargin 0mm
+\evensidemargin -4.5mm
+\topmargin -10mm
+\parindent 10pt
+
+
+%NORMALE SCHRIFT
+\setkomafont{disposition}{\normalcolor\bfseries}
+%Linie unter Bild
+\newcommand{\decoRule}{\rule{.8\textwidth}{.4pt}}
+
+%============================TITELSEITE============================
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % New command to make the lines in the title page
+\newcommand*{\supervisor}[1]{\def\supname{#1}}
+\newcommand*{\thesistitle}[1]{\def\@title{#1}\def\ttitle{#1}}
+\newcommand*{\examiner}[1]{\def\examname{#1}}
+\newcommand*{\degree}[1]{\def\degreename{#1}}
+\renewcommand*{\author}[1]{\def\authorname{#1}}
+\newcommand*{\addresses}[1]{\def\addressname{#1}}
+\newcommand*{\university}[1]{\def\univname{#1}}
+\newcommand*{\department}[1]{\def\deptname{#1}}
+\newcommand*{\group}[1]{\def\groupname{#1}}
+\newcommand*{\faculty}[1]{\def\facname{#1}}
+\newcommand*{\subjects}[1]{\def\subjectname{#1}}
+\newcommand*{\keywords}[1]{\def\keywordnames{#1}}
+\def\authorname{}
+\def\ttitle{}
+
+
+%===================================================================
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+\lstset{language=[90]Fortran,
+  basicstyle=\ttfamily,
+  keywordstyle=\color{blue},
+  breaklines=true,
+  %commentstyle=\color{green},
+  %morecomment=[l]{!\ }% Comment only with space after !
+}
+
+\begin{document}
+\title{What to keep in mind while commenting/documenting the code}
+\maketitle
+\onehalfspacing
+\noindent First of all: This is meant as a short guidance. A detailed description of Doxygen can be found on http://www.stack.nl/~dimitri/doxygen/index.html \\
+\section{Doxygen's configuration file}
+The most important configuration options I could find out so far: \\
+\hfill \\
+\begin{tabular}{|c|L{5.5cm}|L{4.6cm}|}
+\hline 
+Configuration option & Explanation & Example \\ 
+\hline 
+PROJECT\_NAME & This name is used in the title of most generated pages and in a few other places &  \textsc{project\_name = \grqq wabbit\grqq} \\
+\hline
+PROJECT\_BRIEF &  optional one line description for a project that appears at the top of each page & \textsc{project\_brief} = \grqq (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nsects in (T)urbulence\grqq \\
+\hline
+OUTPUT\_DIRECTORY &  Specify the path into which the generated documentation will be written. &  \textsc{output\_directory} = ./doc/output 
+\\
+\hline
+OPTIMIZE\_FOR\_FORTRAN & Doxygen will generate output that is tailored for Fortran. & \textsc{optimize\_for\_fortran = yes} \\
+\hline
+EXTENSION\_MAPPING & Doxygen selects the parser to use depending on the extension of the files it parses. & \textsc{extension\_mapping }= f90=FortranFree \\
+\hline
+MARKDOWN\_SUPPORT & Doxygen pre-processes all comments according to the Markdown format, which allows for more readable documentation (see section \ref{markdown}) & \textsc{markdown\_support = yes} \\
+\hline
+\end{tabular}
+\begin{tabular}{|c|L{5.5cm}|L{4.6cm}|}
+\hline
+Configuration option & Explanation & Example \\ 
+\hline
+EXTRACT\_ALL & If set to yes, doxygen will assume all entities in the documentation are documented, even if no documentation was available. & \textsc{extract\_all = no}\\
+\hline
+GENERATE\_TODOLIST & This list is created by putting \textbackslash todo commands in the documentation.& \textsc{generate\_todolist = yes}\\
+\hline
+INPUT & Specify the files and/or directories that contain documented source files. & \textsc{input} = ./LIB \textbackslash \hfill
+		       	 ./doc/mainpage.txt \\
+\hline
+FILE\_PATTERNS & If value of INPUT tag contains directories, the FILE\_PATTERNS tag specifies one or more wildcard patterns to filter out the source-files in the directories. & \textsc{file\_patterns} = *.f90 \\
+\hline
+RECURSIVE & To specify whether or not subdirectories should be searched for input files as well. & \textsc{recursive = yes} \\
+\hline
+IMAGE\_PATH & To specify one or more files or directories that contain images that are to be included in the documentation (see section \ref{image})&  \textsc{image\_path} = ./doc/images \\
+ \hline
+SOURCE\_BROWSER & A list of source files will be generated. Documented entities will be cross-referenced with these sources.& \textsc{source\_browser = yes} \\
+\hline
+REFERENCES\_LINK\_SOURCE & Hyperlinks from functions in REFERENCES\_RELATION and REFERENCED\_BY\_RELATION lists will link to the source code. & \textsc{references\_link\_source = yes} \\
+\hline
+HTML\_OUTPUT & Used to specify where the HTML docs will be put. Relative path: Value of \textsc{output\_directory} is put in front of it. (Same for latex output) & \textsc{html\_output} = html \\
+\hline
+\end{tabular} 
+\begin{tabular}{|c|L{5.5cm}|L{4.6cm}|}
+\hline 
+Configuration option & Explanation & Example \\ 
+\hline
+HTML\_EXTRA\_STYLESHEET & Using this option one can overrule certain style aspects. & \textsc{html\_extra\_stylesheet} =  ./doc/mystyle.css \\
+\hline
+MAX\_DOT\_GRAPH\_DEPTH &  Set the maximum depth of the graphs generated by dot (e.g. the call graphs) & \textsc{max\_dot\_graph\_depth} = 1\\
+\hline 
+\end{tabular} 
+\section{Comments}
+For Fortran code, \grqq !>\grqq \ or \grqq !<\grqq \ starts a comment and \grqq !!\grqq \ or \grqq !>\grqq \ can be used to continue an one line comment into a multi-line comment. Note that in-body documentation is not implemented for Fortran! An example for a comment block:
+\lstinputlisting[language=Fortran, linerange={12-14}]{../LIB/MESH/compute_friends_table.f90}
+\subsection*{Parameters}
+\lstinputlisting[language=Fortran, linerange={32-41}]{../LIB/MESH/update_neighbors_2D.f90}
+\section{Special Commands} \label{image}
+Here are some special commands you should include while commenting new code:
+\begin{description}
+\item[\texttt{!> \textbackslash file}]\hfill \\
+Indicates that a comment block contains documentation for a source or header file. If \textsc{extract\_all} is set to \textsc{no}, you will need this to include the file into the documentation.
+\item[\texttt{!> \textbackslash callgraph}]\hfill \\ 
+If put in a comment block of a function or method and \textsc{have\_dot} set to \textsc{yes}, then doxygen will generate a call graph for that function (provided the implementation of the function or method calls other documented functions).
+\item[\texttt{!> \textbackslash mainpage}]\hfill \\ 
+If the \textbackslash mainpage command is placed in a comment block the block is used to customize the index page (in HTML) or the first chapter (in Latex).
+\item[\texttt{!> \textbackslash name}]\hfill \\ 
+Name of the file/subroutine.
+\item[\texttt{!> \textbackslash version}]\hfill \\
+Current version of subroutine/file.
+\item[\texttt{!> \textbackslash author}]\hfill \\ 
+Author(s) of the subroutine/file.
+\end{description}
+\lstinputlisting[language=Fortran, linerange={1-2, 4-4, 6-9}]{../LIB/MESH/treecode_to_hilbertcode_2D.f90}
+\begin{description}
+\item[\texttt{!> \textbackslash brief}]\hfill \\ 
+Starts a paragraph that serves as a brief description.
+\item[\texttt{!> \textbackslash details}]\hfill \\ 
+Just like \texttt{!> \textbackslash brief} starts a brief description, \texttt{!> \textbackslash details} starts the detailed description. You can also start a new paragraph with a blank line.
+\item[\texttt{!> \textbackslash image}] \hfill \\ 
+Inserts an image into the documentation. This command is format specific. First argument:  output format in which the image should be embedded, second argument: file name of the image, third argument: caption, fourth argument: width or height of the image.
+\end{description}
+\lstinputlisting[language=Fortran, firstline=39, lastline=39]{../LIB/MESH/treecode_to_hilbertcode_2D.f90}
+\begin{description}
+\item[\texttt{!> \textbackslash note}]\hfill \\ 
+Starts a paragraph where a note can be entered. The paragraph will be indented.
+\item[\texttt{!> \textbackslash todo}]\hfill \\
+ Starts a paragraph where a \textsc{todo} item is described.
+\end{description}
+Both the \texttt{!> \textbackslash note} and the \texttt{!> \textbackslash todo} paragraph will be highlighted.
+\section{Markdown support} \label{markdown}
+You can use Markdown formatting syntax to let the output look good.
+\subsection{Paragraphs}
+Paragraphs are seperated by a blank line. To start a new line, put \grqq \textbackslash n\grqq at the end of the line.
+\subsection{Tables} 
+A table consists of a header line, a separator line, and at least one row line. Table columns are separated by the pipe (|) character.
+\lstinputlisting[language=Fortran, firstline=22, lastline=26]{../LIB/MESH/treecode_to_hilbertcode_2D.f90}
+\subsection{Lists}
+Simple bullet lists can be made by starting a line with -, +, or *. List items can span multiple paragraphs (if each paragraph starts with the proper indentation) and lists can be nested. To start with a new item include a blank line.
+\lstinputlisting[language=Fortran, firstline=12, lastline=19]{../LIB/MESH/treecode_to_hilbertcode_2D.f90}
+You can also generate a numbered list:
+\lstset{language=Fortran}
+\begin{lstlisting}
+!! 1. First item
+!! 2. Second item
+\end{lstlisting}
+\subsection{Automatic Linking}
+To create a link to an URL or e-mail address Markdown supports the following syntax:
+\lstinputlisting[language=Fortran, firstline=6, lastline=6]{mainpage.txt}
+Note that ` `   lets the text appear in monospaced font.
+\end{document}

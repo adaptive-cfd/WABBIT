@@ -87,13 +87,14 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    if ( params%debug ) then
+        ! end time
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        ! start time
+        sub_t0 = MPI_Wtime()
 
-    ! end time
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    time_sum = 0.0_rk
+        time_sum = 0.0_rk
+    end if
 
     lgt_n_old = 0
     iteration = 0
@@ -121,19 +122,23 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
 
-        ! end time
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        sub_t1 = MPI_Wtime()
-        time_sum = time_sum + (sub_t1 - sub_t0)
+        if ( params%debug ) then
+            ! end time
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            sub_t1 = MPI_Wtime()
+            time_sum = time_sum + (sub_t1 - sub_t0)
+        end if
 
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
-        ! end time
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! start time
-        sub_t0 = MPI_Wtime()
+        if ( params%debug ) then
+            ! end time
+            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            ! start time
+            sub_t0 = MPI_Wtime()
+        end if
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
@@ -267,11 +272,13 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
     end do
 
-    ! end time
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    ! end time
-    sub_t1 = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
+    if ( params%debug ) then
+        ! end time
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        ! end time
+        sub_t1 = MPI_Wtime()
+        time_sum = time_sum + (sub_t1 - sub_t0)
+    end if
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
@@ -284,10 +291,12 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
-    ! end time
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
-    ! start time
-    sub_t0 = MPI_Wtime()
+    if ( params%debug ) then
+        ! end time
+        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        ! start time
+        sub_t0 = MPI_Wtime()
+    end if
 
     !> load balancing destroys the lists again, so we have to create them one last time to
     !! end on a valid mesh

@@ -92,7 +92,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
     !! except if they are already on the highest level.
-    !! FIXME: For consistency, it would be better to always refine (allowing one level
+    !> \todo  FIXME: For consistency, it would be better to always refine (allowing one level
     !! beyond maxlevel), but afterwards coarsen to fall back to maxlevel again
     if ( params%threeD_case ) then
         ! 3D:

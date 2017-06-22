@@ -144,7 +144,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
     ! loop over all active blocks (heavy data)
-    ! FIXME: you could also look over light data, as ddx is available only from that. no mpi
+    !> \todo FIXME: you could also look over light data, as ddx is available only from that. no mpi
     do k = 1, hvy_n
         ! light id of this block
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )

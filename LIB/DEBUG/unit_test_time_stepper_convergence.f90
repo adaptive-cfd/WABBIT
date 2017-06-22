@@ -206,7 +206,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     params_loc%time_step_method = 'CFL_cond'
     params_loc%CFL              = 0.5_rk
 
-    ! FIXME: you could also look over light data, as ddx is available only from that. no mpi
+    !> \todo FIXME: you could also look over light data, as ddx is available only from that. no mpi
     do k = 1, hvy_n
         ! light id of this block
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params_loc%rank, params_loc%number_blocks )

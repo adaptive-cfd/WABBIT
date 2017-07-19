@@ -136,7 +136,7 @@ subroutine RHS_2D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
     end if
 
     ! return
-    ! \todo DO NOT OVERWRITE?
+    !> \todo DO NOT OVERWRITE?
     phi = rhs
 
     do ix = 1, Bs+2*g

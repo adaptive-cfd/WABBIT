@@ -26,6 +26,7 @@ module module_params
     ! use physics module
     use module_convection_diffusion
     use module_navier_stokes
+    use module_acm
     ! ini file parser module
     use module_ini_files_parser_mpi
 
@@ -43,8 +44,8 @@ module module_params
         real(kind=rk)                               :: CFL
         ! dt
         real(kind=rk)                               :: dt
-        ! time stepper method
-        character(len=80)                           :: time_step_method
+        ! time step calculator
+        character(len=80)                           :: time_step_calc
         ! data writing frequency
         integer(kind=ik)                            :: write_freq
         ! butcher tableau containing coefficients for Runge-Kutta method
@@ -67,6 +68,13 @@ module module_params
         character(len=80)                           :: initial_cond
         ! width of the initial condition (e.g. Gauss blob)
         real(kind=rk)                               :: inicond_width
+
+        ! penalization?
+        logical                                     :: penalization
+        ! penalization factor
+        real(kind=rk)                               :: eps_penal
+        ! smooth mask for penalization term
+        logical                                     :: smooth_mask
 
         ! grid parameter
         integer(kind=ik)                            :: number_domain_nodes
@@ -103,6 +111,7 @@ module module_params
         ! physics substructure
         type(type_params_convection_diffusion_physics) :: physics
         type(type_params_physics_navier_stokes)     :: physics_ns
+        type(type_params_physics_acm)               :: physics_acm
 
         ! use third dimension
         logical                                     :: threeD_case

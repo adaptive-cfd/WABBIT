@@ -50,7 +50,7 @@
 !
 ! ********************************************************************************************
 
-subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -76,8 +76,12 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
 
     ! communication lists:
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
@@ -90,7 +94,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, lgt_id, d, j
+    integer(kind=ik)                    :: k, d, j
 
     ! time step, dx
     real(kind=rk)                       :: dt, dx, my_dx
@@ -143,13 +147,11 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
-    ! loop over all active blocks (heavy data)
-    !> \todo FIXME: you could also look over light data, as ddx is available only from that. no mpi
-    do k = 1, hvy_n
-        ! light id of this block
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+    ! loop over all active blocks (light data)
+    !> \todo no mpi
+    do k = 1, lgt_n
         ! compute blocks' spacing from treecode
-        call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+        call get_block_spacing_origin( params, lgt_active(k), lgt_block, xx0, ddx )
         ! find smallest dx of active blocks
         my_dx = min(my_dx, minval(ddx(1:d)) )
     end do
@@ -182,7 +184,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! restart time
     sub_t0 = MPI_Wtime()
     
-    ! save data at time t
+    ! save data at time t to heavy work array
     call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
 
     call RHS_wrapper(time, dt, params, hvy_work, rk_coeffs(1,1), 1, lgt_block, hvy_active, hvy_n, hvy_block)

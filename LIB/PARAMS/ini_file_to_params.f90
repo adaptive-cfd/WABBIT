@@ -96,7 +96,7 @@ subroutine ini_file_to_params( params, filename )
     ! read output write frequency
     call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
     ! read method to calculate time step
-    call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_method, "CFL_cond" )
+    call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_calc, "CFL_cond" )
     ! read value of fixed time step
     call read_param_mpi(FILE, 'Time', 'dt', params%dt, 1e-6_rk )
     ! read CFL number
@@ -277,6 +277,30 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
+        case('2D_acm')
+            ! domain size
+            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            ! set third dimension to zero
+            params%Lz = 0.0_rk
+            if ( params%number_data_fields > 4) then!/= 3) then
+                write(*,'(80("_"))')
+                write(*,'("ERROR: try to solve acm with", i3, " datafield(s)")') params%number_data_fields
+                stop
+            end if
+            allocate( params%physics_acm%names( params%number_data_fields ) )
+            params%physics_acm%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names_acm', params%physics_acm%names, params%physics_acm%names )
+            ! speed of sound for acm
+            call read_param_mpi(FILE, 'Physics', 'c_0', params%physics_acm%c_0, 10.0_rk)
+
+            ! inverse of Re
+            call read_param_mpi(FILE, 'Physics', 'nu', params%physics_acm%nu, 1e-1_rk)
+            
+            ! gamma_p
+            call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: physics type is unknown"
@@ -285,11 +309,25 @@ subroutine ini_file_to_params( params, filename )
 
     end select
 
+    !**************************************************************************
+    ! read INITIAL CONDITION parameters
+
     ! initial condition
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
     ! width of initial condition (e.g. Gauss-Blob, depends on Lx and Ly)
     call read_param_mpi(FILE, 'Physics', 'inicond_width', params%inicond_width, 1e-2_rk)
+
+
+    !***************************************************************************
+    ! read VOLUME PENALIZATION METHOD parameters
+
+    ! penalization flag
+    call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
+    ! penalization factor
+    call read_param_mpi(FILE, 'VPM', 'eps_penal', params%eps_penal, 1e-4_rk)
+    ! smooth mask for penalization term
+    call read_param_mpi(FILE, 'VPM', 'smooth_mask', params%smooth_mask, .true.)
 
     !***************************************************************************
     ! read DISCRETIZATION parameters

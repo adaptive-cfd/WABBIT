@@ -3,7 +3,8 @@
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 RHS_3D_convection_diffusion.f90 \
-RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 RHS_2D_advection.f90
+RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 RHS_2D_advection.f90 \
+RHS_2D_acm.f90 create_mask.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -17,6 +18,7 @@ MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wra
 # physics modules
 MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
+MFILED += module_2D_acm.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -84,7 +86,10 @@ $(OBJDIR)/module_convection_diffusion.o: module_convection_diffusion.f90 $(OBJDI
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser_mpi.o \
+$(OBJDIR)/module_acm.o: module_acm.f90 $(OBJDIR)/module_precision.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_acm.o $(OBJDIR)/module_ini_files_parser_mpi.o  \
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -103,7 +108,7 @@ $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_para
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90 $(OBJDIR)/module_params.o \
-	inicond_gauss_blob.f90 initial_condition_on_block_wrapper.f90 inicond_sinus_2D.f90 inicond_sphere.f90
+	inicond_gauss_blob.f90 initial_condition_on_block_wrapper.f90 inicond_sinus_2D.f90 inicond_sphere.f90 inicond_constant_acm.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o

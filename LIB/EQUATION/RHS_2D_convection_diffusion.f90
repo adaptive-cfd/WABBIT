@@ -38,8 +38,8 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_d
     real(kind=rk), intent(in)                                   :: dx, dy, u01, u02, nu
     !> datafield
     real(kind=rk), dimension(Bs+2*g, Bs+2*g), intent(inout)     :: phi
-    ! order discretization
-    character(len=80)                                           :: order_discretization
+    !> order discretization
+    character(len=80), intent(in)                               :: order_discretization
 
     ! auxiliary fields for rhs calculation
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)                    :: rhs
@@ -127,7 +127,7 @@ subroutine RHS_2D_convection_diffusion(phi, dx, dy, g, Bs, u01, u02, nu, order_d
     end if
 
     ! return 
-    ! \todo DO NOT OVERWRITE?
+    !> \todo DO NOT OVERWRITE?
     phi = rhs
 
     do ix = 1, Bs+2*g

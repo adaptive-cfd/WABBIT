@@ -41,6 +41,7 @@ contains
   include "initial_condition_on_block_wrapper.f90"
   include "inicond_gauss_blob.f90"
   include "inicond_sinus_2D.f90"
+  include "inicond_constant_acm.f90"
 
   ! 3D sphere initialization
   include "inicond_sphere.f90"

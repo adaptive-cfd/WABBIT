@@ -200,6 +200,23 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                                        params%order_discretization  )                             
                  end do
             end do
+       case('2D_acm')
+            ! loop over all active heavy data blocks
+            do k = 1, hvy_n
+                ! copy ghost nodes to hvy_work
+                hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 1:N_dF, hvy_active(k) )
+
+                ! convert given hvy_id to lgt_id for block spacing routine
+                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+
+                ! get block spacing for RHS
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+                ! RHS (compute k-coefficients)
+                call RHS_2D_acm( params, g, Bs, &
+                                  dx, x0, N_dF, &
+                                  hvy_work( :, :, 1, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ), params%order_discretization)
+            end do
 
        case default
            write(*,'(80("_"))')

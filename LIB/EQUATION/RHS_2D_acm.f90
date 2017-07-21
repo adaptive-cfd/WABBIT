@@ -7,7 +7,7 @@
 !> \version 0.5
 !> \author engels, sm
 !
-!> \brief RHS for 2D acm penalty method
+!> \brief RHS for 2D artificial compressibility method
 !
 !>
 !! input:    - datafield, grid parameter, derivative order \n
@@ -19,7 +19,7 @@
 !! 27/06/17 - create
 ! ********************************************************************************************
 
-subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization)
+subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, int_block, volume_int)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -46,13 +46,20 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization)
     real(kind=rk), intent(inout)                   :: phi(Bs+2*g, Bs+2*g, N_dF)
     !> discretization order
     character(len=80), intent(in)                  :: order_discretization
+    !> integral of each block
+    real(kind=rk), dimension(2), intent(out)       :: int_block
+    !> global volume integral of the last time step
+    real(kind=rk), dimension(2), intent(in)        :: volume_int
 
+    !> RHS
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, N_dF) :: rhs
     
     !> mask term for every grid point in this block
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask
     !> velocity of the solid (set to zero)
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, 2)    :: us
+    !> forcing term
+    real(kind=rk), dimension(2)                    :: forcing
 
 
     !> local datafields
@@ -83,6 +90,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization)
     rhs  = 0.0_rk
     mask = 0.0_rk
     us   = 0.0_rk
+    int_block = 0.0_rk
 
     dx_inv = 1.0_rk / (2.0_rk*dx(1))
     dy_inv = 1.0_rk / (2.0_rk*dx(2))
@@ -98,6 +106,8 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization)
         call create_mask(params, mask, x0, dx, Bs, g)
         mask = mask*eps_inv
     end if
+
+    call  compute_forcing(forcing, volume_int, params%Lx, params%Ly)
 
    if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -125,16 +135,23 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization)
                 penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))
                 penaly = -mask(ix,iy)*(v(ix,iy)-us(ix,iy,2))
 
-                rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + 0.1_rk
-                rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + 0.1_rk
+                rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
+                rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
                 rhs(ix,iy,3) = -(c_0**2)*(div_U) - gamma*p(ix,iy)
 
                 if (N_dF ==4) rhs(ix,iy,4) = v_dx-u_dy
+
+                int_block(1) = int_block(1) + u(ix,iy)
+                int_block(2) = int_block(2) + v(ix,iy)
                 
               end do
         end do
 
     end if
+    int_block(1) = int_block(1)*dx(1)*dx(2)
+    int_block(2) = int_block(2)*dx(1)*dx(2)
+
+    !> \todo DO NOT OVERWRITE?
     phi = rhs
 
     ! ! grad(u)
@@ -161,6 +178,57 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization)
     ! rhs(:,:,3) = -(c_0**2)*(div_U)
 
 end subroutine RHS_2D_acm
+
+subroutine compute_forcing(forcing, volume_int, Lx, Ly)
+
+! ********************************************************************************************
+! WABBIT
+! ============================================================================================
+!
+!> \brief compute forcing term for artificial conmpressibility method to accelerate 
+!
+!>
+!! input:    - velocity, volume integral, grid parameters \n
+!! output:   - forcing term \n
+!!
+!!
+!! = log ======================================================================================
+!! \n
+!! 21/07/17 - create
+!*********************************************************************************************
+!---------------------------------------------------------------------------------------------
+! modules
+use module_precision
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+implicit none
+
+    !> forcing term
+    real(kind=rk), dimension(2), intent(out) :: forcing
+
+    !> volume integral
+    real(kind=rk), dimension(2), intent(in)  :: volume_int
+    !> domain size
+    real(kind=rk), intent(in)                :: Lx, Ly
+
+    !> mean flow
+    real(kind=rk)                            :: ux_mean, uy_mean
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+    forcing = 0.0_rk
+    
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ux_mean = volume_int(1)/(Lx*Ly)
+    uy_mean = volume_int(1)/(Lx*Ly)
+
+    forcing(1) = max(0.0_rk, 1.0_rk-ux_mean)
+
+end subroutine compute_forcing
 
 
 ! subroutine grad_central(u_dx, u_dy, Bs, g, u, dx_inv, dy_inv)

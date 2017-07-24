@@ -363,7 +363,7 @@ program main
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, lgt_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end if
 
         ! adapt the mesh

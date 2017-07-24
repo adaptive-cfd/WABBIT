@@ -144,6 +144,9 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
         case('no_filter')
             ! do nothing..
 
+        case('wavelet')
+            ! do nothing..
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: filter type is unknown"
@@ -174,47 +177,60 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
         ! loop over all datafields
         do dF = 1, N_dF
 
-            ! save old block data
-            block_old = hvy_block(:, :, :, dF, hvy_active(k) )
+            ! switch case
+            ! explicit filter -> stencil_size /= 0
+            ! wavelet filter -> stencil_size == 0
+            if (stencil_size /= 0) then
+                ! explicit filter
 
-            ! 3D or 2D case
-            if ( params%threeD_case ) then
-                ! 3D
-                ! loop over block data
-                do i = g+1, Bs+g
-                    do j = g+1, Bs+g
-                        do l = g+1, Bs+g
+                ! save old block data
+                block_old = hvy_block(:, :, :, dF, hvy_active(k) )
+
+                ! 3D or 2D case
+                if ( params%threeD_case ) then
+                    ! 3D
+                    ! loop over block data
+                    do i = g+1, Bs+g
+                        do j = g+1, Bs+g
+                            do l = g+1, Bs+g
+
+                                ! x direction
+                                call filter_1D( block_old(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l ), phi_tilde(1), stencil(1:stencil_size) )
+                                ! y direction
+                                call filter_1D( block_old(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), l ), phi_tilde(2), stencil(1:stencil_size) )
+                                ! z direction
+                                call filter_1D( block_old(i, j, l-( (stencil_size+1)/2-1):l+( (stencil_size+1)/2-1) ), phi_tilde(3), stencil(1:stencil_size) )
+
+                                ! filter
+                                hvy_block(i, j, l, dF, hvy_active(k) ) = hvy_block(i, j, l, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
+
+                            end do
+                        end do
+                    end do
+
+                else
+                    ! 2D
+                    ! loop over block data
+                    do i = g+1, Bs+g
+                        do j = g+1, Bs+g
 
                             ! x direction
-                            call filter_1D( block_old(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l ), phi_tilde(1), stencil(1:stencil_size) )
+                            call filter_1D( block_old(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1 ), phi_tilde(1), stencil(1:stencil_size) )
                             ! y direction
-                            call filter_1D( block_old(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), l ), phi_tilde(2), stencil(1:stencil_size) )
-                            ! z direction
-                            call filter_1D( block_old(i, j, l-( (stencil_size+1)/2-1):l+( (stencil_size+1)/2-1) ), phi_tilde(3), stencil(1:stencil_size) )
+                            call filter_1D( block_old(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), 1 ), phi_tilde(2), stencil(1:stencil_size) )
 
                             ! filter
-                            hvy_block(i, j, l, dF, hvy_active(k) ) = hvy_block(i, j, l, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
+                            hvy_block(i, j, 1, dF, hvy_active(k) ) = hvy_block(i, j, 1, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2)
 
                         end do
                     end do
-                end do
 
-            else
-                ! 2D
-                ! loop over block data
-                do i = g+1, Bs+g
-                    do j = g+1, Bs+g
+                end if
 
-                        ! x direction
-                        call filter_1D( block_old(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1 ), phi_tilde(1), stencil(1:stencil_size) )
-                        ! y direction
-                        call filter_1D( block_old(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), 1 ), phi_tilde(2), stencil(1:stencil_size) )
+            elseif (stencil_size == 0) then
 
-                        ! filter
-                        hvy_block(i, j, 1, dF, hvy_active(k) ) = hvy_block(i, j, 1, dF, hvy_active(k) ) + phi_tilde(1) + phi_tilde(2)
-
-                    end do
-                end do
+                ! wavelet filter
+                call wavelet_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
 
             end if
 

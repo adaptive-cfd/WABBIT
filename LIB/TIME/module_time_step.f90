@@ -53,6 +53,7 @@ contains
     ! filter
     include "filter_block.f90"
     include "filter_1D.f90"
+    include "wavelet_filter.f90"
 
     ! dt calculation
     include "calculate_time_step.f90"

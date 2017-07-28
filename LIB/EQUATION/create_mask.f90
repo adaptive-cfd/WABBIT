@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine create_mask( params, mask, x0, dx, Bs, g )
+subroutine create_mask(params, mask, x0, dx, Bs, g )
 
     use module_params
     use module_precision
@@ -28,55 +28,82 @@ subroutine create_mask( params, mask, x0, dx, Bs, g )
     implicit none
 
     !> user defined parameter structure
-    type (type_params), intent(in)                            :: params
+    type (type_params), intent(in)                                    :: params
     !> mask term for every grid point of this block
-    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(inout)   :: mask
+    real(kind=rk), dimension(2*g+Bs, 2*g+Bs, 2*g+Bs), intent(inout)   :: mask
     !> spacing and origin of block
-    real(kind=rk), dimension(3), intent(in)                   :: x0, dx
+    real(kind=rk), dimension(3), intent(in)                           :: x0, dx
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in)                                      :: Bs, g
 
     ! auxiliary variable for gauss pulse
-    real(kind=rk)                                             :: x, y, R_cyl, cx, cy, r, h
+    real(kind=rk)                                             :: x, y, z, R_cyl, cx, cy, cz, r, h
     ! loop variables
-    integer(kind=ik)                                          :: ix, iy
+    integer(kind=ik)                                          :: ix, iy, iz
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-!---------------------------------------------------------------------------------------------
-! main body
-
     ! reset mask array
     mask = 0.0_rk
+
+!---------------------------------------------------------------------------------------------
+! main body
 
     ! place cylinder in the center of the domain
     cx = 0.5_rk * params%Lx
     cy = 0.5_rk * params%Ly
 
-    ! radius of the cylinder
-    R_cyl = params%inicond_width * params%Lx * params%Ly
-    ! parameter for smoothing function (width)
-    h = 1e-1_rk*R_cyl
-    
-    do ix=1, Bs+2*g
-       x = dble(ix-(g+1)) * dx(1) + x0(1) - cx
-       do iy=1, Bs+2*g
-           y = dble(iy-(g+1)) * dx(2) + x0(2) - cy
-           ! distance from center of cylinder
-           r = dsqrt(x*x + y*y)
-           if (params%smooth_mask) then
-               call smoothstep(mask(ix,iy), r, R_cyl, h)
-           else
-               ! if point is inside the cylinder, set mask to 1
-               if (r <= R_cyl) then
-                   mask(ix,iy) = 1.0_rk
-               else
-                   mask(ix,iy) = 0.0_rk
-               end if
-           end if
-       end do
-    end do
+    if (params%threeD_case) then
+        cz = 0.5_rk * params%Lz
+        ! radius of the cylinder
+        R_cyl = params%inicond_width * params%Lx * params%Ly * params%Lz
+        do ix=1, Bs+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - cx
+            do iy=1, Bs+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2) - cy
+                do iz = 1, Bs+2*g
+                    z = dble(iz-(g+1)) * dx(3) + x0(3) - cz
+                    ! distance from center of cylinder
+                    r = dsqrt(x**2 + y**2 + z**2)
+                    if (params%smooth_mask) then
+                        call smoothstep(mask(ix,iy,iz), r, R_cyl, h)
+                    else
+                        ! if point is inside the cylinder, set mask to 1
+                        if (r <= R_cyl) then
+                            mask(ix,iy,iz) = 1.0_rk
+                        else
+                            mask(ix,iy,iz) = 0.0_rk
+                        end if
+                    end if
+                end do
+            end do
+         end do
+     else
+         ! radius of the cylinder
+         R_cyl = params%inicond_width * params%Lx * params%Ly
+         ! parameter for smoothing function (width)
+         h = 1e-1_rk*R_cyl
+
+         do ix=1, Bs+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - cx
+            do iy=1, Bs+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2) - cy
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+                if (params%smooth_mask) then
+                    call smoothstep(mask(ix,iy,1), r, R_cyl, h)
+                else
+                    ! if point is inside the cylinder, set mask to 1
+                    if (r <= R_cyl) then
+                        mask(ix,iy,1) = 1.0_rk
+                    else
+                        mask(ix,iy,1) = 0.0_rk
+                    end if
+                end if
+            end do
+         end do
+     end if
 
 
 end subroutine create_mask

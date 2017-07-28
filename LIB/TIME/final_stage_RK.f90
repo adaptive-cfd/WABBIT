@@ -190,9 +190,6 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                             hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
                                + dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( :, :, :, (j-1)*N_dF+1:j*N_dF, hvy_active(k))
                             
-                            if (N_dF==4) then
-                               hvy_block(:, :, :, N_dF, hvy_active(k)) = hvy_work( :, :, :, 2*N_dF, hvy_active(k) )
-                            end if
                         end if
                     end do
                 end do

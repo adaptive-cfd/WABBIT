@@ -74,16 +74,14 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
     integer(kind=ik), intent(in)        :: hvy_n
 
     !> global integral
-    real(kind=rk), dimension(2), save   :: volume_int = 0.0_rk
-    !> local integral of each process and of each block
-    real(kind=rk), dimension(2)         :: int_local, int_block
+    real(kind=rk), dimension(3)         :: volume_int
 
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0
     ! loop variables
     integer(kind=ik)                    :: k, dF, N_dF, lgt_id
     ! grid parameter, error variable
-    integer(kind=ik)                    :: Bs, g, mpi_err
+    integer(kind=ik)                    :: Bs, g
 
 
 !---------------------------------------------------------------------------------------------
@@ -98,8 +96,6 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    int_local = 0.0_rk
 
     ! RHS depends on physics
     select case(params%physics_type)
@@ -208,6 +204,8 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                  end do
             end do
        case('2D_acm')
+            ! compute volume integral
+            call volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt_block)
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 ! copy ghost nodes to hvy_work
@@ -222,10 +220,9 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                 ! RHS (compute k-coefficients)
                 call RHS_2D_acm( params, g, Bs, &
                                   dx, x0, N_dF, &
-                                  hvy_work( :, :, 1, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ), params%order_discretization, int_block, volume_int)
-                int_local = int_local + int_block
+                                  hvy_work( :, :, 1, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ), params%order_discretization, volume_int, time + rk_coeff*dt)
             end do
-            call MPI_ALLREDUCE(int_local, volume_int, 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpi_err)
+
        case default
            write(*,'(80("_"))')
            write(*,*) "ERROR: physics type is unknown"

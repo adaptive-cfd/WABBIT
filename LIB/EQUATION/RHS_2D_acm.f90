@@ -19,7 +19,7 @@
 !! 27/06/17 - create
 ! ********************************************************************************************
 
-subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, int_block, volume_int)
+subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, volume_int, time)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -46,17 +46,17 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     real(kind=rk), intent(inout)                   :: phi(Bs+2*g, Bs+2*g, N_dF)
     !> discretization order
     character(len=80), intent(in)                  :: order_discretization
-    !> integral of each block
-    real(kind=rk), dimension(2), intent(out)       :: int_block
-    !> global volume integral of the last time step
+    !> global volume integral
     real(kind=rk), dimension(2), intent(in)        :: volume_int
+    !> time
+    real(kind=rk), intent(in)                      :: time
 
     !> RHS
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, N_dF) :: rhs
     
     !> mask term for every grid point in this block
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask
-    !> velocity of the solid (set to zero)
+    !> velocity of the solid
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, 2)    :: us
     !> forcing term
     real(kind=rk), dimension(2)                    :: forcing
@@ -69,6 +69,9 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, v_dydy, p_dx, p_dy, penalx, penaly
     ! loop variables
     integer(kind=rk)                               :: ix, iy
+    ! coefficients for Tam&Webb
+    real(kind=rk)                                  :: a(-3:3)
+    real(kind=rk)                                  :: b(-2:2)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -90,7 +93,6 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     rhs  = 0.0_rk
     mask = 0.0_rk
     us   = 0.0_rk
-    int_block = 0.0_rk
 
     dx_inv = 1.0_rk / (2.0_rk*dx(1))
     dy_inv = 1.0_rk / (2.0_rk*dx(2))
@@ -98,6 +100,15 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     dy2_inv = 1.0_rk / (dx(2)**2)
 
     eps_inv = 1.0_rk / eps
+
+    ! Tam & Webb, 4th order optimized (for first derivative)
+    a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
+         0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+
+    ! 4th order coefficients for second derivative
+    b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, &
+            4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -107,7 +118,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
         mask = mask*eps_inv
     end if
 
-    call  compute_forcing(forcing, volume_int, params%Lx, params%Ly)
+    call  compute_forcing(forcing, volume_int, params%Lx, params%Ly, time)
 
    if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -137,19 +148,59 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
 
                 rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
                 rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
-                rhs(ix,iy,3) = -(c_0**2)*(div_U) - gamma*p(ix,iy)
+                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
 
-                if (N_dF ==4) rhs(ix,iy,4) = v_dx-u_dy
-
-                int_block(1) = int_block(1) + u(ix,iy)
-                int_block(2) = int_block(2) + v(ix,iy)
-                
-              end do
+            end do
         end do
 
+    else if (order_discretization == "FD_4th_central_optimized") then
+        !-----------------------------------------------------------------------
+        ! 4th order
+        !-----------------------------------------------------------------------
+        do ix = g+1, Bs+g
+            do iy = g+1, Bs+g
+
+                ! first derivatives of u, v, p
+                u_dx = (a(-3)*u(ix-3,iy) + a(-2)*u(ix-2,iy) + a(-1)*u(ix-1,iy) + a(0)*u(ix,iy)&
+                 +  a(+1)*u(ix+1,iy) + a(+2)*u(ix+2,iy) + a(+3)*u(ix+3,iy))*dx_inv
+                u_dy = (a(-3)*u(ix,iy-3) + a(-2)*u(ix,iy-2) + a(-1)*u(ix,iy-1) + a(0)*u(ix,iy)&
+                 +  a(+1)*u(ix,iy+1) + a(+2)*u(ix,iy+2) + a(+3)*u(ix,iy+3))*dy_inv
+                v_dx = (a(-3)*v(ix-3,iy) + a(-2)*v(ix-2,iy) + a(-1)*v(ix-1,iy) + a(0)*v(ix,iy)&
+                 +  a(+1)*v(ix+1,iy) + a(+2)*v(ix+2,iy) + a(+3)*v(ix+3,iy))*dx_inv
+                v_dy = (a(-3)*v(ix,iy-3) + a(-2)*v(ix,iy-2) + a(-1)*v(ix,iy-1) + a(0)*v(ix,iy)&
+                 +  a(+1)*v(ix,iy+1) + a(+2)*v(ix,iy+2) + a(+3)*v(ix,iy+3))*dy_inv
+                p_dx = (a(-3)*p(ix-3,iy) + a(-2)*p(ix-2,iy) + a(-1)*p(ix-1,iy) + a(0)*p(ix,iy)&
+                 +  a(+1)*p(ix+1,iy) + a(+2)*p(ix+2,iy) + a(+3)*p(ix+3,iy))*dx_inv
+                p_dy = (a(-3)*p(ix,iy-3) + a(-2)*p(ix,iy-2) + a(-1)*p(ix,iy-1) + a(0)*p(ix,iy)&
+                 +  a(+1)*p(ix,iy+1) + a(+2)*p(ix,iy+2) + a(+3)*u(ix,iy+3))*dy_inv
+
+                ! second derivatives of u and v
+                 u_dxdx = (b(-2)*u(ix-2,iy) + b(-1)*u(ix-1,iy) + b(0)*u(ix,iy)&
+                   +  b(1)*u(ix+1,iy) + b(2)*u(ix+2,iy))*dx2_inv
+                 u_dydy = (b(-2)*u(ix,iy-2) + b(-1)*u(ix,iy-1) + b(0)*u(ix,iy)&
+                   +  b(1)*u(ix,iy+1) + b(2)*u(ix,iy+2))*dy2_inv
+                 v_dxdx = (b(-2)*v(ix-2,iy) + b(-1)*v(ix-1,iy) + b(0)*v(ix,iy)&
+                   +  b(1)*v(ix+1,iy) + b(2)*v(ix+2,iy))*dx2_inv
+                 v_dydy = (b(-2)*v(ix,iy-2) + b(-1)*v(ix,iy-1) + b(0)*v(ix,iy)&
+                   +  b(1)*v(ix,iy+1) + b(2)*v(ix,iy+2))*dy2_inv
+
+                 div_U = u_dx + v_dy
+
+                 penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))
+                 penaly = -mask(ix,iy)*(v(ix,iy)-us(ix,iy,2))
+
+                 rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
+                 rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
+                 rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
+
+            end do
+        end do
+
+    else
+      write(*,*) "ERROR: discretization method in params%order_discretization is unknown"
+      write(*,*) order_discretization
+      stop
     end if
-    int_block(1) = int_block(1)*dx(1)*dx(2)
-    int_block(2) = int_block(2)*dx(1)*dx(2)
 
     !> \todo DO NOT OVERWRITE?
     phi = rhs
@@ -179,13 +230,13 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
 
 end subroutine RHS_2D_acm
 
-subroutine compute_forcing(forcing, volume_int, Lx, Ly)
+subroutine compute_forcing(forcing, volume_int, Lx, Ly, time)
 
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
 !
-!> \brief compute forcing term for artificial conmpressibility method to accelerate 
+!> \brief compute forcing term for artificial conmpressibility method to accelerate fluid
 !
 !>
 !! input:    - velocity, volume integral, grid parameters \n
@@ -212,9 +263,13 @@ implicit none
     real(kind=rk), dimension(2), intent(in)  :: volume_int
     !> domain size
     real(kind=rk), intent(in)                :: Lx, Ly
+    !> time
+    real(kind=rk), intent(in)                :: time
 
     !> mean flow
     real(kind=rk)                            :: ux_mean, uy_mean
+
+    real(kind=rk)                            :: startup_conditioner
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -224,9 +279,10 @@ implicit none
 ! main body
 
     ux_mean = volume_int(1)/(Lx*Ly)
-    uy_mean = volume_int(1)/(Lx*Ly)
+    uy_mean = volume_int(2)/(Lx*Ly)
 
-    forcing(1) = max(0.0_rk, 1.0_rk-ux_mean)
+    forcing(1) = max(0.0_rk, 1.0_rk-ux_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
+    !forcing(2) = max(0.0_rk, -uy_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
 
 end subroutine compute_forcing
 

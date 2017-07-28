@@ -384,6 +384,9 @@ program main
         ! write data to disk
         if (modulo(iteration, params%write_freq) == 0) then
             call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+            if (params%physics_type == '2D_acm') then
+                call write_vorticity(hvy_work, hvy_block(:,:,1,1:2,:), lgt_block, hvy_active, hvy_n, params, params%number_block_nodes, params%number_ghost_nodes, time, iteration, lgt_active, lgt_n)
+            end if
             output_time = time
         endif
 

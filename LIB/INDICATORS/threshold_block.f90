@@ -163,6 +163,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
       ! the block is tagged as "wants to coarsen" by setting the tag -1
       ! note gradedness and completeness may prevent it from actually going through with that
       if (detail < params%eps) then
+      !if (detail < (params%eps * 2**( lgt_block(lgt_id, params%max_treelevel+1) - 1 ) )) then
         ! coarsen block, -1
         my_refinement_status( k ) = -1
       end if

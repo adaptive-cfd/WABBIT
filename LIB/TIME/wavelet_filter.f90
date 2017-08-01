@@ -10,8 +10,8 @@
 !> \brief wavelet filter subroutine
 !
 !>
-!! input:    - params, light and heavy data, neighbor list \n
-!! output:   - light and heavy data arrays \n
+!! input:    - params, heavy data,  \n
+!! output:   - heavy data  \n
 !!
 !!
 !! = log ======================================================================================

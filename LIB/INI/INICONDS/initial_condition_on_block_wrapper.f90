@@ -26,13 +26,10 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   real(kind=rk), intent(in) :: x0(1:3),dx(1:3)
   !> what function to use
   character(len=*), intent(in) :: inicond
-  real(kind=rk),dimension(:,:,:), allocatable :: mask
   integer(kind=ik)              :: Bs, g
 
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
-
-  allocate(mask(2*g + Bs, 2*g+Bs,1))
   
 
   select case( inicond )
@@ -50,8 +47,6 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
 
   case("constant_acm")
         call inicond_constant_acm( u )
-        !call create_mask( params, mask, x0, dx, Bs, g)
-        !u(:,:,:,1) = u(:,:,:,1) - mask
         
 
   case default
@@ -59,6 +54,5 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
 
   end select
 
-deallocate(mask)
 
 end subroutine initial_condition_on_block_wrapper

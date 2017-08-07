@@ -203,6 +203,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                                        params%order_discretization  )                             
                  end do
             end do
+
        case('2D_acm')
             ! compute volume integral
             call volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt_block)
@@ -219,15 +220,35 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
                 ! RHS (compute k-coefficients)
                 call RHS_2D_acm( params, g, Bs, &
-                                  dx, x0, N_dF, &
+                                  dx(1:2), x0(1:2), N_dF, &
                                   hvy_work( :, :, 1, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ), params%order_discretization, volume_int, time + rk_coeff*dt)
             end do
+       
+        case('3D_acm')
+            ! compute volume integral
+            call volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt_block)
+            ! loop over all active heavy data blocks
+            do k = 1, hvy_n
+                ! copy ghost nodes to hvy_work
+                hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 1:N_dF, hvy_active(k) )
 
-       case default
-           write(*,'(80("_"))')
-           write(*,*) "ERROR: physics type is unknown"
-           write(*,*) params%physics_type
-           stop
+                ! convert given hvy_id to lgt_id for block spacing routine
+                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+
+                ! get block spacing for RHS
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+                ! RHS (compute k-coefficients)
+                call RHS_2D_acm( params, g, Bs, &
+                                  dx, x0, N_dF, &
+                                  hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ), params%order_discretization, volume_int, time + rk_coeff*dt)
+            end do
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: physics type is unknown"
+            write(*,*) params%physics_type
+            stop
 
     end select
 

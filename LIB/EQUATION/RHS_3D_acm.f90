@@ -3,7 +3,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name RHS_23_acm.f90
+!> \name RHS_3D_acm.f90
 !> \version 0.5
 !> \author engels, sm
 !
@@ -124,7 +124,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
 
     if (params%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask(params, mask, x0, dx, Bs, g)
+        call create_mask_3D(params, mask, x0, dx, Bs, g)
         mask = mask*eps_inv
     end if
 
@@ -225,17 +225,27 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
                     p_dz = (a(-3)*p(ix,iy,iz-3) + a(-2)*p(ix,iy,iz-2) + a(-1)*p(ix,iy,iz-1) + a(0)*p(ix,iy,iz)&
                      +  a(+1)*p(ix,iy,iz+1) + a(+2)*p(ix,iy,iz+2) + a(+3)*p(ix,iy,iz+3))*dx_inv
 
-                    ! second derivatives of u and v
-                     u_dxdx = (b(-2)*u(ix-2,iy) + b(-1)*u(ix-1,iy) + b(0)*u(ix,iy)&
-                       +  b(1)*u(ix+1,iy) + b(2)*u(ix+2,iy))*dx2_inv
-                     u_dydy = (b(-2)*u(ix,iy-2) + b(-1)*u(ix,iy-1) + b(0)*u(ix,iy)&
-                       +  b(1)*u(ix,iy+1) + b(2)*u(ix,iy+2))*dy2_inv
-                     v_dxdx = (b(-2)*v(ix-2,iy) + b(-1)*v(ix-1,iy) + b(0)*v(ix,iy)&
-                       +  b(1)*v(ix+1,iy) + b(2)*v(ix+2,iy))*dx2_inv
-                     v_dydy = (b(-2)*v(ix,iy-2) + b(-1)*v(ix,iy-1) + b(0)*v(ix,iy)&
-                       +  b(1)*v(ix,iy+1) + b(2)*v(ix,iy+2))*dy2_inv
+                   ! second derivatives of u, v and w
+                    u_dxdx = (b(-2)*u(ix-2,iy,iz) + b(-1)*u(ix-1,iy,iz) + b(0)*u(ix,iy,iz)&
+                      +  b(1)*u(ix+1,iy,iz) + b(2)*u(ix+2,iy,iz))*dx2_inv
+                    u_dydy = (b(-2)*u(ix,iy-2,iz) + b(-1)*u(ix,iy-1,iz) + b(0)*u(ix,iy,iz)&
+                      +  b(1)*u(ix,iy+1,iz) + b(2)*u(ix,iy+2,iz))*dy2_inv
+                    u_dzdz = (b(-2)*u(ix,iy,iz-2) + b(-1)*u(ix,iy,iz-1) + b(0)*u(ix,iy,iz)&
+                      +  b(1)*u(ix,iy,iz+1) + b(2)*u(ix,iy,iz+2))*dz2_inv
+                    v_dxdx = (b(-2)*v(ix-2,iy,iz) + b(-1)*v(ix-1,iy,iz) + b(0)*v(ix,iy,iz)&
+                      +  b(1)*v(ix+1,iy,iz) + b(2)*v(ix+2,iy,iz))*dx2_inv
+                    v_dydy = (b(-2)*v(ix,iy-2,iz) + b(-1)*v(ix,iy-1,iz) + b(0)*v(ix,iy,iz)&
+                      +  b(1)*v(ix,iy+1,iz) + b(2)*v(ix,iy+2,iz))*dy2_inv
+                    v_dzdz = (b(-2)*v(ix,iy,iz-2) + b(-1)*v(ix,iy,iz-1) + b(0)*v(ix,iy,iz)&
+                      +  b(1)*v(ix,iy,iz+1) + b(2)*v(ix,iy,iz+2))*dz2_inv
+                    w_dxdx = (b(-2)*w(ix-2,iy,iz) + b(-1)*w(ix-1,iy,iz) + b(0)*w(ix,iy,iz)&
+                      +  b(1)*w(ix+1,iy,iz) + b(2)*w(ix+2,iy,iz))*dx2_inv
+                    w_dydy = (b(-2)*w(ix,iy-2,iz) + b(-1)*w(ix,iy-1,iz) + b(0)*w(ix,iy,iz)&
+                      +  b(1)*w(ix,iy+1,iz) + b(2)*w(ix,iy+2,iz))*dy2_inv
+                    w_dzdz = (b(-2)*w(ix,iy,iz-2) + b(-1)*w(ix,iy,iz-1) + b(0)*w(ix,iy,iz)&
+                      +  b(1)*w(ix,iy,iz+1) + b(2)*w(ix,iy,iz+2))*dz2_inv
 
-                     div_U = u_dx + v_dy + w_dz
+                    div_U = u_dx + v_dy + w_dz
 
                     penalx = -mask(ix,iy,iz)*(u(ix,iy,iz)-us(ix,iy,iz,1))
                     penaly = -mask(ix,iy,iz)*(v(ix,iy,iz)-us(ix,iy,iz,2))

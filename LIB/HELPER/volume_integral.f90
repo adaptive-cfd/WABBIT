@@ -10,8 +10,13 @@
 !> \brief computation of the velocity volume integral 
 !
 !>
-!! input:    -  \n
-!! output:   -  \n
+!! input:    
+!!           - heavy block data
+!!           - params
+!!           - hvy_active, lgt_block list
+!!
+!! output:   
+!!           - volume integral
 !!
 !!
 !! = log ======================================================================================

@@ -156,13 +156,12 @@ $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(O
 $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o \
+$(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o \
 	save_data.f90 write_field.f90 write_vorticity.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-# $(OBJDIR)/module_operators.o
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	volume_integral.f90 #compute_vorticity.f90
+	volume_integral.f90 compute_vorticity.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

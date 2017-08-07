@@ -74,7 +74,7 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
        u = hvy_block(:, :, 1, hvy_active(k))
        v = hvy_block(:, :, 2, hvy_active(k))
 
-      ! call compute_vorticity(params, u, v, dx, vorticity, Bs, g)
+       call compute_vorticity(params, u, v, dx, vorticity)
 
        hvy_work(:, :, 1, 1, hvy_active(k)) = vorticity(:,:)
 

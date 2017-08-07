@@ -38,7 +38,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     !> grid parameter
     integer(kind=ik), intent(in)                   :: g, Bs
     !> origin and spacing of the block
-    real(kind=rk), dimension(3), intent(in)        :: x0, dx
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
 
     !> number of datafields
     integer(kind=ik), intent(in)                   :: N_dF
@@ -114,7 +114,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
 
     if (params%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask(params, mask, x0, dx, Bs, g)
+        call create_mask_2D(params, mask, x0, dx, Bs, g)
         mask = mask*eps_inv
     end if
 

@@ -28,7 +28,7 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
   !> number of heavy and light active blocks
   integer(kind=ik), intent(inout)      :: hvy_n
   !> what function to use
-  character(len=*), intent(in) :: inicond
+  character(len=*), intent(in)         :: inicond
   ! loop variable
   integer(kind=ik)                     :: k
   integer(kind=ik)                     :: hvy_id, lgt_id

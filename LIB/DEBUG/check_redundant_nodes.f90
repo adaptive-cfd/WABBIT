@@ -1136,10 +1136,12 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
     ! clean up
     deallocate( com_matrix_pos  )
 
-    deallocate( int_send_buffer  )
-    deallocate( int_receive_buffer  )
-    deallocate( real_send_buffer  )
-    deallocate( real_receive_buffer  )
+    if ( number_procs > 1 ) then
+        deallocate( int_send_buffer  )
+        deallocate( int_receive_buffer  )
+        deallocate( real_send_buffer  )
+        deallocate( real_receive_buffer  )
+    end if
 
 end subroutine check_external_nodes
 

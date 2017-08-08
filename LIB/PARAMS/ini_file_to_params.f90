@@ -150,11 +150,11 @@ subroutine ini_file_to_params( params, filename )
         case('2D_navier_stokes')
 
             ! error case: try to solve navier stokes equation with less or more than 4 datafields
-            if ( params%number_data_fields /= 4) then
-                write(*,'(80("_"))')
-                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
-                stop
-            end if
+!            if ( params%number_data_fields /= 4) then
+!                write(*,'(80("_"))')
+!                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
+!                stop
+!            end if
 
             ! domain size
             call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )

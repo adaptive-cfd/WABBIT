@@ -34,7 +34,7 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   case ("zeros")
     u = 0.0_rk
 
-  case ("gauss-blob","gauss_blob")
+  case ("gauss-blob","gauss_blob","ns_pressure_blob")
     call inicond_gauss_blob( params, u, x0, dx )
 
   case ("3D_sphere")

@@ -65,7 +65,7 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
     sigma = params%inicond_width * params%Lx * params%Ly
 
     if (params%threeD_case) then
-      sigma = 0.05*params%Lx
+      sigma = params%inicond_width*params%Lx
       ! 3D case
       ! create gauss pulse
       do ix = g+1,Bs+g

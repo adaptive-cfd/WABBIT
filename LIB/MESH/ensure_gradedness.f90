@@ -170,7 +170,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                               elseif ( neighbor_status == -1) then
                                   ! neighbor wants to coarsen, which is what I want too,
                                   ! so we both would just go up one level together - that's fine
-                                  ! FIXME: I have no idea why the following line is required.
+                                  !> \todo FIXME: I have no idea why the following line is required.
                                   my_refine_change( k ) = max( 0_1, my_refine_change( k ) )
                               end if
                         else

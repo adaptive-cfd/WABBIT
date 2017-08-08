@@ -81,11 +81,13 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
                     hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                 end do
             end do
+
         case('2D_navier_stokes')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
             end do
+
         case('3D_convection_diffusion')
             ! loop over all datafields
             do dF = 1, N_dF
@@ -94,11 +96,13 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
                      hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                 end do
             end do
+
         case('3D_navier_stokes')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
             end do
+
         case('2D_advection')
             ! loop over all datafields
             do dF = 1, N_dF
@@ -107,6 +111,13 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
                     hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                 end do
             end do
+
+        case('2D_acm')
+            ! loop over all active heavy data blocks
+            do k = 1, hvy_n
+                hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
+            end do
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: physics type is unknown"

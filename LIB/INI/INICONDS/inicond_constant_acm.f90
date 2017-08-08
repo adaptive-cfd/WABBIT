@@ -3,32 +3,33 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name module_initialization.f90
-!> \version 0.4
-!> \author engels
+!> \name inicond_constant_acm.f90
+!> \version 0.5
+!> \author sm
 !
-!> \brief module for all init subroutines
+!> \brief initialize field for acm
 !
 !>
+!! input:    - phi \n
+!! output:   - phi \n
+!!
+!!
 !! = log ======================================================================================
 !! \n
-!! 03 Apr 2017 - create \n
-!! 12/04/17 - add 3D sphere
-!!
+!! 
+!
 ! ********************************************************************************************
 
-module module_initial_conditions
+subroutine inicond_constant_acm(phi)
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-    use mpi
-    ! global parameters
-    use module_params
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
+
+    ! initial data field
+    real(kind=rk), intent(inout)            :: phi(:, :, :, :)
+
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -36,14 +37,15 @@ module module_initial_conditions
 !---------------------------------------------------------------------------------------------
 ! main body
 
-contains
+    ! create field phi
+    phi = 0.0_rk
 
-  include "initial_condition_on_block_wrapper.f90"
-  include "inicond_gauss_blob.f90"
-  include "inicond_sinus_2D.f90"
-  include "inicond_constant_acm.f90"
+    ! it sometimes causes bizarre effects not to delete extremely small numbers:
+    ! so we do that now.
+    where ( phi<1.0e-13_rk )
+       phi = 0.0_rk
+    end where
 
-  ! 3D sphere initialization
-  include "inicond_sphere.f90"
+    phi(:,:,:,1) = 1.0_rk
 
-end module module_initial_conditions
+end subroutine inicond_constant_acm

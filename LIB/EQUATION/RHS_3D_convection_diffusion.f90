@@ -143,7 +143,7 @@ subroutine RHS_3D_convection_diffusion(phi, dx, dy, dz, g, Bs, u01, u02, u03, nu
     end if
 
     ! return 
-    ! \todo DO NOT OVERWRITE?
+    !> \todo DO NOT OVERWRITE?
     phi = rhs
 
 end subroutine RHS_3D_convection_diffusion

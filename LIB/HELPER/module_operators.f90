@@ -3,19 +3,19 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name module_time_step.f90
-!> \version 0.4
-!> \author msr
+!> \name module_operators.f90
+!> \version 0.5
+!> \author sm
 !
-!> \brief time step module
+!> \brief module for all operator routines
 !
 !>
 !! = log ======================================================================================
 !! \n
-!! 24/11/16 - create
-! ********************************************************************************************
+!! 28/7/17 - create
+! *********************************************************************************************
 
-module module_time_step
+module module_operators
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -25,12 +25,10 @@ module module_time_step
     use module_params
     ! debug module
     use module_debug
-    ! MPI module
-    use module_MPI
-    ! use mesh module, since we need to compute dx and origin of blocks
+    ! own MPI module
+    !use module_mpi
+    ! use mesh module, since we want to compute origin/spacing of blocks
     use module_mesh, only : get_block_spacing_origin
-
-    use module_operators, only: volume_integral
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -45,19 +43,7 @@ module module_time_step
 
 contains
 
-    ! time step
-    include "time_stepper.f90"
-    include "set_RK_input.f90"
-    include "RHS_wrapper.f90"
-    include "final_stage_RK.f90"
-    include "save_data_t.f90"
+    include "volume_integral.f90"
+    include "compute_vorticity.f90"
 
-    ! filter
-    include "filter_block.f90"
-    include "filter_1D.f90"
-    include "wavelet_filter.f90"
-
-    ! dt calculation
-    include "calculate_time_step.f90"
-
-end module module_time_step
+end module module_operators

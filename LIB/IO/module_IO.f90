@@ -32,6 +32,8 @@ module module_IO
     use module_mpi
     ! use mesh module, since we want to compute origin/spacing of blocks
     use module_mesh
+    ! use module operators for computation of the vorticity field
+    use module_operators, only: compute_vorticity
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -51,5 +53,8 @@ contains
 
     ! create list of active blocks (heavy data)
     include "write_field.f90"
+
+    ! compute vorticity to save it on disk
+    include "write_vorticity.f90"
 
 end module module_IO

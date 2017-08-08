@@ -26,6 +26,11 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   real(kind=rk), intent(in) :: x0(1:3),dx(1:3)
   !> what function to use
   character(len=*), intent(in) :: inicond
+  integer(kind=ik)              :: Bs, g
+
+    Bs    = params%number_block_nodes
+    g     = params%number_ghost_nodes
+  
 
   select case( inicond )
   case ("sinus_2d","sinus2d","sin2d")
@@ -40,9 +45,14 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   case ("3D_sphere")
         call inicond_sphere( params, u, x0, dx )
 
+  case("constant_acm")
+        call inicond_constant_acm( u )
+        
+
   case default
     call error_msg("the initial condition is unkown: "//trim(adjustl(inicond)))
 
   end select
+
 
 end subroutine initial_condition_on_block_wrapper

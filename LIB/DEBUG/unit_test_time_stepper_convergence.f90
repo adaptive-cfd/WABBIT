@@ -203,15 +203,13 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     end if
 
     ! set dt parameter
-    params_loc%time_step_method = 'CFL_cond'
+    params_loc%time_step_calc = 'CFL_cond'
     params_loc%CFL              = 0.5_rk
 
-    ! FIXME: you could also look over light data, as ddx is available only from that. no mpi
-    do k = 1, hvy_n
-        ! light id of this block
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params_loc%rank, params_loc%number_blocks )
+    !> \todo no mpi
+    do k = 1, lgt_n
         ! compute blocks' spacing from treecode
-        call get_block_spacing_origin( params_loc, lgt_id, lgt_block, xx0, ddx )
+        call get_block_spacing_origin( params_loc, lgt_active(k), lgt_block, xx0, ddx )
         ! find smallest dx of active blocks
         my_dx = min(my_dx, minval(ddx(1:d)) )
     end do
@@ -223,7 +221,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     call calculate_time_step( params_loc, dx, dt )
 
     ! set calculated dt as fixed dt
-    params_loc%time_step_method = 'fixed'
+    params_loc%time_step_calc = 'fixed'
     params_loc%dt = dt
     ! set time max
     params_loc%time_max = 1.0_rk
@@ -288,7 +286,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! time stepper
         !-----------------------------------------------------------------------
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end do
 
         if ( idt == 1 ) then

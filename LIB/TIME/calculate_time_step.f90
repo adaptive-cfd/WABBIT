@@ -51,7 +51,7 @@ subroutine calculate_time_step( params, dx, dt )
         case('CFL_cond')
             if (allocated(params%physics%u0)) then
                ! calculate time step, loop over all data fields
-               \todo CFL time step calculation do not work with ns physics
+               ! \todo CFL time step calculation do not work with ns physics
                if ( params%threeD_case ) then
                   do dF = 1, N_dF
                      norm_u = norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 3 ))

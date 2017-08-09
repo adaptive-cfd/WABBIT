@@ -30,13 +30,13 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
   !> what function to use
   character(len=*), intent(in)         :: inicond
   ! loop variable
-  integer(kind=ik)                     :: k, dF, pF, rhoF
+  integer(kind=ik)                     :: k, dF, pF, rhoF, UxF, UyF, UzF
   integer(kind=ik)                     :: hvy_id, lgt_id
   ! origin and spacing of blocks
   real(kind=rk)                        :: x0(1:3), dx(1:3)
 
   ! p0 value \todo get from ini file
-  real(kind=rk)                        :: p0
+  real(kind=rk)                        :: p0, rho0
 
   !---------------------------------------------------------------------------------------------
   ! interfaces
@@ -44,10 +44,14 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
   !---------------------------------------------------------------------------------------------
   ! variables initialization
 
-    pF = 0
+    pF   = 0
     rhoF = 0
+    UxF  = 0
+    UyF  = 0
+    UzF  = 0
 
-    p0 = 1.0e5_rk
+    rho0 = 1.0_rk
+    p0   = 1.0e5_rk
 
   !---------------------------------------------------------------------------------------------
   ! main body
@@ -82,36 +86,55 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
 
                 case ("ns_pressure_blob")
                     ! pressure field gets gauss blob, velocity fields set to zero, density field to 1
-                    ! find p field
+                    ! find fields
                     do dF = 1, params%number_data_fields
                         if ( params%physics_ns%names(dF) == "p" ) pF = dF
                         if ( params%physics_ns%names(dF) == "rho" ) rhoF = dF
+                        if ( params%physics_ns%names(dF) == "Ux" ) UxF = dF
+                        if ( params%physics_ns%names(dF) == "Uy" ) UyF = dF
+                        if ( params%physics_ns%names(dF) == "Uz" ) UzF = dF
                     end do
 
-                    do dF = 2, params%number_data_fields
-                        if ( dF == pF ) then
-                            ! set gauus blob to p, add p0
-                            hvy_block( :, :, :, dF, hvy_id) = p0 + 1000.0_rk * hvy_block( :, :, :, 1, hvy_id)
-                        elseif ( dF == rhoF ) then
-                            ! ini rho field
-                            hvy_block( :, :, :, dF, hvy_id) = 1.0_rk
-                        else
-                            ! velocity fields
-                            hvy_block( :, :, :, dF, hvy_id) = 0.0_rk
-                        end if
+                    ! set fields
+                    ! set gauss blob to p, note: shear layer is in field one
+                    hvy_block( :, :, :, pF, hvy_id) = p0 + 1000.0_rk * hvy_block( :, :, :, 1, hvy_id)
+                    ! set rho
+                    hvy_block( :, :, :, rhoF, hvy_id) = rho0
+                    ! set Ux
+                    hvy_block( :, :, :, UxF, hvy_id) = 0.0_rk
+                    ! set Uy
+                    hvy_block( :, :, :, UyF, hvy_id) = 0.0_rk
+
+                    if (params%threeD_case) then
+                        ! set Uz to zero
+                        hvy_block( :, :, :, UzF, hvy_id) = 0.0_rk
+                    endif
+
+                case ("shear_layer")
+                    ! Uy field gets shear layer, Ux set to zero, rho to rho0, p to p0
+                    ! find fields
+                    do dF = 1, params%number_data_fields
+                        if ( params%physics_ns%names(dF) == "p" ) pF = dF
+                        if ( params%physics_ns%names(dF) == "rho" ) rhoF = dF
+                        if ( params%physics_ns%names(dF) == "Ux" ) UxF = dF
+                        if ( params%physics_ns%names(dF) == "Uy" ) UyF = dF
+                        if ( params%physics_ns%names(dF) == "Uz" ) UzF = dF
                     end do
 
-                    ! set first datafield, note: still contains gauss blob
-                    if ( pF == 1 ) then
-                        ! first field is p field, add p0
-                        hvy_block( :, :, :, 1, hvy_id) = 1000.0_rk * hvy_block( :, :, :, 1, hvy_id) + p0
-                    elseif ( rhoF == 1 ) then
-                        ! first field is rho, set to one
-                        hvy_block( :, :, :, 1, hvy_id) = 1.0_rk
-                    else
-                        ! other field
-                        hvy_block( :, :, :, 1, hvy_id) = 0.0_rk
-                    end if
+                    ! set fields
+                    ! set shear layer to Uy, note: shear layer is in field one
+                    hvy_block( :, :, :, UyF, hvy_id) = 100.0_rk * hvy_block( :, :, :, 1, hvy_id) - 50.0_rk
+                    ! set p
+                    hvy_block( :, :, :, pF, hvy_id) = p0
+                    ! set rho
+                    hvy_block( :, :, :, rhoF, hvy_id) = rho0
+                    ! set Ux
+                    hvy_block( :, :, :, UxF, hvy_id) = 0.0_rk
+
+                    if (params%threeD_case) then
+                        ! set Uz to zero
+                        hvy_block( :, :, :, UzF, hvy_id) = 0.0_rk
+                    endif
 
             end select
 

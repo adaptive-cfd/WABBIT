@@ -46,4 +46,7 @@ contains
   ! 3D sphere initialization
   include "inicond_sphere.f90"
 
+  ! shear layer initialization
+  include "inicond_shear_layer.f90"
+
 end module module_initial_conditions

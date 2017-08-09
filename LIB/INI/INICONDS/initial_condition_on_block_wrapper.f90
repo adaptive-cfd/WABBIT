@@ -48,6 +48,8 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   case("constant_acm")
         call inicond_constant_acm( u )
         
+  case ("shear_layer")
+    call inicond_shear_layer( params, u, x0, dx )
 
   case default
     call error_msg("the initial condition is unkown: "//trim(adjustl(inicond)))

@@ -160,7 +160,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
 
     ! calculate dt
-    call calculate_time_step(params, dx, dt)
+    call calculate_time_step(params, hvy_block, hvy_active, hvy_n, dx, dt)
 
     ! calculate value for time after one dt
     time_dt = time + dt

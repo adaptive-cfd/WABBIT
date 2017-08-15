@@ -65,7 +65,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
 
     ! shear layer width
     ! \todo set shear layer width in ini file
-    w = 0.04_rk * params%Lx
+    w = 0.15_rk * params%Lx
 
     if (params%threeD_case) then
         ! nothing to do, set heavy data to zero

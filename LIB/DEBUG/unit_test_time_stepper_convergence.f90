@@ -218,7 +218,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
 
     ! calculate dt
-    call calculate_time_step( params_loc, dx, dt )
+    call calculate_time_step( params_loc, hvy_block, hvy_active, hvy_n, dx, dt )
 
     ! set calculated dt as fixed dt
     params_loc%time_step_calc = 'fixed'

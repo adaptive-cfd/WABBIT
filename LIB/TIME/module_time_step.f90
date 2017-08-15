@@ -60,4 +60,7 @@ contains
     ! dt calculation
     include "calculate_time_step.f90"
 
+    ! velocity norm calculation
+    include "get_block_max_velocity_norm.f90"
+
 end module module_time_step

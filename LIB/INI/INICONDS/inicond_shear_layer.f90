@@ -126,8 +126,8 @@ subroutine inicond_shear_layer( params, u, x0, dx )
                 end if
 
                 ! Ux
-                u(ix, iy, 1, UxF) = 0.05_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
-                !u(ix, iy, 1, UxF) = 0.5_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
+                !u(ix, iy, 1, UxF) = 0.05_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
+                u(ix, iy, 1, UxF) = 0.005_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
 
             end do
         end do
@@ -165,7 +165,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
 !        end do
 
         ! set Uy velocity values [first try]
-        u(:, :, 1, UyF) = 300.0_rk * u(:, :, 1, UyF)
+        !u(:, :, 1, UyF) = 300.0_rk * u(:, :, 1, UyF)
 
         ! set rho, p field
         u(:, :, 1, rhoF) = rho0

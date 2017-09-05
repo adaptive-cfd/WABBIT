@@ -274,6 +274,7 @@ program main
 
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+    call write_vorticity(hvy_work, hvy_block(:,:,1,2:3,:), lgt_block, hvy_active, hvy_n, params, params%number_block_nodes, params%number_ghost_nodes, time, iteration, lgt_active, lgt_n)
 
     ! max neighbor num
     !> \todo move max neighbor num to params struct

@@ -19,7 +19,7 @@
 !! 18/04/17 - create
 !
 ! ********************************************************************************************
-subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, dx, dt )
+subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dx, dt )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -37,6 +37,13 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, dx, dt )
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
+
     !> dx
     real(kind=rk)                       :: dx
     !> time step dt
@@ -50,6 +57,9 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, dx, dt )
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
+
+    ! maximal mesh level
+    integer(kind=ik)                    :: Jmax
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -115,6 +125,19 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, dx, dt )
             else
                 dt = params%dt
             end if
+
+        case('lvl_fixed')
+
+            ! find Jmax
+            Jmax = max_active_level( lgt_block, lgt_active, lgt_n )
+
+            dt = params%dt / 2**Jmax
+
+        case default
+            write(*,'(80("_"))')
+            write(*,*) "ERROR: time stepper method ist unknown"
+            write(*,*) params%time_step_calc
+            stop
 
     end select
     ! penalization stability criterion

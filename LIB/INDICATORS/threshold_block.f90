@@ -21,6 +21,8 @@
 !! = log ======================================================================================
 !! \n
 !! 10/11/16 - switch to v0.4
+!! 08/09/17 - add linear wavelet filtering - discarding all details, if block level == Jmax
+!!
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
@@ -112,61 +114,71 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     ! loop over all active heavy data, note: light data need to synchronize after this step
     do k = 1, hvy_n
 
-      ! calculate light id
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+        ! calculate light id
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
-      ! reset detail
-      detail = 0.0_rk
+        ! reset detail
+        detail = 0.0_rk
 
-      ! loop over all datafields
-      do dF = 1, params%number_data_fields
-          if ( params%threeD_case ) then
-            ! ********** 3D **********
-            ! copy block data to array u1
-            u1(:,:,:) = hvy_block( :, :, :, dF, hvy_active(k) )
-            ! now, coarsen array u1 (restriction)
-            call restriction_3D( u1, u3 )  ! fine, coarse
-            ! then, re-interpolate to the initial level (prediciton)
-            call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
+        ! check block level
+        if ( lgt_block( lgt_id, params%max_treelevel+1) == params%max_treelevel ) then
+            ! block is on Jmax level -> discarding all details
+            ! coarsen block, note: all sister block are also on Jmax, so coarsening should allways work
+            my_refinement_status( k ) = -1
 
-            ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-            ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-            do i = 1, Bs+2*g
-              do j = 1, Bs+2*g
-                do l = 1, Bs+2*g
-                  detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
-                end do
+        else
+            ! block is not on Jmax -> calculate details
+            ! loop over all datafields
+            do dF = 1, params%number_data_fields
+                if ( params%threeD_case ) then
+                    ! ********** 3D **********
+                    ! copy block data to array u1
+                    u1(:,:,:) = hvy_block( :, :, :, dF, hvy_active(k) )
+                    ! now, coarsen array u1 (restriction)
+                    call restriction_3D( u1, u3 )  ! fine, coarse
+                    ! then, re-interpolate to the initial level (prediciton)
+                    call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
+
+                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                    do i = 1, Bs+2*g
+                        do j = 1, Bs+2*g
+                            do l = 1, Bs+2*g
+                                detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
+                            end do
+                        end do
+                    end do
+
+                    else
+                        ! ********** 2D **********
+                        ! copy block data to array u1
+                        u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
+                        ! now, coarsen array u1 (restriction)
+                        call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
+                        ! then, re-interpolate to the initial level (prediciton)
+                        call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+
+                        ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                        ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                        do i = 1, Bs+2*g
+                            do j = 1, Bs+2*g
+                                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
+                            end do
+                        end do
+
+                  end if
               end do
-            end do
 
-          else
-            ! ********** 2D **********
-            ! copy block data to array u1
-            u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
-            ! now, coarsen array u1 (restriction)
-            call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
-            ! then, re-interpolate to the initial level (prediciton)
-            call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+              ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
+              ! the block is tagged as "wants to coarsen" by setting the tag -1
+              ! note gradedness and completeness may prevent it from actually going through with that
+              if (detail < params%eps) then
+              !if (detail < (params%eps * 2**( lgt_block(lgt_id, params%max_treelevel+1) - 1 ) )) then
+                  ! coarsen block, -1
+                  my_refinement_status( k ) = -1
+              end if
 
-            ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-            ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-            do i = 1, Bs+2*g
-              do j = 1, Bs+2*g
-                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
-              end do
-            end do
-
-          end if
-      end do
-
-      ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
-      ! the block is tagged as "wants to coarsen" by setting the tag -1
-      ! note gradedness and completeness may prevent it from actually going through with that
-      if (detail < params%eps) then
-      !if (detail < (params%eps * 2**( lgt_block(lgt_id, params%max_treelevel+1) - 1 ) )) then
-        ! coarsen block, -1
-        my_refinement_status( k ) = -1
-      end if
+        end if
 
     end do
 

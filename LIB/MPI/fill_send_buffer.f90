@@ -55,7 +55,7 @@
 !
 ! ********************************************************************************************
 
-subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank, int_send_buffer, real_send_buffer )
+subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank, int_send_buffer, real_send_buffer, synch_stage )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -84,6 +84,9 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
     integer(kind=ik), intent(inout)                 :: int_send_buffer(:,:)
     !> real send buffer
     real(kind=rk), intent(inout)                    :: real_send_buffer(:,:)
+
+    !> synch stage
+    integer(kind=ik), intent(in)                    :: synch_stage
 
     ! loop variable
     integer(kind=ik)                                :: k, i
@@ -122,7 +125,11 @@ subroutine fill_send_buffer( params, hvy_block, com_lists, com_matrix_line, rank
                 call create_send_buffer_3D(params, hvy_block, com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), real_send_buffer( :, column_pos ), buffer_i)
             else
                 ! 2D:
-                call create_send_buffer_2D(params, hvy_block(:, :, 1, :, :), com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), real_send_buffer( :, column_pos ), buffer_i)
+                if ( synch_stage /= 4 ) then
+                    call create_send_buffer_2D(params, hvy_block(:, :, 1, :, :), com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), real_send_buffer( :, column_pos ), buffer_i)
+                else
+                    call create_redundant_send_buffer_2D(params, hvy_block(:, :, 1, :, :), com_lists( 1:com_matrix_line(k), :, k), com_matrix_line(k), real_send_buffer( :, column_pos ), buffer_i)
+                end if
             end if
 
 

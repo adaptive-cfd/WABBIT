@@ -264,7 +264,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             ! first element of int buffer = length of real buffer (buffer_i)
 
             ! fill send buffer and position communication matrix
-            call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer )
+            call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer, synch_stage )
 
             if ( params%debug ) then
                 call MPI_Barrier(MPI_COMM_WORLD, ierr)
@@ -630,7 +630,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                             !call write_receive_buffer_3D(params, int_receive_buffer(2:int_N, buffer_pos), real_receive_buffer(1:real_N, buffer_pos), hvy_block )
                                         else
                                             ! 2D:
-                                            call write_receive_buffer_2D(params, int_receive_buffer(int_start:int_start+2, buffer_pos), real_receive_buffer(real_start:real_N, buffer_pos), hvy_block(:, :, 1, :, :) )
+                                            call write_redundant_receive_buffer_2D(params, int_receive_buffer(int_start:int_start+2, buffer_pos), real_receive_buffer(real_start:real_N, buffer_pos), hvy_block(:, :, 1, :, :) )
                                         end if
 
                                     end if

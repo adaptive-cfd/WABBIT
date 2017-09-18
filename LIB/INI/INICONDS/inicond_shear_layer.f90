@@ -63,7 +63,8 @@ subroutine inicond_shear_layer( params, u, x0, dx )
     UzF  = 0
 
     rho0 = 1.0_rk
-    p0   = 1.0e5_rk
+    !p0   = 1.0e5_rk
+    p0   = 2.5_rk
 
     ! find fields
     do dF = 1, params%number_data_fields
@@ -78,8 +79,14 @@ subroutine inicond_shear_layer( params, u, x0, dx )
 ! main body
 
     ! place layer in the center of the domain
-    mux1 = 0.3_rk * params%Lx
-    mux2 = 0.7_rk * params%Lx
+    !mux1 = 0.3_rk * params%Lx
+    !mux2 = 0.7_rk * params%Lx
+    !mux1 = 0.25_rk * params%Lx
+    !mux2 = 0.75_rk * params%Lx
+
+    mux1 = params%Lx/2.0_rk - 0.25_rk
+    mux2 = params%Lx/2.0_rk + 0.25_rk
+
     muy  = 0.5_rk * params%Ly
 
     ! boundary layer width
@@ -87,7 +94,8 @@ subroutine inicond_shear_layer( params, u, x0, dx )
 
     ! shear layer width
     ! \todo set shear layer width in ini file
-    w = 0.15_rk * params%Lx
+    !w = 0.15_rk * params%Lx
+    w = 160.0_rk !320.0_rk
 
     if (params%threeD_case) then
         ! nothing to do, set heavy data to zero
@@ -118,16 +126,19 @@ subroutine inicond_shear_layer( params, u, x0, dx )
                 ! shear layer, setup [1]
                 ! Uy
                 if ( x <= 0.5_rk*params%Lx ) then
-                    u(ix, iy, 1, UyF) = dtanh( 80.0_rk/params%Lx * ( x - 0.25_rk*params%Lx ) )
+                    u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( x - mux1 ) )
                     !u(ix, iy, 1, UyF) = dtanh( 200.0_rk/params%Lx * ( x - 0.25_rk*params%Lx ) )
+                    u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( x - mux1 ) ) ) / 2.0_rk + rho0
                 else
-                    u(ix, iy, 1, UyF) = dtanh( 80.0_rk/params%Lx * ( 0.75_rk*params%Lx - x ) )
+                    u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( mux2 - x ) )
                     !u(ix, iy, 1, UyF) = dtanh( 200.0_rk/params%Lx * ( 0.75_rk*params%Lx - x ) )
+                    u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( mux2 - x ) ) ) / 2.0_rk + rho0
                 end if
 
                 ! Ux
                 !u(ix, iy, 1, UxF) = 0.05_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
-                u(ix, iy, 1, UxF) = 0.0005_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
+                !u(ix, iy, 1, UxF) = 0.0005_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
+                u(ix, iy, 1, UxF) = 0.01_rk * dsin( 2.0_rk * pi * 2.0_rk * params%Ly * ( y - muy  ) / params%Ly )
 
             end do
         end do
@@ -168,7 +179,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
         !u(:, :, 1, UyF) = 300.0_rk * u(:, :, 1, UyF)
 
         ! set rho, p field
-        u(:, :, 1, rhoF) = rho0
+        !u(:, :, 1, rhoF) = rho0
         u(:, :, 1, pF)   = p0
 
     endif

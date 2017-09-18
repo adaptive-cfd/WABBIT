@@ -165,12 +165,12 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 0 ) then
                         ! sender on same level
                         ! receive data
-                        do l = 1, g+rmv_redundant
-                            data_corner_rmv_redundant(l, 1:g+rmv_redundant) = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
-                            buffer_i            = buffer_i + g+rmv_redundant
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
                         end do
                         ! write data
-                        hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, 1:g+rmv_redundant, dF, my_block ) = data_corner_rmv_redundant(1:g+rmv_redundant, 1:g+rmv_redundant)
+                        hvy_block( Bs+g+1:Bs+g+g, 1:g, dF, my_block ) = data_corner(1:g, 1:g)
 
                     else
                         ! sender on lower level
@@ -201,12 +201,12 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 0 ) then
                         ! sender on same level
                         ! receive data
-                        do l = 1, g+rmv_redundant
-                            data_corner_rmv_redundant(l, 1:g+rmv_redundant) = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
-                            buffer_i            = buffer_i + g+rmv_redundant
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
                         end do
                         ! write data
-                        hvy_block( Bs+g+1-rmv_redundant:Bs+g+g, Bs+g+1-rmv_redundant:Bs+g+g, dF, my_block ) = data_corner_rmv_redundant(1:g+rmv_redundant, 1:g+rmv_redundant)
+                        hvy_block( Bs+g+1:Bs+g+g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner(1:g, 1:g)
 
                     else
                         ! sender on lower level
@@ -237,12 +237,12 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 0 ) then
                         ! sender on same level
                         ! receive data
-                        do l = 1, g+rmv_redundant
-                            data_corner_rmv_redundant(l, 1:g+rmv_redundant) = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
-                            buffer_i            = buffer_i + g+rmv_redundant
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
                         end do
                         ! write data
-                        hvy_block( 1:g+rmv_redundant, 1:g+rmv_redundant, dF, my_block ) = data_corner_rmv_redundant(1:g+rmv_redundant, 1:g+rmv_redundant)
+                        hvy_block( 1:g, 1:g, dF, my_block ) = data_corner(1:g, 1:g)
 
                     else
                         ! sender on lower level
@@ -273,12 +273,12 @@ subroutine write_receive_buffer_2D(params, int_buffer, recv_buff, hvy_block)
                     elseif ( level_diff == 0 ) then
                         ! sender on same level
                         ! receive data
-                        do l = 1, g+rmv_redundant
-                            data_corner_rmv_redundant(l, 1:g+rmv_redundant) = recv_buff(buffer_i:buffer_i+g+rmv_redundant-1)
-                            buffer_i            = buffer_i + g+rmv_redundant
+                        do l = 1, g
+                            data_corner(l, 1:g) = recv_buff(buffer_i:buffer_i+g-1)
+                            buffer_i            = buffer_i + g
                         end do
                         ! write data
-                        hvy_block( 1:g+rmv_redundant, Bs+g+1-rmv_redundant:Bs+g+g, dF, my_block ) = data_corner_rmv_redundant(1:g+rmv_redundant, 1:g+rmv_redundant)
+                        hvy_block( 1:g, Bs+g+1:Bs+g+g, dF, my_block ) = data_corner(1:g, 1:g)
 
                     else
                         ! sender on lower level

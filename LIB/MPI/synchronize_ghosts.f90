@@ -464,7 +464,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                                         real_start = real_start + g*g*params%number_data_fields
                                                     else
                                                         ! case 0
-                                                        real_start = real_start + (g+rmv_redundant)*(g+rmv_redundant)*params%number_data_fields
+                                                        real_start = real_start + g*g*params%number_data_fields
                                                     end if
                                                 case(9:16)
                                                     if ( int_receive_buffer( j+1, buffer_pos ) /= -1 ) then

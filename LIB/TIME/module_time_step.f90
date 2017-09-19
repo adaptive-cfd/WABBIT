@@ -28,7 +28,7 @@ module module_time_step
     ! MPI module
     use module_MPI
     ! use mesh module, since we need to compute dx and origin of blocks
-    use module_mesh, only : get_block_spacing_origin
+    use module_mesh, only : get_block_spacing_origin, max_active_level
 
     use module_operators, only: volume_integral
 

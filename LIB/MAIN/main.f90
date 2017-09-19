@@ -274,6 +274,9 @@ program main
 
     ! save initial condition to disk
     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+    if (params%physics_type == '2D_navier_stokes') then
+        call write_vorticity(hvy_work, hvy_block(:,:,1,2:3,:), lgt_block, hvy_active, hvy_n, params, params%number_block_nodes, params%number_ghost_nodes, time, iteration, lgt_active, lgt_n)
+    end if
 
     ! max neighbor num
     !> \todo move max neighbor num to params struct
@@ -318,48 +321,48 @@ program main
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-       ! check redundant nodes
-       if ( params%debug ) then
-
-           ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-           call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-           ! start time
-           sub_t0 = MPI_Wtime()
-
-           ! check redundant nodes
-           call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
-
-           ! barrier
-           call MPI_Barrier(MPI_COMM_WORLD, ierr)
-           ! synchronize stop status
-           call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
-
-           ! end time
-           sub_t1 = MPI_Wtime()
-           ! write time
-           if ( params%debug ) then
-               ! find free or corresponding line
-               k = 1
-               do while ( debug%name_comp_time(k) /= "---" )
-                   ! entry for current subroutine exists
-                   if ( debug%name_comp_time(k) == "check_redundant_nodes" ) exit
-                   k = k + 1
-               end do
-               ! write time
-               debug%name_comp_time(k) = "check_redundant_nodes"
-               debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-               debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-           end if
-
-           ! stop programm if difference on redundant nodes
-           if (stop_status) then
-               ! save data
-               call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-               ! stop program
-               stop
-           end if
-       end if
+!       ! check redundant nodes
+!       if ( params%debug ) then
+!
+!           ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
+!           call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+!
+!           ! start time
+!           sub_t0 = MPI_Wtime()
+!
+!           ! check redundant nodes
+!           call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
+!
+!           ! barrier
+!           call MPI_Barrier(MPI_COMM_WORLD, ierr)
+!           ! synchronize stop status
+!           call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+!
+!           ! end time
+!           sub_t1 = MPI_Wtime()
+!           ! write time
+!           if ( params%debug ) then
+!               ! find free or corresponding line
+!               k = 1
+!               do while ( debug%name_comp_time(k) /= "---" )
+!                   ! entry for current subroutine exists
+!                   if ( debug%name_comp_time(k) == "check_redundant_nodes" ) exit
+!                   k = k + 1
+!               end do
+!               ! write time
+!               debug%name_comp_time(k) = "check_redundant_nodes"
+!               debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+!               debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
+!           end if
+!
+!           ! stop programm if difference on redundant nodes
+!           if (stop_status) then
+!               ! save data
+!               call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+!               ! stop program
+!               stop
+!           end if
+!       end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
@@ -374,7 +377,7 @@ program main
         ! output on screen
         if (rank==0) then
             write(*,'(80("-"))')
-            write(*, '("RUN: iteration=",i7,3x," time=",f16.6,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
+            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
              iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
 
@@ -389,6 +392,7 @@ program main
             else if (params%physics_type == '3D_acm') then
                 call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
             end if
+
             output_time = time
         endif
 
@@ -409,6 +413,9 @@ program main
 
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+    if ( params%physics_type == '2D_navier_stokes') then
+        call write_vorticity(hvy_work, hvy_block(:,:,1,1:2,:), lgt_block, hvy_active, hvy_n, params, params%number_block_nodes, params%number_ghost_nodes, time, iteration, lgt_active, lgt_n)
+    end if
 
     ! debug info
     if ( params%debug ) then

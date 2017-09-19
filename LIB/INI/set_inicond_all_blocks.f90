@@ -68,7 +68,7 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
         ! compute block spacing and origin from treecode
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        ! note: subroutine sets initial condition on first datafield
+        !> \note subroutine sets initial condition on first datafield
         ! set the initial condition on this block
         call initial_condition_on_block_wrapper( params, hvy_block(:,:,:,:,hvy_id), x0, dx, inicond )
 

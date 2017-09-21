@@ -42,7 +42,7 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
     !> grid parameters
     integer(kind=ik)                               :: Bs, g
     !> derivatives
-    real(kind=rk)                                  :: u_dx, u_dy, u_dz, v_dx, v_dy, v_dz, w_dx, w_dy, w_dz
+    real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
     !> inverse of dx, dy, dz
     real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv
     ! loop variables

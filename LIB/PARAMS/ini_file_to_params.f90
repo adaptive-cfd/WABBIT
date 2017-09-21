@@ -283,7 +283,30 @@ subroutine ini_file_to_params( params, filename )
             call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
             ! set third dimension to zero
             params%Lz = 0.0_rk
-            if ( params%number_data_fields > 4) then!/= 3) then
+            if ( params%number_data_fields /= 3) then
+                write(*,'(80("_"))')
+                write(*,'("ERROR: try to solve acm with", i3, " datafield(s)")') params%number_data_fields
+                stop
+            end if
+            allocate( params%physics_acm%names( params%number_data_fields ) )
+            params%physics_acm%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names_acm', params%physics_acm%names, params%physics_acm%names )
+            ! speed of sound for acm
+            call read_param_mpi(FILE, 'Physics', 'c_0', params%physics_acm%c_0, 10.0_rk)
+
+            ! inverse of Re
+            call read_param_mpi(FILE, 'Physics', 'nu', params%physics_acm%nu, 1e-1_rk)
+            
+            ! gamma_p
+            call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
+
+        case('3D_acm')
+            ! domain size
+            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
+            if ( params%number_data_fields /= 4) then
                 write(*,'(80("_"))')
                 write(*,'("ERROR: try to solve acm with", i3, " datafield(s)")') params%number_data_fields
                 stop

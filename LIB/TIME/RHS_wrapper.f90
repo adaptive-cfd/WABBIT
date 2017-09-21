@@ -239,7 +239,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                 ! RHS (compute k-coefficients)
-                call RHS_2D_acm( params, g, Bs, &
+                call RHS_3D_acm( params, g, Bs, &
                                   dx, x0, N_dF, &
                                   hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ), params%order_discretization, volume_int, time + rk_coeff*dt)
             end do

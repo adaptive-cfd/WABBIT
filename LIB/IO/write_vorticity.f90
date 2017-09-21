@@ -39,9 +39,9 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
     real(kind=rk), intent(inout)                   :: hvy_work(:, :, :, :, :)
     !> time
     real(kind=rk), intent(in)                      :: time
-    !>
+    !> number of active blocks (heavy and light data)
     integer(kind=ik), intent(in)                   :: hvy_n, lgt_n, iteration
-    !>
+    !> light data array
     integer(kind=ik), intent(in)                   :: lgt_block(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)                   :: hvy_active(:)
@@ -76,11 +76,17 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
            hvy_work(:,:,:,2,hvy_active(k)) = hvy_block(:,:,:,2,hvy_active(k))  ! v
            hvy_work(:,:,:,3,hvy_active(k)) = hvy_block(:,:,:,3,hvy_active(k))  ! w
        else
-           ! store u,v in hvy_work array
-           hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,1,hvy_active(k))  ! u
-           hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))  ! v
-           !u = hvy_block(:, :, 1, hvy_active(k))
-           !v = hvy_block(:, :, 2, hvy_active(k))
+           if (params%physics_type=='2D_navier_stokes') then
+               ! store u,v in hvy_work array
+               hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))/hvy_block(:,:,1,1,hvy_active(k))**2  ! u
+               hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,3,hvy_active(k))/hvy_block(:,:,1,1,hvy_active(k))**2  ! v
+           else
+               ! store u,v in hvy_work array
+               hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,1,hvy_active(k))  ! u
+               hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))  ! v
+               !u = hvy_block(:, :, 1, hvy_active(k))
+               !v = hvy_block(:, :, 2, hvy_active(k))
+           end if
        end if
        
        ! compute vorticity from u,v and store it in datafield 3 of hvy_work array

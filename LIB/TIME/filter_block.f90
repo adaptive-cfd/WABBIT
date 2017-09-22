@@ -147,6 +147,9 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
         case('wavelet')
             ! do nothing..
 
+        case('bogey_shock')
+            ! do nothing..
+
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: filter type is unknown"
@@ -229,8 +232,17 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
             elseif (stencil_size == 0) then
 
-                ! wavelet filter
-                call wavelet_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
+                select case(params%filter_type)
+
+                    case('wavelet')
+                    ! wavelet filter
+                    call wavelet_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
+
+                    case('bogey_shock')
+                    ! shock filter
+                    call bogey_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
+
+                end select
 
             end if
 

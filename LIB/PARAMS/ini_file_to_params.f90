@@ -343,6 +343,8 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no-filter" )
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
+    ! bogey shock detector threshold
+    call read_param_mpi(FILE, 'Discretization', 'r_th', params%r_th, 1e-3_rk )
 
 
     !***************************************************************************

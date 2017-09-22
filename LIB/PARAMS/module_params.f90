@@ -150,6 +150,8 @@ module module_params
         character(len=80)                           :: filter_type
         ! frequency
         integer(kind=ik)                            :: filter_freq
+        ! bogey shock detector threshold
+        real(kind=rk)                               :: r_th
 
     end type type_params
 

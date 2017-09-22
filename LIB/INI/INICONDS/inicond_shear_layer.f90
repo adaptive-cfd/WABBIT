@@ -63,7 +63,6 @@ subroutine inicond_shear_layer( params, u, x0, dx )
     UzF  = 0
 
     rho0 = 1.0_rk
-    !p0   = 1.0e5_rk
     p0   = 2.5_rk
 
     ! find fields
@@ -78,12 +77,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! place layer in the center of the domain
-    !mux1 = 0.3_rk * params%Lx
-    !mux2 = 0.7_rk * params%Lx
-    !mux1 = 0.25_rk * params%Lx
-    !mux2 = 0.75_rk * params%Lx
-
+    ! place layer
     mux1 = params%Lx/2.0_rk - 0.25_rk
     mux2 = params%Lx/2.0_rk + 0.25_rk
 
@@ -93,9 +87,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
     sigma = params%inicond_width * params%Lx
 
     ! shear layer width
-    ! \todo set shear layer width in ini file
-    !w = 0.15_rk * params%Lx
-    w = 160.0_rk !320.0_rk
+    w = params%inicond_width
 
     if (params%threeD_case) then
         ! nothing to do, set heavy data to zero
@@ -111,75 +103,23 @@ subroutine inicond_shear_layer( params, u, x0, dx )
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
 
-!                ! set shear layer [first try], note: tanh do not work?
-!                !u(ix, iy, 1, 1) = dabs( 0.5_rk * (dtanh( sigma * ( dabs(x-mux) - w ) ) - 1.0_rk) )
-!                if ( x <= mux1 ) then
-!                    u(ix, iy, 1, UyF) = dexp( - ( (x-mux1)**2  ) / (0.0001_rk*params%Lx) )
-!                elseif ( x >= mux2 ) then
-!                    u(ix, iy, 1, UyF) = dexp( - ( (x-mux2)**2  ) / (0.0001_rk*params%Lx) )
-!                else
-!                    u(ix, iy, 1, UyF) = 1.0_rk
-!                end if
-!                ! Ux
-!                u(ix, iy, 1, UxF) = 0.0_rk
-
                 ! shear layer, setup [1]
                 ! Uy
                 if ( x <= 0.5_rk*params%Lx ) then
                     u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( x - mux1 ) )
-                    !u(ix, iy, 1, UyF) = dtanh( 200.0_rk/params%Lx * ( x - 0.25_rk*params%Lx ) )
                     u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( x - mux1 ) ) ) / 2.0_rk + rho0
                 else
                     u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( mux2 - x ) )
-                    !u(ix, iy, 1, UyF) = dtanh( 200.0_rk/params%Lx * ( 0.75_rk*params%Lx - x ) )
                     u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( mux2 - x ) ) ) / 2.0_rk + rho0
                 end if
 
                 ! Ux
-                !u(ix, iy, 1, UxF) = 0.05_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
-                !u(ix, iy, 1, UxF) = 0.0005_rk*params%Ly * dsin( 2.0_rk * pi/params%Ly * ( y + 0.25_rk*params%Ly ) )
                 u(ix, iy, 1, UxF) = 0.01_rk * dsin( 2.0_rk * pi * 2.0_rk * params%Ly * ( y - muy  ) / params%Ly )
 
             end do
         end do
 
-!        ! start disturbance
-!        do ix = g+1,Bs+g
-!            do iy = g+1,Bs+g
-!              ! compute x,y coordinates from spacing and origin
-!              x = dble(ix-(g+1)) * dx(1) + x0(1)
-!              y = dble(iy-(g+1)) * dx(2) + x0(2)
-!
-!                ! shift coordinates
-!                x = x - 0.2_rk*params%Lx
-!
-!                ! check boundary
-!                if ( y < 0.0_rk ) then
-!                    y = params%Ly + y
-!                end if
-!
-!                if ( x < 0.0_rk ) then
-!                    x = params%Lx + x
-!                end if
-!
-!                if ( y > params%Ly ) then
-!                    y = params%Ly - y
-!                end if
-!
-!                if ( x > params%Lx ) then
-!                    x = params%Lx - x
-!                end if
-!
-!              ! set actual inicond gauss blob
-!              u(ix, iy, 1, UyF) = u(ix, iy, 1, UyF) + 0.05_rk * dexp( -( (x-0.5_rk*params%Lx)**2 + (y-0.5_rk*params%Ly)**2 ) / (0.0001_rk*params%Lx) )
-!            end do
-!        end do
-
-        ! set Uy velocity values [first try]
-        !u(:, :, 1, UyF) = 300.0_rk * u(:, :, 1, UyF)
-
-        ! set rho, p field
-        !u(:, :, 1, rhoF) = rho0
+        ! set p field
         u(:, :, 1, pF)   = p0
 
     endif

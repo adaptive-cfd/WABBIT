@@ -218,6 +218,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! add aditional annotations
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
+    call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n/))
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)

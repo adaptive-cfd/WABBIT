@@ -57,11 +57,29 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
     ! file name
     character(len=80)                              :: fname
 
+    ! field numbers for navier stokes physics
+    integer(kind=ik)                               :: df, pF, rhoF, UxF, UyF, UzF
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
     !vorticity = 0.0_rk
     hvy_work  = 0.0_rk
+
+    pF   = 0
+    rhoF = 0
+    UxF  = 0
+    UyF  = 0
+    UzF  = 0
+
+    ! find fields
+    do dF = 1, params%number_data_fields
+        if ( params%physics_ns%names(dF) == "p" ) pF = dF
+        if ( params%physics_ns%names(dF) == "rho" ) rhoF = dF
+        if ( params%physics_ns%names(dF) == "Ux" ) UxF = dF
+        if ( params%physics_ns%names(dF) == "Uy" ) UyF = dF
+        if ( params%physics_ns%names(dF) == "Uz" ) UzF = dF
+    end do
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -78,8 +96,8 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
        else
            if (params%physics_type=='2D_navier_stokes') then
                ! store u,v in hvy_work array
-               hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))/hvy_block(:,:,1,1,hvy_active(k))**2  ! u
-               hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,3,hvy_active(k))/hvy_block(:,:,1,1,hvy_active(k))**2  ! v
+               hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,UxF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! u
+               hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,UyF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! v
            else
                ! store u,v in hvy_work array
                hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,1,hvy_active(k))  ! u

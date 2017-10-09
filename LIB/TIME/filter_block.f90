@@ -240,7 +240,9 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
                     case('bogey_shock')
                     ! shock filter
-                    call bogey_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
+                    if ( dF == 1 ) then
+                        call bogey_filter( params, hvy_block(:, :, :, 1:N_dF, hvy_active(k) ))
+                    end if
 
                 end select
 

@@ -176,7 +176,7 @@ subroutine ini_file_to_params( params, filename )
             ! read dynamic viscosity
             call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
             ! read switch to turn on|off dissipation
-            call read_param_mpi(FILE, 'Blocks', 'dissipation', params%physics_ns%dissipation, .true. )
+            call read_param_mpi(FILE, 'Physics', 'dissipation', params%physics_ns%dissipation, .true. )
 
             ! read variable names
             ! allocate names list

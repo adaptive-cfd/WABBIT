@@ -35,7 +35,8 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
     ! origin and spacing of blocks
     real(kind=rk)                        :: x0(1:3), dx(1:3)
 
-    ! p0 value \todo get from ini file, rework gauss blob setup - see shear layer setup as template
+    ! p0 value 
+    !> \todo get from ini file, rework gauss blob setup - see shear layer setup as template
     real(kind=rk)                        :: p0, rho0
 
   !---------------------------------------------------------------------------------------------
@@ -68,7 +69,7 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
         ! compute block spacing and origin from treecode
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        ! note: subroutine sets initial condition on first datafield
+        !> \note subroutine sets initial condition on first datafield
         ! set the initial condition on this block
         call initial_condition_on_block_wrapper( params, hvy_block(:,:,:,:,hvy_id), x0, dx, inicond )
 

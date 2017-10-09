@@ -45,5 +45,6 @@ contains
 
     include "volume_integral.f90"
     include "compute_vorticity.f90"
+    include "compute_forcing.f90"
 
 end module module_operators

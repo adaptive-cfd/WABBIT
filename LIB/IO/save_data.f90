@@ -93,6 +93,9 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
             case('2D_acm')
                 ! select corresponding datafield name
                 write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_acm%names(k))), nint(time * 1.0e6_rk)
+            case('3D_acm')
+                ! select corresponding datafield name
+                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_acm%names(k))), nint(time * 1.0e6_rk)
             case default
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: physics type is unknown - can not save data"

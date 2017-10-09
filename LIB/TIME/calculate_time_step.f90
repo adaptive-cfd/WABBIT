@@ -82,7 +82,7 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
             ! convection_diffusion, advection physics
             if (allocated(params%physics%u0)) then
                ! calculate time step, loop over all data fields
-               ! \todo CFL time step calculation do not work with ns physics
+               !> \todo CFL time step calculation do not work with ns physics
                if ( params%threeD_case ) then
                   do dF = 1, N_dF
                      norm_u = norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 3 ))
@@ -100,7 +100,7 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
                end if
 
             ! acm physics
-            elseif (params%physics_type == '2D_acm') then
+            elseif ((params%physics_type == '2D_acm') .or. (params%physics_type == '3D_acm'))  then
                dt = minval( (/dt,  params%CFL * dx / params%physics_acm%c_0 /))
 
             ! ns physics

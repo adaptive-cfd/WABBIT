@@ -19,13 +19,15 @@
 !! 27/07/17 - create
 ! ********************************************************************************************
 
-subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, int_block, volume_int, time)
+subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, volume_int, time)
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
     ! global parameters
     use module_params
+
+    use module_operators
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -46,10 +48,8 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     real(kind=rk), intent(inout)                           :: phi(Bs+2*g, Bs+2*g, Bs+2*g, N_dF)
     !> discretization order
     character(len=80), intent(in)                          :: order_discretization
-    !> integral of each block
-    real(kind=rk), dimension(2), intent(out)               :: int_block
     !> global volume integral of the last time step
-    real(kind=rk), dimension(2), intent(in)                :: volume_int
+    real(kind=rk), dimension(3), intent(in)                :: volume_int
     !> time
     real(kind=rk), intent(in)                              :: time
 
@@ -57,25 +57,25 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, Bs+2*g, N_dF) :: rhs
     
     !> mask term for every grid point in this block
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g)               :: mask
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g, Bs+2*g)       :: mask
     !> velocity of the solid
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g, 2)            :: us
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g ,Bs+2*g, 3)    :: us
     !> forcing term
-    real(kind=rk), dimension(2)                            :: forcing
-
-
+    real(kind=rk), dimension(3)                            :: forcing
     !> local datafields
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: u, v, w, p
-    !> 
-    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv dx2_inv, dy2_inv, dz2_inv c_0,&
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g, Bs+2*g )      :: u, v, w, p
+
+    !> inverse dx, physics/acm parameters
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0,&
                                                       nu, eps, eps_inv, gamma
+    !> derivatives
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                                                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
                                                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, & 
                                                      p_dx, p_dy, p_dz, penalx, penaly, penalz
-    ! loop variables
+    !> loop variables
     integer(kind=rk)                               :: ix, iy, iz
-    ! coefficients for Tam&Webb
+    !> coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
     real(kind=rk)                                  :: b(-2:2)
 
@@ -92,14 +92,13 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
     gamma       = params%physics_acm%gamma_p
 
     
-    u = phi(:,:,1)
-    v = phi(:,:,2)
-    p = phi(:,:,3)
+    u = phi(:,:,:,1)
+    v = phi(:,:,:,2)
+    p = phi(:,:,:,3)
 
     rhs  = 0.0_rk
     mask = 0.0_rk
     us   = 0.0_rk
-    int_block = 0.0_rk
 
     dx_inv = 1.0_rk / (2.0_rk*dx(1))
     dy_inv = 1.0_rk / (2.0_rk*dx(2))
@@ -181,11 +180,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
                     rhs(ix,iy,iz,3) = -u(ix,iy,iz)*w_dx - v(ix,iy,iz)*w_dy - w(ix,iy,iz)*w_dz - p_dz &
                                     + nu*(w_dxdx + w_dydy + w_dzdz) + penalz + forcing(3)
                     rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p(ix,iy,iz)
-
-                    int_block(1) = int_block(1) + u(ix,iy,iz)
-                    int_block(2) = int_block(2) + v(ix,iy,iz)
-                    int_block(3) = int_block(3) + w(ix,iy,iz)
-                
+                end do
             end do
         end do
 
@@ -195,7 +190,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
         !-----------------------------------------------------------------------
         do ix = g+1, Bs+g
             do iy = g+1, Bs+g
-            
+                do iz = g+1, Bs+g
                     ! first derivatives of u, v, p
                     u_dx = (a(-3)*u(ix-3,iy,iz) + a(-2)*u(ix-2,iy,iz) + a(-1)*u(ix-1,iy,iz) + a(0)*u(ix,iy,iz)&
                      +  a(+1)*u(ix+1,iy,iz) + a(+2)*u(ix+2,iy,iz) + a(+3)*u(ix+3,iy,iz))*dx_inv
@@ -258,12 +253,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
                     rhs(ix,iy,iz,3) = -u(ix,iy,iz)*w_dx - v(ix,iy,iz)*w_dy - w(ix,iy,iz)*w_dz - p_dz &
                                     + nu*(w_dxdx + w_dydy + w_dzdz) + penalz + forcing(3)
                     rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p(ix,iy,iz)
-
-                    int_block(1) = int_block(1) + u(ix,iy,iz)
-                    int_block(2) = int_block(2) + v(ix,iy,iz)
-                    int_block(3) = int_block(3) + w(ix,iy,iz)
-
-
+                end do
             end do
         end do
 
@@ -272,11 +262,6 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, in
       write(*,*) order_discretization
       stop
     end if
-
-
-
-    int_block(1) = int_block(1)*dx(1)*dx(2)
-    int_block(2) = int_block(2)*dx(1)*dx(2)
 
     !> \todo DO NOT OVERWRITE?
     phi = rhs

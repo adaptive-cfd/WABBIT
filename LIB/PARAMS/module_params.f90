@@ -66,6 +66,8 @@ module module_params
         character(len=80)                           :: boundary_cond
         ! initial condition
         character(len=80)                           :: initial_cond
+        ! files we want to read fo inital cond.
+        character(len=80), dimension(:), allocatable :: inicond_files
         ! width of the initial condition (e.g. Gauss blob)
         real(kind=rk)                               :: inicond_width
 

@@ -79,7 +79,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
     ! coordinates and spacing arrays
-    real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:), block_treecode(:,:)
+    real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:)
+    ! treecode array
+    integer(kind=ik), allocatable       :: block_treecode(:,:)
 
     ! file id integer
     integer(hid_t)                      :: file_id
@@ -215,7 +217,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), block_treecode)
     endif
 
-    ! add aditional annotations
+    ! add additional annotations
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n/))

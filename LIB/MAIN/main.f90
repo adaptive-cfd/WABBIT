@@ -264,7 +264,7 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, .true., com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, .true., com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks

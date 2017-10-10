@@ -47,6 +47,7 @@ contains
     ! init_data subroutine
     include "set_blocks_initial_condition.f90"
     include "set_inicond_all_blocks.f90"
+    include "get_inicond_from_file.f90"
 
     ! allocate and reset all memotry requred for the gird
     include "allocate_grid.f90"

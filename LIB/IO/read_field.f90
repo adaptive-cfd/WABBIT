@@ -11,14 +11,14 @@
 !
 !>
 !! input:
-!!           - 
-!!           - 
-!!           - 
-!!           - 
+!!           - name of the file we want to read from
+!!           - parameter array
+!!           - heavy data array
+!!           - number of active blocks (light and heavy)
 !!           - 
 !!
 !! output:
-!!           -
+!!           - heavy data array
 !!
 !!
 !! = log ======================================================================================
@@ -27,7 +27,7 @@
 !
 ! ********************************************************************************************
 
-subroutine read_field(fname, dF, params, )
+subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -39,12 +39,14 @@ subroutine read_field(fname, dF, params, )
 
     !> file name
     character(len=*), intent(in)        :: fname
-
     !> datafield number
     integer(kind=ik), intent(in)        :: dF
-
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> number of heavy and light active blocks
+    integer(kind=ik), intent(in)        :: hvy_n, lgt_n
 
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
@@ -77,25 +79,12 @@ subroutine read_field(fname, dF, params, )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    t1 = MPI_wtime()
-
+    hvy_block = 0.0_rk  ! oder 9.99e99_rk???
     call check_file_exists(fname)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
-    ! call read_attribute(fname, "blocks", "domain_size", domain)
-    ! call read_attribute(fname, "blocks", "time", ttime)
-    ! call read_attribute(fname, "blocks", "iteration", iiteration)
-    ! call read_attribute(fname, "blocks", "total_number_blocks", lgt_n)
-    
-    ! if (rank==0) then
-    !     hvy_n = lgt_n/params%number_procs + modulo(lgt_n,params%number_procs)
-    ! else
-    !     hvy_n = lgt_n/params%number_procs
-    ! end if
-
     allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
-    allocate(block_treecode(1:params%max_treelevel, 1:hvy_n))
 
     if ( params%threeD_case ) then
 
@@ -115,56 +104,36 @@ subroutine read_field(fname, dF, params, )
 
     endif
 
-    if (rank==0) then
-        write(*,'(40("~"))')
-        write(*,'("Reading from file ",A)') trim(adjustl(fname))
-        write(*,'("nx=",i4," ny=",i4," nz=",i4," time=",g12.4') ,ttime(1)
-        write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
+    ! DO WE NEED THIS?
+    ! if (rank==0) then
+    !     write(*,'(40("~"))')
+    !     write(*,'("Reading from file ",A)') trim(adjustl(fname))
+    !     write(*,'(" time=",g12.4') ,time(1)
+    !     write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
 
-        ! if the domain size doesn't match, proceed, but yell.
-        if ((params%Lx.ne.domain(1)).or.(params%Ly.ne.domain(2)).or.(params%Lz.ne.domain(3))) then
-            write (*,'(A)') " WARNING! Domain size mismatch."
-            write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') params%Lx,params%Ly,params%Lz
-            write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
-            write (*,'(A)') "proceed, with fingers crossed."
-        end if
-
-        ! ! if the resolutions do not match, yell and hang yourself
-        ! if ((nx/=nxyz(1)).or.(ny/=nxyz(2)).or.(nz/=nxyz(3))) then
-        !   write (*,'(A)') "ERROR! Resolution mismatch"
-        !   write (*,'(A)') "This happens if ra(:) and rb(:) are not properly initialized."
-        !   write (*,'("in memory:   nx=",i4," ny=",i4," nz=",i4)') nx,ny,nz
-        !   write (*,'("but in file: nx=",i4," ny=",i4," nz=",i4)') nxyz
-        !   stop
-        ! endif
-    end if
+    !     ! if the domain size doesn't match, proceed, but yell.
+    !     if ((params%Lx.ne.domain(1)).or.(params%Ly.ne.domain(2)).or.(params%Lz.ne.domain(3))) then
+    !         write (*,'(A)') " WARNING! Domain size mismatch."
+    !         write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') params%Lx,params%Ly,params%Lz
+    !         write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
+    !         write (*,'(A)') "proceed, with fingers crossed."
+    !     end if
+    ! end if
 
 
     ! actual reading of file
     if ( params%threeD_case ) then
         ! 3D data case
         call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D,ubounds3D, myblockbuffer)
-        call read_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), block_treecode)
 
     else
         ! 2D data case
         call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer)
-        call read_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/2,ubounds2D(3)/), block_treecode)
     end if
     
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
     
-    do k=1, hvy_n
-        hvy_block(:,:,:,dF,k) = myblockbuffer(:,:,:,k)
-        call hvy_id_to_lgt_id( lgt_id, k, rank, hvy_n )
-        lgt_block(lgt_id,1:params%max_treelevel) = block_treecode(k,:)
-        !lgt_block(rank*hvy_n+1:hvy_n+rank*hvy_n,1:params%max_treelevel) = block_treecode(:,:)
-    end do
-
-    !create hvy_active and lgt_active list
-    call create_active_and_sorted_lists(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, create_sorted_list)
-
+    hvy_block(:,:,:,dF,1:hvy_n) = myblockbuffer(:,:,:,1:hvy_n)
     deallocate(myblockbuffer)
-    deallocate(block_treecode)
 end subroutine read_field

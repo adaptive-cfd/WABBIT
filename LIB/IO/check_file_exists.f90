@@ -7,7 +7,7 @@ subroutine check_file_exists(fname)
 
   inquire ( file=fname, exist=exist1 )
   if ( exist1 .eqv. .false.) then
-    if (root) write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
+    write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
     stop
   endif
 

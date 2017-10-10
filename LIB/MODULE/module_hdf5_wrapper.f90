@@ -71,6 +71,13 @@ module module_hdf5_wrapper
         module procedure read_attrib_dble, read_attrib_int
     end interface read_attribute
 
+    interface write_dset_mpi_hdf5_2D
+        module procedure write_dble_dset_mpi_hdf5_2D, write_int_dset_mpi_hdf5_2D
+    end interface write_dset_mpi_hdf5_2D
+
+    interface read_dset_mpi_hdf5_2D
+        module procedure read_int_dset_mpi_hdf5_2D, read_dble_dset_mpi_hdf5_2D
+    end interface read_dset_mpi_hdf5_2D
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -150,7 +157,7 @@ contains
   ! OUTPUT:
   !   field           data read from file
   !-------------------------------------------------------------------------------
-  subroutine read_dset_mpi_hdf5_2D( file_id, dsetname, lbounds, ubounds, field )
+  subroutine read_dble_dset_mpi_hdf5_2D( file_id, dsetname, lbounds, ubounds, field )
     implicit none
     integer, parameter                        :: datarank = 2 ! data dimensionality (2D or 3D)
 
@@ -166,19 +173,19 @@ contains
     integer(hid_t) :: file_precision
 
     ! dataset dimensions in the file.
-    integer(hsize_t), dimension(rank) :: dims_global
-    ! integer(hsize_t), dimension(rank) :: dims_file, dims_dummy
+    integer(hsize_t), dimension(datarank) :: dims_global
+    integer(hsize_t), dimension(datarank) :: dims_file, dims_dummy
     ! hyperslab dimensions
-    integer(hsize_t), dimension(rank) :: dims_local
+    integer(hsize_t), dimension(datarank) :: dims_local
     ! chunks dimensions
-    integer(hsize_t), dimension(rank) :: chunk_dims
+    integer(hsize_t), dimension(datarank) :: chunk_dims
 
     ! how many blocks to select from dataspace
-    integer(hsize_t),  dimension(rank) :: count  = 1
-    integer(hssize_t), dimension(rank) :: offset
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
     ! stride is spacing between elements, this is one here. striding is done in the
     ! caller; here, we just write the entire (possibly downsampled) field to disk.
-    integer(hsize_t),  dimension(rank) :: stride = 1
+    integer(hsize_t),  dimension(datarank) :: stride = 1
     integer :: error  ! error flags
 
     integer :: i, mpicode,mindim,maxdim
@@ -212,13 +219,13 @@ contains
     ! Read actual field from file (dataset)
     !----------------------------------------------------------------------------
     ! dataspace in the file: contains all data from all procs
-    call h5screate_simple_f(rank, dims_global, filespace, error)
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
     ! dataspace in memory: contains only local data
-    call h5screate_simple_f(rank, dims_local, memspace, error)
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
     ! Create chunked dataset
     call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-    call h5pset_chunk_f(plist_id, rank, chunk_dims, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
 
     ! Open an existing dataset.
     call h5dopen_f(file_id, dsetname, dset_id, error)
@@ -227,8 +234,8 @@ contains
     ! get the dimensions of the field in the file
     call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
 
-    if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
-      if (root) write(*,*) "read_hdf5 error: file dimensions do not match"
+    if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
+      write(*,*) "read_hdf5 error: file dimensions do not match"
       call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
     endif
 
@@ -251,16 +258,16 @@ contains
     ! Close dataset
     call h5dclose_f(dset_id, error)
 
-  end subroutine read_dset_mpi_hdf5_2D
+  end subroutine read_dble_dset_mpi_hdf5_2D
 
-  subroutine read_dset_mpi_hdf5_3D( file_id, dsetname, lbounds, ubounds, field )
+  subroutine read_int_dset_mpi_hdf5_2D( file_id, dsetname, lbounds, ubounds, field )
     implicit none
-    integer, parameter                        :: datarank = 3 ! data dimensionality (2D or 3D)
+    integer, parameter                        :: datarank = 2 ! data dimensionality (2D or 3D)
 
     integer(hid_t), intent(in)                :: file_id
     character(len=*),intent(in)               :: dsetname
     integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
-    real(kind=rk), intent(inout)              :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2),lbounds(3):ubounds(3))
+    integer(kind=ik), intent(inout)           :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2))
 
     integer(hid_t) :: dset_id       ! dataset identifier
     integer(hid_t) :: filespace     ! dataspace identifier in file
@@ -269,19 +276,19 @@ contains
     integer(hid_t) :: file_precision
 
     ! dataset dimensions in the file.
-    integer(hsize_t), dimension(rank) :: dims_global
-    ! integer(hsize_t), dimension(rank) :: dims_file, dims_dummy
+    integer(hsize_t), dimension(datarank) :: dims_global
+    integer(hsize_t), dimension(datarank) :: dims_file, dims_dummy
     ! hyperslab dimensions
-    integer(hsize_t), dimension(rank) :: dims_local
+    integer(hsize_t), dimension(datarank) :: dims_local
     ! chunks dimensions
-    integer(hsize_t), dimension(rank) :: chunk_dims
+    integer(hsize_t), dimension(datarank) :: chunk_dims
 
     ! how many blocks to select from dataspace
-    integer(hsize_t),  dimension(rank) :: count  = 1
-    integer(hssize_t), dimension(rank) :: offset
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
     ! stride is spacing between elements, this is one here. striding is done in the
     ! caller; here, we just write the entire (possibly downsampled) field to disk.
-    integer(hsize_t),  dimension(rank) :: stride = 1
+    integer(hsize_t),  dimension(datarank) :: stride = 1
     integer :: error  ! error flags
 
     integer :: i, mpicode,mindim,maxdim
@@ -315,13 +322,116 @@ contains
     ! Read actual field from file (dataset)
     !----------------------------------------------------------------------------
     ! dataspace in the file: contains all data from all procs
-    call h5screate_simple_f(rank, dims_global, filespace, error)
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
     ! dataspace in memory: contains only local data
-    call h5screate_simple_f(rank, dims_local, memspace, error)
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
     ! Create chunked dataset
     call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-    call h5pset_chunk_f(plist_id, rank, chunk_dims, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
+
+    ! Open an existing dataset.
+    call h5dopen_f(file_id, dsetname, dset_id, error)
+    ! get its dataspace
+    call h5dget_space_f(dset_id, filespace, error)
+    ! get the dimensions of the field in the file
+    call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
+
+    if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
+      write(*,*) "read_hdf5 error: file dimensions do not match"
+      call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
+    endif
+
+    ! Select hyperslab in the file.
+    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
+    error, stride, dims_local)
+
+    ! Create property list for collective dataset read
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+
+
+    call h5dread_f( dset_id, H5T_NATIVE_DOUBLE, field, dims_local, error, &
+    mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
+
+    call h5sclose_f(filespace, error)
+    call h5sclose_f(memspace, error)
+    call h5pclose_f(plist_id, error) ! note the dataset remains opened
+
+    ! Close dataset
+    call h5dclose_f(dset_id, error)
+
+  end subroutine read_int_dset_mpi_hdf5_2D
+
+  subroutine read_dset_mpi_hdf5_3D( file_id, dsetname, lbounds, ubounds, field )
+    implicit none
+    integer, parameter                        :: datarank = 3 ! data dimensionality (2D or 3D)
+
+    integer(hid_t), intent(in)                :: file_id
+    character(len=*),intent(in)               :: dsetname
+    integer,dimension(1:datarank), intent(in) :: lbounds, ubounds
+    real(kind=rk), intent(inout)              :: field(lbounds(1):ubounds(1),lbounds(2):ubounds(2),lbounds(3):ubounds(3))
+
+    integer(hid_t) :: dset_id       ! dataset identifier
+    integer(hid_t) :: filespace     ! dataspace identifier in file
+    integer(hid_t) :: memspace      ! dataspace identifier in memory
+    integer(hid_t) :: plist_id      ! property list identifier
+    integer(hid_t) :: file_precision
+
+    ! dataset dimensions in the file.
+    integer(hsize_t), dimension(datarank) :: dims_global
+    integer(hsize_t), dimension(datarank) :: dims_file, dims_dummy
+    ! hyperslab dimensions
+    integer(hsize_t), dimension(datarank) :: dims_local
+    ! chunks dimensions
+    integer(hsize_t), dimension(datarank) :: chunk_dims
+
+    ! how many blocks to select from dataspace
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
+    ! stride is spacing between elements, this is one here. striding is done in the
+    ! caller; here, we just write the entire (possibly downsampled) field to disk.
+    integer(hsize_t),  dimension(datarank) :: stride = 1
+    integer :: error  ! error flags
+
+    integer :: i, mpicode,mindim,maxdim
+    ! what follows is for the attribute "time"
+  !  integer, parameter :: arank = 1
+
+    ! determine size of memory (i.e. the entire array). note we assume the file
+    ! contains the right amount of data, which must be ensured outside of this function
+    do i=1, datarank
+      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      ! size of the global array
+      dims_global(i) = int( maxdim-mindim+1, kind=hsize_t)
+      ! size of array on this cpu
+      dims_local(i) = ubounds(i)-lbounds(i) +1
+    end do
+
+    ! Tell HDF5 how our  data is organized:
+    offset = lbounds
+
+    ! Each process knows how much data it has and where to store it.
+    ! now, define the dataset chunking. Chunking is largest dimension in
+    ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
+    ! which is about 16MB)
+    do i = 1, datarank
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      chunk_dims(i) = min(chunk_dims(i), max_chunk )
+    enddo
+
+    !----------------------------------------------------------------------------
+    ! Read actual field from file (dataset)
+    !----------------------------------------------------------------------------
+    ! dataspace in the file: contains all data from all procs
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
+    ! dataspace in memory: contains only local data
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
+
+    ! Create chunked dataset
+    call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
 
     ! Open an existing dataset.
     call h5dopen_f(file_id, dsetname, dset_id, error)
@@ -331,7 +441,7 @@ contains
     call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
-      if (root) write(*,*) "read_hdf5 error: file dimensions do not match"
+      write(*,*) "read_hdf5 error: file dimensions do not match"
       call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
     endif
 
@@ -373,19 +483,19 @@ contains
     integer(hid_t) :: file_precision
 
     ! dataset dimensions in the file.
-    integer(hsize_t), dimension(rank) :: dims_global
-    ! integer(hsize_t), dimension(rank) :: dims_file, dims_dummy
+    integer(hsize_t), dimension(datarank) :: dims_global
+    integer(hsize_t), dimension(datarank) :: dims_file, dims_dummy
     ! hyperslab dimensions
-    integer(hsize_t), dimension(rank) :: dims_local
+    integer(hsize_t), dimension(datarank) :: dims_local
     ! chunks dimensions
-    integer(hsize_t), dimension(rank) :: chunk_dims
+    integer(hsize_t), dimension(datarank) :: chunk_dims
 
     ! how many blocks to select from dataspace
-    integer(hsize_t),  dimension(rank) :: count  = 1
-    integer(hssize_t), dimension(rank) :: offset
+    integer(hsize_t),  dimension(datarank) :: count  = 1
+    integer(hssize_t), dimension(datarank) :: offset
     ! stride is spacing between elements, this is one here. striding is done in the
     ! caller; here, we just write the entire (possibly downsampled) field to disk.
-    integer(hsize_t),  dimension(rank) :: stride = 1
+    integer(hsize_t),  dimension(datarank) :: stride = 1
     integer :: error  ! error flags
 
     integer :: i, mpicode,mindim,maxdim
@@ -419,13 +529,13 @@ contains
     ! Read actual field from file (dataset)
     !----------------------------------------------------------------------------
     ! dataspace in the file: contains all data from all procs
-    call h5screate_simple_f(rank, dims_global, filespace, error)
+    call h5screate_simple_f(datarank, dims_global, filespace, error)
     ! dataspace in memory: contains only local data
-    call h5screate_simple_f(rank, dims_local, memspace, error)
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
     ! Create chunked dataset
     call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-    call h5pset_chunk_f(plist_id, rank, chunk_dims, error)
+    call h5pset_chunk_f(plist_id, datarank, chunk_dims, error)
 
     ! Open an existing dataset.
     call h5dopen_f(file_id, dsetname, dset_id, error)
@@ -435,7 +545,7 @@ contains
     call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
-      if (root) write(*,*) "read_hdf5 error: file dimensions do not match"
+      write(*,*) "read_hdf5 error: file dimensions do not match"
       call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
     endif
 
@@ -475,7 +585,7 @@ contains
   ! OUTPUT:
   !   none
   !-------------------------------------------------------------------------------
-  subroutine write_dset_mpi_hdf5_2D(file_id, dsetname, lbounds, ubounds, field)
+  subroutine write_dble_dset_mpi_hdf5_2D(file_id, dsetname, lbounds, ubounds, field)
     implicit none
     integer, parameter :: datarank = 2 ! data dimensionality (2D or 3D)
 
@@ -599,7 +709,7 @@ contains
     call h5sclose_f(memspace, error)
     call h5dclose_f(dset_id, error) ! Close the dataset.
     call h5pclose_f(plist_id, error) ! Close the property list.
-  end subroutine write_dset_mpi_hdf5_2D
+  end subroutine write_dble_dset_mpi_hdf5_2D
 
 
   !-------------------------------------------------------------------------------
@@ -1489,7 +1599,7 @@ subroutine read_attrib_dble(file_id,dsetname,aname,attribute)
   real(kind=rk), DIMENSION(:), intent (inout) :: attribute
   character(len=*), intent(in)                :: aname ! attribute name
 
-  integer, parameter :: arank = 1
+  integer, parameter :: arankn = 1
   integer            :: dim
   integer            :: error  ! error flags
   integer(hid_t)     :: aspace_id ! Attribute Dataspace identifier

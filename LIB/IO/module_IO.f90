@@ -57,4 +57,13 @@ contains
     ! compute vorticity to save it on disk
     include "write_vorticity.f90"
 
+    ! read mesh properties and time from input file
+    include "read_mesh_and_attributes.f90"
+
+    ! read field from input file
+    include "read_field.f90"
+
+    ! check if input file exists
+    include "check_file_exists.f90"
+
 end module module_IO

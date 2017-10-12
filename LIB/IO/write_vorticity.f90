@@ -64,7 +64,7 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
 ! variables initialization
 
     !vorticity = 0.0_rk
-    hvy_work  = 0.0_rk
+    !hvy_work  = 0.0_rk
 
     pF   = 0
     rhoF = 0
@@ -72,63 +72,85 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
     UyF  = 0
     UzF  = 0
 
-    ! find fields
-    do dF = 1, params%number_data_fields
-        if ( params%physics_ns%names(dF) == "p" ) pF = dF
-        if ( params%physics_ns%names(dF) == "rho" ) rhoF = dF
-        if ( params%physics_ns%names(dF) == "Ux" ) UxF = dF
-        if ( params%physics_ns%names(dF) == "Uy" ) UyF = dF
-        if ( params%physics_ns%names(dF) == "Uz" ) UzF = dF
-    end do
+    if ( params%physics_type=='2D_navier_stokes' .or. params%physics_type=='3D_navier_stokes' ) then
+        ! find fields
+        do dF = 1, params%number_data_fields
+            if ( params%physics_ns%names(dF) == "p" ) pF = dF
+            if ( params%physics_ns%names(dF) == "rho" ) rhoF = dF
+            if ( params%physics_ns%names(dF) == "Ux" ) UxF = dF
+            if ( params%physics_ns%names(dF) == "Uy" ) UyF = dF
+            if ( params%physics_ns%names(dF) == "Uz" ) UzF = dF
+        end do
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    do k=1, hvy_n
-       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-       
-       if (params%threeD_case) then
-           ! store u,v, w in hvy_work array
-           hvy_work(:,:,:,1,hvy_active(k)) = hvy_block(:,:,:,1,hvy_active(k))  ! u
-           hvy_work(:,:,:,2,hvy_active(k)) = hvy_block(:,:,:,2,hvy_active(k))  ! v
-           hvy_work(:,:,:,3,hvy_active(k)) = hvy_block(:,:,:,3,hvy_active(k))  ! w
-       else
-           if (params%physics_type=='2D_navier_stokes') then
-               ! store u,v in hvy_work array
-               hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,UxF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! u
-               hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,UyF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! v
-           else
-               ! store u,v in hvy_work array
-               hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,1,hvy_active(k))  ! u
-               hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))  ! v
-               !u = hvy_block(:, :, 1, hvy_active(k))
-               !v = hvy_block(:, :, 2, hvy_active(k))
-           end if
-       end if
-       
-       ! compute vorticity from u,v and store it in datafield 3 of hvy_work array
-       call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:, :, :, 4:6, hvy_active(k)))
+    ! calculate vorticity only for proper physic
+    select case (params%physics_type)
 
-       ! hvy_work(:, :, 1, 1, hvy_active(k)) = vorticity(:,:)
+        case('2D_acm')
+            do k=1, hvy_n
 
-   end do
+                call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                ! store u,v in hvy_work array
+                hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,1,hvy_active(k))  ! u
+                hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))  ! v
 
-   if (params%threeD_case) then
-       ! write field 4 to 6 of hvy_work array (vorticity) to disk
-       ! write vorticity in x direction
-       write( fname,'(a, "_", i12.12, ".h5")') 'vor_x', nint(time * 1.0e6_rk)
-       call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-       ! write vorticity in y direction
-       write( fname,'(a, "_", i12.12, ".h5")') 'vor_y', nint(time * 1.0e6_rk)
-       call write_field(fname, time, iteration, 5, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-       ! write vorticity in z direction
-       write( fname,'(a, "_", i12.12, ".h5")') 'vor_z', nint(time * 1.0e6_rk)
-       call write_field(fname, time, iteration, 6, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-   else
-       write( fname,'(a, "_", i12.12, ".h5")') 'vor', nint(time * 1.0e6_rk)
-       ! write field 4 of hvy_work array (vorticity) to disk
-       call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-   end if
+            end do
+
+            call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:, :, :, 4:6, hvy_active(k)))
+
+            write( fname,'(a, "_", i12.12, ".h5")') 'vor', nint(time * 1.0e6_rk)
+            ! write field 4 of hvy_work array (vorticity) to disk
+            call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
+
+        case('3D_acm')
+            do k=1, hvy_n
+
+                call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                ! store u,v, w in hvy_work array
+                hvy_work(:,:,:,1,hvy_active(k)) = hvy_block(:,:,:,1,hvy_active(k))  ! u
+                hvy_work(:,:,:,2,hvy_active(k)) = hvy_block(:,:,:,2,hvy_active(k))  ! v
+                hvy_work(:,:,:,3,hvy_active(k)) = hvy_block(:,:,:,3,hvy_active(k))  ! w
+
+            end do
+
+            call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:, :, :, 4:6, hvy_active(k)))
+
+            ! write field 4 to 6 of hvy_work array (vorticity) to disk
+            ! write vorticity in x direction
+            write( fname,'(a, "_", i12.12, ".h5")') 'vor_x', nint(time * 1.0e6_rk)
+            call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
+            ! write vorticity in y direction
+            write( fname,'(a, "_", i12.12, ".h5")') 'vor_y', nint(time * 1.0e6_rk)
+            call write_field(fname, time, iteration, 5, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
+            ! write vorticity in z direction
+            write( fname,'(a, "_", i12.12, ".h5")') 'vor_z', nint(time * 1.0e6_rk)
+            call write_field(fname, time, iteration, 6, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
+
+        case('2D_navier_stokes')
+            do k=1, hvy_n
+
+                call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                ! store u,v in hvy_work array
+                hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,UxF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! u
+                hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,UyF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! v
+
+            end do
+
+            call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:, :, :, 4:6, hvy_active(k)))
+
+            write( fname,'(a, "_", i12.12, ".h5")') 'vor', nint(time * 1.0e6_rk)
+            ! write field 4 of hvy_work array (vorticity) to disk
+            call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
+
+        case('3D_navier_stokes')
+            ! /todo vorticity calculation
+
+    end select
 
 end subroutine write_vorticity

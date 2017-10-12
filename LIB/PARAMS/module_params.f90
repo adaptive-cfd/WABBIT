@@ -46,8 +46,14 @@ module module_params
         real(kind=rk)                               :: dt
         ! time step calculator
         character(len=80)                           :: time_step_calc
+
+        ! data writing frequency
+        character(len=80)                           :: write_method
         ! data writing frequency
         integer(kind=ik)                            :: write_freq
+        ! data writing frequency
+        real(kind=rk)                               :: write_time
+
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable  :: butcher_tableau
 

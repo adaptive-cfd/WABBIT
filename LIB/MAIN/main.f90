@@ -382,11 +382,30 @@ program main
         end if
 
         ! write data to disk
-        if (modulo(iteration, params%write_freq) == 0) then
-            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-            call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-            output_time = time
-        endif
+        select case(params%write_method)
+
+            case('fixed_freq')
+                if (modulo(iteration, params%write_freq) == 0) then
+                    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+                    call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+                    output_time = time
+                endif
+
+            case('fixed_time')
+                !if (modulo(time, params%write_time) < 1e-12_rk) then
+                if ( (time - floor(time / params%write_time) * params%write_time) < 1e-12_rk) then
+                    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+                    call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+                    output_time = time
+                endif
+
+            case default
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: write method is unknown"
+                write(*,*) params%write_method
+                stop
+
+        end select
 
         ! debug info
         if ( params%debug ) then

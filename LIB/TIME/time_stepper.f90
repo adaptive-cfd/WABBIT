@@ -170,6 +170,16 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
         time_dt = params%time_max
     end if
 
+    if ( params%write_method == 'fixed_time' ) then
+        ! time step should also fit in output time step size
+        ! criterion: check in time+dt above next output time
+        ! if so: truncate time+dt
+        if ( aint(time_dt/params%write_time) - aint(time/params%write_time) > 0.1_rk) then
+            dt = aint(time_dt/params%write_time, kind=rk)*params%write_time - time
+            time_dt = time + dt
+        end if
+    end if
+
     if ( params%debug ) then
         ! time measurement without ghost nodes synchronization
         call MPI_Barrier(MPI_COMM_WORLD, ierr)

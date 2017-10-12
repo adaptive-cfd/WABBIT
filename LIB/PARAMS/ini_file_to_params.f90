@@ -93,8 +93,15 @@ subroutine ini_file_to_params( params, filename )
     !
     ! read time_max
     call read_param_mpi(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
+
+    ! read output write method
+    call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
     ! read output write frequency
     call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
+    ! read output write frequency
+    call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+
+
     ! read method to calculate time step
     call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_calc, "CFL_cond" )
     ! read value of fixed time step

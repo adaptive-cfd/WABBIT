@@ -100,6 +100,8 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
     ! read output write frequency
     call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+    ! assume start at time 0.0 /todo change if start with reloaded data
+    params%next_write_time = 0.0_rk + params%write_time
 
 
     ! read method to calculate time step

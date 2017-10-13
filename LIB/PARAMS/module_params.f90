@@ -53,6 +53,8 @@ module module_params
         integer(kind=ik)                            :: write_freq
         ! data writing frequency
         real(kind=rk)                               :: write_time
+        ! data next write time, store here the next time for output data
+        real(kind=rk)                               :: next_write_time
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable  :: butcher_tableau

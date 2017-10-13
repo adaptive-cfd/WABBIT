@@ -65,8 +65,8 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! number of files to be read from
-    N_files = size(params%inicond_files)
+    ! number of files to read from
+    N_files = params%number_data_fields
 
 !---------------------------------------------------------------------------------------------
 ! main body

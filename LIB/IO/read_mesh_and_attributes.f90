@@ -65,12 +65,12 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     integer(kind=ik)                              :: blocks_per_rank_list(0:params%number_procs-1) 
     ! loop variables
     integer(kind=rk)                              :: lgt_id, k
-    ! domain size we will get from file
-    real(kind=rk), dimension(1:3)                 :: domain
     ! error variable
     integer(kind=ik)                              :: ierr
     integer(kind=ik), dimension(1)                :: iiteration, number_blocks
     real(kind=rk), dimension(1)                   :: ttime
+    integer(kind=ik)                              :: treecode_size
+    real(kind=rk), dimension(3)                   :: domain
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -80,6 +80,8 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     ! grid parameter
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
+    
+    lgt_id = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -89,6 +91,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
     call read_attribute(file_id, "blocks", "domain-size", domain)
+    if (.not. (params%threeD_case)) domain(3) = params%Lz
     call read_attribute(file_id, "blocks", "time", ttime)
     call read_attribute(file_id, "blocks", "iteration", iiteration)
     call read_attribute(file_id, "blocks", "total_number_blocks", number_blocks)
@@ -98,9 +101,9 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     iteration = iiteration(1)
 
     if (rank==0) then
-        write(*,'(40("~"))')
-        write(*,'("Reading from file ",A)') trim(adjustl(fname))
-        write(*,'("time=",g12.4)') time
+        write(*,'(80("_"))')
+        write(*,'("READING: Reading from file ",A)') trim(adjustl(fname))
+        write(*,'("time=",g12.4," iteration=", i5)') time, iteration
         write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
 
         ! if the domain size doesn't match, proceed, but yell.
@@ -112,7 +115,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
         end if
     end if
 
-    if ( (rank == 0) ) then!.and. verbosity ) then
+    if ( (rank == 0) ) then
         write(*,'(80("_"))')
         write(*,'(A)') "READING: initializing grid from file..."
         write(*,'( "Nblocks=",i6," (on all cpus)")') lgt_n
@@ -125,8 +128,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     ! Nblocks per CPU
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note
     ! zero indexing as required by MPI
-
-!    allocate( blocks_per_rank_list( 0:number_procs-1 ) )
 
     ! set list to the average value
     blocks_per_rank_list = lgt_n / number_procs
@@ -150,33 +151,34 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     hvy_n = blocks_per_rank_list(rank)
 
     allocate(block_treecode(1:params%max_treelevel, 1:hvy_n))
-    allocate (my_lgt_block(1:size(lgt_block,1), 1:size(lgt_block,2)))
+    allocate (my_lgt_block(size(lgt_block,1), size(lgt_block,2)))
+    my_lgt_block = -1
+    block_treecode = 0
 
-    my_lgt_block = 0
     ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + 2]
     ! array we want to hold, so that all CPU can read from the same file simultaneously
     ! (note zero-based offset):
-    lbounds = (/1, lgt_n + 1/) - 1
-    ubounds = (/2, lgt_n + hvy_n - 1/)
+    lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
+    ubounds = (/params%max_treelevel-1, lbounds(2) + hvy_n - 1/)
 
     call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
-   
-    do k=1, hvy_n
+     do k=1, hvy_n
         call hvy_id_to_lgt_id( lgt_id, k, rank, hvy_n )
-        my_lgt_block(lgt_id,1:params%max_treelevel) = block_treecode(k,:)
+        ! copy treecode
+        my_lgt_block(lgt_id,1:params%max_treelevel) = block_treecode(:,k)
+        ! set mesh level
+        my_lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k), params%max_treelevel)
+        ! set refinement status 
+        my_lgt_block(lgt_id, params%max_treelevel+2) = 0
     end do
-    
-    ! set refinement status
-    my_lgt_block(:, params%max_treelevel+2) = 0
-    ! set mesh level
-!    my_lgt_block(...)
+
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
     ! be synced. However, the light data has to.
-    lgt_block = 0
+    lgt_block = -1
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
     deallocate(my_lgt_block)

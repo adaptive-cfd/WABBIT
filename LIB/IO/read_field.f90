@@ -65,6 +65,8 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     integer(kind=ik), dimension(3)      :: ubounds2D, lbounds2D
 
     real(kind=rk), dimension(3)         :: domain
+    ! procs per rank array
+    integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -76,6 +78,9 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
 
+    allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
+    allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
+    myblockbuffer = 99.0_rk
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -84,14 +89,14 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
-    allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
+    call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
 
     if ( params%threeD_case ) then
 
         ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
-        lbounds3D = (/1,1,1,lgt_n+1/) - 1
+        lbounds3D = (/1,1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds3D = (/Bs-1,Bs-1,Bs-1,lbounds3D(4)+hvy_n-1/)
 
     else
@@ -99,7 +104,7 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
         ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
-        lbounds2D = (/1,1,lgt_n+1/) - 1
+        lbounds2D = (/1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds2D = (/Bs-1,Bs-1,lbounds2D(3)+hvy_n-1/)
 
     endif
@@ -120,7 +125,7 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     !     end if
     ! end if
 
-
+    if (rank==0) write(*,*) 'FIEEEEEELD', dF
     ! actual reading of file
     if ( params%threeD_case ) then
         ! 3D data case
@@ -130,10 +135,15 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
         ! 2D data case
         call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer)
     end if
-    
+
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
-    
-    hvy_block(:,:,:,dF,1:hvy_n) = myblockbuffer(:,:,:,1:hvy_n)
+
+    if (params%threeD_case) then
+        hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,1:hvy_n) = myblockbuffer(:,:,:,1:hvy_n)
+    else
+        hvy_block(g+1:Bs+g,g+1:Bs+g,1,dF,1:hvy_n) = myblockbuffer(:,:,1,1:hvy_n)
+    end if
+
     deallocate(myblockbuffer)
 end subroutine read_field

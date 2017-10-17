@@ -96,7 +96,7 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
         ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
-        lbounds3D = (/1,1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
+        lbounds3D = (/0,0,0,sum(actual_blocks_per_proc(0:rank-1))/)
         ubounds3D = (/Bs-1,Bs-1,Bs-1,lbounds3D(4)+hvy_n-1/)
 
     else
@@ -104,12 +104,12 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
         ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
-        lbounds2D = (/1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
+        lbounds2D = (/0,0,sum(actual_blocks_per_proc(0:rank-1))/)
         ubounds2D = (/Bs-1,Bs-1,lbounds2D(3)+hvy_n-1/)
 
     endif
 
-    ! DO WE NEED THIS?
+    ! DO WE NEED THIS? YEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEES
     ! if (rank==0) then
     !     write(*,'(40("~"))')
     !     write(*,'("Reading from file ",A)') trim(adjustl(fname))
@@ -125,15 +125,14 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     !     end if
     ! end if
 
-    if (rank==0) write(*,*) 'FIEEEEEELD', dF
     ! actual reading of file
     if ( params%threeD_case ) then
         ! 3D data case
-        call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D,ubounds3D, myblockbuffer)
+        call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
 
     else
         ! 2D data case
-        call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer)
+        call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
     end if
 
     ! close file and HDF5 library

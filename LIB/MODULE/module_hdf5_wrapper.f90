@@ -237,7 +237,7 @@ contains
 
     call h5sclose_f(filespace, error)
     call h5sclose_f(memspace, error)
-    call h5pclose_f(plist_id, error) ! note the dataset remains opened
+    call h5pclose_f(plist_id, error) 
 
     ! Close dataset
     call h5dclose_f(dset_id, error)
@@ -356,7 +356,7 @@ contains
 
     call h5sclose_f(filespace, error)
     call h5sclose_f(memspace, error)
-    call h5pclose_f(plist_id, error) ! note the dataset remains opened
+    call h5pclose_f(plist_id, error)
 
     ! Close dataset
     call h5dclose_f(dset_id, error)
@@ -456,13 +456,12 @@ contains
     call h5dread_f( dset_id, H5T_NATIVE_DOUBLE, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
-    write(*,*) '_________', dims_local, field(1,1,ubounds(3)-3)
     call h5sclose_f(filespace, error)
     call h5sclose_f(memspace, error)
     call h5pclose_f(plist_id, error) ! note the dataset remains opened
 
-    ! Close dataset
-    call h5dclose_f(dset_id, error)
+    call h5dclose_f(dset_id, error)  ! Close dataset
+
 
   end subroutine read_dset_mpi_hdf5_3D
 
@@ -846,7 +845,6 @@ contains
     call h5dclose_f(dset_id, error) ! Close the dataset.
     call h5pclose_f(plist_id, error) ! Close the property list.
   end subroutine write_dble_dset_mpi_hdf5_2D
-
 
   !-------------------------------------------------------------------------------
   ! write array to HDF5 file

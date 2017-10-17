@@ -140,12 +140,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
         call error_msg("ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
     end if
 
-!    if (rank==0) then
-!        hvy_n = lgt_n/params%number_procs + modulo(lgt_n,params%number_procs)
-!    else
-!        hvy_n = lgt_n/params%number_procs
-!    end if
-
     ! number of active blocks on my process
     ! WHAT HAPPENS IF HVY_N = 0 ?????????
     hvy_n = blocks_per_rank_list(rank)
@@ -166,7 +160,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
      do k=1, hvy_n
-        call hvy_id_to_lgt_id( lgt_id, k, rank, hvy_n )
+        call hvy_id_to_lgt_id( lgt_id, k, rank, params%number_blocks )
         ! copy treecode
         my_lgt_block(lgt_id,1:params%max_treelevel) = block_treecode(:,k)
         ! set mesh level
@@ -178,7 +172,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
     ! be synced. However, the light data has to.
-    lgt_block = -1
+    lgt_block = 0
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
     deallocate(my_lgt_block)

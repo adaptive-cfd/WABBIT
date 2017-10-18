@@ -51,8 +51,6 @@ module module_params
         ! data writing frequency
         character(len=80)                            :: write_method
         ! data writing frequency
-        integer(kind=ik)                             :: write_freq
-        ! data writing frequency
         real(kind=rk)                                :: write_time
         ! data next write time, store here the next time for output data
         real(kind=rk)                                :: next_write_time

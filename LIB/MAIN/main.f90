@@ -283,15 +283,7 @@ program main
         ! save initial condition to disk
         ! we don't need this for an initial condition we got from a file (there already is this file)
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        select case (params%physics_type)
-            case('2D_navier_stokes')
-                call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-
-            case('2D_acm')
-                call write_vorticity(hvy_work, hvy_block(:,:,:,1:2,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-            case('3D_acm') 
-                call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        end select
+        call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
     ! max neighbor num
     !> \todo move max neighbor num to params struct
@@ -399,20 +391,30 @@ program main
         end if
 
         ! write data to disk
-        if (modulo(iteration, params%write_freq) == 0) then
-            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-            ! write vorticity to disk
-            select case (params%physics_type)
-                case('2D_navier_stokes')
-                    call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-                case('2D_acm')
-                    call write_vorticity(hvy_work, hvy_block(:,:,:,1:2,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-                case('3D_acm') 
-                    call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-            end select
+        select case(params%write_method)
 
-            output_time = time
-        endif
+            case('fixed_freq')
+                if (modulo(iteration, params%write_freq) == 0) then
+                    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+                    call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+                    output_time = time
+                endif
+
+            case('fixed_time')
+                if ( abs(time - params%next_write_time) < 1e-12_rk ) then
+                    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+                    call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+                    output_time = time
+                    params%next_write_time = params%next_write_time + params%write_time
+                endif
+
+            case default
+                write(*,'(80("_"))')
+                write(*,*) "ERROR: write method is unknown"
+                write(*,*) params%write_method
+                stop
+
+        end select
 
         ! debug info
         if ( params%debug ) then
@@ -432,15 +434,7 @@ program main
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then 
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        ! write vorticity to disk
-        select case (params%physics_type)
-            case('2D_navier_stokes')
-                call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-            case('2D_acm')
-                call write_vorticity(hvy_work, hvy_block(:,:,:,1:2,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-            case('3D_acm') 
-                call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        end select
+        call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
 
     ! debug info

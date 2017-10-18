@@ -48,7 +48,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
     integer(kind=ik)                        :: Bs, g
 
     ! p0 value \todo get from ini file
-    real(kind=rk)                           :: p0, rho0
+    real(kind=rk)                           :: p0, rho0, u0
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -64,6 +64,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
 
     rho0 = 1.0_rk
     p0   = 2.5_rk
+    u0   = 0.0_rk
 
     ! find fields
     do dF = 1, params%number_data_fields
@@ -106,21 +107,26 @@ subroutine inicond_shear_layer( params, u, x0, dx )
                 ! shear layer, setup [1]
                 ! Uy
                 if ( x <= 0.5_rk*params%Lx ) then
-                    u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( x - mux1 ) )
+                    u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( x - mux1 ) ) + u0
                     u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( x - mux1 ) ) ) / 2.0_rk + rho0
                 else
-                    u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( mux2 - x ) )
+                    u(ix, iy, 1, UyF) = dtanh( w/params%Lx * ( mux2 - x ) ) + u0
                     u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( mux2 - x ) ) ) / 2.0_rk + rho0
                 end if
 
                 ! Ux
-                u(ix, iy, 1, UxF) = 0.01_rk * dsin( 2.0_rk * pi * 2.0_rk * params%Ly * ( y - muy  ) / params%Ly )
+                u(ix, iy, 1, UxF) = 0.05_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params%Ly )
 
             end do
         end do
 
         ! set p field
         u(:, :, 1, pF)   = p0
+
+        !
+        u(:, :, 1, rhoF) = sqrt(u(:, :, 1, rhoF))
+        u(:, :, 1, UxF)  = u(:, :, 1, UxF) * (u(:, :, 1, rhoF))**2
+        u(:, :, 1, UyF)  = u(:, :, 1, UyF) * (u(:, :, 1, rhoF))**2
 
     endif
 

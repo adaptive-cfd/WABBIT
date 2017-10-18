@@ -93,8 +93,17 @@ subroutine ini_file_to_params( params, filename )
     !
     ! read time_max
     call read_param_mpi(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
+
+    ! read output write method
+    call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
     ! read output write frequency
     call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
+    ! read output write frequency
+    call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+    ! assume start at time 0.0 /todo change if start with reloaded data
+    params%next_write_time = 0.0_rk + params%write_time
+
+
     ! read method to calculate time step
     call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_calc, "CFL_cond" )
     ! read value of fixed time step
@@ -176,7 +185,7 @@ subroutine ini_file_to_params( params, filename )
             ! read dynamic viscosity
             call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
             ! read switch to turn on|off dissipation
-            call read_param_mpi(FILE, 'Blocks', 'dissipation', params%physics_ns%dissipation, .true. )
+            call read_param_mpi(FILE, 'Physics', 'dissipation', params%physics_ns%dissipation, .true. )
 
             ! read variable names
             ! allocate names list

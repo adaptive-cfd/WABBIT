@@ -123,6 +123,7 @@ contains
         ! be erased
         call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error, access_prp = plist_id)
     endif
+
     ! this closes the property list plist_id (we'll re-use it)
     call h5pclose_f(plist_id, error)
   end subroutine open_file_hdf5
@@ -273,7 +274,6 @@ contains
     integer(hid_t) :: filespace     ! dataspace identifier in file
     integer(hid_t) :: memspace      ! dataspace identifier in memory
     integer(hid_t) :: plist_id      ! property list identifier
-    integer(hid_t) :: file_precision
 
     ! dataset dimensions in the file.
     integer(hsize_t), dimension(datarank) :: dims_global
@@ -376,7 +376,6 @@ contains
     integer(hid_t) :: filespace     ! dataspace identifier in file
     integer(hid_t) :: memspace      ! dataspace identifier in memory
     integer(hid_t) :: plist_id      ! property list identifier
-    integer(hid_t) :: file_precision
 
     ! dataset dimensions in the file.
     integer(hsize_t), dimension(datarank) :: dims_global
@@ -479,7 +478,6 @@ contains
     integer(hid_t) :: filespace     ! dataspace identifier in file
     integer(hid_t) :: memspace      ! dataspace identifier in memory
     integer(hid_t) :: plist_id      ! property list identifier
-    integer(hid_t) :: file_precision
 
     ! dataset dimensions in the file.
     integer(hsize_t), dimension(datarank) :: dims_global
@@ -1540,7 +1538,6 @@ subroutine read_attrib_dble(file_id,dsetname,aname,attribute)
   character(len=*), intent (in)               :: dsetname, aname
   real(kind=rk), DIMENSION(:), intent (inout) :: attribute
 
-  integer, parameter :: arankn = 1
   integer            :: dim
   integer            :: error  ! error flags
   integer(hid_t)     :: aspace_id ! Attribute Dataspace identifier
@@ -1595,7 +1592,6 @@ subroutine read_attrib_int(file_id,dsetname,aname,attribute)
   character(len=*), intent (in)                  :: dsetname, aname
   integer(kind=ik), DIMENSION(:), intent (inout) :: attribute
 
-  integer, parameter  :: arank = 1
   integer             :: dim
   integer             :: error  ! error flags
   integer(hid_t)      :: aspace_id ! Attribute Dataspace identifier

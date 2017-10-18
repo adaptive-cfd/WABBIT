@@ -471,7 +471,7 @@ contains
       write(*,*) "error: vector and default value are not of the same length"
     endif
 
-    write(formatstring,'("(",i2.2,"(g10.3,1x))")') n
+    write(formatstring,'("(",i2.2,"(g17.3,1x))")') n
 
     call GetValue(PARAMS, section, keyword, value)
 

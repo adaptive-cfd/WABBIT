@@ -82,7 +82,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     g    = params%number_ghost_nodes
     
     lgt_id = 0
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -100,6 +99,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     lgt_n     = number_blocks(1)
     iteration = iiteration(1)
 
+    ! print some messages
     if (rank==0) then
         write(*,'(80("_"))')
         write(*,'("READING: Reading from file ",A)') trim(adjustl(fname))
@@ -107,7 +107,8 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
         write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
 
         ! if the domain size doesn't match, proceed, but yell.
-        if ((params%Lx.ne.domain(1)).or.(params%Ly.ne.domain(2)).or.(params%Lz.ne.domain(3))) then
+        if ((abs(params%Lx-domain(1))>1e-12_rk).or.(abs(params%Ly-domain(2))>1e-12_rk) &
+            .or.(abs(params%Lz-domain(3))>1e-12_rk)) then
             write (*,'(A)') " WARNING! Domain size mismatch."
             write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') params%Lx, params%Ly, params%Lz
             write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
@@ -119,7 +120,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
         write(*,'(80("_"))')
         write(*,'(A)') "READING: initializing grid from file..."
         write(*,'( "Nblocks=",i6," (on all cpus)")') lgt_n
-        ! check if there is already some data on the grid (see routine header description)
+        ! check if there is already some data on the grid
         if ( maxval(lgt_block(:,1))>=0 ) then
             write(*,'(A)') "ERROR: READ_MESH is called with NON_EMPTY DATA!!!!!"
         end if
@@ -131,7 +132,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
 
     ! set list to the average value
     blocks_per_rank_list = lgt_n / number_procs
-    ! as this does not necessairly work out, distribute remaining blocks on the first CPUs
+    ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
     if (mod(lgt_n, number_procs) > 0) then
         blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
     end if
@@ -147,7 +148,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     allocate(block_treecode(1:params%max_treelevel, 1:hvy_n))
     allocate (my_lgt_block(size(lgt_block,1), size(lgt_block,2)))
     my_lgt_block = -1
-    block_treecode = 0
 
     ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + 2]
     ! array we want to hold, so that all CPU can read from the same file simultaneously

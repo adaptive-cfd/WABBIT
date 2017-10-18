@@ -82,7 +82,9 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
 
   !---------------------------------------------------------------------------------------------
   ! main body
-    if (params%initial_cond == 'read_from_file') then
+
+    ! choose between reading from files and creating datafields analytically
+    if (params%initial_cond == 'read_from_files') then
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
     else
         !---------------------------------------------------------------------------

@@ -27,7 +27,7 @@
 !
 ! ********************************************************************************************
 
-subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
+subroutine read_field(fname, dF, params, hvy_block, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -46,7 +46,7 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> number of heavy and light active blocks
-    integer(kind=ik), intent(in)        :: hvy_n, lgt_n
+    integer(kind=ik), intent(in)        :: hvy_n
 
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
@@ -64,7 +64,6 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
     integer(kind=ik), dimension(4)      :: ubounds3D, lbounds3D
     integer(kind=ik), dimension(3)      :: ubounds2D, lbounds2D
 
-    real(kind=rk), dimension(3)         :: domain
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
@@ -80,11 +79,9 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
 
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
     allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
-    myblockbuffer = 99.0_rk
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    hvy_block = 0.0_rk  ! oder 9.99e99_rk???
     call check_file_exists(fname)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
@@ -109,21 +106,11 @@ subroutine read_field(fname, dF, params, hvy_block, lgt_n, hvy_n)
 
     endif
 
-    ! DO WE NEED THIS? YEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEES
-    ! if (rank==0) then
-    !     write(*,'(40("~"))')
-    !     write(*,'("Reading from file ",A)') trim(adjustl(fname))
-    !     write(*,'(" time=",g12.4') ,time(1)
-    !     write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
-
-    !     ! if the domain size doesn't match, proceed, but yell.
-    !     if ((params%Lx.ne.domain(1)).or.(params%Ly.ne.domain(2)).or.(params%Lz.ne.domain(3))) then
-    !         write (*,'(A)') " WARNING! Domain size mismatch."
-    !         write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') params%Lx,params%Ly,params%Lz
-    !         write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
-    !         write (*,'(A)') "proceed, with fingers crossed."
-    !     end if
-    ! end if
+    if (rank==0) then
+        write(*,'(80("_"))')
+        write(*,'("READING: Reading datafield ",i2," from file ",A)') dF,&
+        trim(adjustl(fname))
+    end if
 
     ! actual reading of file
     if ( params%threeD_case ) then

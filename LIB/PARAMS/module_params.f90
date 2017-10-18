@@ -39,76 +39,76 @@ module module_params
     type type_params
 
         ! maximal time for main time loop
-        real(kind=rk)                               :: time_max
+        real(kind=rk)                                :: time_max
         ! CFL criteria for time step calculation
-        real(kind=rk)                               :: CFL
+        real(kind=rk)                                :: CFL
         ! dt
-        real(kind=rk)                               :: dt
+        real(kind=rk)                                :: dt
         ! time step calculator
-        character(len=80)                           :: time_step_calc
+        character(len=80)                            :: time_step_calc
         ! data writing frequency
-        integer(kind=ik)                            :: write_freq
+        integer(kind=ik)                             :: write_freq
         ! butcher tableau containing coefficients for Runge-Kutta method
-        real(kind=rk), dimension(:,:), allocatable  :: butcher_tableau
+        real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau
 
         ! threshold for wavelet indicator
-        real(kind=rk)                               :: eps
+        real(kind=rk)                                :: eps
         ! minimal level for blocks in data tree
-        integer(kind=ik)                            :: min_treelevel
+        integer(kind=ik)                             :: min_treelevel
         ! maximal level for blocks in data tree
-        integer(kind=ik)                            :: max_treelevel
+        integer(kind=ik)                             :: max_treelevel
 
         ! order of refinement predictor
-        character(len=80)                           :: order_predictor
+        character(len=80)                            :: order_predictor
         ! order of spatial discretization
-        character(len=80)                           :: order_discretization
+        character(len=80)                            :: order_discretization
         ! boundary condition
-        character(len=80)                           :: boundary_cond
+        character(len=80)                            :: boundary_cond
         ! initial condition
-        character(len=80)                           :: initial_cond
-        ! files we want to read fo inital cond.
-        character(len=80), dimension(:), allocatable :: inicond_files
+        character(len=80)                            :: initial_cond
+        ! files we want to read for inital cond.
+        character(len=80), dimension(:), allocatable :: input_files
         ! width of the initial condition (e.g. Gauss blob)
-        real(kind=rk)                               :: inicond_width
+        real(kind=rk)                                :: inicond_width
 
         ! penalization?
-        logical                                     :: penalization
+        logical                                      :: penalization
         ! penalization factor
-        real(kind=rk)                               :: eps_penal
+        real(kind=rk)                                :: eps_penal
         ! smooth mask for penalization term
-        logical                                     :: smooth_mask
+        logical                                      :: smooth_mask
 
         ! grid parameter
-        integer(kind=ik)                            :: number_domain_nodes
-        integer(kind=ik)                            :: number_block_nodes
-        integer(kind=ik)                            :: number_ghost_nodes
+        integer(kind=ik)                             :: number_domain_nodes
+        integer(kind=ik)                             :: number_block_nodes
+        integer(kind=ik)                             :: number_ghost_nodes
 
         ! switch for mesh adaption
-        logical                                     :: adapt_mesh
+        logical                                      :: adapt_mesh
 
         ! number of allocated heavy data fields per process
-        integer(kind=ik)                            :: number_blocks
+        integer(kind=ik)                             :: number_blocks
         ! number of allocated data fields in heavy data array, number of fields in heavy work data (depend from time step scheme, ...)
-        integer(kind=ik)                            :: number_data_fields
-        integer(kind=ik)                            :: number_fields
+        integer(kind=ik)                             :: number_data_fields
+        integer(kind=ik)                             :: number_fields
 
         ! block distribution for load balancing (also used for start distribution)
-        character(len=80)                           :: block_distribution
+        character(len=80)                            :: block_distribution
 
         ! debug flag
-        logical                                     :: debug
+        logical                                      :: debug
 
         ! use non-uniform mesh correction
-        logical                                     :: non_uniform_mesh_correction
+        logical                                      :: non_uniform_mesh_correction
 
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------
         ! physics type
-        character(len=80)                           :: physics_type
+        character(len=80)                            :: physics_type
 
         ! domain length
-        real(kind=rk)                               :: Lx, Ly, Lz
+        real(kind=rk)                                :: Lx, Ly, Lz
 
         ! physics substructure
         type(type_params_convection_diffusion_physics) :: physics

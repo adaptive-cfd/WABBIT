@@ -341,13 +341,14 @@ subroutine ini_file_to_params( params, filename )
     ! width of initial condition (e.g. Gauss-Blob, depends on Lx and Ly)
     call read_param_mpi(FILE, 'Physics', 'inicond_width', params%inicond_width, 1e-2_rk)
    
-    if (params%initial_cond == 'read_from_file') then
+    if (params%initial_cond == 'read_from_files') then
         ! read variable names
-        allocate( params%inicond_files( params%number_data_fields ) )
+        allocate( params%input_files( params%number_data_fields ) )
 
-        params%inicond_files = "---"
-        call read_param_mpi(FILE, 'Physics', 'inicond_files', params%inicond_files, params%inicond_files)
+        params%input_files = "---"
+        call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
     end if
+
     !***************************************************************************
     ! read VOLUME PENALIZATION METHOD parameters
 

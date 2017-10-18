@@ -43,14 +43,8 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     integer(kind=ik), intent(inout)       :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)          :: hvy_block(:, :, :, :, :)
-    !> list of active blocks (light data)
-!    integer(kind=ik), intent(inout)      :: hvy_active(:)
-    !> list of active blocks light data)
-!    integer(kind=ik), intent(inout)      :: lgt_active(:)
     !> number of heavy and light active blocks
     integer(kind=ik), intent(inout)       :: hvy_n, lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-!    integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:)
     !> time loop variables
     real(kind=rk), intent(inout)          :: time
     integer(kind=ik), intent(inout)       :: iteration
@@ -74,20 +68,13 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     ! start time
     sub_t0 = MPI_wtime()
 
-    ! call fetch_attributes(params%ini_files(1), params, lgt_n, hvy_n, time, iteration)
+    ! read treecode, time, iteration and total number of blocks from first input file
+    call read_mesh_and_attributes(params%input_files(1), params, lgt_n, hvy_n, lgt_block, time, iteration)
 
-    call read_mesh_and_attributes(params%inicond_files(1), params, lgt_n, hvy_n, lgt_block, time, iteration)
-
-!    !create hvy_active and lgt_active list
-!    call create_active_and_sorted_lists(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true.)
- 
-!    ! update neighbor relations
-!    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-
+    ! read datafields from files into hvy_block array
     do dF = 1, N_files
-        call read_field(params%inicond_files(dF), dF, params, hvy_block, lgt_n, hvy_n )
+        call read_field(params%input_files(dF), dF, params, hvy_block, hvy_n )
     end do
-
 
     ! end time
     sub_t1 = MPI_wtime()

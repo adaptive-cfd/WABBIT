@@ -272,18 +272,27 @@ program main
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    ! save initial condition to disk
-    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-    select case (params%physics_type)
-        case('2D_navier_stokes')
-            call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        
-        case('2D_acm')
-            call write_vorticity(hvy_work, hvy_block(:,:,:,1:2,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        case('3D_acm') 
-            call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-    end select
+    if (params%initial_cond=="read_from_files") then
+        ! balance the load
+        if (params%threeD_case) then
+            call balance_load_3D(params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
+        else
+            call balance_load_2D(params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+        end if
+    else
+        ! save initial condition to disk
+        ! we don't need this for an initial condition we got from a file (there already is this file)
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+        select case (params%physics_type)
+            case('2D_navier_stokes')
+                call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
 
+            case('2D_acm')
+                call write_vorticity(hvy_work, hvy_block(:,:,:,1:2,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+            case('3D_acm') 
+                call write_vorticity(hvy_work, hvy_block(:,:,:,1:3,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+        end select
+    end if
     ! max neighbor num
     !> \todo move max neighbor num to params struct
     if ( params%threeD_case ) then

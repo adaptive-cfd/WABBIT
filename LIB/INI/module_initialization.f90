@@ -31,6 +31,8 @@ module module_initialization
     use module_mesh
     ! this module contains the routines to set the initial condition on blocks
     use module_initial_conditions
+    ! read routines
+    use module_IO
 !---------------------------------------------------------------------------------------------
 ! variables
 

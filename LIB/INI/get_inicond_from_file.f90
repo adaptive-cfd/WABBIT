@@ -5,9 +5,9 @@
 ! ============================================================================================
 !> \name get_inicond_from_file.f90
 !> \version 0.5
-!> \author engels, sm
+!> \author sm
 !
-!> \brief read initial condition from a file
+!> \brief call subroutines that read mesh and fields as initial condition from files
 !
 !>
 !! input:
@@ -17,8 +17,7 @@
 !!           - light data array
 !!           - heavy data array
 !!           - number of active blocks (light and heavy)
-!!           - light and heavy active block list
-!!           -
+!!           - time and iteration
 !!
 !!
 !! = log ======================================================================================

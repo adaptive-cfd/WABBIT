@@ -36,6 +36,8 @@ module module_acm
         real(kind=rk)                               :: nu
         ! gamma_p
         real(kind=rk)                               :: gamma_p
+        ! want to add forcing?
+        logical                                     :: forcing
         
         ! variable names
         character(len=80), allocatable              :: names(:)

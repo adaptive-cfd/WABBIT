@@ -7,14 +7,12 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief read mesh properties of saved field in hdf5-file at iteration and time t
+!> \brief read mesh properties and attributes (iteration and time t) of a field saved in a hdf5-file
 !
 !>
 !! input:
 !!           - parameter array
 !!           - name of the file we want to read from
-!!           - 
-!!           - 
 !!
 !! output:
 !!           - light block array
@@ -45,7 +43,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     !> number of active blocks (heavy and light data)
     integer(kind=ik), intent(inout)               :: hvy_n, lgt_n
     !> light data array
-    integer(kind=ik), intent(inout)               :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)               :: lgt_block(:,:)
     !> time (to be read from file)
     real(kind=rk), intent(inout)                  :: time
     !> iteration (to be read from file)
@@ -99,7 +97,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     lgt_n     = number_blocks(1)
     iteration = iiteration(1)
 
-    ! print some messages
+    ! print time, iteration and domain on screen
     if (rank==0) then
         write(*,'(80("_"))')
         write(*,'("READING: Reading from file ",A)') trim(adjustl(fname))
@@ -132,6 +130,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
 
     ! set list to the average value
     blocks_per_rank_list = lgt_n / number_procs
+
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
     if (mod(lgt_n, number_procs) > 0) then
         blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1

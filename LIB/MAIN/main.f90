@@ -284,6 +284,7 @@ program main
         ! we don't need this for an initial condition we got from a file (there already is this file)
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
         call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+        call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
     ! max neighbor num
     !> \todo move max neighbor num to params struct
@@ -397,6 +398,7 @@ program main
                 if (modulo(iteration, params%write_freq) == 0) then
                     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
                     call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+                    call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
                     output_time = time
                 endif
 
@@ -404,6 +406,7 @@ program main
                 if ( abs(time - params%next_write_time) < 1e-12_rk ) then
                     call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
                     call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+                    call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
                     output_time = time
                     params%next_write_time = params%next_write_time + params%write_time
                 endif
@@ -435,6 +438,7 @@ program main
     if ( abs(output_time-time) > 1e-10_rk ) then 
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
         call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+        call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
 
     ! debug info

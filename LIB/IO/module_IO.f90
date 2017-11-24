@@ -34,7 +34,7 @@ module module_IO
     use module_mesh
     ! use module operators for computation of the vorticity field
     use module_operators, only: compute_vorticity
-
+    
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -51,11 +51,14 @@ contains
     ! create list of active blocks (light data)
     include "save_data.f90"
 
-    ! create list of active blocks (heavy data)
+    ! write fields to disk
     include "write_field.f90"
 
     ! compute vorticity to save it on disk
     include "write_vorticity.f90"
+
+    ! write mask term to disk
+    include "write_mask.f90"
 
     ! read mesh properties and time from input file
     include "read_mesh_and_attributes.f90"

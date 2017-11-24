@@ -12,10 +12,9 @@
 !>
 !! input:
 !!           - name of the file we want to read from
+!!           - number of datafield
 !!           - parameter array
-!!           - heavy data array
-!!           - number of active blocks (light and heavy)
-!!           - 
+!!           - number of active blocks (heavy)
 !!
 !! output:
 !!           - heavy data array
@@ -90,7 +89,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
 
     if ( params%threeD_case ) then
 
-        ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
+        ! tell the hdf5 wrapper what part of the global [Bs x Bs x Bs x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/0,0,0,sum(actual_blocks_per_proc(0:rank-1))/)
@@ -98,7 +97,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
 
     else
 
-        ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
+        ! tell the hdf5 wrapper what part of the global [Bs x Bs x 1 x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/0,0,sum(actual_blocks_per_proc(0:rank-1))/)
@@ -106,6 +105,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
 
     endif
 
+    ! print a message
     if (rank==0) then
         write(*,'(80("_"))')
         write(*,'("READING: Reading datafield ",i2," from file ",A)') dF,&
@@ -125,6 +125,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
 
+    ! copy data to heavy block array (without ghost nodes)
     if (params%threeD_case) then
         hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,1:hvy_n) = myblockbuffer(:,:,:,1:hvy_n)
     else

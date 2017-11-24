@@ -58,8 +58,9 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
     a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
          0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
-    dx_inv = 1.0_rk / (2.0_rk*dx(1))
-    dy_inv = 1.0_rk / (2.0_rk*dx(2))
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+    dz_inv = 1.0_rk / dx(3)
 
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
@@ -71,12 +72,12 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g
                     do iz = g+1, Bs+g
-                        u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv
-                        u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv
-                        v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv
-                        v_dz = (v(ix,iy,iz+1)-v(ix,iy,iz-1))*dz_inv
-                        w_dx = (w(ix+1,iy,iz)-w(ix-1,iy,iz))*dx_inv
-                        w_dy = (w(ix,iy+1,iz)-w(ix,iy-1,iz))*dy_inv
+                        u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv*0.5_rk
+                        u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv*0.5_rk
+                        v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv*0.5_rk
+                        v_dz = (v(ix,iy,iz+1)-v(ix,iy,iz-1))*dz_inv*0.5_rk
+                        w_dx = (w(ix+1,iy,iz)-w(ix-1,iy,iz))*dx_inv*0.5_rk
+                        w_dy = (w(ix,iy+1,iz)-w(ix,iy-1,iz))*dy_inv*0.5_rk
                     
                         vorticity(ix,iy,iz,1) = w_dy - v_dz
                         vorticity(ix,iy,iz,2) = u_dz - w_dx
@@ -116,8 +117,8 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
         if (params%order_discretization == "FD_2nd_central" ) then
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g
-                    u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv
-                    v_dx = (v(ix+1,iy,1)-v(ix-1,iy,1))*dx_inv
+                    u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv*0.5_rk
+                    v_dx = (v(ix+1,iy,1)-v(ix-1,iy,1))*dx_inv*0.5_rk
                     vorticity(ix,iy,1,1) = v_dx - u_dy
                  end do
             end do

@@ -56,7 +56,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, N_dF) :: rhs
     
     !> mask term for every grid point in this block
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask
+    real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask, sponge
     !> velocity of the solid
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, 2)    :: us
     !> forcing term
@@ -67,7 +67,8 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: u, v, p
     !> 
     real(kind=rk)                                  :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
-    real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, v_dydy, p_dx, p_dy, penalx, penaly
+    real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
+                                                      v_dydy, p_dx, p_dy, penalx, penaly, alpha
     ! loop variables
     integer(kind=rk)                               :: ix, iy
     ! coefficients for Tam&Webb
@@ -86,21 +87,25 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     eps         = params%eps_penal
     gamma       = params%physics_acm%gamma_p
 
+
     
     u = phi(:,:,1)
     v = phi(:,:,2)
     p = phi(:,:,3)
 
-    rhs  = 0.0_rk
-    mask = 0.0_rk
-    us   = 0.0_rk
+    rhs    = 0.0_rk
+    mask   = 0.0_rk
+    us     = 0.0_rk
+    sponge = 0.0_rk
 
-    dx_inv = 1.0_rk / (2.0_rk*dx(1))
-    dy_inv = 1.0_rk / (2.0_rk*dx(2))
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
 
     eps_inv = 1.0_rk / eps
+
+    alpha = 100.0_rk
 
     ! Tam & Webb, 4th order optimized (for first derivative)
     a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
@@ -118,38 +123,46 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
         call create_mask_2D(params, mask, x0, dx, Bs, g)
         mask = mask*eps_inv
     end if
+    
+    if (params%physics_acm%forcing) then
+        call compute_forcing(forcing, volume_int, params%Lx, params%Ly, 1.0_rk, time)
+    else
+        forcing = 0.0_rk
+    end if
 
-    call  compute_forcing(forcing, volume_int, params%Lx, params%Ly, 1.0_rk, time)
+    call sponge_2D(params, sponge, x0, dx, Bs, g)
+    sponge=alpha*sponge
 
-   if (order_discretization == "FD_2nd_central" ) then
+    if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
         do ix = g+1, Bs+g
             do iy = g+1, Bs+g
 
-                u_dx = (u(ix+1,iy)-u(ix-1,iy))*dx_inv
-                u_dy = (u(ix,iy+1)-u(ix,iy-1))*dy_inv
+                u_dx = (u(ix+1,iy)-u(ix-1,iy))*dx_inv*0.5_rk
+                u_dy = (u(ix,iy+1)-u(ix,iy-1))*dy_inv*0.5_rk
                 u_dxdx = (u(ix-1,iy)-2.0_rk*u(ix,iy)+u(ix+1,iy))*dx2_inv
                 u_dydy = (u(ix,iy-1)-2.0_rk*u(ix,iy)+u(ix,iy+1))*dy2_inv
 
 
-                v_dx = (v(ix+1,iy)-v(ix-1,iy))*dx_inv
-                v_dy = (v(ix,iy+1)-v(ix,iy-1))*dy_inv
+                v_dx = (v(ix+1,iy)-v(ix-1,iy))*dx_inv*0.5_rk
+                v_dy = (v(ix,iy+1)-v(ix,iy-1))*dy_inv*0.5_rk
                 v_dxdx = (v(ix-1,iy)-2.0_rk*v(ix,iy)+v(ix+1,iy))*dx2_inv
                 v_dydy = (v(ix,iy-1)-2.0_rk*v(ix,iy)+v(ix,iy+1))*dy2_inv
 
-                p_dx = (p(ix+1,iy)-p(ix-1,iy))*dx_inv
-                p_dy = (p(ix,iy+1)-p(ix,iy-1))*dy_inv
+                p_dx = (p(ix+1,iy)-p(ix-1,iy))*dx_inv*0.5_rk
+                p_dy = (p(ix,iy+1)-p(ix,iy-1))*dy_inv*0.5_rk
 
                 div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))
+                penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))-alpha*sponge(ix,iy)*(u(ix,iy)-1.0_rk)
                 penaly = -mask(ix,iy)*(v(ix,iy)-us(ix,iy,2))
 
                 rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
                 rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
                 rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
+
             end do
         end do
 
@@ -204,81 +217,4 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     !> \todo DO NOT OVERWRITE?
     phi = rhs
 
-    ! ! grad(u)
-    ! call grad_central(u_dx, u_dy, Bs, g, u, dx_inv, dy_inv)
-    ! ! grad(v)
-    ! call grad_central(v_dx, v_dy, Bs, g, v, dx_inv, dy_inv)
-    ! ! grad(p)
-    ! call grad_central(p_dx, p_dy, Bs, g, p, dx_inv, dy_inv)
-
-    ! ! laplace(u)
-    ! call laplace_central(u_lapl, Bs, g, u, dx2_inv, dy2_inv)
-    ! ! laplace(v)
-    ! call laplace_central(v_lapl, Bs, g, v, dx2_inv, dy2_inv)
-
-    ! ! penalization term
-    ! penalx = -mask*(u-us(:,:,1))
-    ! penaly = -mask*(v-us(:,:,2))
-    ! ! divergence of u
-    ! div_U  = u_dx + v_dy
-
-    ! !RHS
-    ! rhs(:,:,1) = -u*div_U - p_dx + nu*u_lapl + penalx
-    ! rhs(:,:,2) = -v*div_U - p_dy + nu*v_lapl + penaly
-    ! rhs(:,:,3) = -(c_0**2)*(div_U)
-
 end subroutine RHS_2D_acm
-
-! subroutine grad_central(u_dx, u_dy, Bs, g, u, dx_inv, dy_inv)
-! !---------------------------------------------------------------------------------------------
-! ! modules
-!     ! global parameters
-!     use module_params
-! !---------------------------------------------------------------------------------------------
-! ! variables
-!     implicit none
-!     integer(kind=ik), intent(in)                         :: Bs, g
-!     real(kind=rk), dimension(2*g+Bs,2*g+Bs), intent(in)  :: u
-!     real(kind=rk), dimension(2*g+Bs,2*g+Bs), intent(out) :: u_dx, u_dy
-!     real(kind=rk), intent(in)                            :: dx_inv, dy_inv
-!     integer(kind=ik)                                     :: ix, iy
-! !---------------------------------------------------------------------------------------------
-! ! main body
-!    u_dx = 0.0_rk
-!    u_dy = 0.0_rk
-!    do ix = g+1, Bs+g
-!        do iy = g+1, Bs+g
-!            u_dx(ix,iy) = (u(ix+1,iy)-u(ix-1,iy))*dx_inv
-!            u_dy(ix,iy) = (u(ix,iy+1)-u(ix,iy-1))*dy_inv
-!        end do
-!   end do
-
-! end subroutine grad_central
-
-
-! subroutine laplace_central(u_dxdx, Bs, g, u, dx2_inv, dy2_inv)
-! !---------------------------------------------------------------------------------------------
-! ! modules
-!     ! global parameters
-!     use module_params
-! !---------------------------------------------------------------------------------------------
-! ! variables
-!     implicit none
-!     integer(kind=ik), intent(in)                         :: Bs, g
-!     real(kind=rk), dimension(2*g+Bs,2*g+Bs), intent(in)  :: u
-!     real(kind=rk), dimension(2*g+Bs,2*g+Bs), intent(out) :: u_lapl
-!     real(kind=rk), intent(in)                            :: dx2_inv, dy2_inv
-!     real(kind=rk)                                        :: u_dxdx, u_dydy
-!     integer(kind=ik)                                     :: ix, iy
-! !---------------------------------------------------------------------------------------------
-! ! main body
-!    u_lapl = 0.0_rk 
-!    do ix = g+1, Bs+g
-!        do iy = g+1, Bs+g
-!            u_dxdx        = (u(ix-1,iy)-2.0_rk*u(ix,iy)+u(ix+1,iy))*dx2_inv
-!            u_dydy        = (u(ix,iy-1)-2.0_rk*u(ix,iy)+u(ix,iy+1))*dy2_inv
-!            u_lapl(ix,iy) = u_dxdx + u_dydy
-!        end do
-!   end do
-
-! end subroutine laplace_central

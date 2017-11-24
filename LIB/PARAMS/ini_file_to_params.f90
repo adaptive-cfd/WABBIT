@@ -310,6 +310,9 @@ subroutine ini_file_to_params( params, filename )
             ! gamma_p
             call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
 
+            ! want to add a forcing term?
+            call read_param_mpi(FILE, 'Physics', 'forcing', params%physics_acm%forcing, .false.)
+
         case('3D_acm')
             ! domain size
             call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
@@ -332,6 +335,9 @@ subroutine ini_file_to_params( params, filename )
             
             ! gamma_p
             call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
+
+            ! want to add a forcing term?
+            call read_param_mpi(FILE, 'Physics', 'forcing', params%physics_acm%forcing, .false.)
 
         case default
             write(*,'(80("_"))')
@@ -367,6 +373,8 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'VPM', 'eps_penal', params%eps_penal, 1e-4_rk)
     ! smooth mask for penalization term
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params%smooth_mask, .true.)
+    ! geometry
+    call read_param_mpi(FILE, 'VPM', 'geometry', params%geometry, "---")
 
     !***************************************************************************
     ! read DISCRETIZATION parameters

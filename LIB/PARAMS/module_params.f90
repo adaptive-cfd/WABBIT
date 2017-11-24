@@ -84,6 +84,8 @@ module module_params
         real(kind=rk)                                :: eps_penal
         ! smooth mask for penalization term
         logical                                      :: smooth_mask
+        ! geometry for VPM
+        character(len=80)                            :: geometry
 
         ! grid parameter
         integer(kind=ik)                             :: number_domain_nodes

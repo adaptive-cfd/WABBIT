@@ -1,4 +1,22 @@
-! checks if a given file ("fname") exists. if not, code is stopped brutally
+!> \file
+!> \callgraph
+! ********************************************************************************************
+! WABBIT
+! ============================================================================================
+!> \name check_file_exists.f90
+!> \version 0.5
+!> \author engels, sm
+!
+!> \brief checks if a given file ("fname") exists. if not, code is stopped brutally
+!
+!>
+!! input:    - name of the given file  \\
+!!
+!! = log ======================================================================================
+!! \n
+!! 22/09/17 - create
+!
+! ********************************************************************************************
 subroutine check_file_exists(fname)
   implicit none
 

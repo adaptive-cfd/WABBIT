@@ -100,9 +100,9 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     mask = 0.0_rk
     us   = 0.0_rk
 
-    dx_inv = 1.0_rk / (2.0_rk*dx(1))
-    dy_inv = 1.0_rk / (2.0_rk*dx(2))
-    dz_inv = 1.0_rk / (2.0_rk*dx(3))
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+    dz_inv = 1.0_rk / dx(3)
 
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
@@ -126,8 +126,12 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
         call create_mask_3D(params, mask, x0, dx, Bs, g)
         mask = mask*eps_inv
     end if
-
-    call  compute_forcing(forcing, volume_int, params%Lx, params%Ly, params%Lz, time)
+    
+    if (params%physics_acm%forcing) then
+        call  compute_forcing(forcing, volume_int, params%Lx, params%Ly, params%Lz, time)
+    else
+        forcing = 0.0_rk
+    end if
 
    if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -138,34 +142,34 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
                 do iz = g+1, Bs+g
 
                     ! first and second derivatives of u,v,w
-                    u_dx = (u(ix+1,iy,iz)-u(ix-1,iy,iz))*dx_inv
-                    u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv
-                    u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv
+                    u_dx = (u(ix+1,iy,iz)-u(ix-1,iy,iz))*dx_inv*0.5_rk
+                    u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv*0.5_rk
+                    u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv*0.5_rk
 
                     u_dxdx = (u(ix-1,iy,iz)-2.0_rk*u(ix,iy,iz)+u(ix+1,iy,iz))*dx2_inv
                     u_dydy = (u(ix,iy-1,iz)-2.0_rk*u(ix,iy,iz)+u(ix,iy+1,iz))*dy2_inv
                     u_dzdz = (u(ix,iy,iz-1)-2.0_rk*u(ix,iy,iz)+u(ix,iy,iz+1))*dz2_inv
 
-                    v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv
-                    v_dy = (v(ix,iy+1,iz)-v(ix,iy-1,iz))*dy_inv
-                    v_dz = (v(ix,iy,iz+1)-v(ix,iy,iz-1))*dz_inv
+                    v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv*0.5_rk
+                    v_dy = (v(ix,iy+1,iz)-v(ix,iy-1,iz))*dy_inv*0.5_rk
+                    v_dz = (v(ix,iy,iz+1)-v(ix,iy,iz-1))*dz_inv*0.5_rk
 
                     v_dxdx = (v(ix-1,iy,iz)-2.0_rk*v(ix,iy,iz)+v(ix+1,iy,iz))*dx2_inv
                     v_dydy = (v(ix,iy-1,iz)-2.0_rk*v(ix,iy,iz)+v(ix,iy+1,iz))*dy2_inv
                     v_dzdz = (v(ix,iy,iz-1)-2.0_rk*v(ix,iy,iz)+v(ix,iy,iz+1))*dz2_inv
 
-                    w_dx = (w(ix+1,iy,iz)-w(ix-1,iy,iz))*dx_inv
-                    w_dy = (w(ix,iy+1,iz)-w(ix,iy-1,iz))*dy_inv
-                    w_dz = (w(ix,iy,iz+1)-w(ix,iy,iz-1))*dz_inv
+                    w_dx = (w(ix+1,iy,iz)-w(ix-1,iy,iz))*dx_inv*0.5_rk
+                    w_dy = (w(ix,iy+1,iz)-w(ix,iy-1,iz))*dy_inv*0.5_rk
+                    w_dz = (w(ix,iy,iz+1)-w(ix,iy,iz-1))*dz_inv*0.5_rk
 
                     w_dxdx = (w(ix-1,iy,iz)-2.0_rk*w(ix,iy,iz)+w(ix+1,iy,iz))*dx2_inv
                     w_dydy = (w(ix,iy-1,iz)-2.0_rk*w(ix,iy,iz)+w(ix,iy+1,iz))*dy2_inv
                     w_dzdz = (w(ix,iy,iz-1)-2.0_rk*w(ix,iy,iz)+w(ix,iy,iz+1))*dz2_inv
                     
                     ! first derivative of p
-                    p_dx = (p(ix+1,iy,iz)-p(ix-1,iy,iz))*dx_inv
-                    p_dy = (p(ix,iy+1,iz)-p(ix,iy-1,iz))*dy_inv
-                    p_dy = (p(ix,iy,iz+1)-p(ix,iy,iz-1))*dz_inv
+                    p_dx = (p(ix+1,iy,iz)-p(ix-1,iy,iz))*dx_inv*0.5_rk
+                    p_dy = (p(ix,iy+1,iz)-p(ix,iy-1,iz))*dy_inv*0.5_rk
+                    p_dy = (p(ix,iy,iz+1)-p(ix,iy,iz-1))*dz_inv*0.5_rk
 
                     div_U = u_dx + v_dy + w_dz
 

@@ -56,7 +56,7 @@ implicit none
     uz_mean = volume_int(3)/(Lx*Ly*Lz)
 
     forcing(1) = max(0.0_rk, 1.0_rk-ux_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
-    forcing(2) = max(0.0_rk, 0.0_rk-uy_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
-    forcing(3) = max(0.0_rk, 0.0_rk-uz_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
+!    forcing(2) = max(0.0_rk, 0.0_rk-uy_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
+!    forcing(3) = max(0.0_rk, 0.0_rk-uz_mean)* startup_conditioner(time, 0.0_rk, 0.5_rk)
 
 end subroutine compute_forcing

@@ -38,7 +38,11 @@ module module_acm
         real(kind=rk)                               :: gamma_p
         ! want to add forcing?
         logical                                     :: forcing
-        
+        ! want to add sponge?
+        logical                                     :: sponge_layer
+        ! alpha for sponge
+        real(kind=rk)                               :: alpha
+
         ! variable names
         character(len=80), allocatable              :: names(:)
 

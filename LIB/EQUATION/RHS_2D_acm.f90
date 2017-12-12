@@ -66,9 +66,9 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     !> local datafields
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: u, v, p
     !> 
-    real(kind=rk)                                  :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
+    real(kind=rk)                                  :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, c_eta_inv, gamma
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                                                      v_dydy, p_dx, p_dy, penalx, penaly, alpha
+                                                      v_dydy, p_dx, p_dy, penalx, penaly
     ! loop variables
     integer(kind=rk)                               :: ix, iy
     ! coefficients for Tam&Webb
@@ -84,7 +84,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     ! set parameters for readability
     c_0         = params%physics_acm%c_0
     nu          = params%physics_acm%nu
-    eps         = params%eps_penal
+    c_eta_inv   = 1.0_rk / params%c_eta
     gamma       = params%physics_acm%gamma_p
 
 
@@ -103,10 +103,6 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
 
-    eps_inv = 1.0_rk / eps
-
-    alpha = 100.0_rk
-
     ! Tam & Webb, 4th order optimized (for first derivative)
     a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
          0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
@@ -121,7 +117,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     if (params%penalization) then
         ! create mask term for every grid point in this block
         call create_mask_2D(params, mask, x0, dx, Bs, g)
-        mask = mask*eps_inv
+        mask = mask*c_eta_inv
     end if
     
     if (params%physics_acm%forcing) then
@@ -130,8 +126,10 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
         forcing = 0.0_rk
     end if
 
-    call sponge_2D(params, sponge, x0, dx, Bs, g)
-    sponge=alpha*sponge
+    if (params%physics_acm%sponge_layer) then
+        call sponge_2D(params, sponge, x0, dx, Bs, g)
+        sponge = params%physics_acm%alpha*sponge
+    end if
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -156,7 +154,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
 
                 div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))-alpha*sponge(ix,iy)*(u(ix,iy)-1.0_rk)
+                penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))-sponge(ix,iy)*(u(ix,iy)-1.0_rk)
                 penaly = -mask(ix,iy)*(v(ix,iy)-us(ix,iy,2))
 
                 rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)

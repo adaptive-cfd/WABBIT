@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 
-subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
+subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -70,7 +70,6 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
 
   !> if .false. the code initializes on the coarsest grid, if .true. iterations
   !> are performed and the mesh is refined to gurantee the error eps
-  logical, intent(in) :: adapt
   integer(kind=ik)                     :: lgt_n_old
 
   !---------------------------------------------------------------------------------------------
@@ -91,16 +90,16 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
         ! Create the first mesh on the coarsest treelevel
         !---------------------------------------------------------------------------
         call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true. )
-
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
         !---------------------------------------------------------------------------
         call set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
-
         !---------------------------------------------------------------------------
         ! grid adaptation
         !---------------------------------------------------------------------------
-        if (adapt) then
+        !> if .false. the code initializes on the coarsest grid, if .true. iterations
+        !> are performed and the mesh is refined to gurantee the error eps
+        if (params%adapt_mesh) then
           ! we have to repeat the adapation process until the grid has reached a final
           ! state. Since we start on the coarsest level, in each iteration we cannot loose
           ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.

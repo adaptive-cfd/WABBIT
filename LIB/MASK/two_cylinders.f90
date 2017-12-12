@@ -53,12 +53,12 @@ subroutine two_cylinders(params, mask, x0, dx, Bs, g)
 ! main body
 
     ! center of the first cylinder
-    cx1 = 0.5884_rk*params%Lx
-    cy1 = 0.4116_rk*params%Ly
+    cx1 = 0.25_rk*params%Lx
+    cy1 = 7.7_rk
 
     ! center of the second cylinder
-    cx2 = 0.4116_rk*params%Lx
-    cy2 = 0.5884_rk*params%Ly
+    cx2 = 4.7_rk
+    cy2 = 0.5_rk*params%Ly
 
     ! radius of the cylinders
     R = params%inicond_width

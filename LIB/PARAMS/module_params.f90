@@ -81,7 +81,7 @@ module module_params
         ! penalization?
         logical                                      :: penalization
         ! penalization factor
-        real(kind=rk)                                :: eps_penal
+        real(kind=rk)                                :: c_eta
         ! smooth mask for penalization term
         logical                                      :: smooth_mask
         ! geometry for VPM

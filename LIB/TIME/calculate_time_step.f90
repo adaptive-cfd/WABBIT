@@ -141,5 +141,5 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
 
     end select
     ! penalization stability criterion
-    if (params%penalization) dt = minval( (/dt, 0.99_rk*params%eps_penal /) )
+    if (params%penalization) dt = minval( (/dt, 0.99_rk*params%c_eta /) )
 end subroutine calculate_time_step

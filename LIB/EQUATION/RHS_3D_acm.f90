@@ -67,7 +67,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
 
     !> inverse dx, physics/acm parameters
     real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0,&
-                                                      nu, eps, eps_inv, gamma
+                                                      nu, c_eta_inv, gamma
     !> derivatives
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                                                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
@@ -88,7 +88,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     ! set parameters for readability
     c_0         = params%physics_acm%c_0
     nu          = params%physics_acm%nu
-    eps         = params%eps_penal
+    c_eta_inv   = params%c_eta
     gamma       = params%physics_acm%gamma_p
 
     
@@ -108,8 +108,6 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     dy2_inv = 1.0_rk / (dx(2)**2)
     dz2_inv = 1.0_rk / (dx(3)**2)
 
-    eps_inv = 1.0_rk / eps
-
     ! Tam & Webb, 4th order optimized (for first derivative)
     a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
          0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
@@ -124,7 +122,7 @@ subroutine RHS_3D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     if (params%penalization) then
         ! create mask term for every grid point in this block
         call create_mask_3D(params, mask, x0, dx, Bs, g)
-        mask = mask*eps_inv
+        mask = mask*c_eta_inv
     end if
     
     if (params%physics_acm%forcing) then

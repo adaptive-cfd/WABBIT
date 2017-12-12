@@ -114,6 +114,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable          :: rk_coeffs(:,:)
 
+    real(kind=rk), dimension(3) :: volume_int
 
 !---------------------------------------------------------------------------------------------
 ! interfaces

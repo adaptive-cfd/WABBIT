@@ -313,6 +313,12 @@ subroutine ini_file_to_params( params, filename )
             ! want to add a forcing term?
             call read_param_mpi(FILE, 'Physics', 'forcing', params%physics_acm%forcing, .false.)
 
+            ! want to add a sponge term?
+            call read_param_mpi(FILE, 'Physics', 'sponge_layer', params%physics_acm%sponge_layer, .false.)
+
+            ! alpha for sponge layer
+            call read_param_mpi(FILE, 'Physics', 'alpha', params%physics_acm%alpha, 100.0_rk)
+
         case('3D_acm')
             ! domain size
             call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
@@ -370,7 +376,7 @@ subroutine ini_file_to_params( params, filename )
     ! penalization flag
     call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
     ! penalization factor
-    call read_param_mpi(FILE, 'VPM', 'eps_penal', params%eps_penal, 1e-4_rk)
+    call read_param_mpi(FILE, 'VPM', 'c_eta', params%c_eta, 1e-4_rk)
     ! smooth mask for penalization term
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params%smooth_mask, .true.)
     ! geometry

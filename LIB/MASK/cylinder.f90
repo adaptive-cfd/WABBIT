@@ -53,6 +53,7 @@ subroutine cylinder(params, mask, x0, dx, Bs, g )
 
     ! place cylinder in the center of the domain
     cx = 0.5_rk * params%Lx
+!    cx = 4.7_rk
     cy = 0.5_rk * params%Ly
 
     ! radius of the cylinder

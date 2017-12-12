@@ -109,7 +109,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    allocate (myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
     allocate (coords_spacing(1:3, 1:hvy_n) )
     allocate (coords_origin(1:3, 1:hvy_n))
     allocate (block_treecode(1:params%max_treelevel, 1:hvy_n))
@@ -136,6 +135,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! (note zero-based offset):
         lbounds3D = (/1,1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds3D = (/Bs-1,Bs-1,Bs-1,lbounds3D(4)+hvy_n-1/)
+        allocate (myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
 
     else
 
@@ -144,6 +144,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! (note zero-based offset):
         lbounds2D = (/1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds2D = (/Bs-1,Bs-1,lbounds2D(3)+hvy_n-1/)
+        allocate (myblockbuffer( 1:Bs, 1:Bs,1, 1:hvy_n ))
 
     endif
 

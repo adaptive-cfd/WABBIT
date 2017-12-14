@@ -143,8 +143,6 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test params struct
         logical                                     :: unit_test
-        ! unit test ghost nodes synchronization flag
-        logical                                     :: test_ghost_nodes_synch
         ! unit test time_stepper convergence flag
         logical                                     :: test_time_stepper
         ! unit test spatial convergence flag

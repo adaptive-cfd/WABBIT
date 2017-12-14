@@ -7,7 +7,8 @@
 !> \version 0.5
 !> \author msr
 !
-!> \brief reset ghosts nodes for debuging
+!> \brief reset ghosts nodes for all blocks (not just active ones) for debuging
+!> ghost nodes are set to a very large constant.
 !
 !>
 !! input:    - params, light and heavy data \n
@@ -34,14 +35,10 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-
-    ! loop variables
-    integer(kind=ik)                    :: k, dF
 
     ! grid parameter
     integer(kind=ik)                    :: g, Bs
@@ -58,29 +55,17 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! main body
+    ! delete layer of ghost nodes for all blocks (not just active ones)
 
-    ! loop over all active blocks
-    do k = 1, hvy_n
-        ! loop over all datafields
-        do dF = 1, params%number_data_fields
-            ! reset ghost nodes
-            if ( params%threeD_case ) then
-                ! 3D:
-                hvy_block(1:g, :, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
-                hvy_block(Bs+g+1:Bs+2*g, :, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
-                hvy_block(:, 1:g, :, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
-                hvy_block(:, Bs+g+1:Bs+2*g, :, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
-                hvy_block(:, :, 1:g, dF, hvy_active(k) )           = 99.0_rk!9.0e9_rk
-                hvy_block(:, :, Bs+g+1:Bs+2*g, dF, hvy_active(k) ) = 99.0_rk!9.0e9_rk
-            else
-                ! 2D:
-                hvy_block(1:g, :, 1, 1, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(Bs+g+1:Bs+2*g, :, 1, 1, hvy_active(k) ) = 9.0e9_rk
-                hvy_block(:, 1:g, 1, 1, hvy_active(k) )           = 9.0e9_rk
-                hvy_block(:, Bs+g+1:Bs+2*g, 1, 1, hvy_active(k) ) = 9.0e9_rk
-            end if
-        end do
-    end do
-
-
+    !-- x-direction
+    hvy_block(1:g, :, :, :, : )           = 9.0e9_rk
+    hvy_block(Bs+g+1:Bs+2*g, :, :, :, : ) = 9.0e9_rk
+    !-- y-direction
+    hvy_block(:, 1:g, :, :, : )           = 9.0e9_rk
+    hvy_block(:, Bs+g+1:Bs+2*g, :, :, : ) = 9.0e9_rk
+    !-- z-direction
+    if ( params%threeD_case ) then
+      hvy_block(:, :, 1:g, :, : )           = 9.0e9_rk
+      hvy_block(:, :, Bs+g+1:Bs+2*g, :, : ) = 9.0e9_rk
+    end if
 end subroutine reset_ghost_nodes

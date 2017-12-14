@@ -54,7 +54,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
 
     !> RHS
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, N_dF) :: rhs
-    
+
     !> mask term for every grid point in this block
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask, sponge
     !> velocity of the solid
@@ -65,7 +65,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
 
     !> local datafields
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: u, v, p
-    !> 
+    !>
     real(kind=rk)                                  :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
                                                       v_dydy, p_dx, p_dy, penalx, penaly, alpha
@@ -87,8 +87,6 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     eps         = params%eps_penal
     gamma       = params%physics_acm%gamma_p
 
-
-    
     u = phi(:,:,1)
     v = phi(:,:,2)
     p = phi(:,:,3)
@@ -108,13 +106,9 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
     alpha = 100.0_rk
 
     ! Tam & Webb, 4th order optimized (for first derivative)
-    a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
-         0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-
+    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! 4th order coefficients for second derivative
-    b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, &
-            4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-
+    b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -123,7 +117,7 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
         call create_mask_2D(params, mask, x0, dx, Bs, g)
         mask = mask*eps_inv
     end if
-    
+
     if (params%physics_acm%forcing) then
         call compute_forcing(forcing, volume_int, params%Lx, params%Ly, 1.0_rk, time)
     else
@@ -144,7 +138,6 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
                 u_dy = (u(ix,iy+1)-u(ix,iy-1))*dy_inv*0.5_rk
                 u_dxdx = (u(ix-1,iy)-2.0_rk*u(ix,iy)+u(ix+1,iy))*dx2_inv
                 u_dydy = (u(ix,iy-1)-2.0_rk*u(ix,iy)+u(ix,iy+1))*dy2_inv
-
 
                 v_dx = (v(ix+1,iy)-v(ix-1,iy))*dx_inv*0.5_rk
                 v_dy = (v(ix,iy+1)-v(ix,iy-1))*dy_inv*0.5_rk
@@ -171,41 +164,31 @@ subroutine RHS_2D_acm(params, g, Bs, dx, x0, N_dF, phi, order_discretization, vo
         ! 4th order
         !-----------------------------------------------------------------------
         do ix = g+1, Bs+g
-            do iy = g+1, Bs+g
+          do iy = g+1, Bs+g
 
-                ! first derivatives of u, v, p
-                u_dx = (a(-3)*u(ix-3,iy) + a(-2)*u(ix-2,iy) + a(-1)*u(ix-1,iy) + a(0)*u(ix,iy)&
-                 +  a(+1)*u(ix+1,iy) + a(+2)*u(ix+2,iy) + a(+3)*u(ix+3,iy))*dx_inv
-                u_dy = (a(-3)*u(ix,iy-3) + a(-2)*u(ix,iy-2) + a(-1)*u(ix,iy-1) + a(0)*u(ix,iy)&
-                 +  a(+1)*u(ix,iy+1) + a(+2)*u(ix,iy+2) + a(+3)*u(ix,iy+3))*dy_inv
-                v_dx = (a(-3)*v(ix-3,iy) + a(-2)*v(ix-2,iy) + a(-1)*v(ix-1,iy) + a(0)*v(ix,iy)&
-                 +  a(+1)*v(ix+1,iy) + a(+2)*v(ix+2,iy) + a(+3)*v(ix+3,iy))*dx_inv
-                v_dy = (a(-3)*v(ix,iy-3) + a(-2)*v(ix,iy-2) + a(-1)*v(ix,iy-1) + a(0)*v(ix,iy)&
-                 +  a(+1)*v(ix,iy+1) + a(+2)*v(ix,iy+2) + a(+3)*v(ix,iy+3))*dy_inv
-                p_dx = (a(-3)*p(ix-3,iy) + a(-2)*p(ix-2,iy) + a(-1)*p(ix-1,iy) + a(0)*p(ix,iy)&
-                 +  a(+1)*p(ix+1,iy) + a(+2)*p(ix+2,iy) + a(+3)*p(ix+3,iy))*dx_inv
-                p_dy = (a(-3)*p(ix,iy-3) + a(-2)*p(ix,iy-2) + a(-1)*p(ix,iy-1) + a(0)*p(ix,iy)&
-                 +  a(+1)*p(ix,iy+1) + a(+2)*p(ix,iy+2) + a(+3)*u(ix,iy+3))*dy_inv
+            ! first derivatives of u, v, p
+            u_dx = (a(-3)*u(ix-3,iy) + a(-2)*u(ix-2,iy) + a(-1)*u(ix-1,iy) + a(0)*u(ix,iy) + a(+1)*u(ix+1,iy) + a(+2)*u(ix+2,iy) + a(+3)*u(ix+3,iy))*dx_inv
+            u_dy = (a(-3)*u(ix,iy-3) + a(-2)*u(ix,iy-2) + a(-1)*u(ix,iy-1) + a(0)*u(ix,iy) + a(+1)*u(ix,iy+1) + a(+2)*u(ix,iy+2) + a(+3)*u(ix,iy+3))*dy_inv
+            v_dx = (a(-3)*v(ix-3,iy) + a(-2)*v(ix-2,iy) + a(-1)*v(ix-1,iy) + a(0)*v(ix,iy) + a(+1)*v(ix+1,iy) + a(+2)*v(ix+2,iy) + a(+3)*v(ix+3,iy))*dx_inv
+            v_dy = (a(-3)*v(ix,iy-3) + a(-2)*v(ix,iy-2) + a(-1)*v(ix,iy-1) + a(0)*v(ix,iy) + a(+1)*v(ix,iy+1) + a(+2)*v(ix,iy+2) + a(+3)*v(ix,iy+3))*dy_inv
+            p_dx = (a(-3)*p(ix-3,iy) + a(-2)*p(ix-2,iy) + a(-1)*p(ix-1,iy) + a(0)*p(ix,iy) + a(+1)*p(ix+1,iy) + a(+2)*p(ix+2,iy) + a(+3)*p(ix+3,iy))*dx_inv
+            p_dy = (a(-3)*p(ix,iy-3) + a(-2)*p(ix,iy-2) + a(-1)*p(ix,iy-1) + a(0)*p(ix,iy) + a(+1)*p(ix,iy+1) + a(+2)*p(ix,iy+2) + a(+3)*p(ix,iy+3))*dy_inv
 
-                ! second derivatives of u and v
-                 u_dxdx = (b(-2)*u(ix-2,iy) + b(-1)*u(ix-1,iy) + b(0)*u(ix,iy)&
-                   +  b(1)*u(ix+1,iy) + b(2)*u(ix+2,iy))*dx2_inv
-                 u_dydy = (b(-2)*u(ix,iy-2) + b(-1)*u(ix,iy-1) + b(0)*u(ix,iy)&
-                   +  b(1)*u(ix,iy+1) + b(2)*u(ix,iy+2))*dy2_inv
-                 v_dxdx = (b(-2)*v(ix-2,iy) + b(-1)*v(ix-1,iy) + b(0)*v(ix,iy)&
-                   +  b(1)*v(ix+1,iy) + b(2)*v(ix+2,iy))*dx2_inv
-                 v_dydy = (b(-2)*v(ix,iy-2) + b(-1)*v(ix,iy-1) + b(0)*v(ix,iy)&
-                   +  b(1)*v(ix,iy+1) + b(2)*v(ix,iy+2))*dy2_inv
+            ! second derivatives of u and v
+            u_dxdx = (b(-2)*u(ix-2,iy) + b(-1)*u(ix-1,iy) + b(0)*u(ix,iy) + b(+1)*u(ix+1,iy) + b(+2)*u(ix+2,iy))*dx2_inv
+            u_dydy = (b(-2)*u(ix,iy-2) + b(-1)*u(ix,iy-1) + b(0)*u(ix,iy) + b(+1)*u(ix,iy+1) + b(+2)*u(ix,iy+2))*dy2_inv
+            v_dxdx = (b(-2)*v(ix-2,iy) + b(-1)*v(ix-1,iy) + b(0)*v(ix,iy) + b(+1)*v(ix+1,iy) + b(+2)*v(ix+2,iy))*dx2_inv
+            v_dydy = (b(-2)*v(ix,iy-2) + b(-1)*v(ix,iy-1) + b(0)*v(ix,iy) + b(+1)*v(ix,iy+1) + b(+2)*v(ix,iy+2))*dy2_inv
 
-                 div_U = u_dx + v_dy
+            div_U = u_dx + v_dy
 
-                 penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))
-                 penaly = -mask(ix,iy)*(v(ix,iy)-us(ix,iy,2))
+            penalx = -mask(ix,iy)*(u(ix,iy)-us(ix,iy,1))
+            penaly = -mask(ix,iy)*(v(ix,iy)-us(ix,iy,2))
 
-                 rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
-                 rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
-                 rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
-            end do
+            rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
+            rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
+            rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
+          end do
         end do
 
     else

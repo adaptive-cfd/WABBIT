@@ -102,6 +102,10 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
             ! acm physics
             elseif ((params%physics_type == '2D_acm') .or. (params%physics_type == '3D_acm'))  then
                dt = minval( (/dt,  params%CFL * dx / params%physics_acm%c_0 /))
+               ! also respect a (roughly) estimated stability restriction for the
+               ! explicit integration of the diffusion term (which is in dx**2, unfortunately)
+               ! this condition will very rarely take effect (e.g. at low reynolds numbers and high resolution)
+               dt = minval( (/dt, 0.5*dx**2/params%physics_acm%nu/) )
 
             ! ns physics
             elseif ( params%physics_type == '2D_navier_stokes' ) then

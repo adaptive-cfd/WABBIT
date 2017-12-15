@@ -48,7 +48,7 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
 
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                         :: sub_t0, sub_t1
+    real(kind=rk)                         :: t0
     ! number of files to read from
     integer(kind=ik)                      :: N_files
     ! loop variable
@@ -58,12 +58,11 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
 
     ! number of files to read from
     N_files = params%number_data_fields
+    ! start time
+    t0 = MPI_wtime()
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    sub_t0 = MPI_wtime()
 
     ! read treecode, time, iteration and total number of blocks from first input file
     call read_mesh_and_attributes(params%input_files(1), params, lgt_n, hvy_n, lgt_block, time, iteration)
@@ -73,22 +72,6 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
         call read_field(params%input_files(dF), dF, params, hvy_block, hvy_n )
     end do
 
-    ! end time
-    sub_t1 = MPI_wtime()
-
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "read_data" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "read_data"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
-
+    ! timing
+    call toc( params, "read_data", MPI_wtime()-t0 )
 end subroutine get_inicond_from_file

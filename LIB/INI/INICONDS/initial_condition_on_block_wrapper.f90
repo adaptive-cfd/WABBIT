@@ -28,31 +28,30 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   character(len=*), intent(in) :: inicond
   integer(kind=ik)              :: Bs, g
 
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
-  
+  Bs    = params%number_block_nodes
+  g     = params%number_ghost_nodes
 
   select case( inicond )
   case ("sinus_2d","sinus2d","sin2d")
-      call inicond_sinus_2D( params, u, x0, dx )
+    call inicond_sinus_2D( params, u, x0, dx )
 
   case ("zeros")
-      u = 0.0_rk
+    u = 0.0_rk
 
   case ("gauss-blob","gauss_blob","ns_pressure_blob")
-      call inicond_gauss_blob( params, u, x0, dx )
+    call inicond_gauss_blob( params, u, x0, dx )
 
   case ("3D_sphere")
-      call inicond_sphere( params, u, x0, dx )
+    call inicond_sphere( params, u, x0, dx )
 
   case("constant_acm")
-      call inicond_constant_acm( u )
-        
+    call inicond_constant_acm( u )
+
   case ("shear_layer")
-      call inicond_shear_layer( params, u, x0, dx )
+    call inicond_shear_layer( params, u, x0, dx )
 
   case default
-      call error_msg("the initial condition is unkown: "//trim(adjustl(inicond)))
+    call error_msg("the initial condition is unkown: "//trim(adjustl(inicond)))
 
   end select
 

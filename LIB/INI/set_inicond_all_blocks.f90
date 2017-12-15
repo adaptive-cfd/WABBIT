@@ -35,7 +35,7 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
     ! origin and spacing of blocks
     real(kind=rk)                        :: x0(1:3), dx(1:3)
 
-    ! p0 value 
+    ! p0 value
     !> \todo get from ini file, rework gauss blob setup - see shear layer setup as template
     real(kind=rk)                        :: p0, rho0
 
@@ -73,6 +73,7 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
         ! set the initial condition on this block
         call initial_condition_on_block_wrapper( params, hvy_block(:,:,:,:,hvy_id), x0, dx, inicond )
 
+!######****** HACK: this entire if-clause has to go!!!!! it makes no sense
         ! more than on datafield
         if ( params%number_data_fields > 1 ) then
 

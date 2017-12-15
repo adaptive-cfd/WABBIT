@@ -11,18 +11,18 @@
 !
 !>
 !! Runge-Kutta: \n
-!! data_field(t) = data_field(t) + sum(b_j*k_j) 
+!! data_field(t) = data_field(t) + sum(b_j*k_j)
 !! with k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_ji*k_i))         \n
 !!
 !! \image html time_step.svg "Time-stepper" width=300
 !!
-!! input:    
+!! input:
 !!           - time variable
 !!           - params
 !!           - light and heavy data
-!!           - neighbor list 
+!!           - neighbor list
 !!
-!! output:   
+!! output:
 !!           - time variable
 !!           - heavy data array
 !!
@@ -193,7 +193,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! restart time
     sub_t0 = MPI_Wtime()
-    
+
     ! save data at time t to heavy work array
     call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
 
@@ -203,7 +203,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     do j = 2, size(rk_coeffs, 1)-1
 
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
-        
+
         if ( params%debug ) then
             ! time measurement without ghost nodes synchronization
             call MPI_Barrier(MPI_COMM_WORLD, ierr)
@@ -224,28 +224,14 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! final stage
     call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
-    
+
     ! increase time variable after all RHS substeps
     time = time_dt
 
-    ! end time
+    ! timings
     sub_t1   = MPI_Wtime()
     time_sum = time_sum + (sub_t1 - sub_t0)
-    
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "time_step (w/o ghost synch.)" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "time_step (w/o ghost synch.)"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
-    end if
+    call toc( params, "time_step (w/o ghost synch.)", time_sum)
 
     deallocate(rk_coeffs )
 

@@ -195,8 +195,10 @@ program main
     select case(dim_number)
         case('2D')
             params%threeD_case = .false.
+            params%dim = 2
         case('3D')
             params%threeD_case = .true.
+            params%dim = 3
         case default
             call error_msg("ERROR: case dimension is wrong")
     end select
@@ -222,7 +224,6 @@ program main
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
-
     ! allocate communication arrays
     call allocate_com_arrays(params, com_lists, com_matrix)
 

@@ -126,6 +126,7 @@ module module_params
 
         ! use third dimension
         logical                                     :: threeD_case
+        integer(kind=ik)                            :: dim ! can be 2 or 3 
 
         ! -------------------------------------------------------------------------------------
         ! MPI

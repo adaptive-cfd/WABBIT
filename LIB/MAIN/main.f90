@@ -107,9 +107,7 @@ program main
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
 
-    ! number of dimensions
-    character(len=80)                   :: dim_number
-    ! filename of *.inni file used to read parameters
+    ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
 
     ! loop variable
@@ -166,48 +164,27 @@ program main
     call MPI_Init(ierr)
     ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    params%rank         = rank
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
-
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    ! save MPI data in params struct
-    params%rank         = rank
     params%number_procs = number_procs
-
-    ! unit test off
-    params%unit_test    = .false.
-
-    ! cpu start time
-    call cpu_time(t0)
-
-    ! read number of dimensions from command line
-    call get_command_argument(1, dim_number)
-
-    ! output dimension number
-    if (rank==0) then
-        write(*,'(80("_"))')
-        write(*, '("INIT: run ", a3, " case")') dim_number
-    end if
-
-    ! save case dimension in params struct
-    select case(dim_number)
-        case('2D')
-            params%threeD_case = .false.
-            params%dim = 2
-        case('3D')
-            params%threeD_case = .true.
-            params%dim = 3
-        case default
-            call error_msg("ERROR: case dimension is wrong")
-    end select
-
     ! output MPI status
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
+
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+    call cpu_time(t0)
+
+
+    ! unit test off
+    params%unit_test    = .false.
+
+    ! are we running in 2D or 3D mode? Check that from the command line call.
+    call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
     ! Initialize parameters and grid
@@ -296,22 +273,8 @@ program main
         max_neighbors = 12
     end if
 
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "init_data" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "init_data"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
+    ! timing
+    call toc( params, "init_data", MPI_wtime()-sub_t0 )
 
     !---------------------------------------------------------------------------
     ! main time loop
@@ -403,18 +366,9 @@ program main
           params%next_write_time = params%next_write_time + params%write_time
         endif
 
-        ! debug info
-        if ( params%debug ) then
-            ! sum and reset times and calls
-            debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
-            debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
-            ! write debug infos to file
-            call write_debug_times( iteration, params )
-            ! reset loop values
-            debug%comp_time(:,1) = 0.0_rk
-            debug%comp_time(:,2) = 0.0_rk
-
-        end if
+        ! at the end of a time step, we increase the total counters/timers for all measurements
+        ! by what has been done in the last time step, then we flush the current timing to disk.
+        call timing_next_timestep( params, iteration )
 
     end do
 
@@ -427,14 +381,9 @@ program main
       call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
 
-    ! debug info
-    if ( params%debug ) then
-        ! sum times and calls
-        debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
-        debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
-        ! write debug infos to file
-        call write_debug_times( iteration, params )
-    end if
+    ! at the end of a time step, we increase the total counters/timers for all measurements
+    ! by what has been done in the last time step, then we flush the current timing to disk.
+    call timing_next_timestep( params, iteration )
 
     ! MPI Barrier before program ends
     call MPI_Barrier(MPI_COMM_WORLD, ierr)

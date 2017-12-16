@@ -66,7 +66,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   ! omit returning this block.
   N_sisters = size(lgt_sisters_id)
   if ( N_sisters /= 4 .and. N_sisters /= 8 .and. N_sisters /= 3 .and. N_sisters /= 7 ) then
-    call error_msg("find_sisters: you don't ask for a valid number of sisters")
+    call abort("find_sisters: you don't ask for a valid number of sisters")
   endif
 
   ! allocate an array for all treecodes (including all 4/8 sisters)
@@ -100,7 +100,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
 
     ! security check:
     if ( lgt_block(lgt_sisters_id(i),1) < 0 .or. lgt_block(lgt_sisters_id(i),1) > 7) then
-      call error_msg("for some reason, find sisters seems to find an inactive block... lists updated?")
+      call abort("for some reason, find sisters seems to find an inactive block... lists updated?")
     endif
   end do
 

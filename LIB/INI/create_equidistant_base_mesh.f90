@@ -118,7 +118,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   end if
   ! some error control -> did we loose blocks? should never happen.
   if ( sum(blocks_per_rank_list) /= num_blocks) then
-    call error_msg("ERROR: on the coarsest grid, we seem to have gained/lost some blocks during distribution...")
+    call abort("ERROR: on the coarsest grid, we seem to have gained/lost some blocks during distribution...")
   end if
 
 

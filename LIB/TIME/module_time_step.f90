@@ -31,6 +31,8 @@ module module_time_step
     use module_mesh, only : get_block_spacing_origin, max_active_level
 
     use module_operators, only: volume_integral
+    ! to call RHS routines:
+    use module_ACM_new
 
 !---------------------------------------------------------------------------------------------
 ! variables

@@ -19,7 +19,7 @@ module module_precision
 
 !---------------------------------------------------------------------------------------------
 ! modules
-
+  use MPI
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -41,10 +41,39 @@ module module_precision
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
+    interface abort
+      module procedure abort1, abort2, abort3
+    end interface
 !---------------------------------------------------------------------------------------------
 ! main body
 
 contains
+
+  subroutine abort1(code,msg)
+    implicit none
+    character(len=*), intent(in) :: msg
+    integer(kind=ik), intent(in) :: code
+    integer(kind=ik) :: mpierr
+
+    write(*,*) msg
+    call MPI_ABORT( MPI_COMM_WORLD, code, mpierr)
+  end subroutine
+
+  subroutine abort2(code)
+    implicit none
+    integer(kind=ik), intent(in) :: code
+    integer(kind=ik) :: mpierr
+
+    call MPI_ABORT( MPI_COMM_WORLD, code, mpierr)
+  end subroutine
+
+  subroutine abort3(msg)
+    implicit none
+    character(len=*), intent(in) :: msg
+    integer(kind=ik) :: mpierr
+
+    write(*,*) msg
+    call MPI_ABORT( MPI_COMM_WORLD, 666, mpierr)
+  end subroutine
 
 end module module_precision

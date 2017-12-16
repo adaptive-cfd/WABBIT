@@ -21,6 +21,7 @@
 ! ********************************************************************************************
 subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dx, dt )
 
+    use module_acm_new, only : GET_DT_BLOCK_ACM
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -61,6 +62,9 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
     ! maximal mesh level
     integer(kind=ik)                    :: Jmax
 
+    reaL(kind=rk ) :: ddx(1:3), xx0(1:3), dt_tmp
+    integer(kind=ik) :: k, lgt_id
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -73,6 +77,28 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
 !---------------------------------------------------------------------------------------------
 ! main body
 
+!$$$$$$$$$$$$$$ NEW CODE $$$$$$$$$$$$$$$$
+  if (params%physics_type == 'ACM-new') then
+    dt = 9.0e9_rk
+    do k = 1, hvy_n
+
+        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+
+        select case (params%physics_type)
+        case ('ACM-new')
+          call GET_DT_BLOCK_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), params%number_ghost_nodes, xx0, ddx, dt_tmp )
+        case default
+          call abort('phycics module unkown.')
+        end select
+
+        dt = min( dt, dt_tmp )
+
+    end do
+    goto 10
+  endif
+
+!$$$$$$$$$$$$$$ OLD CODE $$$$$$$$$$$$$$$$
     select case(params%time_step_calc)
         case('fixed')
             dt = params%dt
@@ -98,14 +124,6 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
                      dt = minval((/dt, params%CFL * dx / norm_u /))
                   end do
                end if
-
-            ! acm physics
-            elseif ((params%physics_type == '2D_acm') .or. (params%physics_type == '3D_acm'))  then
-               dt = minval( (/dt,  params%CFL * dx / params%physics_acm%c_0 /))
-               ! also respect a (roughly) estimated stability restriction for the
-               ! explicit integration of the diffusion term (which is in dx**2, unfortunately)
-               ! this condition will very rarely take effect (e.g. at low reynolds numbers and high resolution)
-               dt = minval( (/dt, 0.5*dx**2/params%physics_acm%nu/) )
 
             ! ns physics
             elseif ( params%physics_type == '2D_navier_stokes' ) then
@@ -146,4 +164,6 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
     end select
     ! penalization stability criterion
     if (params%penalization) dt = minval( (/dt, 0.99_rk*params%eps_penal /) )
+
+10 continue
 end subroutine calculate_time_step

@@ -109,7 +109,7 @@ subroutine coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n
         endif
 
       case default
-          call error_msg("ERROR: unknown coarsening operator")
+          call abort("ERROR: unknown coarsening operator")
 
     end select
 

@@ -16,7 +16,7 @@
 !!           - heavy data array
 !!
 !! output:
-!!           - 
+!!           -
 !!
 !!
 !! = log ======================================================================================
@@ -24,23 +24,21 @@
 !! 24/07/17 - create
 !
 ! ********************************************************************************************
-subroutine compute_vorticity(params, u, v, w, dx, vorticity)
+subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
-    !> physics parameter structure
-    type (type_params), intent(in)                 :: params
     !> origin and spacing of the block
     real(kind=rk), dimension(3), intent(in)        :: dx
     !> local datafields
     real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w
     !> vorticity
     real(kind=rk), dimension(:,:,:,:), intent(out) :: vorticity
-    
+    character(len=*), intent(in)                   :: discretization
     !> grid parameters
-    integer(kind=ik)                               :: Bs, g
+    integer(kind=ik), intent(in)                   :: Bs, g
     !> derivatives
     real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
     !> inverse of dx, dy, dz
@@ -55,20 +53,17 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
     vorticity = 0.0_rk
 
     ! Tam & Webb, 4th order optimized (for first derivative)
-    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
-         0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
     dz_inv = 1.0_rk / dx(3)
 
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    if (params%threeD_case) then
-        if (params%order_discretization == "FD_2nd_central" ) then
+    if (size(u,3)>2) then ! 3D case
+        if (discretization == "FD_2nd_central" ) then
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g
                     do iz = g+1, Bs+g
@@ -78,14 +73,14 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
                         v_dz = (v(ix,iy,iz+1)-v(ix,iy,iz-1))*dz_inv*0.5_rk
                         w_dx = (w(ix+1,iy,iz)-w(ix-1,iy,iz))*dx_inv*0.5_rk
                         w_dy = (w(ix,iy+1,iz)-w(ix,iy-1,iz))*dy_inv*0.5_rk
-                    
+
                         vorticity(ix,iy,iz,1) = w_dy - v_dz
                         vorticity(ix,iy,iz,2) = u_dz - w_dx
                         vorticity(ix,iy,iz,3) = v_dx - u_dy
                     end do
                  end do
             end do
-        else if (params%order_discretization == "FD_4th_central_optimized") then
+        else if (discretization == "FD_4th_central_optimized") then
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g
                     do iz = g+1, Bs+g
@@ -101,7 +96,7 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
                       +  a(+1)*w(ix+1,iy,iz) + a(+2)*w(ix+2,iy,iz) + a(+3)*w(ix+3,iy,iz))*dx_inv
                         w_dy = (a(-3)*w(ix,iy-3,iz) + a(-2)*w(ix,iy-2,iz) + a(-1)*w(ix,iy-1,iz) + a(0)*w(ix,iy,iz)&
                      +  a(+1)*w(ix,iy+1,iz) + a(+2)*w(ix,iy+2,iz) + a(+3)*w(ix,iy+3,iz))*dy_inv
-                       
+
                         vorticity(ix,iy,iz,1) = w_dy - v_dz
                         vorticity(ix,iy,iz,2) = u_dz - w_dx
                         vorticity(ix,iy,iz,3) = v_dx - u_dy
@@ -109,12 +104,12 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
                 end do
             end do
         else
-            write(*,*) "ERROR: discretization method in params%order_discretization is unknown"
-            write(*,*) params%order_discretization
+            write(*,*) "ERROR: discretization method in discretization is unknown"
+            write(*,*) discretization
             stop
         end if
     else
-        if (params%order_discretization == "FD_2nd_central" ) then
+        if (discretization == "FD_2nd_central" ) then
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g
                     u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv*0.5_rk
@@ -122,7 +117,7 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
                     vorticity(ix,iy,1,1) = v_dx - u_dy
                  end do
             end do
-        else if (params%order_discretization == "FD_4th_central_optimized") then
+        else if (discretization == "FD_4th_central_optimized") then
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g
                     u_dy = (a(-3)*u(ix,iy-3,1) + a(-2)*u(ix,iy-2,1) + a(-1)*u(ix,iy-1,1) + a(0)*u(ix,iy,1)&
@@ -133,8 +128,8 @@ subroutine compute_vorticity(params, u, v, w, dx, vorticity)
                 end do
             end do
         else
-            write(*,*) "ERROR: discretization method in params%order_discretization is unknown"
-            write(*,*) params%order_discretization
+            write(*,*) "ERROR: discretization method in discretization is unknown"
+            write(*,*) discretization
             stop
         end if
     end if

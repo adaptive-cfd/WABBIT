@@ -174,7 +174,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                   my_refine_change( k ) = max( 0_1, my_refine_change( k ) )
                               end if
                         else
-                          call error_msg("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
+                          call abort("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
                         end if
                     end if ! if neighbor exists
                     end do ! loop over neighbors
@@ -204,7 +204,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                 my_refine_change( k ) = +1
                               end if
                             else
-                              call error_msg("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
+                              call abort("ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
                             end if
                       end if ! if neighbor exists
                       end do
@@ -237,7 +237,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
         ! avoid infinite loops
         counter = counter + 1
-        if (counter == 10) call error_msg("ERROR: unable to build a graded mesh")
+        if (counter == 10) call abort("ERROR: unable to build a graded mesh")
 
     end do ! end do of repeat procedure until grid_changed==.false.
 

@@ -108,7 +108,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
           call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
 
       case default
-          call error_msg("ERROR: refine_mesh: the refinement indicator is unkown")
+          call abort("ERROR: refine_mesh: the refinement indicator is unkown")
 
     end select
 

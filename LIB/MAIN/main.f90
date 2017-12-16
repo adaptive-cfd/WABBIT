@@ -41,6 +41,7 @@ program main
     use module_time_step
     ! unit test module
     use module_unit_test
+    use module_ACM_new
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -195,6 +196,12 @@ program main
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
 
+    select case(params%physics_type)
+      ! if I put it in ini_file_to_params, I have a cricular dependenc in the makefile
+    case('ACM-new')
+      call READ_PARAMETERS_ACM( filename )
+    end select
+
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     ! reset the grid: all blocks are inactive and empty
@@ -245,10 +252,13 @@ program main
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk
-        ! we don't need this for an initial condition we got from a file (there already is this file)
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+        ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+
+        ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+        ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+        ! slots. the state vector (hvy_block) is copied if desired.
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
     end if
 
     ! max neighbor num
@@ -265,7 +275,9 @@ program main
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
-    do while ( time < params%time_max )
+    if (rank==0) write(*,*) "starting main time loop"
+
+    do while ( time < params%time_max .and. iteration<params%nt)
 
         ! new iteration
         iteration = iteration + 1
@@ -277,49 +289,6 @@ program main
 
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-!       ! check redundant nodes
-!       if ( params%debug ) then
-!
-!           ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-!           call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-!
-!           ! start time
-!           sub_t0 = MPI_Wtime()
-!
-!           ! check redundant nodes
-!           call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_stop_status )
-!
-!           ! barrier
-!           call MPI_Barrier(MPI_COMM_WORLD, ierr)
-!           ! synchronize stop status
-!           call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
-!
-!           ! end time
-!           sub_t1 = MPI_Wtime()
-!           ! write time
-!           if ( params%debug ) then
-!               ! find free or corresponding line
-!               k = 1
-!               do while ( debug%name_comp_time(k) /= "---" )
-!                   ! entry for current subroutine exists
-!                   if ( debug%name_comp_time(k) == "check_redundant_nodes" ) exit
-!                   k = k + 1
-!               end do
-!               ! write time
-!               debug%name_comp_time(k) = "check_redundant_nodes"
-!               debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-!               debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-!           end if
-!
-!           ! stop programm if difference on redundant nodes
-!           if (stop_status) then
-!               ! save data
-!               call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-!               ! stop program
-!               stop
-!           end if
-!       end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
@@ -333,11 +302,9 @@ program main
 
         ! output on screen
         if (rank==0) then
-            write(*,'(80("-"))')
             write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
              iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
-
         end if
 
 
@@ -345,9 +312,12 @@ program main
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
           call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-          call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-          call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+
+          ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+          ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+          ! slots. the state vector (hvy_block) is copied if desired.
+          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+
           output_time = time
           params%next_write_time = params%next_write_time + params%write_time
         endif
@@ -362,9 +332,11 @@ program main
     if ( abs(output_time-time) > 1e-10_rk ) then
       ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
       call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-      call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-      call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-      call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+
+      ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+      ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+      ! slots. the state vector (hvy_block) is copied if desired.
+      call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements

@@ -12,15 +12,15 @@
 !>
 !! for the RK4 the final stage looks like this: \n
 !! data_field(t+dt) = data_field(t) + dt*(b1*k1 + b2*k2 + b3*k3 + b4*k4)
-!! 
-!! input:    
+!!
+!! input:
 !!           - params
 !!           - heavy data
 !!           - time step dt
 !!           - coefficients for Runge Kutta
-!! 
+!!
 !! output:
-!!           - hvy_work 
+!!           - hvy_work
 !!
 !!
 !! butcher table, e.g.
@@ -91,7 +91,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                     !u_n = u_n +...
                     hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) )
 
-                    do j = 2, size(rk_coeffs, 2) 
+                    do j = 2, size(rk_coeffs, 2)
                         if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                         else
                             ! ... dt*(b1*k1 + b2*k2+ ..)
@@ -109,7 +109,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                     !u_n = u_n +...
                     hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
 
-                    do j = 2, size(rk_coeffs, 2) 
+                    do j = 2, size(rk_coeffs, 2)
                         if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                         else
                             ! ... dt*(b1*k1 + b2*k2+ ..)
@@ -128,7 +128,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                     !u_n = u_n +...
                     hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) )
 
-                    do j = 2, size(rk_coeffs, 2) 
+                    do j = 2, size(rk_coeffs, 2)
                         if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                         else
                             ! ... dt*(b1*k1 + b2*k2+ ..)
@@ -146,7 +146,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                     !u_n = u_n +...
                     hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
 
-                    do j = 2, size(rk_coeffs, 2) 
+                    do j = 2, size(rk_coeffs, 2)
                         if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                         else
                             ! ... dt*(b1*k1 + b2*k2+ ..)
@@ -165,7 +165,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                     !u_n = u_n +...
                     hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) )
 
-                    do j = 2, size(rk_coeffs, 2) 
+                    do j = 2, size(rk_coeffs, 2)
                         if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                         else
                             ! ... dt*(b1*k1 + b2*k2+ ..)
@@ -177,13 +177,13 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                 end do
             end do
 
-        case('2D_acm')
+        case('2D_acm','ACM-new')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 !u_n = u_n +...
                 hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
 
-                do j = 2, size(rk_coeffs, 2) 
+                do j = 2, size(rk_coeffs, 2)
                     if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                     else
                         ! ... dt*(b1*k1 + b2*k2+ ..)
@@ -201,7 +201,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                 !u_n = u_n +...
                 hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
 
-                do j = 2, size(rk_coeffs, 2) 
+                do j = 2, size(rk_coeffs, 2)
                     if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
                     else
                         ! ... dt*(b1*k1 + b2*k2+ ..)

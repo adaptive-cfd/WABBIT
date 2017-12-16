@@ -142,7 +142,7 @@ subroutine RHS_2D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
     do ix = 1, Bs+2*g
       do iy = 1, Bs+2*g
         if (abs(phi(ix,iy)) > 1.0e+6_rk) then
-          call error_msg("very large values of phi -> we stop here to let you think.")
+          call abort("very large values of phi -> we stop here to let you think.")
         endif
       end do
     end do

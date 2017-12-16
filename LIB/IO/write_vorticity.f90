@@ -17,7 +17,7 @@
 !!           - heavy data array
 !!
 !! output:
-!!           - 
+!!           -
 !!
 !!
 !! = log ======================================================================================
@@ -85,48 +85,6 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
     ! calculate vorticity only for proper physic
     select case (params%physics_type)
 
-        case('2D_acm')
-            do k=1, hvy_n
-
-                call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                ! store u,v in hvy_work array
-                hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,1,hvy_active(k))  ! u
-                hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,2,hvy_active(k))  ! v
-
-                call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:,:,:,4:6,hvy_active(k)))
-
-            end do
-
-            write( fname,'(a, "_", i12.12, ".h5")') 'vor', nint(time * 1.0e6_rk)
-            ! write field 4 of hvy_work array (vorticity) to disk
-            call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-
-        case('3D_acm')
-            do k=1, hvy_n
-
-                call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                ! store u,v, w in hvy_work array
-                hvy_work(:,:,:,1,hvy_active(k)) = hvy_block(:,:,:,1,hvy_active(k))  ! u
-                hvy_work(:,:,:,2,hvy_active(k)) = hvy_block(:,:,:,2,hvy_active(k))  ! v
-                hvy_work(:,:,:,3,hvy_active(k)) = hvy_block(:,:,:,3,hvy_active(k))  ! w
-
-                call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:,:,:,4:6,hvy_active(k)))
-
-            end do
-
-            ! write field 4 to 6 of hvy_work array (vorticity) to disk
-            ! write vorticity in x direction
-            write( fname,'(a, "_", i12.12, ".h5")') 'vor_x', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 4, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-            ! write vorticity in y direction
-            write( fname,'(a, "_", i12.12, ".h5")') 'vor_y', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 5, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-            ! write vorticity in z direction
-            write( fname,'(a, "_", i12.12, ".h5")') 'vor_z', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 6, params, lgt_block, hvy_work(:,:,:,:,:), lgt_active, lgt_n, hvy_n)
-
         case('2D_navier_stokes')
             do k=1, hvy_n
 
@@ -136,7 +94,7 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
                 hvy_work(:,:,1,1,hvy_active(k)) = hvy_block(:,:,1,UxF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! u
                 hvy_work(:,:,1,2,hvy_active(k)) = hvy_block(:,:,1,UyF,hvy_active(k))/hvy_block(:,:,1,rhoF,hvy_active(k))**2  ! v
 
-                call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:,:,:,4:6,hvy_active(k)))
+                ! call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:,:,:,4:6,hvy_active(k)))
 
             end do
 
@@ -155,7 +113,7 @@ subroutine write_vorticity( hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, p
                 hvy_work(:,:,:,2,hvy_active(k)) = hvy_block(:,:,:,UyF,hvy_active(k))/hvy_block(:,:,:,rhoF,hvy_active(k))**2  ! v
                 hvy_work(:,:,:,3,hvy_active(k)) = hvy_block(:,:,:,UyF,hvy_active(k))/hvy_block(:,:,:,rhoF,hvy_active(k))**2  ! w
 
-                call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:,:,:,4:6,hvy_active(k)))
+                ! call compute_vorticity(params, hvy_work(:,:,:,1,hvy_active(k)), hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, hvy_work(:,:,:,4:6,hvy_active(k)))
 
             end do
 

@@ -97,7 +97,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
                   end do
                 end if
             else
-              call error_msg("find_sisters: we did not find all sister blocks! (grid error!)")
+              call abort("find_sisters: we did not find all sister blocks! (grid error!)")
             end if
         end if
     end do

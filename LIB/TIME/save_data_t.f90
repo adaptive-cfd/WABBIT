@@ -10,11 +10,11 @@
 !> \brief Save data at time t for Runge-Kutta time step routine
 !
 !>
-!! input: 
+!! input:
 !!          - params
 !!          - heavy data
 !!
-!! output:   
+!! output:
 !!          - heavy data
 !!
 !! butcher table, e.g.
@@ -58,7 +58,7 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
     integer(kind=ik), intent(in)        :: hvy_n
 
     !> loop variables
-    integer(kind=ik)                    :: dF, N_dF, k
+    integer(kind=ik)                    :: dF, neq, k
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -66,7 +66,7 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N_dF  = params%number_data_fields
+    neq  = params%number_data_fields
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -75,7 +75,7 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
     select case (params%physics_type)
         case('2D_convection_diffusion')
             ! loop over all data fields
-            do dF = 1, N_dF
+            do dF = 1, neq
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                     hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
@@ -85,12 +85,12 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
         case('2D_navier_stokes')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
-                hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
+                hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
             end do
 
         case('3D_convection_diffusion')
             ! loop over all datafields
-            do dF = 1, N_dF
+            do dF = 1, neq
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                      hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
@@ -100,28 +100,22 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
         case('3D_navier_stokes')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
-                hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
+                hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
             end do
 
         case('2D_advection')
             ! loop over all datafields
-            do dF = 1, N_dF
+            do dF = 1, neq
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                     hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) = hvy_block( :, :, :, dF, hvy_active(k) )
                 end do
             end do
 
-        case('2D_acm')
+        case('2D_acm',"ACM-new",'3D_acm')
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
-                hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
-            end do
-
-        case('3D_acm')
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                hvy_work( :, :, :, 1:N_dF, hvy_active(k) ) = hvy_block( :, :, :, 1:N_dF, hvy_active(k) )
+                hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
             end do
 
         case default

@@ -158,7 +158,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! find globally smallest dx
     call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
-
     ! calculate dt
     call calculate_time_step(params, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dx, dt)
 
@@ -196,8 +195,8 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! save data at time t to heavy work array
     call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
-
     call RHS_wrapper(time, dt, params, hvy_work, rk_coeffs(1,1), 1, lgt_block, hvy_active, hvy_n, hvy_block)
+
 
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1)-1

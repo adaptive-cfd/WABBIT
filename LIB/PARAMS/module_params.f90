@@ -26,7 +26,6 @@ module module_params
     ! use physics module
     use module_convection_diffusion
     use module_navier_stokes
-    use module_acm
     ! ini file parser module
     use module_ini_files_parser_mpi
 
@@ -44,6 +43,8 @@ module module_params
         real(kind=rk)                                :: CFL
         ! dt
         real(kind=rk)                                :: dt
+        ! number of allowed time steps
+        integer(kind=ik)                             :: nt
         ! time step calculator
         character(len=80)                            :: time_step_calc
         ! data writing frequency
@@ -122,7 +123,6 @@ module module_params
         ! physics substructure
         type(type_params_convection_diffusion_physics) :: physics
         type(type_params_physics_navier_stokes)     :: physics_ns
-        type(type_params_physics_acm)               :: physics_acm
 
         ! use third dimension
         logical                                     :: threeD_case
@@ -133,11 +133,16 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! data exchange method
         character(len=80)                           :: mpi_data_exchange
-
         ! process rank
         integer(kind=ik)                            :: rank
         ! number of processes
         integer(kind=ik)                            :: number_procs
+
+        ! -------------------------------------------------------------------------------------
+        ! saving
+        ! -------------------------------------------------------------------------------------
+        integer(kind=ik) :: N_fields_saved
+        character(len=80), allocatable, dimension(:) :: field_names
 
         ! -------------------------------------------------------------------------------------
         ! unit test
@@ -206,10 +211,14 @@ contains
               params%threeD_case = .true.
               params%dim = 3
           case default
-              call error_msg("ERROR: case dimension is wrong")
+              call abort(1,"ERROR: case dimension is wrong")
       end select
 
     end subroutine
+
+
+
+
 
 ! --------------------------------------------------------------------
 ! INTEGER FUNCTION  FindMinimum():

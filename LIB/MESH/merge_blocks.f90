@@ -52,7 +52,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   level = lgt_block( lgt_blocks_to_merge(1), maxtL+1 )
 
   if ( N_merge /= 4 .and. N_merge /= 8) then
-    call error_msg('You try to merge neither n=4 or 8 blocks...this cannot work.')
+    call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
   endif
 
   ! Check which CPU holds the blocks. The CPU will also hold the merged, new block
@@ -62,7 +62,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
 
   ! Check if all blocks lie on the same rank
   if ( maxval(data_rank(1:N_merge)-data_rank(1)) /= 0 ) then
-    call error_msg("You try to merge blocks on different ranks, but you must call gather_ranks before.")
+    call abort("You try to merge blocks on different ranks, but you must call gather_ranks before.")
   endif
 
 

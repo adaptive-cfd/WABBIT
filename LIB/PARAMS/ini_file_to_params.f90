@@ -62,6 +62,8 @@ subroutine ini_file_to_params( params, filename )
     call read_ini_file_mpi(FILE, filename, .true.)
 
 
+    call read_param_mpi(FILE, 'Dimensionality', 'dim', params%dim, 2 )
+
     !***************************************************************************
     ! read BLOCK parameters
     ! read number_block_nodes
@@ -88,11 +90,25 @@ subroutine ini_file_to_params( params, filename )
     ! use non-uniform mesh correction
     call read_param_mpi(FILE, 'Blocks', 'non_uniform_mesh_correction', params%non_uniform_mesh_correction, .true. )
 
+    ! domain size
+    call read_param_mpi(FILE, 'DomainSize', 'Lx', params%Lx, 1.0_rk )
+    call read_param_mpi(FILE, 'DomainSize', 'Ly', params%Ly, 1.0_rk )
+    call read_param_mpi(FILE, 'DomainSize', 'Lz', params%Lz, 1.0_rk )
+
+    ! saving options.
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
+    allocate( params%field_names(1:params%N_fields_saved) )
+    call read_param_mpi(FILE, 'Saving', 'field_names', params%field_names, (/"ux","uy","p "/) )
+
+
     !***************************************************************************
     ! read TIME parameters
     !
-    ! read time_max
+    ! time to reach in simulation
     call read_param_mpi(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
+    ! number of time steps to be performed. default value is very large, so if not set
+    ! the limit will not be reached
+    call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
 
     ! read output write method
     call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
@@ -117,235 +133,6 @@ subroutine ini_file_to_params( params, filename )
     0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
     0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
     0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
-
-    !***************************************************************************
-    ! read PHYSICS parameters
-    !
-    ! first: read physics type
-    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
-
-    select case(params%physics_type)
-
-        case('2D_convection_diffusion')
-
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! set third dimension to zero
-            params%Lz = 0.0_rk
-
-            ! allocate memory in params structure (need 2*data_fields for velocity
-            ! and 1*data_fields for diffusion coefficient)
-            allocate( params%physics%u0( 2*params%number_data_fields ) )
-            allocate( params%physics%nu( params%number_data_fields ) )
-
-            ! reset values, use as default values
-            params%physics%u0 = 0.0_rk
-            params%physics%nu = 0.0_rk
-
-            ! read velocity
-            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
-            ! read diffusion
-            call read_param_mpi(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics%names( params%number_data_fields ) )
-
-            params%physics%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
-
-        case('2D_navier_stokes')
-
-            ! error case: try to solve navier stokes equation with less or more than 4 datafields
-!            if ( params%number_data_fields /= 4) then
-!                write(*,'(80("_"))')
-!                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
-!                stop
-!            end if
-
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! set third dimension to zero
-            params%Lz = 0.0_rk
-
-            ! physics parameter
-            ! read adiabatic coefficient
-            call read_param_mpi(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
-            ! read specific gas constant
-            call read_param_mpi(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
-            ! calculate isochoric heat capacity
-            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
-            ! calculate isobaric heat capacity
-            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
-            ! read prandtl number
-            call read_param_mpi(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
-            ! read dynamic viscosity
-            call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
-            ! read switch to turn on|off dissipation
-            call read_param_mpi(FILE, 'Physics', 'dissipation', params%physics_ns%dissipation, .true. )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics_ns%names( params%number_data_fields ) )
-            params%physics_ns%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
-
-        case('3D_convection_diffusion')
-
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-
-            ! allocate memory in params structure (need 3*data_fields for velocity
-            ! and 1*data_fields for diffusion coefficient)
-            allocate( params%physics%u0( 3*params%number_data_fields ) )
-            allocate( params%physics%nu( params%number_data_fields ) )
-
-            ! reset values, use as default values
-            params%physics%u0 = 0.0_rk
-            params%physics%nu = 0.0_rk
-
-            ! read velocity
-            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
-            ! read diffusion
-            call read_param_mpi(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics%names( params%number_data_fields ) )
-
-            params%physics%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
-
-        case('3D_navier_stokes')
-
-            ! error case: try to solve navier stokes equation with less or more than 5 datafields
-            if ( params%number_data_fields /= 5) then
-                write(*,'(80("_"))')
-                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
-                stop
-            end if
-
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-
-            ! physics parameter
-            ! read adiabatic coefficient
-            call read_param_mpi(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
-            ! read specific gas constant
-            call read_param_mpi(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
-            ! calculate isochoric heat capacity
-            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
-            ! calculate isobaric heat capacity
-            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
-            ! read prandtl number
-            call read_param_mpi(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
-            ! read dynamic viscosity
-            call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
-            ! read switch to turn on|off dissipation
-            call read_param_mpi(FILE, 'Blocks', 'dissipation', params%physics_ns%dissipation , .true. )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics_ns%names( params%number_data_fields ) )
-            params%physics_ns%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
-
-        case('2D_advection')
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! set third dimension to zero
-            params%Lz = 0.0_rk
-
-            ! use convection velocity for time step calculation
-            allocate( params%physics%u0( 2*params%number_data_fields ) )
-
-
-            ! reset values, use as default values
-            params%physics%u0 = 0.0_rk
-            ! read velocity
-            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
-
-            ! read variable names
-            ! allocate names list
-            ! use convection-diffusion physics struct !
-            allocate( params%physics%names( params%number_data_fields ) )
-
-
-            params%physics%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
-
-        case('2D_acm')
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            ! set third dimension to zero
-            params%Lz = 0.0_rk
-            if ( params%number_data_fields /= 3) then
-                write(*,'(80("_"))')
-                write(*,'("ERROR: try to solve acm with", i3, " datafield(s)")') params%number_data_fields
-                stop
-            end if
-            allocate( params%physics_acm%names( params%number_data_fields ) )
-            params%physics_acm%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names_acm', params%physics_acm%names, params%physics_acm%names )
-            ! speed of sound for acm
-            call read_param_mpi(FILE, 'Physics', 'c_0', params%physics_acm%c_0, 10.0_rk)
-
-            ! inverse of Re
-            call read_param_mpi(FILE, 'Physics', 'nu', params%physics_acm%nu, 1e-1_rk)
-
-            ! gamma_p
-            call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
-
-            ! want to add a forcing term?
-            call read_param_mpi(FILE, 'Physics', 'forcing', params%physics_acm%forcing, .false.)
-
-        case('3D_acm')
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-            if ( params%number_data_fields /= 4) then
-                write(*,'(80("_"))')
-                write(*,'("ERROR: try to solve acm with", i3, " datafield(s)")') params%number_data_fields
-                stop
-            end if
-            allocate( params%physics_acm%names( params%number_data_fields ) )
-            params%physics_acm%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names_acm', params%physics_acm%names, params%physics_acm%names )
-            ! speed of sound for acm
-            call read_param_mpi(FILE, 'Physics', 'c_0', params%physics_acm%c_0, 10.0_rk)
-
-            ! inverse of Re
-            call read_param_mpi(FILE, 'Physics', 'nu', params%physics_acm%nu, 1e-1_rk)
-
-            ! gamma_p
-            call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
-
-            ! want to add a forcing term?
-            call read_param_mpi(FILE, 'Physics', 'forcing', params%physics_acm%forcing, .false.)
-
-        case default
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: physics type is unknown"
-            write(*,*) params%physics_type
-            stop
-
-    end select
 
     !**************************************************************************
     ! read INITIAL CONDITION parameters
@@ -414,6 +201,145 @@ subroutine ini_file_to_params( params, filename )
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
 
+    !***************************************************************************
+    ! read PHYSICS parameters
+    !
+    ! first: read physics type
+    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
+
+    select case(params%physics_type)
+
+        case('2D_convection_diffusion')
+            ! allocate memory in params structure (need 2*data_fields for velocity
+            ! and 1*data_fields for diffusion coefficient)
+            allocate( params%physics%u0( 2*params%number_data_fields ) )
+            allocate( params%physics%nu( params%number_data_fields ) )
+
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            params%physics%nu = 0.0_rk
+
+            ! read velocity
+            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+            ! read diffusion
+            call read_param_mpi(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
+
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics%names( params%number_data_fields ) )
+
+            params%physics%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
+
+        case('2D_navier_stokes')
+
+            ! physics parameter
+            ! read adiabatic coefficient
+            call read_param_mpi(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
+            ! read specific gas constant
+            call read_param_mpi(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
+            ! calculate isochoric heat capacity
+            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
+            ! calculate isobaric heat capacity
+            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
+            ! read prandtl number
+            call read_param_mpi(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
+            ! read dynamic viscosity
+            call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
+            ! read switch to turn on|off dissipation
+            call read_param_mpi(FILE, 'Physics', 'dissipation', params%physics_ns%dissipation, .true. )
+
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics_ns%names( params%number_data_fields ) )
+            params%physics_ns%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
+
+        case('3D_convection_diffusion')
+
+            ! allocate memory in params structure (need 3*data_fields for velocity
+            ! and 1*data_fields for diffusion coefficient)
+            allocate( params%physics%u0( 3*params%number_data_fields ) )
+            allocate( params%physics%nu( params%number_data_fields ) )
+
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            params%physics%nu = 0.0_rk
+
+            ! read velocity
+            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+            ! read diffusion
+            call read_param_mpi(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
+
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics%names( params%number_data_fields ) )
+
+            params%physics%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
+
+        case('3D_navier_stokes')
+
+            ! error case: try to solve navier stokes equation with less or more than 5 datafields
+            if ( params%number_data_fields /= 5) then
+                write(*,'(80("_"))')
+                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
+                stop
+            end if
+
+            ! domain size
+            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
+
+            ! physics parameter
+            ! read adiabatic coefficient
+            call read_param_mpi(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
+            ! read specific gas constant
+            call read_param_mpi(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
+            ! calculate isochoric heat capacity
+            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
+            ! calculate isobaric heat capacity
+            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
+            ! read prandtl number
+            call read_param_mpi(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
+            ! read dynamic viscosity
+            call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
+            ! read switch to turn on|off dissipation
+            call read_param_mpi(FILE, 'Blocks', 'dissipation', params%physics_ns%dissipation , .true. )
+
+            ! read variable names
+            ! allocate names list
+            allocate( params%physics_ns%names( params%number_data_fields ) )
+            params%physics_ns%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
+
+        case('2D_advection')
+            ! use convection velocity for time step calculation
+            allocate( params%physics%u0( 2*params%number_data_fields ) )
+
+
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            ! read velocity
+            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+
+            ! read variable names
+            ! allocate names list
+            ! use convection-diffusion physics struct !
+            allocate( params%physics%names( params%number_data_fields ) )
+
+
+            params%physics%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
+
+    end select
+
     !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,
     ! wabbit will automatically select the number of blocks per rank to be allocated
@@ -451,13 +377,13 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
-        call error_msg("ERROR: need more ghost nodes for given refinement order")
+        call abort("ERROR: need more ghost nodes for given refinement order")
     end if
     if ( (params%number_ghost_nodes < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-        call error_msg("ERROR: need more ghost nodes for given refinement order")
+        call abort("ERROR: need more ghost nodes for given refinement order")
     end if
     if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
-        call error_msg("ERROR: need more ghost nodes for given derivative order")
+        call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
 end subroutine ini_file_to_params

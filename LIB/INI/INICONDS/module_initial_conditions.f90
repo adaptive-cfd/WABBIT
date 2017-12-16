@@ -25,6 +25,7 @@ module module_initial_conditions
     use mpi
     ! global parameters
     use module_params
+    use module_ACM_new
 !---------------------------------------------------------------------------------------------
 ! variables
 

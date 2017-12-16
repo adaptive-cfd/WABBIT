@@ -3,46 +3,37 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name module_acm.f90
+!> \name module_operators.f90
 !> \version 0.5
 !> \author sm
-!!
-!! \brief module for 2D/3D acm physics
-!!
-!!
+!
+!> \brief module for all operator routines
+!
+!>
 !! = log ======================================================================================
 !! \n
-!!
-! ********************************************************************************************
+!! 28/7/17 - create
+! *********************************************************************************************
 
-module module_acm
+module module_operators
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
-    use module_precision
+    use mpi
+    ! global parameters
+    use module_params
+    ! debug module
+    use module_debug
+    ! own MPI module
+    !use module_mpi
+    ! use mesh module, since we want to compute origin/spacing of blocks
+    use module_mesh, only : get_block_spacing_origin
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
-
-    ! user defined data structure for time independent variables
-    type type_params_physics_acm
-       
-        ! c_0 
-        real(kind=rk)                               :: c_0
-        ! nu
-        real(kind=rk)                               :: nu
-        ! gamma_p
-        real(kind=rk)                               :: gamma_p
-        ! want to add forcing?
-        logical                                     :: forcing
-        
-        ! variable names
-        character(len=80), allocatable              :: names(:)
-
-    end type type_params_physics_acm
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -52,5 +43,7 @@ module module_acm
 
 contains
 
+    include "volume_integral.f90"
+    include "compute_vorticity.f90"
 
-end module module_acm
+end module module_operators

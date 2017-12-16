@@ -31,6 +31,20 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   Bs    = params%number_block_nodes
   g     = params%number_ghost_nodes
 
+!$$$$$$$$$$$$$$$$$$$$$ NEW
+  if (params%physics_type=="ACM-new") then
+    write(*,*) "INICOND new code  "
+    select case (params%physics_type)
+    case ("ACM-new")
+      call INICOND_ACM( 0.0_rk, u, g, x0, dx )
+    case default
+      call abort("soething wrong")
+    end select
+
+return
+  endif
+
+! $$$$$$$$$$$$$$$$$$$$$$$$$$$ OLD
   select case( inicond )
   case ("sinus_2d","sinus2d","sin2d")
     call inicond_sinus_2D( params, u, x0, dx )
@@ -51,7 +65,7 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
     call inicond_shear_layer( params, u, x0, dx )
 
   case default
-    call error_msg("the initial condition is unkown: "//trim(adjustl(inicond)))
+    call abort("the initial condition is unkown: "//trim(adjustl(inicond)))
 
   end select
 

@@ -106,6 +106,10 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume
     a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! 4th order coefficients for second derivative
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
+
+    if (maxval(abs(params_acm%mean_flow)) > 1.0e3_rk ) then
+      call abort(887, "ACM: meanflow out of bounds")
+    endif
 !---------------------------------------------------------------------------------------------
 ! main body
 

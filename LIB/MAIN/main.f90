@@ -195,12 +195,9 @@ program main
     call get_command_argument( 2, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    ! have the pysics module read their own parameters
+    call init_physics_modules( params, filename )
 
-    select case(params%physics_type)
-      ! if I put it in ini_file_to_params, I have a cricular dependenc in the makefile
-    case('ACM-new')
-      call READ_PARAMETERS_ACM( filename )
-    end select
 
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -300,20 +297,12 @@ program main
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         endif
 
-        ! output on screen
-        if (rank==0) then
-            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
-             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n )
-        end if
-
-
         ! write data to disk
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+          ! call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-          ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+          ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
           ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
           ! slots. the state vector (hvy_block) is copied if desired.
           call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
@@ -326,6 +315,12 @@ program main
         ! by what has been done in the last time step, then we flush the current timing to disk.
         call timing_next_timestep( params, iteration )
 
+        ! output on screen
+        if (rank==0) then
+            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
+             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             max_active_level( lgt_block, lgt_active, lgt_n )
+        end if
     end do
 
     ! save end field to disk, only if timestep is not saved allready

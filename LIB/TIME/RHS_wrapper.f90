@@ -93,16 +93,15 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
     ! grid parameter
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
     ! RHS depends on physics
-    select case(params%physics_type)
+    select case(params%physics_type) ! -- TODO: remove, once all physics modules are renewed.
 
-    case("ACM-new")
+    case("ACM-new") ! -- TODO: remove, once all physics modules are renewed.
       !-------------------------------------------------------------------------
-      ! 1st stage: init_stage.
+      ! 1st stage: init_stage. (called once, not for all blocks)
       !-------------------------------------------------------------------------
       ! performs initializations in the RHS module, such as resetting integrals
       select case(params%physics_type)
@@ -116,7 +115,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
       end select
 
       !-------------------------------------------------------------------------
-      ! 2nd stage: integral_stage.
+      ! 2nd stage: integral_stage. (called for all blocks)
       !-------------------------------------------------------------------------
       ! For some RHS, the eqn depend not only on local, block based qtys, such as
       ! the state vector, but also on the entire grid, for example to compute a
@@ -143,7 +142,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
 
       !-------------------------------------------------------------------------
-      ! 3rd stage: post integral stage.
+      ! 3rd stage: post integral stage. (called once, not for all blocks)
       !-------------------------------------------------------------------------
       ! in rhs module, used ror example for MPI_REDUCES
       select case(params%physics_type)
@@ -158,7 +157,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
 
       !-------------------------------------------------------------------------
-      ! 3rd stage: local evaluation of RHS on all blocks
+      ! 4th stage: local evaluation of RHS on all blocks (called for all blocks)
       !-------------------------------------------------------------------------
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
@@ -182,7 +181,8 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
 
 
-
+ ! -- TODO: remove, once all physics modules are renewed.
+ ! all following lines.
         case('2D_convection_diffusion')
             ! loop over all data fields
             do dF = 1, N_dF
@@ -291,6 +291,5 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
             call abort(1717,"ERROR: physics type is unknown"//params%physics_type)
 
     end select
-
 
 end subroutine RHS_wrapper

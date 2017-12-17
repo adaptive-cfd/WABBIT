@@ -23,7 +23,8 @@ module module_params
 !---------------------------------------------------------------------------------------------
 ! modules
     use mpi
-    ! use physics module
+    ! use physics module (TODO: remove this dependency, as we may create circulars in
+    ! the MAKEFILE)
     use module_convection_diffusion
     use module_navier_stokes
     ! ini file parser module
@@ -215,82 +216,5 @@ contains
       end select
 
     end subroutine
-
-
-
-
-
-! --------------------------------------------------------------------
-! INTEGER FUNCTION  FindMinimum():
-!    This function returns the location of the minimum in the section
-! between Start and End.
-! --------------------------------------------------------------------
-
-!   INTEGER FUNCTION  FindMinimum(x, Start, End)
-!      IMPLICIT  NONE
-!      INTEGER, DIMENSION(1:), INTENT(IN) :: x
-!      INTEGER, INTENT(IN)                :: Start, End
-!      INTEGER                            :: Minimum
-!      INTEGER                            :: Location
-!      INTEGER                            :: i
-!
-!      Minimum  = x(Start)      ! assume the first is the min
-!      Location = Start         ! record its position
-!      DO i = Start+1, End      ! start with next elements
-!         IF (x(i) < Minimum) THEN  !   if x(i) less than the min?
-!            Minimum  = x(i)        !      Yes, a new minimum found
-!            Location = i                !      record its position
-!         END IF
-!      END DO
-!      FindMinimum = Location           ! return the position
-!   END FUNCTION  FindMinimum
-!
-!! --------------------------------------------------------------------
-!! SUBROUTINE  Swap():
-!!    This subroutine swaps the values of its two formal arguments.
-!! --------------------------------------------------------------------
-!
-!   SUBROUTINE  Swap(a, b)
-!      IMPLICIT  NONE
-!      INTEGER, INTENT(INOUT) :: a, b
-!      INTEGER                :: Temp
-!
-!      Temp = a
-!      a    = b
-!      b    = Temp
-!   END SUBROUTINE  Swap
-!
-!! --------------------------------------------------------------------
-!! SUBROUTINE  Sort():
-!!    This subroutine receives an array x() and sorts it into ascending
-!! order.
-!! --------------------------------------------------------------------
-!
-!   SUBROUTINE  Sort(x)
-!      IMPLICIT  NONE
-!      INTEGER, DIMENSION(:,:), INTENT(INOUT) :: x
-!      INTEGER                               :: sze, ndata
-!      INTEGER                               :: i
-!      INTEGER                               :: Location
-!
-!      sze = size(x,1)
-!      ndata = size(x,2)
-!
-!       ! SORT KEY IS SECOND ENTRY!!!!!!!!!!!!!!!
-!
-!      DO i = 1, sze-1          ! except for the last
-!         Location = FindMinimum(x(:,2), i, sze)    ! find min from this to last
-!         CALL  Swap(x(i,1), x(Location,1)) ! swap this and the minimum
-!         CALL  Swap(x(i,2), x(Location,2)) ! swap this and the minimum
-!      END DO
-!   END SUBROUTINE  Sort
-!
-!subroutine barrier
-!  use mpi
-!  implicit none
-!  integer :: ierr
-!
-!  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-!end subroutine
 
 end module module_params

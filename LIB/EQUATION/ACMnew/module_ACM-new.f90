@@ -5,7 +5,7 @@
 ! ============================================================================================
 !> \name module_acm.f90
 !> \version 0.5
-!> \author sm
+!> \author engels
 !!
 !! \brief module for 2D/3D acm physics
 !!
@@ -82,8 +82,9 @@ contains
   include "iniconds.f90"
 
   !-----------------------------------------------------------------------------
-  ! main level wrapper routine to read parameters in the physics module. It is
-  ! called in
+  ! main level wrapper routine to read parameters in the physics module. It reads
+  ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
+  ! the parameter struct for wabbit is not available.
   subroutine READ_PARAMETERS_ACM( filename )
     implicit none
 
@@ -138,6 +139,9 @@ contains
   ! the divergence etc., which are not in your state vector, this routine has to
   ! copy and compute what you want to save to the work array.
   !
+  ! In the main code, save_fields than saves the first N_fields_saved components of the
+  ! work array to file.
+  !
   ! NOTE that as we have way more work arrays than actual state variables (typically
   ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
   !-----------------------------------------------------------------------------
@@ -186,6 +190,29 @@ contains
 
 
   !-----------------------------------------------------------------------------
+  ! when savig to disk, WABBIT would like to know how you named you variables.
+  ! e.g. u(:,:,:,1) is called "ux"
+  !
+  ! the main routine save_fields has to know how you label the stuff you want to
+  ! store from the work array, and this routine returns those strings
+  !-----------------------------------------------------------------------------
+  subroutine FIELD_NAMES_ACM( N, name )
+    implicit none
+    ! component index
+    integer(kind=ik), intent(in) :: N
+    ! returns the name
+    character(len=80), intent(out) :: name
+
+    if (allocated(params_acm%names)) then
+      name = params_acm%names(N)
+    else
+      call abort(5554,'Something ricked')
+    endif
+
+  end subroutine FIELD_NAMES_ACM
+
+
+  !-----------------------------------------------------------------------------
   ! main level wrapper to set the right hand side on a block. Note this is completely
   ! independent of the grid any an MPI formalism, neighboring relations and the like.
   ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
@@ -231,7 +258,9 @@ contains
       !-------------------------------------------------------------------------
       ! 1st stage: init_stage.
       !-------------------------------------------------------------------------
+      ! this stage is called only once, not for each block.
       ! performs initializations in the RHS module, such as resetting integrals
+
       params_acm%mean_flow = 0.0_rk
 
     case ("integral_stage")
@@ -243,6 +272,12 @@ contains
       ! global forcing term (e.g. in FSI the forces on bodies). As the physics
       ! modules cannot see the grid, (they only see blocks), in order to encapsulate
       ! them nicer, two RHS stages have to be defined: integral / local stage.
+      !
+      ! called for each block.
+
+      if (maxval(abs(u))>1.0e5) then
+        call abort(6661,"ACM fail: very very large values in state vector.")
+      endif
 
       if (params_acm%forcing) then
         if (params_acm%dim == 2) then
@@ -256,6 +291,10 @@ contains
       endif
 
     case ("post_stage")
+      !-------------------------------------------------------------------------
+      ! 3rd stage: post_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, not for each block.
 
       if (params_acm%forcing) then
         tmp = params_acm%mean_flow
@@ -269,10 +308,12 @@ contains
 
     case ("local_stage")
       !-------------------------------------------------------------------------
-      ! 3rd stage: local evaluation of RHS on all blocks
+      ! 4th stage: local evaluation of RHS on all blocks
       !-------------------------------------------------------------------------
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
+      !
+      ! called for each block.
 
       if (size(u,4) == 3) then
         ! this is a 2d case (ux,uy,p)
@@ -367,19 +408,5 @@ contains
   end subroutine INICOND_ACM
 
 
-  !-----------------------------------------------------------------------------
-  ! when savig to disk, WABBIT would like to know how you named you variables.
-  ! e.g. u(:,:,:,1) is called "ux"
-  !-----------------------------------------------------------------------------
-  subroutine FIELD_NAMES_ACM( N, name )
-    implicit none
-    ! component index
-    integer(kind=ik), intent(in) :: N
-    ! returns the name
-    character(len=80), intent(out) :: name
-
-    name = params_acm%names(N)
-
-  end subroutine FIELD_NAMES_ACM
 
 end module module_acm_new

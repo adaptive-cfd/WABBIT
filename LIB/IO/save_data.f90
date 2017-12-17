@@ -66,14 +66,18 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+    ! start time
+    t0 = MPI_Wtime()
+    if (params%rank == 0) then
+      write(*,'("IO: Saving data triggered, time=",g15.8)')  time
+    endif
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! start time
-    t0 = MPI_Wtime()
-
-    if (params%physics_type=='ACM-new') then
+    if (params%physics_type=='ACM-new') then ! TODO: remove this line.
+      ! preparatory step. The physics modules have to copy everything they want to
+      ! save to disk to the work array. missing qty's shall be computed.
       do k = 1, hvy_n
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
@@ -85,24 +89,48 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! to disk in the work array. This way, we can also store derived variables
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
-        call PREPARE_SAVE_DATA_ACM( time, hvy_block(:,:,:,:,hvy_active(k)), &
-        params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
+        select case(params%physics_type)
+        case ('ACM-new')
+          call PREPARE_SAVE_DATA_ACM( time, hvy_block(:,:,:,:,hvy_active(k)), &
+          params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
+
+        case default
+          call abort(88119, "unknown physics....")
+
+        end select
 
       enddo
 
+      ! actual saving step. one file per component.
+      ! loop over components/qty's:
       do k = 1, params%N_fields_saved
-        call FIELD_NAMES_ACM(k, tmp)
-        write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
 
+        ! physics modules shall provide an interface for wabbit to know how to label
+        ! the components to be stored to hard disk (in the work array)
+        select case(params%physics_type)
+        case ('ACM-new')
+          call FIELD_NAMES_ACM(k, tmp)
+
+        case default
+          call abort(88119, "unknown physics....")
+
+        end select
+
+        ! create filename
+        write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+        ! actual writing
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
+
       enddo
 
       call toc( params, "save_data", MPI_wtime()-t0 )
       !!!!!!
+      ! TODO: this will be the end of the new routine,  once all physics modules are renewed.
       return
       !!!!!!
     endif
-
+ ! -- TODO: remove, once all physics modules are renewed.
+ ! all following lines
     do k = 1, params%number_data_fields
 
         ! file name depends on variable names

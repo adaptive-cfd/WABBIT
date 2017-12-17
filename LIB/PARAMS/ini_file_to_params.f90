@@ -207,9 +207,12 @@ subroutine ini_file_to_params( params, filename )
     ! first: read physics type
     call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
 
-    select case(params%physics_type)
+    ! NOTE: this routine initializes WABBIT AND NOT THE PHYSICS MODULES THEMSELVES!
 
-        case('2D_convection_diffusion')
+ ! -- TODO: remove, once all physics modules are renewed.
+    select case(params%physics_type) ! -- TODO: remove, once all physics modules are renewed.
+
+    case('2D_convection_diffusion') ! -- TODO: remove, once all physics modules are renewed.
             ! allocate memory in params structure (need 2*data_fields for velocity
             ! and 1*data_fields for diffusion coefficient)
             allocate( params%physics%u0( 2*params%number_data_fields ) )
@@ -232,7 +235,7 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
-        case('2D_navier_stokes')
+        case('2D_navier_stokes') ! -- TODO: remove, once all physics modules are renewed.
 
             ! physics parameter
             ! read adiabatic coefficient
@@ -256,7 +259,7 @@ subroutine ini_file_to_params( params, filename )
             params%physics_ns%names = "---"
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
-
+ ! -- TODO: remove, once all physics modules are renewed.
         case('3D_convection_diffusion')
 
             ! allocate memory in params structure (need 3*data_fields for velocity
@@ -281,7 +284,7 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
-        case('3D_navier_stokes')
+        case('3D_navier_stokes') ! -- TODO: remove, once all physics modules are renewed.
 
             ! error case: try to solve navier stokes equation with less or more than 5 datafields
             if ( params%number_data_fields /= 5) then
@@ -318,7 +321,7 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
 
-        case('2D_advection')
+        case('2D_advection') ! -- TODO: remove, once all physics modules are renewed.
             ! use convection velocity for time step calculation
             allocate( params%physics%u0( 2*params%number_data_fields ) )
 

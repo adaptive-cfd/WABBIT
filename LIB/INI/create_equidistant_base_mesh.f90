@@ -55,7 +55,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
 
   ! MPI error variable
   integer(kind=ik)                    :: ierr
-  
+
   ! loop control variables in space
   integer(kind=ik)                    :: ix, iy, iz, icpu, nx, ny, nz
 
@@ -90,7 +90,6 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   ny = 2**Jmin
 
   if ( (params%rank == 0) .and. verbosity ) then
-    write(*,'(80("_"))')
     write(*,'(A)') "INIT: initializing an equidistant grid..."
     write(*,'(" Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
     write(*,'(" on this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz

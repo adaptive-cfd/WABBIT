@@ -10,7 +10,7 @@
 !> \brief main program, init all data, start time loop, output on screen during program run
 !
 !>
-!! 
+!!
 !! = log ======================================================================================
 !! \n
 !! 04/11/16 - switch to v0.4 \n
@@ -107,9 +107,7 @@ program main
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
 
-    ! number of dimensions
-    character(len=80)                   :: dim_number
-    ! filename of *.inni file used to read parameters
+    ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
 
     ! loop variable
@@ -166,46 +164,27 @@ program main
     call MPI_Init(ierr)
     ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    params%rank         = rank
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
-
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    ! save MPI data in params struct
-    params%rank         = rank
     params%number_procs = number_procs
-
-    ! unit test off
-    params%unit_test    = .false.
-
-    ! cpu start time
-    call cpu_time(t0)
-
-    ! read number of dimensions from command line
-    call get_command_argument(1, dim_number)
-
-    ! output dimension number
-    if (rank==0) then
-        write(*,'(80("_"))')
-        write(*, '("INIT: run ", a3, " case")') dim_number
-    end if
-
-    ! save case dimension in params struct
-    select case(dim_number)
-        case('2D')
-            params%threeD_case = .false.
-        case('3D')
-            params%threeD_case = .true.
-        case default
-            call error_msg("ERROR: case dimension is wrong")
-    end select
-
     ! output MPI status
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
+
+
+    ! start time
+    sub_t0 = MPI_Wtime()
+    call cpu_time(t0)
+
+
+    ! unit test off
+    params%unit_test    = .false.
+
+    ! are we running in 2D or 3D mode? Check that from the command line call.
+    call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
     ! Initialize parameters and grid
@@ -222,7 +201,6 @@ program main
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
-
     ! allocate communication arrays
     call allocate_com_arrays(params, com_lists, com_matrix)
 
@@ -233,10 +211,9 @@ program main
        call unit_test_treecode( params )
     end if
     ! perform a convergence test on ghost node sync'ing
-    if (params%test_ghost_nodes_synch) then
-        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    end if
+    ! I don't see a good reason to skip this test ever - I removed the condition here.
+    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
 !    if (params%test_wavelet_comp) then
 !        call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
@@ -263,53 +240,26 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, params%adapt_mesh, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
 
-    ! create lists of active blocks (light and heavy data)
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-    if (params%initial_cond=="read_from_files") then
-        ! balance the load
-        if (params%threeD_case) then
-            call balance_load_3D(params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
-        else
-            call balance_load_2D(params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
-        end if
-    else
+    if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk
         ! we don't need this for an initial condition we got from a file (there already is this file)
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
         call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
         call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
+
     ! max neighbor num
     !> \todo move max neighbor num to params struct
     if ( params%threeD_case ) then
-        ! 3D
-        max_neighbors = 74
+        max_neighbors = 74 ! 3D
     else
-        ! 2D
-        max_neighbors = 12
+        max_neighbors = 12 ! 2D
     end if
 
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "init_data" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "init_data"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
+    ! timing
+    call toc( params, "init_data", MPI_wtime()-sub_t0 )
 
     !---------------------------------------------------------------------------
     ! main time loop
@@ -389,64 +339,36 @@ program main
 
         end if
 
+
         ! write data to disk
-        select case(params%write_method)
+        if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
+          ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+          call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+          call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+          output_time = time
+          params%next_write_time = params%next_write_time + params%write_time
+        endif
 
-            case('fixed_freq')
-                if (modulo(iteration, params%write_freq) == 0) then
-                    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-                    call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-                    call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-                    output_time = time
-                endif
-
-            case('fixed_time')
-                if ( abs(time - params%next_write_time) < 1e-12_rk ) then
-                    call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-                    call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-                    call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-                    output_time = time
-                    params%next_write_time = params%next_write_time + params%write_time
-                endif
-
-            case default
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: write method is unknown"
-                write(*,*) params%write_method
-                stop
-
-        end select
-
-        ! debug info
-        if ( params%debug ) then
-            ! sum and reset times and calls
-            debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
-            debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
-            ! write debug infos to file
-            call write_debug_times( iteration, params )
-            ! reset loop values
-            debug%comp_time(:,1) = 0.0_rk
-            debug%comp_time(:,2) = 0.0_rk
-
-        end if
+        ! at the end of a time step, we increase the total counters/timers for all measurements
+        ! by what has been done in the last time step, then we flush the current timing to disk.
+        call timing_next_timestep( params, iteration )
 
     end do
 
     ! save end field to disk, only if timestep is not saved allready
-    if ( abs(output_time-time) > 1e-10_rk ) then 
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+    if ( abs(output_time-time) > 1e-10_rk ) then
+      ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+      call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+      call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+      call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+      call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
 
-    ! debug info
-    if ( params%debug ) then
-        ! sum times and calls
-        debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
-        debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
-        ! write debug infos to file
-        call write_debug_times( iteration, params )
-    end if
+    ! at the end of a time step, we increase the total counters/timers for all measurements
+    ! by what has been done in the last time step, then we flush the current timing to disk.
+    call timing_next_timestep( params, iteration )
 
     ! MPI Barrier before program ends
     call MPI_Barrier(MPI_COMM_WORLD, ierr)

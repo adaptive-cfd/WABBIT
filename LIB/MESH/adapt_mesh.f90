@@ -64,46 +64,34 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     integer(kind=ik), intent(inout)     :: hvy_n
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
-
     ! communication lists:
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
-
     ! communications matrix:
     integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors
-
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
-
+    real(kind=rk)                       :: t0, t1, t_misc
     ! MPI error variable
     integer(kind=ik)                    :: ierr
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    if ( params%debug ) then
-        ! end time
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! start time
-        sub_t0 = MPI_Wtime()
-
-        time_sum = 0.0_rk
-    end if
-
+    ! start time
+    t0 = MPI_Wtime()
+    t1 = t0
+    t_misc = 0.0_rk
     lgt_n_old = 0
     iteration = 0
 
     if ( params%threeD_case ) then
-        ! 3D
         max_neighbors = 56
     else
-        ! 2D
         max_neighbors = 12
     end if
 
@@ -121,230 +109,83 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
-
-        if ( params%debug ) then
-            ! end time
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            sub_t1 = MPI_Wtime()
-            time_sum = time_sum + (sub_t1 - sub_t0)
-        end if
-
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
-        if ( params%debug ) then
-            ! end time
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            ! start time
-            sub_t0 = MPI_Wtime()
-        end if
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
+        t0 = MPI_Wtime()
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        ! CPU timing (only in debug mode)
+        call toc( params, "adapt_mesh (min/max)", MPI_Wtime()-t0 )
 
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "adapt_mesh (min/max)" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "adapt_mesh (min/max)"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-        end if
-
-        ! start time
-        sub_t0 = MPI_Wtime()
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness
+        t0 = MPI_Wtime()
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
-
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "adapt_mesh (gradedness)" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "adapt_mesh (gradedness)"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-        end if
-
-        ! start time
-        sub_t0 = MPI_Wtime()
+        ! CPU timing (only in debug mode)
+        call toc( params, "adapt_mesh (gradedness)", MPI_Wtime()-t0 )
 
 
         !> (d) ensure completeness
+        t0 = MPI_Wtime()
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+        ! CPU timing (only in debug mode)
+        call toc( params, "adapt_mesh (completeness)", MPI_Wtime()-t0 )
 
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "adapt_mesh (completeness)" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "adapt_mesh (completeness)"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-        end if
-
-        ! start time
-        sub_t0 = MPI_Wtime()
 
         !> (e) adapt the mesh, i.e. actually merge blocks
+        t0 = MPI_Wtime()
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
-
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "adapt_mesh (coarse mesh)" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "adapt_mesh (coarse mesh)"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-        end if
-        ! start time
-        sub_t0 = MPI_Wtime()
+        ! CPU timing (only in debug mode)
+        call toc( params, "adapt_mesh (coarse mesh)", MPI_Wtime()-t0 )
 
 
         ! the following calls are indeed required (threshold->ghosts->neighbors->active)
         ! update lists of active blocks (light and heavy data)
         ! update list of sorted nunmerical treecodes, used for finding blocks
+        t0 = MPI_Wtime()
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-
-        ! end time
-        sub_t1 = MPI_Wtime()
-        time_sum = time_sum + (sub_t1 - sub_t0)
-
-        ! start time
-        sub_t0 = MPI_Wtime()
+        t_misc = t_misc + (MPI_Wtime() - t0)
 
 
+        t0 = MPI_Wtime()
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        ! CPU timing (only in debug mode)
+        call toc( params, "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
+
         iteration = iteration + 1
-
-        ! end time
-        sub_t1 = MPI_Wtime()
-        ! write time
-        if ( params%debug ) then
-            ! find free or corresponding line
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-                ! entry for current subroutine exists
-                if ( debug%name_comp_time(k) == "adapt_mesh (update neighbors)" ) exit
-                k = k + 1
-            end do
-            ! write time
-            debug%name_comp_time(k) = "adapt_mesh (update neighbors)"
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-            debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-        end if
-        ! start time
-        sub_t0 = MPI_Wtime()
-
-
     end do
-
-    if ( params%debug ) then
-        ! end time
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! end time
-        sub_t1 = MPI_Wtime()
-        time_sum = time_sum + (sub_t1 - sub_t0)
-    end if
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
     if ( params%threeD_case ) then
-        ! 3D:
         call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
     else
-        ! 2D:
         call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
     end if
 
-    if ( params%debug ) then
-        ! end time
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! start time
-        sub_t0 = MPI_Wtime()
-    end if
 
     !> load balancing destroys the lists again, so we have to create them one last time to
     !! end on a valid mesh
     !! update lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
+    t0 = MPI_wtime()
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    t_misc = t_misc + (MPI_Wtime() - t0)
 
-    ! end time
-    sub_t1 = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! update neighbor relations
+    t0 = MPI_Wtime()
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    ! CPU timing (only in debug mode)
+    call toc( params, "adapt_mesh (update neighbors) ", MPI_Wtime()-t0 )
 
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "adapt_mesh (update neighbors)" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "adapt_mesh (update neighbors)"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + (sub_t1 - sub_t0)
-    end if
 
-    time_sum = time_sum + (sub_t1 - sub_t0)
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "adapt_mesh (...)" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "adapt_mesh (...)"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
-    end if
-
+    ! time remaining parts of this routine.
+    call toc( params, "adapt_mesh (...)", t_misc )
+    call toc( params, "adapt_mesh (TOTAL)", MPI_wtime()-t1)
 end subroutine adapt_mesh

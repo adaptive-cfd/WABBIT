@@ -126,6 +126,7 @@ module module_params
 
         ! use third dimension
         logical                                     :: threeD_case
+        integer(kind=ik)                            :: dim ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------
         ! MPI
@@ -143,8 +144,6 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test params struct
         logical                                     :: unit_test
-        ! unit test ghost nodes synchronization flag
-        logical                                     :: test_ghost_nodes_synch
         ! unit test time_stepper convergence flag
         logical                                     :: test_time_stepper
         ! unit test spatial convergence flag
@@ -176,6 +175,41 @@ contains
     ! this file reads the ini file and distributes all the parameters to the
     ! various structs holding them
     include "ini_file_to_params.f90"
+
+    ! --------------------------------------------------------------------
+    ! currently, wabbit is called ./wabbit 2D params.ini so the decision if we're
+    ! running 2d or 3d is done in the command line call. here we figure that out
+    ! and save the result in the parameter structure.
+    ! --------------------------------------------------------------------
+    subroutine decide_if_running_2D_or_3D(params)
+      implicit none
+      !> user defined parameter structure
+      type (type_params), intent(inout) :: params
+
+      character(len=80) :: dim_number
+
+      ! read number of dimensions from command line
+      call get_command_argument(1, dim_number)
+
+      ! output dimension number
+      if (params%rank==0) then
+          write(*,'(80("_"))')
+          write(*, '("INIT: running ", a3, " case")') dim_number
+      end if
+
+      ! save case dimension in params struct
+      select case(dim_number)
+          case('2D')
+              params%threeD_case = .false.
+              params%dim = 2
+          case('3D')
+              params%threeD_case = .true.
+              params%dim = 3
+          case default
+              call error_msg("ERROR: case dimension is wrong")
+      end select
+
+    end subroutine
 
 ! --------------------------------------------------------------------
 ! INTEGER FUNCTION  FindMinimum():

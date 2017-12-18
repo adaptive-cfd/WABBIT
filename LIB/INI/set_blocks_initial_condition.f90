@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 
-subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
+subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -70,10 +70,8 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
 
   !> if .false. the code initializes on the coarsest grid, if .true. iterations
   !> are performed and the mesh is refined to gurantee the error eps
-  integer(kind=ik)                     :: lgt_n_old
-
-  !---------------------------------------------------------------------------------------------
-  ! interfaces
+  logical, intent(in) :: adapt
+  integer(kind=ik) :: lgt_n_old
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -81,6 +79,11 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
 
   !---------------------------------------------------------------------------------------------
   ! main body
+    if (params%rank==0) then
+      write(*,*) "Setting initial condition on all blocks."
+      write(*,*) "Initial condition is ", params%initial_cond
+      write(*,*) "Adaptive initial condition is: ", adapt
+    endif
 
     ! choose between reading from files and creating datafields analytically
     if (params%initial_cond == 'read_from_files') then
@@ -105,7 +108,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
           ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
           do while ( lgt_n /= lgt_n_old)
             lgt_n_old = lgt_n
-            ! push up the entire grid one level. 
+            ! push up the entire grid one level.
             !> \todo It would be better to selectively
             !! go up one level where a refinement indicator tells us to do so, but in the current code
             !! versions it is easier to use everywhere
@@ -127,5 +130,37 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
           enddo
         endif
     end if
+
+    !---------------------------------------------------------------------------
+    ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks
+    ! so the neighboring information and active lists are outdated. It is good practice that a routine
+    ! that modifies the grid shall return a WORKING grid, with at least active / neighboring lists
+    ! up to date. here, we also perform an initial load balancing step which is not overly important,
+    ! since in the time loop it is performed as well, but its still good to have a neatly balanced initial
+    ! condition. This is especially true if the initial condition is read from file.
+    !
+    ! NOTE: in fact, adapt_mesh returns a working mesh (good practice!), so the update here may be
+    ! redundant, but as we initialize only once we can live with the extra cost (and increased security)
+    !---------------------------------------------------------------------------
+
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+    ! balance the load
+    if (params%threeD_case) then
+        call balance_load_3D(params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
+    else
+        call balance_load_2D(params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+    end if
+
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
 
 end subroutine set_blocks_initial_condition

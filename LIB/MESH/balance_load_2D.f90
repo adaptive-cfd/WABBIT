@@ -92,7 +92,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: free_light_id, free_heavy_id
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+    real(kind=rk)                       :: t0
 
     ! space filling curve list
     integer(kind=ik), allocatable       :: sfc_com_list(:,:), sfc_sorted_list(:,:)
@@ -118,7 +118,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 ! variables initialization
 
     ! start time
-    sub_t0 = MPI_Wtime()
+    t0 = MPI_Wtime()
 
     tag = 0
 
@@ -795,21 +795,6 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
     deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer, my_lgt_block )
 
-    ! end time
-    sub_t1 = MPI_Wtime()
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "balance_load" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "balance_load"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + sub_t1 - sub_t0
-    end if
-
+    ! timing
+    call toc( params, "balance_load", MPI_wtime()-t0 )
 end subroutine balance_load_2D

@@ -306,7 +306,7 @@ subroutine ini_file_to_params( params, filename )
 
             ! inverse of Re
             call read_param_mpi(FILE, 'Physics', 'nu', params%physics_acm%nu, 1e-1_rk)
-            
+
             ! gamma_p
             call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
 
@@ -338,7 +338,7 @@ subroutine ini_file_to_params( params, filename )
 
             ! inverse of Re
             call read_param_mpi(FILE, 'Physics', 'nu', params%physics_acm%nu, 1e-1_rk)
-            
+
             ! gamma_p
             call read_param_mpi(FILE, 'Physics', 'gamma_p', params%physics_acm%gamma_p, 1.0_rk)
 
@@ -361,7 +361,7 @@ subroutine ini_file_to_params( params, filename )
 
     ! width of initial condition (e.g. Gauss-Blob, depends on Lx and Ly)
     call read_param_mpi(FILE, 'Physics', 'inicond_width', params%inicond_width, 1e-2_rk)
-   
+
     if (params%initial_cond == 'read_from_files') then
         ! read variable names
         allocate( params%input_files( params%number_data_fields ) )
@@ -415,8 +415,6 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Debug', 'test_time_stepper', params%test_time_stepper, .false.)
     ! unit test spatial flag
     call read_param_mpi(FILE, 'Debug', 'test_spatial', params%test_spatial, .false.)
-    ! unit test ghost nodes synchronization flag
-    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
     ! unit test wavelet compression flag
     call read_param_mpi(FILE, 'Debug', 'test_wavelet_comp', params%test_wavelet_comp, .false.)
     ! unit test treecode flag

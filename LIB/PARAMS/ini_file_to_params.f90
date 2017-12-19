@@ -380,7 +380,7 @@ subroutine ini_file_to_params( params, filename )
     ! smooth mask for penalization term
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params%smooth_mask, .true.)
     ! geometry
-    call read_param_mpi(FILE, 'VPM', 'geometry', params%geometry, "---")
+    call read_param_mpi(FILE, 'VPM', 'mask', params%mask, "---")
 
     !***************************************************************************
     ! read DISCRETIZATION parameters

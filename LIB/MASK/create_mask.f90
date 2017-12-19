@@ -41,7 +41,7 @@ subroutine create_mask_2D(params, mask, x0, dx, Bs, g )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    select case(params%geometry)
+    select case(params%mask)
 
         case('cylinder')
             call cylinder(params, mask, x0, dx, Bs, g)
@@ -49,8 +49,8 @@ subroutine create_mask_2D(params, mask, x0, dx, Bs, g )
             call two_cylinders(params, mask, x0, dx, Bs, g)
         case default
             write(*,'(80("_"))')
-            write(*,*) "ERROR: geometry for VPM is unknown"
-            write(*,*) params%geometry
+            write(*,*) "ERROR: mask for VPM is unknown"
+            write(*,*) params%mask
             stop
     end select
 
@@ -77,14 +77,14 @@ subroutine create_mask_3D(params, mask, x0, dx, Bs, g )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    select case(params%geometry)
+    select case(params%mask)
 
         case('sphere')
             call sphere(params, mask, x0, dx, Bs, g)
         case default
             write(*,'(80("_"))')
-            write(*,*) "ERROR: geometry for VPM is unknown"
-            write(*,*) params%geometry
+            write(*,*) "ERROR: mask for VPM is unknown"
+            write(*,*) params%mask
             stop
     end select
 

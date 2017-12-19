@@ -95,6 +95,13 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
         dt = min( dt, dt_tmp )
 
     end do
+    
+    ! synchronize time steps
+    ! store local (per process) time step
+    dt_tmp = dt
+    ! global minimum time step
+    call MPI_Allreduce(dt_tmp, dt, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
+    
     goto 10
   endif
 

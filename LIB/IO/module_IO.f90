@@ -35,6 +35,7 @@ module module_IO
     ! use module operators for computation of the vorticity field
     use module_operators, only: compute_vorticity
 use module_ACM_new
+use module_ConvDiff_new
 !---------------------------------------------------------------------------------------------
 ! variables
 

@@ -33,6 +33,7 @@ module module_time_step
     use module_operators, only: volume_integral
     ! to call RHS routines:
     use module_ACM_new
+    use module_convdiff_new
 
 !---------------------------------------------------------------------------------------------
 ! variables

@@ -200,7 +200,7 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                 end if
             end do
 
-        case('2D_acm','ACM-new','3D_acm')
+        case('2D_acm','ACM-new','3D_acm',"ConvDiff-new")
             ! first: k_j = RHS(data_field(t) + ...
             ! loop over all active heavy data blocks
             do k = 1, hvy_n

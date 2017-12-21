@@ -32,13 +32,16 @@ subroutine initial_condition_on_block_wrapper( params, u, x0, dx, inicond )
   g     = params%number_ghost_nodes
 
 !$$$$$$$$$$$$$$$$$$$$$ NEW
-  if (params%physics_type=="ACM-new") then
-    write(*,*) "INICOND new code  "
+  if (params%physics_type=="ACM-new" .or. params%physics_type=="ConvDiff-new") then
     select case (params%physics_type)
     case ("ACM-new")
       call INICOND_ACM( 0.0_rk, u, g, x0, dx )
+
+    case ("ConvDiff-new")
+      call INICOND_ConvDiff( 0.0_rk, u, g, x0, dx )
+
     case default
-      call abort("soething wrong")
+      call abort(999,"soething wrong")
     end select
 
 return

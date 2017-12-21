@@ -185,7 +185,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
         sub_t1   = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)
     end if
-
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -218,7 +217,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
         sub_t0 = MPI_Wtime()
 
         call RHS_wrapper(time, dt, params, hvy_work, rk_coeffs(j,1), j, lgt_block, hvy_active, hvy_n, hvy_block)
-
     end do
 
     ! final stage

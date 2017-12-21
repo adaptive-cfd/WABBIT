@@ -26,6 +26,7 @@ module module_initial_conditions
     ! global parameters
     use module_params
     use module_ACM_new
+    use module_convdiff_new
 !---------------------------------------------------------------------------------------------
 ! variables
 

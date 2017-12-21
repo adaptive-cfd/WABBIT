@@ -26,6 +26,7 @@
 subroutine init_physics_modules( params, filename )
   ! of course, we have to load all available physics modules here.
   use module_ACM_new
+  use module_convdiff_new
   use module_convection_diffusion
   use module_navier_stokes
   ! NOTE: this is *NOT* a part of module_params.f90 in order to avoid circulars in the makefile
@@ -41,6 +42,9 @@ subroutine init_physics_modules( params, filename )
   select case ( params%physics_type )
   case ('ACM-new')
     call READ_PARAMETERS_ACM( filename )
+
+  case ('ConvDiff-new')
+    call READ_PARAMETERS_convdiff( filename )
 
   case default
     call abort(1212,'unknown physics...say whaaat?')

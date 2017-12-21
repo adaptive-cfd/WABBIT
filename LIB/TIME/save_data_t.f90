@@ -112,7 +112,7 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
                 end do
             end do
 
-        case('2D_acm',"ACM-new",'3D_acm')
+        case('2D_acm',"ACM-new",'3D_acm',"ConvDiff-new")
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )

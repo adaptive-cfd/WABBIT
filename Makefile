@@ -14,7 +14,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
 	module_initial_conditions.f90 module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
-	module_indicators.f90 module_operators.f90 module_ACM-new.f90
+	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90
 # physics modules
 MFILED += module_convection_diffusion.f90
 MFILED += module_2D_navier_stokes.f90
@@ -25,7 +25,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
 VPATH += :LIB/PARAMS:LIB/INI/INICONDS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
-VPATH += :LIB/OPERATORS
+VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion
 
 # Set the default compiler if it's not already set
 FC = mpif90
@@ -41,9 +41,9 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
-#FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-#FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
-#FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
+FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
 # HDF_ROOT is set in environment.
 HDF_LIB = $(HDF_ROOT)/lib64
 HDF_INC = $(HDF_ROOT)/include
@@ -90,6 +90,11 @@ $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_prec
 $(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_convection_diffusion.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser_mpi.o \
 	ini_file_to_params.f90

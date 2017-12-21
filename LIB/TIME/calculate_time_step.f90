@@ -21,7 +21,6 @@
 ! ********************************************************************************************
 subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dx, dt )
 
-    use module_acm_new, only : GET_DT_BLOCK_ACM
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -78,7 +77,7 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
 ! main body
 
 !$$$$$$$$$$$$$$ NEW CODE $$$$$$$$$$$$$$$$
-  if (params%physics_type == 'ACM-new') then
+  if (params%physics_type == 'ACM-new' .or. params%physics_type == 'ConvDiff-new') then
     dt = 9.0e9_rk
     do k = 1, hvy_n
 
@@ -88,6 +87,11 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
         select case (params%physics_type)
         case ('ACM-new')
           call GET_DT_BLOCK_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), params%number_ghost_nodes, xx0, ddx, dt_tmp )
+
+        case ('ConvDiff-new')
+          call GET_DT_BLOCK_convdiff( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), params%number_block_nodes, &
+           params%number_ghost_nodes, xx0, ddx, dt_tmp )
+
         case default
           call abort('phycics module unkown.')
         end select
@@ -95,6 +99,13 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
         dt = min( dt, dt_tmp )
 
     end do
+
+    ! synchronize time steps
+    ! store local (per process) time step
+    dt_tmp = dt
+    ! global minimum time step
+    call MPI_Allreduce(dt_tmp, dt, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
+
     goto 10
   endif
 

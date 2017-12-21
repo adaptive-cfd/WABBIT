@@ -99,7 +99,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
     ! RHS depends on physics
     select case(params%physics_type) ! -- TODO: remove, once all physics modules are renewed.
 
-    case("ACM-new") ! -- TODO: remove, once all physics modules are renewed.
+    case("ACM-new","ConvDiff-new") ! -- TODO: remove, once all physics modules are renewed.
       !-------------------------------------------------------------------------
       ! 1st stage: init_stage. (called once, not for all blocks)
       !-------------------------------------------------------------------------
@@ -110,8 +110,14 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
        call RHS_ACM( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
        x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "init_stage" )
 
+     case ("ConvDiff-new")
+       ! this call is not done for all blocks, but only once, globally.
+       call RHS_convdiff( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
+       x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "init_stage" )
+
       case default
        call abort(2152000, "physics_type is unknown"//params%physics_type)
+
       end select
 
       !-------------------------------------------------------------------------
@@ -135,8 +141,14 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
           call RHS_ACM( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
                x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "integral_stage" )
 
+        case ("ConvDiff-new")
+          ! input state vector: hvy_block, output RHS vector: hvy_work
+          call RHS_convdiff( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
+               x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "integral_stage" )
+
         case default
           call abort(2152000, "physics_type is unknown"//params%physics_type)
+
         end select
       enddo
 
@@ -149,6 +161,11 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
       case ("ACM-new")
         ! this call is not done for all blocks, but only once, globally.
         call RHS_ACM( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
+        x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "post_stage" )
+
+      case ("ConvDiff-new")
+        ! this call is not done for all blocks, but only once, globally.
+        call RHS_ConvDiff( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
         x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "post_stage" )
 
       case default
@@ -172,6 +189,11 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
         case ("ACM-new")
           ! input state vector: hvy_block, output RHS vector: hvy_work
           call RHS_ACM( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
+               x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "local_stage" )
+
+        case ("ConvDiff-new")
+          ! input state vector: hvy_block, output RHS vector: hvy_work
+          call RHS_ConvDiff( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
                x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "local_stage" )
 
         case default

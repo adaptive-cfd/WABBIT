@@ -75,7 +75,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    if (params%physics_type=='ACM-new') then ! TODO: remove this line.
+    if (params%physics_type=='ACM-new' .or.params%physics_type=='ConvDiff-new') then ! TODO: remove this line.
       ! preparatory step. The physics modules have to copy everything they want to
       ! save to disk to the work array. missing qty's shall be computed.
       do k = 1, hvy_n
@@ -94,6 +94,10 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
           call PREPARE_SAVE_DATA_ACM( time, hvy_block(:,:,:,:,hvy_active(k)), &
           params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
 
+        case ('ConvDiff-new')
+          call PREPARE_SAVE_DATA_convdiff( time, hvy_block(:,:,:,:,hvy_active(k)), &
+          params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
+
         case default
           call abort(88119, "unknown physics....")
 
@@ -110,6 +114,9 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         select case(params%physics_type)
         case ('ACM-new')
           call FIELD_NAMES_ACM(k, tmp)
+
+        case ('ConvDiff-new')
+          call FIELD_NAMES_convdiff(k, tmp)
 
         case default
           call abort(88119, "unknown physics....")

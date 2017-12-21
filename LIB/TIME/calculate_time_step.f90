@@ -21,6 +21,7 @@
 ! ********************************************************************************************
 subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dx, dt )
 
+    use module_acm_new, only : GET_DT_BLOCK_ACM
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -77,7 +78,7 @@ subroutine calculate_time_step( params, hvy_block, hvy_active, hvy_n, lgt_block,
 ! main body
 
 !$$$$$$$$$$$$$$ NEW CODE $$$$$$$$$$$$$$$$
-  if (params%physics_type == 'ACM-new' .or. params%physics_type == 'ConvDiff-new') then
+  if (params%physics_type == 'ACM-new') then
     dt = 9.0e9_rk
     do k = 1, hvy_n
 

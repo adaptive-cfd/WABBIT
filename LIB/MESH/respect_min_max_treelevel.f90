@@ -9,12 +9,12 @@
 !
 !> \brief unset refinement status in respect of min/max treelevel
 !
-!> 
-!! input:    
+!>
+!! input:
 !!           - light data
 !!           - min/max treelevel
 !!
-!! output:   
+!! output:
 !!           - light data arrays
 !!
 !! = log ======================================================================================
@@ -36,17 +36,15 @@ subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! treelevel restrictions
-    integer(kind=ik)                    :: max_level, min_level
-
+    integer(kind=ik) :: max_level, min_level
     ! loop variables
-    integer(kind=ik)                    :: k
+    integer(kind=ik) :: k
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

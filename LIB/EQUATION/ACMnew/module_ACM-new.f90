@@ -97,9 +97,8 @@ contains
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
-    call read_param_mpi(FILE, 'ACM-new', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%Lx, 0.5*params_acm%Ly, 0.5*params_acm%Lz/)  )
-    call read_param_mpi(FILE, 'ACM-new', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'Dimensionality', 'dim', params_acm%dim, 2 )
+
     call read_param_mpi(FILE, 'DomainSize', 'Lx', params_acm%Lx, 1.0_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Ly', params_acm%Ly, 1.0_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Lz', params_acm%Lz, 0.0_rk )
@@ -110,6 +109,8 @@ contains
     call read_param_mpi(FILE, 'Saving', 'field_names', params_acm%names, (/"ux","uy","p "/) )
 
 
+    call read_param_mpi(FILE, 'ACM-new', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%Lx, 0.5*params_acm%Ly, 0.5*params_acm%Lz/)  )
+    call read_param_mpi(FILE, 'ACM-new', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     ! speed of sound for acm
     call read_param_mpi(FILE, 'ACM-new', 'c_0', params_acm%c_0, 10.0_rk)
     ! viscosity
@@ -118,9 +119,9 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     ! want to add a forcing term?
     call read_param_mpi(FILE, 'ACM-new', 'forcing', params_acm%forcing, .false.)
-    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm %discretization, "FD_2nd_central")
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
 
+    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm %discretization, "FD_2nd_central")
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0e-3_rk)

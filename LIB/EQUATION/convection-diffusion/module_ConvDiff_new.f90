@@ -338,11 +338,11 @@ contains
 
       unorm = maxval( u0(:,:,1)*u0(:,:,1) + u0(:,:,2)*u0(:,:,2) )
 
-      if ( unorm < 1.0e-7_rk) then
+      if ( unorm < 1.0e-8_rk) then
         ! if the value of u is very small, which may happen if it is time dependent
         ! we choose some fixed value in order not to miss the instant when u becomes
         ! large again.
-        dt = 1.0e-5_rk
+        dt = 1.0e-4_rk
       else
         dt = min(params_convdiff%CFL * dx(1) / sqrt(unorm), dt)
       endif

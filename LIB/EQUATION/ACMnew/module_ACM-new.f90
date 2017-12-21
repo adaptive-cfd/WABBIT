@@ -369,8 +369,6 @@ contains
 
     if (params_acm%penalization) dt = min( dt, params_acm%C_eta )
 
-    if (time + dt > params_acm%T_end) dt = params_acm%T_end - time
-
   end subroutine GET_DT_BLOCK_ACM
 
 

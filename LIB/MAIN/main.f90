@@ -320,6 +320,11 @@ program main
             write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
              iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
+
+             open(14,file='timesteps_info.t',status='unknown',position='append')
+             write (14,'((g15.8,1x),i6,1x,i5,1x,i2,1x,i2)') time, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             max_active_level( lgt_block, lgt_active, lgt_n )
+             close(14)
         end if
     end do
 

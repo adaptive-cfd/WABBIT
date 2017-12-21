@@ -43,7 +43,7 @@ module module_params
         ! CFL criteria for time step calculation
         real(kind=rk)                                :: CFL
         ! dt
-        real(kind=rk)                                :: dt
+        real(kind=rk)                                :: dt_fixed, dt_max
         ! number of allowed time steps
         integer(kind=ik)                             :: nt
         ! time step calculator

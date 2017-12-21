@@ -123,7 +123,9 @@ subroutine ini_file_to_params( params, filename )
     ! read method to calculate time step
     call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_calc, "CFL_cond" )
     ! read value of fixed time step
-    call read_param_mpi(FILE, 'Time', 'dt', params%dt, 1e-6_rk )
+    call read_param_mpi(FILE, 'Time', 'dt_fixed', params%dt_fixed, 0.0_rk )
+    ! read value of fixed time step
+    call read_param_mpi(FILE, 'Time', 'dt_max', params%dt_max, 0.0_rk )
     ! read CFL number
     call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
     ! read butcher tableau (set default value to RK4)
@@ -388,5 +390,10 @@ subroutine ini_file_to_params( params, filename )
     if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
+
+    open (15, file='dt.t', status='replace')
+    close(15)
+    open (15, file='timesteps_info.t', status='replace')
+    close(15)
 
 end subroutine ini_file_to_params

@@ -337,10 +337,18 @@ contains
       call create_velocity_field_2d( time, g, Bs, dx, x0, u0, i )
 
       unorm = maxval( u0(:,:,1)*u0(:,:,1) + u0(:,:,2)*u0(:,:,2) )
-      dt = min(params_convdiff%CFL * dx(1) / sqrt(unorm), dt)
+
+      if ( unorm < 1.0e-7_rk) then
+        ! if the value of u is very small, which may happen if it is time dependent
+        ! we choose some fixed value in order not to miss the instant when u becomes
+        ! large again.
+        dt = 1.0e-5_rk
+      else
+        dt = min(params_convdiff%CFL * dx(1) / sqrt(unorm), dt)
+      endif
 
     enddo
-    if (time + dt > params_convdiff%T_end) dt = params_convdiff%T_end - time
+
 
   end subroutine GET_DT_BLOCK_convdiff
 

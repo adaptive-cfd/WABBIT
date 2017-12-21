@@ -94,51 +94,27 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, d, j
+    integer(kind=ik)                    :: k, j
 
     ! time step, dx
-    real(kind=rk)                       :: dt, dx, my_dx
-    ! spacing and origin of a block
-    real(kind=rk)                       :: xx0(1:3), ddx(1:3)
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank
-
-    ! new time after timestep dt, so current time can be used in RHS
-    real(kind=rk)                       :: time_dt
+    real(kind=rk)                       :: dt
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
+    real(kind=rk)                       :: t0, sub_t1, t_sum
 
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable          :: rk_coeffs(:,:)
 
 
 !---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
 ! variables initialization
 
     ! start time
-    sub_t0 = MPI_Wtime()
+    t0 = MPI_Wtime()
+    t_sum = 0.0_rk
 
     allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
-
-    ! reset dx
-    my_dx = 9.0e9_rk
-    dx    = 9.0e9_rk
-    ! reset dt
-    dt    = 9.0e9_rk
-
-    time_sum = 0.0_rk
-
-    ! set MPI parameter
-    rank         = params%rank
-    d = 2
-    if ( params%threeD_case) d = 3
-
+    dt = 9.0e9_rk
     ! set rk_coeffs
     rk_coeffs = params%butcher_tableau
 
@@ -147,50 +123,16 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
-    ! loop over all active blocks (light data)
-    !> \todo no mpi
-    do k = 1, lgt_n
-        ! compute blocks' spacing from treecode
-        call get_block_spacing_origin( params, lgt_active(k), lgt_block, xx0, ddx )
-        ! find smallest dx of active blocks
-        my_dx = min(my_dx, minval(ddx(1:d)) )
-    end do
+    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt)
 
-    ! find globally smallest dx
-    call MPI_Allreduce(my_dx, dx, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
-    ! calculate dt
-    call calculate_time_step(params, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dx, dt)
+    t_sum = t_sum + (MPI_Wtime() - t0)
 
-    ! calculate value for time after one dt
-    time_dt = time + dt
-    ! last timestep should fit in maximal time
-    if ( time_dt >= params%time_max) then
-        dt = params%time_max - time
-        time_dt = params%time_max
-    end if
-
-    if ( params%write_method == 'fixed_time' ) then
-        ! time step should also fit in output time step size
-        ! criterion: check in time+dt above next output time
-        ! if so: truncate time+dt
-        if ( time_dt > params%next_write_time ) then
-            dt = params%next_write_time - time
-            time_dt = params%next_write_time
-        end if
-    end if
-
-    if ( params%debug ) then
-        ! time measurement without ghost nodes synchronization
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        sub_t1   = MPI_Wtime()
-        time_sum = time_sum + (sub_t1 - sub_t0)
-    end if
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
     ! restart time
-    sub_t0 = MPI_Wtime()
+    t0 = MPI_Wtime()
 
     ! save data at time t to heavy work array
     call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
@@ -202,19 +144,14 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
 
-        if ( params%debug ) then
-            ! time measurement without ghost nodes synchronization
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            sub_t1   = MPI_Wtime()
-            time_sum = time_sum + (sub_t1 - sub_t0)
-        end if
+        t_sum = t_sum + (MPI_Wtime() - t0)
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
         call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
         ! restart time
-        sub_t0 = MPI_Wtime()
+        t0 = MPI_Wtime()
 
         call RHS_wrapper(time, dt, params, hvy_work, rk_coeffs(j,1), j, lgt_block, hvy_active, hvy_n, hvy_block)
     end do
@@ -223,12 +160,12 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
 
     ! increase time variable after all RHS substeps
-    time = time_dt
+    time = time + dt
 
     ! timings
     sub_t1   = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-    call toc( params, "time_step (w/o ghost synch.)", time_sum)
+    t_sum = t_sum + (sub_t1 - t0)
+    call toc( params, "time_step (w/o ghost synch.)", t_sum)
 
     deallocate(rk_coeffs )
 

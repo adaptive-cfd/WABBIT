@@ -118,10 +118,6 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
     ! assume start at time 0.0 /todo change if start with reloaded data
     params%next_write_time = 0.0_rk + params%write_time
-
-
-    ! read method to calculate time step
-    call read_param_mpi(FILE, 'Time', 'time_step_calc', params%time_step_calc, "CFL_cond" )
     ! read value of fixed time step
     call read_param_mpi(FILE, 'Time', 'dt_fixed', params%dt_fixed, 0.0_rk )
     ! read value of fixed time step
@@ -214,29 +210,6 @@ subroutine ini_file_to_params( params, filename )
  ! -- TODO: remove, once all physics modules are renewed.
     select case(params%physics_type) ! -- TODO: remove, once all physics modules are renewed.
 
-    case('2D_convection_diffusion') ! -- TODO: remove, once all physics modules are renewed.
-            ! allocate memory in params structure (need 2*data_fields for velocity
-            ! and 1*data_fields for diffusion coefficient)
-            allocate( params%physics%u0( 2*params%number_data_fields ) )
-            allocate( params%physics%nu( params%number_data_fields ) )
-
-            ! reset values, use as default values
-            params%physics%u0 = 0.0_rk
-            params%physics%nu = 0.0_rk
-
-            ! read velocity
-            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
-            ! read diffusion
-            call read_param_mpi(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics%names( params%number_data_fields ) )
-
-            params%physics%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
-
         case('2D_navier_stokes') ! -- TODO: remove, once all physics modules are renewed.
 
             ! physics parameter
@@ -261,30 +234,6 @@ subroutine ini_file_to_params( params, filename )
             params%physics_ns%names = "---"
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
- ! -- TODO: remove, once all physics modules are renewed.
-        case('3D_convection_diffusion')
-
-            ! allocate memory in params structure (need 3*data_fields for velocity
-            ! and 1*data_fields for diffusion coefficient)
-            allocate( params%physics%u0( 3*params%number_data_fields ) )
-            allocate( params%physics%nu( params%number_data_fields ) )
-
-            ! reset values, use as default values
-            params%physics%u0 = 0.0_rk
-            params%physics%nu = 0.0_rk
-
-            ! read velocity
-            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
-            ! read diffusion
-            call read_param_mpi(FILE, 'Physics', 'nu', params%physics%nu, params%physics%nu )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics%names( params%number_data_fields ) )
-
-            params%physics%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
         case('3D_navier_stokes') ! -- TODO: remove, once all physics modules are renewed.
 
@@ -322,26 +271,6 @@ subroutine ini_file_to_params( params, filename )
             params%physics_ns%names = "---"
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
-
-        case('2D_advection') ! -- TODO: remove, once all physics modules are renewed.
-            ! use convection velocity for time step calculation
-            allocate( params%physics%u0( 2*params%number_data_fields ) )
-
-
-            ! reset values, use as default values
-            params%physics%u0 = 0.0_rk
-            ! read velocity
-            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
-
-            ! read variable names
-            ! allocate names list
-            ! use convection-diffusion physics struct !
-            allocate( params%physics%names( params%number_data_fields ) )
-
-
-            params%physics%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
     end select
 

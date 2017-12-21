@@ -25,7 +25,6 @@ module module_params
     use mpi
     ! use physics module (TODO: remove this dependency, as we may create circulars in
     ! the MAKEFILE)
-    use module_convection_diffusion
     use module_navier_stokes
     ! ini file parser module
     use module_ini_files_parser_mpi
@@ -122,7 +121,6 @@ module module_params
         real(kind=rk)                                :: Lx, Ly, Lz
 
         ! physics substructure
-        type(type_params_convection_diffusion_physics) :: physics
         type(type_params_physics_navier_stokes)     :: physics_ns
 
         ! use third dimension

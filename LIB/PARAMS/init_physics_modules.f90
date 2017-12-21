@@ -27,7 +27,6 @@ subroutine init_physics_modules( params, filename )
   ! of course, we have to load all available physics modules here.
   use module_ACM_new
   use module_convdiff_new
-  use module_convection_diffusion
   use module_navier_stokes
   ! NOTE: this is *NOT* a part of module_params.f90 in order to avoid circulars in the makefile
   ! therefore load also params module.
@@ -37,6 +36,12 @@ subroutine init_physics_modules( params, filename )
 
   type (type_params), intent(in) :: params
   character(len=*), intent(in) :: filename
+
+  if (params%rank==0) then
+    write(*,'(80("-"))')
+    write(*,*) "Initializing physics modules"
+    write(*,'(80("-"))')
+  endif
 
   ! call the initialization routines for the physics module that is in use
   select case ( params%physics_type )

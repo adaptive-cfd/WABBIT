@@ -225,27 +225,14 @@ program main
 !        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 !    end if
 
-    if ( params%test_time_stepper ) then
-        ! time stepper convergence order
-        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        ! reset the grid: all blocks are inactive and empty
-        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    end if
-
-!    if (params%test_spatial) then
-        ! spatial convergence order
-        ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-!        call unit_test_spatial_convergence_order( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
-        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-!    end if
 
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, params%adapt_mesh, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
+    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, int_send_buffer, &
+    int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk

@@ -152,7 +152,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
-	unit_test_ghost_nodes_synchronization.f90 unit_test_wavelet_compression.f90 unit_test_time_stepper_convergence.f90 unit_test_spatial_convergence_order.f90 \
+	unit_test_ghost_nodes_synchronization.f90 unit_test_wavelet_compression.f90 \
 	unit_test_treecode.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

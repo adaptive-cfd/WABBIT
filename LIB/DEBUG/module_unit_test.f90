@@ -48,11 +48,6 @@ contains
 
     include "unit_test_wavelet_compression.f90"
 
-    ! time stepper convergence unit test
-    include "unit_test_time_stepper_convergence.f90"
-
-    ! spatial convergence order test
-    include "unit_test_spatial_convergence_order.f90"
 
     include "unit_test_treecode.f90"
 

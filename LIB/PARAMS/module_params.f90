@@ -94,7 +94,7 @@ module module_params
         integer(kind=ik)                             :: number_ghost_nodes
 
         ! switch for mesh adaption
-        logical                                      :: adapt_mesh
+        logical                                      :: adapt_mesh, adapt_inicond
 
         ! number of allocated heavy data fields per process
         integer(kind=ik)                             :: number_blocks

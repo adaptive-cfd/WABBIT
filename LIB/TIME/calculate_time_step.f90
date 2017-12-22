@@ -116,9 +116,10 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     ! --------------------------------------------------------------------------
     ! other constraints (saving, final time, etc.)
     ! --------------------------------------------------------------------------
-    ! do not jump past final time
-    if (time + dt > params%time_max) dt = params%time_max - time
-
+    ! is there an upper limit for the time step set in parameter file?
+    if (params%dt_max > 0.0) dt = params%dt_max
+    ! is there a fixed timestep set?
+    if (params%dt_fixed > 0.0) dt = params%dt_fixed
 
     if ( params%write_method == 'fixed_time' ) then
         ! time step should also fit in output time step size
@@ -128,12 +129,8 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
             dt = params%next_write_time - time
         end if
     end if
-
-    ! is there an upper limit for the time step set in parameter file?
-    if (params%dt_max > 0.0) dt = params%dt_max
-    ! is there a fixed timestep set?
-    if (params%dt_fixed > 0.0) dt = params%dt_fixed
-
+    ! do not jump past final time
+    if (time + dt > params%time_max) dt = params%time_max - time
   !   goto 10
   ! endif
 

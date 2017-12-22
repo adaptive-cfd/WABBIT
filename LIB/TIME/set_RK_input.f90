@@ -85,74 +85,25 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
 ! main body
 
 
-    select case(params%physics_type)
+    ! first: k_j = RHS(data_field(t) + ...
+    ! loop over all active heavy data blocks
+    do k = 1, hvy_n
+        hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
+    end do
 
-        case('2D_navier_stokes')
-            ! first: k_j = RHS(data_field(t) + ...
+    do l = 2, j
+        ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
+        if (abs(rk_coeffs(l)) < 1e-8_rk) then
+        else
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
-                hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
+                ! new input for computation of k-coefficients
+                ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
+                hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
+                            + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
             end do
-            do l = 2, j
-                ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
-                if (abs(rk_coeffs(l)) < 1e-8_rk) then
-                else
-                    ! loop over all active heavy data blocks
-                    do k = 1, hvy_n
-                        ! new input for computation of k-coefficients
-                        ! k_j = RHS(data_field(t) + sum(a_jl*k_l))
-                        hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
-                                    + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
-                    end do
-                end if
-            end do
-
-        case('3D_navier_stokes')
-            ! first: k_j = RHS(data_field(t) + ..
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
-            end do
-            do l = 2, j
-                ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
-                if (abs(rk_coeffs(l)) < 1e-8_rk) then
-                else
-                    ! loop over all active heavy data blocks
-                    do k = 1, hvy_n
-                        ! new input for computation of k-coefficients
-                        ! k_j = RHS(data_field(t) + sum(a_jl*k_l))
-                        hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
-                                      + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
-                    end do
-                end if
-            end do
-
-        case('2D_acm','ACM-new','3D_acm',"ConvDiff-new")
-            ! first: k_j = RHS(data_field(t) + ...
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
-            end do
-            do l = 2, j
-                ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
-                if (abs(rk_coeffs(l)) < 1e-8_rk) then
-                else
-                    ! loop over all active heavy data blocks
-                    do k = 1, hvy_n
-                        ! new input for computation of k-coefficients
-                        ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                        hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
-                                    + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
-                    end do
-                end if
-            end do
-
-        case default
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: physics type is unknown"
-                write(*,*) params%physics_type
-                stop
-    end select
+        end if
+    end do
 
 
 end subroutine set_RK_input

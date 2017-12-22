@@ -7,7 +7,7 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief Save data at time t for Runge-Kutta time step routine
+!> \brief Copy state vector in hvy_block to hvy_work.
 !
 !>
 !! input:
@@ -33,7 +33,7 @@
 !
 !**********************************************************************************************
 
-subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
+subroutine cp_state_vect_to_work(params, hvy_work, hvy_block, hvy_active, hvy_n)
 
 
 
@@ -61,9 +61,6 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
     integer(kind=ik)                    :: dF, neq, k
 
 !---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
 ! variables initialization
 
     neq  = params%number_data_fields
@@ -71,29 +68,9 @@ subroutine save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! loop over all active heavy data blocks
+    do k = 1, hvy_n
+        hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
+    end do
 
-    select case (params%physics_type)
-
-        case('2D_navier_stokes')
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
-            end do
-
-        case('3D_navier_stokes')
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
-            end do
-
-        case('2D_acm',"ACM-new",'3D_acm',"ConvDiff-new")
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
-            end do
-
-        case default
-            call abort(70761,params%physics_type//"ERROR: physics type is unknown")
-    end select
-
-end subroutine save_data_t
+end subroutine cp_state_vect_to_work

@@ -94,13 +94,13 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, j
+    integer(kind=ik)                    :: k, j, neq
 
     ! time step, dx
     real(kind=rk)                       :: dt
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, sub_t1, t_sum
+    real(kind=rk)                       :: t0, sub_t1, t_sum, t
 
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable          :: rk_coeffs(:,:)
@@ -112,6 +112,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! start time
     t0 = MPI_Wtime()
     t_sum = 0.0_rk
+    neq = params%number_data_fields
 
     allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
     dt = 9.0e9_rk
@@ -125,47 +126,63 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! calculate time step
     call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt)
 
-    t_sum = t_sum + (MPI_Wtime() - t0)
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-    ! restart time
-    t0 = MPI_Wtime()
+
+call cp_state_vect_to_work(params, hvy_work, hvy_block, hvy_active, hvy_n)
 
     ! save data at time t to heavy work array
-    call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
-    call RHS_wrapper(time, dt, params, hvy_work, rk_coeffs(1,1), 1, lgt_block, hvy_active, hvy_n, hvy_block)
+    ! call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
+    j = 1
+    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block(:,:,:,1:neq,:), hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
 
+
+    ! function u1 =RK4(u0,dt,t,v0,mask,mask_dx,rhs)
+    !     % Runge Kutta 4. Ordnung
+    !
+    !     % die vier Aufrufe der rechten Seiten;
+    !     % egal, ob rhs zahl, vektor  oder vektoren=matrix zurueckgibt:
+    !     % solange Dimension u entspricht geht alles glatt.
+    !
+    !     k1=rhs(u0          , t     ,v0,mask,mask_dx);
+    !     k2=rhs(u0+dt/2* k1 , t+dt/2,v0,mask,mask_dx);
+    !     k3=rhs(u0+dt/2* k2 , t+dt/2,v0,mask,mask_dx);
+    !     k4=rhs(u0+dt* k3   , t+dt  ,v0,mask,mask_dx);
+    !     u1 = u0+dt/6 * (k1 + 2*k2 +2*k3+k4) ;
+    !
+    ! end
 
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1)-1
 
+
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
 
-        t_sum = t_sum + (MPI_Wtime() - t0)
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
         call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
-        ! restart time
-        t0 = MPI_Wtime()
-
-        call RHS_wrapper(time, dt, params, hvy_work, rk_coeffs(j,1), j, lgt_block, hvy_active, hvy_n, hvy_block)
+        t = time + dt*rk_coeffs(j,1)
+        call RHS_wrapper(t, params, hvy_block(:,:,:,1:neq,:), hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), &
+        lgt_block, hvy_active, hvy_n)
     end do
 
     ! final stage
     call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
 
-    ! increase time variable after all RHS substeps
-    time = time + dt
 
-    ! timings
-    sub_t1   = MPI_Wtime()
-    t_sum = t_sum + (sub_t1 - t0)
-    call toc( params, "time_step (w/o ghost synch.)", t_sum)
+    !
+    ! ! increase time variable after all RHS substeps
+    time = time + dt
+    !
+    ! ! timings
+    ! sub_t1   = MPI_Wtime()
+    ! t_sum = t_sum + (sub_t1 - t0)
+    ! call toc( params, "time_step (w/o ghost synch.)", t_sum)
 
     deallocate(rk_coeffs )
 

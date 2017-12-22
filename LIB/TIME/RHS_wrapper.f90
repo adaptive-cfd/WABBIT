@@ -7,7 +7,8 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief wrapper for RHS call in time step function
+!> \brief wrapper for RHS call in time step function, computes RHS in work array
+!! (inplace)
 !
 !>
 !! calls RHS depending on physics
@@ -39,7 +40,7 @@
 !
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_active, hvy_n, hvy_block)
+subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, hvy_n)
 
 !----------------------------------------------------------------------------------------------
 ! modules
@@ -51,21 +52,12 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 
     !> time variable
     real(kind=rk), intent(in)           :: time
-    !> dt
-    real(kind=rk), intent(in)           :: dt
-
     !> user defined parameter structure, hvy_active
     type (type_params), intent(in)      :: params
     !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_rhs(:, :, :, :, :)
     !> heavy data array - block data
-    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
-
-    !> loop variable inside time step routine
-    integer(kind=ik), intent(in)        :: j
-    !> coefficient for time + coeff*dt
-    real(kind=rk), intent(in)           :: rk_coeff
-
+    real(kind=rk), intent(in)           :: hvy_state(:, :, :, :, :)
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> list of active blocks (heavy data)
@@ -79,7 +71,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0
     ! loop variables
-    integer(kind=ik)                    :: k, dF, N_dF, lgt_id
+    integer(kind=ik)                    :: k, dF, neqn, lgt_id
     ! grid parameter, error variable
     integer(kind=ik)                    :: Bs, g
 
@@ -88,7 +80,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 ! variables initialization
 
     ! number of datafields
-    N_dF  = params%number_data_fields
+    neqn  = params%number_data_fields
 
     ! grid parameter
     Bs    = params%number_block_nodes
@@ -96,153 +88,104 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! RHS depends on physics
-    select case(params%physics_type) ! -- TODO: remove, once all physics modules are renewed.
+    !-------------------------------------------------------------------------
+    ! 1st stage: init_stage. (called once, not for all blocks)
+    !-------------------------------------------------------------------------
+    ! performs initializations in the RHS module, such as resetting integrals
+    select case(params%physics_type)
+    case ("ACM-new")
+      ! this call is not done for all blocks, but only once, globally.
+      call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
 
-    case("ACM-new","ConvDiff-new") ! -- TODO: remove, once all physics modules are renewed.
-      !-------------------------------------------------------------------------
-      ! 1st stage: init_stage. (called once, not for all blocks)
-      !-------------------------------------------------------------------------
-      ! performs initializations in the RHS module, such as resetting integrals
+    case ("ConvDiff-new")
+      ! this call is not done for all blocks, but only once, globally.
+      call RHS_convdiff( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
+
+    case default
+      call abort(2152000, "physics_type is unknown"//params%physics_type)
+
+    end select
+
+    !-------------------------------------------------------------------------
+    ! 2nd stage: integral_stage. (called for all blocks)
+    !-------------------------------------------------------------------------
+    ! For some RHS, the eqn depend not only on local, block based qtys, such as
+    ! the state vector, but also on the entire grid, for example to compute a
+    ! global forcing term (e.g. in FSI the forces on bodies). As the physics
+    ! modules cannot see the grid, (they only see blocks), in order to encapsulate
+    ! them nicer, two RHS stages have to be defined: integral / local stage.
+    do k = 1, hvy_n
+      ! convert given hvy_id to lgt_id for block spacing routine
+      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+      ! get block spacing for RHS
+      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+      !---------- different physics modules ----------
       select case(params%physics_type)
       case ("ACM-new")
-       ! this call is not done for all blocks, but only once, globally.
-       call RHS_ACM( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
-       x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "init_stage" )
-
-     case ("ConvDiff-new")
-       ! this call is not done for all blocks, but only once, globally.
-       call RHS_convdiff( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
-       x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "init_stage" )
-
-      case default
-       call abort(2152000, "physics_type is unknown"//params%physics_type)
-
-      end select
-
-      !-------------------------------------------------------------------------
-      ! 2nd stage: integral_stage. (called for all blocks)
-      !-------------------------------------------------------------------------
-      ! For some RHS, the eqn depend not only on local, block based qtys, such as
-      ! the state vector, but also on the entire grid, for example to compute a
-      ! global forcing term (e.g. in FSI the forces on bodies). As the physics
-      ! modules cannot see the grid, (they only see blocks), in order to encapsulate
-      ! them nicer, two RHS stages have to be defined: integral / local stage.
-      do k = 1, hvy_n
-        ! convert given hvy_id to lgt_id for block spacing routine
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-        ! get block spacing for RHS
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-        !---------- different physics modules ----------
-        select case(params%physics_type)
-        case ("ACM-new")
-          ! input state vector: hvy_block, output RHS vector: hvy_work
-          call RHS_ACM( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
-               x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "integral_stage" )
-
-        case ("ConvDiff-new")
-          ! input state vector: hvy_block, output RHS vector: hvy_work
-          call RHS_convdiff( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
-               x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "integral_stage" )
-
-        case default
-          call abort(2152000, "physics_type is unknown"//params%physics_type)
-
-        end select
-      enddo
-
-
-      !-------------------------------------------------------------------------
-      ! 3rd stage: post integral stage. (called once, not for all blocks)
-      !-------------------------------------------------------------------------
-      ! in rhs module, used ror example for MPI_REDUCES
-      select case(params%physics_type)
-      case ("ACM-new")
-        ! this call is not done for all blocks, but only once, globally.
-        call RHS_ACM( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
-        x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "post_stage" )
+        ! input state vector: hvy_block, output RHS vector: hvy_work
+        call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
+             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "integral_stage" )
 
       case ("ConvDiff-new")
-        ! this call is not done for all blocks, but only once, globally.
-        call RHS_ConvDiff( time+rk_coeff*dt, hvy_work(:,:,:,1:N_dF,hvy_active(1)), g, &
-        x0, dx, hvy_work(:,:,:,1:N_dF,hvy_active(1)), "post_stage" )
+        ! input state vector: hvy_block, output RHS vector: hvy_work
+        call RHS_convdiff( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
+             x0, dx, hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage" )
+
+      case default
+        call abort(2152000, "physics_type is unknown"//params%physics_type)
+
+      end select
+    enddo
+
+
+    !-------------------------------------------------------------------------
+    ! 3rd stage: post integral stage. (called once, not for all blocks)
+    !-------------------------------------------------------------------------
+    ! in rhs module, used ror example for MPI_REDUCES
+    select case(params%physics_type)
+    case ("ACM-new")
+      ! this call is not done for all blocks, but only once, globally.
+      call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
+      x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
+
+    case ("ConvDiff-new")
+      ! this call is not done for all blocks, but only once, globally.
+      call RHS_ConvDiff( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
+      x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
+
+    case default
+      call abort(2152000, "physics_type is unknown"//params%physics_type)
+    end select
+
+
+    !-------------------------------------------------------------------------
+    ! 4th stage: local evaluation of RHS on all blocks (called for all blocks)
+    !-------------------------------------------------------------------------
+    ! the second stage then is what you would usually do: evaluate local differential
+    ! operators etc.
+    do k = 1, hvy_n
+      ! convert given hvy_id to lgt_id for block spacing routine
+      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+      ! get block spacing for RHS
+      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+      !---------- different physics modules ----------
+      select case(params%physics_type)
+      case ("ACM-new")
+        ! input state vector: hvy_block, output RHS vector: hvy_work
+        call RHS_ACM( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
+             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
+
+      case ("ConvDiff-new")
+        ! input state vector: hvy_block, output RHS vector: hvy_work
+        call RHS_ConvDiff( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
+             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
 
       case default
         call abort(2152000, "physics_type is unknown"//params%physics_type)
       end select
+    enddo
 
-
-      !-------------------------------------------------------------------------
-      ! 4th stage: local evaluation of RHS on all blocks (called for all blocks)
-      !-------------------------------------------------------------------------
-      ! the second stage then is what you would usually do: evaluate local differential
-      ! operators etc.
-      do k = 1, hvy_n
-        ! convert given hvy_id to lgt_id for block spacing routine
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-        ! get block spacing for RHS
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-        !---------- different physics modules ----------
-        select case(params%physics_type)
-        case ("ACM-new")
-          ! input state vector: hvy_block, output RHS vector: hvy_work
-          call RHS_ACM( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
-               x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "local_stage" )
-
-        case ("ConvDiff-new")
-          ! input state vector: hvy_block, output RHS vector: hvy_work
-          call RHS_ConvDiff( time+rk_coeff*dt, hvy_block(:,:,:,1:N_dF, hvy_active(k)), g, &
-               x0, dx, hvy_work(:,:,:,j*N_dF+1:(j+1)*N_dF, hvy_active(k)), "local_stage" )
-
-        case default
-          call abort(2152000, "physics_type is unknown"//params%physics_type)
-        end select
-      enddo
-
-
-
- ! -- TODO: remove, once all physics modules are renewed.
- ! all following lines.
-       case('2D_navier_stokes')
-            ! loop over all active heavy data blocks
-            do k = 1, hvy_n
-                ! copy ghost nodes to hvy_work
-                hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 1:N_dF, hvy_active(k) )
-
-                ! convert given hvy_id to lgt_id for block spacing routine
-                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-
-                ! get block spacing for RHS
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-                ! RHS (compute k-coefficients)
-                call RHS_2D_navier_stokes( params%physics_ns, g, Bs, &
-                                  dx(1), dx(2), N_dF, &
-                                  hvy_work( :, :, 1, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ))
-            end do
-
-       case('3D_navier_stokes')
-           ! loop over all active heavy data blocks
-           do k = 1, hvy_n
-               ! copy ghost nodes to hvy_work
-               hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ) = hvy_block(:, :, :, 1:N_dF, hvy_active(k) )
-
-               ! convert given hvy_id to lgt_id for block spacing routine
-               call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-
-               ! get block spacing for RHS
-               call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-               ! RHS (compute k-coefficients)
-               call RHS_3D_navier_stokes( params%physics_ns, g, Bs, &
-                              dx(1), dx(2), dx(3), N_dF, &
-                              hvy_work( :, :, :, j*N_dF+1:(j+1)*N_dF, hvy_active(k) ))
-           end do
-
-        case default
-            call abort(1717,"ERROR: physics type is unknown"//params%physics_type)
-    end select
 
 end subroutine RHS_wrapper

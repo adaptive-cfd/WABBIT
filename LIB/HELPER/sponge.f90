@@ -7,7 +7,7 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief 
+!> \brief
 !
 !>
 !! input:    - velocity, volume integral, grid parameters \n
@@ -25,14 +25,14 @@ subroutine sponge_2D(params, mask, x0, dx, Bs, g)
 
     implicit none
 
+    ! grid
+    integer(kind=ik), intent(in)                              :: Bs, g
     !> user defined parameter structure
     type (type_params), intent(in)                            :: params
     !> mask term for every grid point of this block
     real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-    ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
 
     ! auxiliary variables
     real(kind=rk)                                             :: x, ddx
@@ -49,11 +49,11 @@ subroutine sponge_2D(params, mask, x0, dx, Bs, g)
 ! main body
 
     ddx = 0.1_rk*params%Lx
-    
-    
+
+
     do ix=1, Bs+2*g
        x = dble(ix-(g+1)) * dx(1) + x0(1)
-       do iy=1, Bs+2*g    
+       do iy=1, Bs+2*g
            if ((params%Lx-x) <= ddx) then
                mask(ix,iy) = (x-(params%Lx-ddx))**2
            elseif (x <= ddx) then
@@ -65,6 +65,3 @@ subroutine sponge_2D(params, mask, x0, dx, Bs, g)
     end do
 
 end subroutine sponge_2D
-
-
-    

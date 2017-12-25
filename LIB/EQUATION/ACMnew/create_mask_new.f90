@@ -5,15 +5,17 @@ subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
 
     implicit none
 
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
     ! grid
     integer(kind=ik), intent(in)                              :: Bs, g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:), intent(inout)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
 
     real(kind=rk) :: cx ,cy,R_cyl,x,y,r,h
     integer :: iy,ix
+
+    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -40,12 +42,12 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
     implicit none
 
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
     ! grid
     integer(kind=ik), intent(in)                              :: Bs, g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
 
     ! auxiliary variables
     real(kind=rk)                                             :: x, y, r, h
@@ -54,6 +56,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     ! reset mask array
     mask = 0.0_rk
@@ -95,12 +98,12 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
   implicit none
 
-  !> mask term for every grid point of this block
-  real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: mask
-  !> spacing and origin of block
-  real(kind=rk), dimension(2), intent(in)                   :: x0, dx
   ! grid
   integer(kind=ik), intent(in)                              :: Bs, g
+  !> mask term for every grid point of this block
+  real(kind=rk), dimension(:,:), intent(out)     :: mask
+  !> spacing and origin of block
+  real(kind=rk), dimension(2), intent(in)                   :: x0, dx
 
   ! auxiliary variables
   real(kind=rk)                                             :: x1, x2, y1, y2, R, cx1, cx2, cy1,&
@@ -110,6 +113,7 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
+  if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
   ! reset mask array
   mask = 0.0_rk

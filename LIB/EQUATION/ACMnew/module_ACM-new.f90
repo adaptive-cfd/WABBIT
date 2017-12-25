@@ -185,7 +185,7 @@ contains
     work(:,:,:,4:6))
 
     ! mask
-    call create_mask_2D_NEW(work(:,:,:,5), x0, dx, Bs, g )
+    call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )
 
   end subroutine
 

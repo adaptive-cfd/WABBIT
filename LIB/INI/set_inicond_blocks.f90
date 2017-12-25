@@ -10,7 +10,7 @@
 !
 !
 ! ********************************************************************************************
-subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, inicond)
+subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, inicond)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -123,4 +123,4 @@ subroutine set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_
 
     enddo
 
-end subroutine set_inicond_all_blocks
+end subroutine set_inicond_blocks

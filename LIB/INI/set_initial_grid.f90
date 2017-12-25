@@ -3,7 +3,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name set_blocks_initial_condition.f90
+!> \name set_initial_grid.f90
 !> \version 0.5
 !> \author msr
 !
@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 
-subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
+subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -71,11 +71,12 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
   !> if .false. the code initializes on the coarsest grid, if .true. iterations
   !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
-  integer(kind=ik) :: lgt_n_old
+  integer(kind=ik) :: lgt_n_old, k, iter
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
     lgt_n_old = 9999999
+    iter = 0
 
   !---------------------------------------------------------------------------------------------
   ! main body
@@ -97,7 +98,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
         !---------------------------------------------------------------------------
-        call set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
 
         !---------------------------------------------------------------------------
         ! grid adaptation
@@ -106,7 +107,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
           ! we have to repeat the adapation process until the grid has reached a final
           ! state. Since we start on the coarsest level, in each iteration we cannot loose
           ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
-          do while ( lgt_n /= lgt_n_old)
+          do while ( lgt_n /= lgt_n_old  .and. iter<params%max_treelevel)
             lgt_n_old = lgt_n
             ! push up the entire grid one level.
             !> \todo It would be better to selectively
@@ -118,18 +119,30 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this
             ! corresponds to advancing the solution in time, it's just that here we know the exact
             ! solution (the inicond)
-            call set_inicond_all_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
 
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
+            iter = iter + 1
             if (params%rank == 0) then
-              write(*,'(" did one mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
+              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') iter,lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
             endif
           enddo
         endif
     end if
+
+    ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
+    ! for example if one does non-adaptive non-equidistant spatial convergence tests
+    if (params%inicond_refinements > 0) then
+      do k = 1, params%inicond_refinements
+        ! refine entire mesh.
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+        ! set initial condition
+        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+      enddo
+    endif
 
     !---------------------------------------------------------------------------
     ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks
@@ -163,4 +176,4 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_neighb
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
 
-end subroutine set_blocks_initial_condition
+end subroutine set_initial_grid

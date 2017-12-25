@@ -44,7 +44,7 @@ module module_params
         ! dt
         real(kind=rk)                                :: dt_fixed, dt_max
         ! number of allowed time steps
-        integer(kind=ik)                             :: nt
+        integer(kind=ik)                             :: nt, inicond_refinements
         ! time step calculator
         character(len=80)                            :: time_step_calc
         ! data writing frequency

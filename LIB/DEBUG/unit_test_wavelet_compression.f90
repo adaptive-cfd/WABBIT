@@ -113,7 +113,7 @@
 !     ! call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, l )
 !
 !     !> \todo FIXME: always set gauss blob
-!     call set_inicond_all_blocks( params, lgt_block, hvy_block, hvy_active, hvy_n, "sin2d")
+!     call set_inicond_blocks( params, lgt_block, hvy_block, hvy_active, hvy_n, "sin2d")
 !
 !     params%eps = eeps(l)
 !

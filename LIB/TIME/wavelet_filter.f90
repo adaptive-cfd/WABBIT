@@ -108,20 +108,20 @@ subroutine wavelet_filter( params, block_data)
 
         ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
         ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-        do i = 1, Bs+2*g
-            do j = 1, Bs+2*g
-                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
-            end do
-        end do
+        ! do i = 1, Bs+2*g
+        !     do j = 1, Bs+2*g
+        !         detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
+        !     end do
+        ! end do
 
         ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
         ! the block should be filtered, overwrite block data with predicted data
-        if (detail < params%eps) then
+        ! if (detail < params%eps) then
             ! wavelet filtering
             !block_data(:,:,1) = u2(:,:,1)
             ! note: do not filter redundant nodes, to avoid instabilities
             block_data(g+2:Bs+g-1,g+2:Bs+g-1,1) = u2(g+2:Bs+g-1,g+2:Bs+g-1,1)
-        end if
+        ! end if
 
     end if
 

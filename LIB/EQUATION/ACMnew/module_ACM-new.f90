@@ -318,8 +318,8 @@ contains
 
       if (size(u,4) == 3) then
         ! this is a 2d case (ux,uy,p)
-        call RHS_2D_acm_new(g, Bs, dx(1:2), x0(1:2), size(u,4), u, params_acm%discretization, &
-        (/1.0_rk,0.0_rk,0.0_rk/), time, rhs)
+        call RHS_2D_acm_new(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
+        (/1.0_rk,0.0_rk,0.0_rk/), time, rhs(:,:,1,:))
 
       elseif (size(u,4) == 4) then
         ! this is a 3d case (ux,uy,uz,p)

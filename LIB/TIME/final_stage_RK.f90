@@ -125,7 +125,6 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
 
                 do j = 2, size(rk_coeffs, 2)
                     if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
-                      write(*,*) "ooooops"
                     else
                         ! ... dt*(b1*k1 + b2*k2+ ..)
                         ! rk_coeffs(size(rk_coeffs,1)) , since we want to access last line,  e.g. b1 = butcher(last line,2)

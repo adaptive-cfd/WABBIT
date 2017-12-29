@@ -45,6 +45,7 @@ subroutine sponge_2D(params, mask, x0, dx, Bs, g)
     ! reset mask array
     mask = 0.0_rk
 
+
 !---------------------------------------------------------------------------------------------
 ! main body
 

@@ -6,11 +6,11 @@ subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in) :: Bs, g
     !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(inout)     :: mask
+    real(kind=rk), dimension(:,:), intent(inout) :: mask
     !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
 
     real(kind=rk) :: cx ,cy,R_cyl,x,y,r,h
     integer :: iy,ix

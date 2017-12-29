@@ -117,7 +117,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     ! other constraints (saving, final time, etc.)
     ! --------------------------------------------------------------------------
     ! is there an upper limit for the time step set in parameter file?
-    if (params%dt_max > 0.0) dt = params%dt_max
+    if (params%dt_max > 0.0) dt = min( params%dt_max, dt)
     ! is there a fixed timestep set?
     if (params%dt_fixed > 0.0) dt = params%dt_fixed
 

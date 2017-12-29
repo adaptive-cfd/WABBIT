@@ -19,7 +19,7 @@
 !! 27/06/17 - create
 ! ********************************************************************************************
 
-subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume_int, time, rhs)
+subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, time, rhs)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -37,12 +37,9 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume
     integer(kind=ik), intent(in)                   :: g, Bs
     !> origin and spacing of the block
     real(kind=rk), dimension(2), intent(in)        :: x0, dx
-
-    !> number of datafields
-    integer(kind=ik), intent(in)                   :: N_dF
     !> datafields
-    real(kind=rk), intent(in)                   :: phi(Bs+2*g, Bs+2*g, N_dF)
-    real(kind=rk), intent(out)                   :: rhs(Bs+2*g, Bs+2*g, N_dF)
+    real(kind=rk), intent(in)                      :: phi(:,:,:)
+    real(kind=rk), intent(inout)                   :: rhs(:,:,:)
     !> discretization order
     character(len=80), intent(in)                  :: order_discretization
     !> global volume integral
@@ -52,13 +49,13 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume
 
 
     !> mask term for every grid point in this block
+    !! todo: evaluate if it is a good idea to have them on the stack (ie defined as
+    !! mask(1:Bs+2g....) or on the heap, ie. allocatable
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask, sponge
     !> velocity of the solid
     real(kind=rk), dimension(Bs+2*g, Bs+2*g, 2)    :: us
     !> forcing term
     real(kind=rk), dimension(3)                    :: forcing
-
-
     !> local datafields
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: u, v, p
     !>
@@ -99,8 +96,9 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume
     dy2_inv = 1.0_rk / (dx(2)**2)
 
     eps_inv = 1.0_rk / eps
-
     alpha = 100.0_rk
+
+    if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,3)/=3) call abort(66233,"wrong size, I go for a walk instead.")
 
     ! Tam & Webb, 4th order optimized (for first derivative)
     a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
@@ -118,13 +116,13 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume
       call create_mask_2D_NEW(mask, x0, dx, Bs, g)
     end if
 
-    ! if (params_acm%forcing) then
-    !   forcing(1) = max(0.0_rk, 1.0_rk-params_acm%mean_flow(1)) * startup_conditioner(time, 0.0_rk, 0.5_rk)
-    !   forcing(2) = max(0.0_rk, 0.0_rk-params_acm%mean_flow(2)) * startup_conditioner(time, 0.0_rk, 0.5_rk)
-    !   forcing(3) = max(0.0_rk, 0.0_rk-params_acm%mean_flow(3)) * startup_conditioner(time, 0.0_rk, 0.5_rk)
-    ! else
+    if (params_acm%forcing) then
+      forcing(1) = max(0.0_rk, 1.0_rk-params_acm%mean_flow(1)) * startup_conditioner(time, 0.0_rk, 0.5_rk)
+      forcing(2) = max(0.0_rk, 0.0_rk-params_acm%mean_flow(2)) * startup_conditioner(time, 0.0_rk, 0.5_rk)
+      forcing(3) = max(0.0_rk, 0.0_rk-params_acm%mean_flow(3)) * startup_conditioner(time, 0.0_rk, 0.5_rk)
+    else
       forcing = 0.0_rk
-    ! end if
+    end if
 
     ! call sponge_2D(params_acm, sponge, x0, dx, Bs, g)
     sponge=0.0_rk!alpha*sponge
@@ -194,9 +192,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, N_dF, phi, order_discretization, volume
         end do
 
     else
-      write(*,*) "ERROR: discretization method in params_acm%order_discretization is unknown"
-      write(*,*) order_discretization
-      stop
+      call abort(441166, "Discretization unkown "//order_discretization//", I ll walk into the light now." )
     end if
 
 end subroutine RHS_2D_acm_new

@@ -121,10 +121,12 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! output on screen
     if (rank == 0) then
-        write(*,'(80("_"))')
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," active blocks=",i5)') time, trim(adjustl(fname)), lgt_n
     endif
 
+    ! we need to know how many blocks each rank actually holds, and all procs need to
+    ! know that distribution for all other procs in order to know what portion of the array
+    ! they must write to.
     call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
 
     ! fill blocks buffer (we cannot use the bvy_block array as it is not contiguous, i.e.
@@ -134,16 +136,16 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
-        lbounds3D = (/1,1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds3D = (/Bs-1,Bs-1,Bs-1,lbounds3D(4)+hvy_n-1/)
+        lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
+        ubounds3D = (/Bs, Bs, Bs, lbounds3D(4)+hvy_n/) - 1
 
     else
 
-        ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
+        ! tell the hdf5 wrapper what part of the global [bs x bs x n_active]
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
-        lbounds2D = (/1,1,sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds2D = (/Bs-1,Bs-1,lbounds2D(3)+hvy_n-1/)
+        lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
+        ubounds2D = (/Bs, Bs, lbounds2D(3)+hvy_n/) - 1
 
     endif
 
@@ -163,9 +165,10 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             lgt_id = lgt_active(k)
             call get_block_spacing_origin( params, lgt_id , lgt_block, xx0, ddx )
 
+
             if ( params%threeD_case ) then
                 ! 3D
-                myblockbuffer(:,:,:,l)      = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
+                myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(3)
@@ -176,10 +179,10 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 coords_spacing(3,l) = ddx(1)
 
                 ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l)         = lgt_block( lgt_active(k), 1:params%max_treelevel )
+                block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             else
                 ! 2D
-                myblockbuffer(:,:,1,l)      = hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id)
+                myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(2)
@@ -188,7 +191,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 coords_spacing(2,l) = ddx(1)
 
                 ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l)         = lgt_block( lgt_active(k), 1:params%max_treelevel )
+                block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             endif
 
             ! next block

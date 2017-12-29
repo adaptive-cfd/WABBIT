@@ -38,22 +38,25 @@ subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
     real(kind=rk), intent(in)                      :: x0(:), dx(:)
     !> datafields
     real(kind=rk), intent(in)                      :: phi(:,:,:,:)
-    real(kind=rk), intent(inout)                     :: rhs(:,:,:,:)
+    real(kind=rk), intent(inout)                   :: rhs(:,:,:,:)
 
     real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:2)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv,nu
     real(kind=rk) :: u_dx, u_dy, u_dxdx, u_dydy
     real(kind=rk) :: u_dz, u_dzdz
     ! loop variables
-    integer(kind=ik)                               :: ix, iy,iz, i, N
+    integer(kind=ik) :: ix, iy, iz, i, N, ia1, ia2, ib1, ib2, ia, ib
     ! coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
     real(kind=rk)                                  :: b(-2:2)
+
 
     ! set parameters for readability
     N = params_convdiff%N_scalars
     u0 = 0.0_rk
     rhs = 0.0_rk
+
+    if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,4)/=N) call abort(66233,"wrong size. The door rings, I'll leave u to it.")
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
@@ -65,10 +68,14 @@ subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
     ! 4th order coefficients for second derivative
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
+    ! ia1 = lbound(a)
+    ! ia2 = ubound(a)
+    ! ib1 = lbound(b)
+    ! ib2 = ubound(b)
 
     ! looop over components - they are independent scalars
     do i = 1, N
-      if (maxval(phi(:,:,:,i))>2.0) call abort(666,"large")
+      if (maxval(phi(:,:,:,i))>2.0) call abort(666,"large values in phi. that cannot be good.")
 
       ! create the advection velocity field, which may be time and space dependent
       call create_velocity_field_2d( time, g, Bs, dx, x0, u0, i )
@@ -76,12 +83,17 @@ subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
       ! because p%nu might load the entire params in the cache and thus be slower:
       nu = params_convdiff%nu(i)
 
+      !!!!!!!!!!!!
+      ! 2D
+      !!!!!!!!!!!!
       if (params_convdiff%dim == 2) then
         select case(params_convdiff%discretization)
-          !-----------------------------------------------------------------------
-          ! 2nd order
-          !-----------------------------------------------------------------------
+        !-----------------------------------------------------------------------
+        ! 2nd order
+        !-----------------------------------------------------------------------
         case("FD_2nd_central")
+          ! please note the performance penalty associated with the if-clause so
+          ! do not put it inside the loop, even if it's tempting.
           if (nu>=1.0e-10) then ! with viscosity
             do ix = g+1, Bs+g
               do iy = g+1, Bs+g
@@ -105,9 +117,9 @@ subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
             end do
 
           endif
-          !-----------------------------------------------------------------------
-          ! 4th order
-          !-----------------------------------------------------------------------
+        !-----------------------------------------------------------------------
+        ! 4th order
+        !-----------------------------------------------------------------------
         case("FD_4th_central_optimized")
           if (nu>=1.0e-10) then ! with viscosity
             do ix = g+1, Bs+g
@@ -142,6 +154,9 @@ subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
           call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
         end select
 
+      !!!!!!!!!!!!!
+      ! 3D
+      !!!!!!!!!!!!!
       else
         select case(params_convdiff%discretization)
         ! !-----------------------------------------------------------------------

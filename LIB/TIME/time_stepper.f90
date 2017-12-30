@@ -131,34 +131,19 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! first ghost nodes synchronization, so grid has changed
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-
-call cp_state_vect_to_work(params, hvy_work, hvy_block, hvy_active, hvy_n)
+    ! copy state vector content to work array.
+    do k = 1, hvy_n
+        hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
+    end do
 
     ! save data at time t to heavy work array
     ! call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
     j = 1
     call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block(:,:,:,1:neq,:), hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
 
-
-    ! function u1 =RK4(u0,dt,t,v0,mask,mask_dx,rhs)
-    !     % Runge Kutta 4. Ordnung
-    !
-    !     % die vier Aufrufe der rechten Seiten;
-    !     % egal, ob rhs zahl, vektor  oder vektoren=matrix zurueckgibt:
-    !     % solange Dimension u entspricht geht alles glatt.
-    !
-    !     k1=rhs(u0          , t     ,v0,mask,mask_dx);
-    !     k2=rhs(u0+dt/2* k1 , t+dt/2,v0,mask,mask_dx);
-    !     k3=rhs(u0+dt/2* k2 , t+dt/2,v0,mask,mask_dx);
-    !     k4=rhs(u0+dt* k3   , t+dt  ,v0,mask,mask_dx);
-    !     u1 = u0+dt/6 * (k1 + 2*k2 +2*k3+k4) ;
-    !
-    ! end
-
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1)-1
-
-
+        ! prepare input for the RK substep
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
 
 
@@ -166,6 +151,7 @@ call cp_state_vect_to_work(params, hvy_work, hvy_block, hvy_active, hvy_n)
         ! further ghost nodes synchronization, fixed grid
         call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
+        ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)
         call RHS_wrapper(t, params, hvy_block(:,:,:,1:neq,:), hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), &
         lgt_block, hvy_active, hvy_n)
@@ -175,15 +161,10 @@ call cp_state_vect_to_work(params, hvy_work, hvy_block, hvy_active, hvy_n)
     call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
 
 
-    !
-    ! ! increase time variable after all RHS substeps
+    ! increase time variable after all RHS substeps
     time = time + dt
-    !
-    ! ! timings
-    ! sub_t1   = MPI_Wtime()
-    ! t_sum = t_sum + (sub_t1 - t0)
-    ! call toc( params, "time_step (w/o ghost synch.)", t_sum)
-
     deallocate(rk_coeffs )
 
+
+    call toc( params, "time_step (everything incl ghosts)", MPI_Wtime()-t0)
 end subroutine time_stepper

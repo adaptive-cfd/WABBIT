@@ -29,10 +29,11 @@ module module_initialization
     use module_debug
     ! mesh module
     use module_mesh
-    ! this module contains the routines to set the initial condition on blocks
-    use module_initial_conditions
     ! read routines
     use module_IO
+    ! to set the initial condition depending on pysics, we have to include them here
+    use module_ConvDiff_new
+    use module_ACM_new
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -56,7 +57,6 @@ contains
     include "reset_grid.f90"
     include "create_equidistant_base_mesh.f90"
     include "allocate_com_arrays.f90"
-
 
     ! initial block distribution - 2D case
     include "initial_block_distribution_2D.f90"

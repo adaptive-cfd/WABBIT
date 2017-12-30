@@ -89,6 +89,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! choose between reading from files and creating datafields analytically
     if (params%initial_cond == 'read_from_files') then
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
+        
     else
         !---------------------------------------------------------------------------
         ! Create the first mesh on the coarsest treelevel

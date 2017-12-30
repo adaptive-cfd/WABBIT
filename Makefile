@@ -13,7 +13,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
-	module_initial_conditions.f90 module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
+	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90
 # physics modules
 MFILED += module_2D_navier_stokes.f90
@@ -22,7 +22,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
-VPATH += :LIB/PARAMS:LIB/INI/INICONDS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
+VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion
 
 # Set the default compiler if it's not already set
@@ -107,19 +107,15 @@ $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDI
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90 $(OBJDIR)/module_params.o \
-	inicond_gauss_blob.f90 initial_condition_on_block_wrapper.f90 inicond_sinus_2D.f90 inicond_sphere.f90 \
-	inicond_constant_acm.f90 inicond_shear_layer.f90 $(OBJDIR)/module_ACM-new.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o  \
+	$(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
 	set_initial_grid.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
 	inicond_vorticity_filaments.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
 	inicond_richtmyer_meshkov.f90 allocate_grid.f90 reset_grid.f90 \
-	$(OBJDIR)/module_initial_conditions.o set_inicond_blocks.f90 allocate_com_arrays.f90 get_inicond_from_file.f90
+	set_inicond_blocks.f90 allocate_com_arrays.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
@@ -131,7 +127,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o \
-	filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 cp_state_vect_to_work.f90 \
+	filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
 	wavelet_filter.f90 get_block_max_velocity_norm.f90 bogey_filter.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

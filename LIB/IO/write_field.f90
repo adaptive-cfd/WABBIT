@@ -95,6 +95,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3)
+    integer(kind=ik), allocatable :: procs(:)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -109,10 +110,12 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    allocate (myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
-    allocate (coords_spacing(1:3, 1:hvy_n) )
-    allocate (coords_origin(1:3, 1:hvy_n))
-    allocate (block_treecode(1:params%max_treelevel, 1:hvy_n))
+    allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
+    allocate(coords_spacing(1:3, 1:hvy_n) )
+    allocate(coords_origin(1:3, 1:hvy_n))
+    allocate(procs(1:hvy_n))
+    procs = rank
+    allocate(block_treecode(1:params%max_treelevel, 1:hvy_n))
 
     coords_origin = 7.0e6_rk
 
@@ -211,6 +214,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%max_treelevel-1,ubounds3D(4)/), block_treecode)
+        call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds3D(4)/), (/ubounds3D(4)/), procs)
     else
         ! 2D data case
         call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
@@ -218,6 +222,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%max_treelevel-1,ubounds2D(3)/), block_treecode)
+        call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds2D(3)/), (/ubounds2D(3)/), procs)
     endif
 
     ! add additional annotations
@@ -233,6 +238,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     deallocate(myblockbuffer)
     deallocate(coords_origin)
     deallocate(coords_spacing)
-    deallocate(block_treecode)
+    deallocate(block_treecode, procs)
 
 end subroutine write_field

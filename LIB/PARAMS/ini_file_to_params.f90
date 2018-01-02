@@ -140,8 +140,6 @@ subroutine ini_file_to_params( params, filename )
     ! initial condition
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
-    ! width of initial condition (e.g. Gauss-Blob, depends on Lx and Ly)
-    call read_param_mpi(FILE, 'Physics', 'inicond_width', params%inicond_width, 1e-2_rk)
 
     if (params%initial_cond == 'read_from_files') then
         ! read variable names
@@ -150,18 +148,6 @@ subroutine ini_file_to_params( params, filename )
         params%input_files = "---"
         call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
     end if
-
-    !***************************************************************************
-    ! read VOLUME PENALIZATION METHOD parameters
-
-    ! penalization flag
-    call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
-    ! penalization factor
-    call read_param_mpi(FILE, 'VPM', 'eps_penal', params%eps_penal, 1e-4_rk)
-    ! smooth mask for penalization term
-    call read_param_mpi(FILE, 'VPM', 'smooth_mask', params%smooth_mask, .true.)
-    ! geometry
-    call read_param_mpi(FILE, 'VPM', 'geometry', params%geometry, "---")
 
     !***************************************************************************
     ! read DISCRETIZATION parameters
@@ -206,75 +192,9 @@ subroutine ini_file_to_params( params, filename )
     !
     ! first: read physics type
     call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
+    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "physics-module" )
 
     ! NOTE: this routine initializes WABBIT AND NOT THE PHYSICS MODULES THEMSELVES!
-
- ! -- TODO: remove, once all physics modules are renewed.
-    select case(params%physics_type) ! -- TODO: remove, once all physics modules are renewed.
-
-        case('2D_navier_stokes') ! -- TODO: remove, once all physics modules are renewed.
-
-            ! physics parameter
-            ! read adiabatic coefficient
-            call read_param_mpi(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
-            ! read specific gas constant
-            call read_param_mpi(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
-            ! calculate isochoric heat capacity
-            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
-            ! calculate isobaric heat capacity
-            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
-            ! read prandtl number
-            call read_param_mpi(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
-            ! read dynamic viscosity
-            call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
-            ! read switch to turn on|off dissipation
-            call read_param_mpi(FILE, 'Physics', 'dissipation', params%physics_ns%dissipation, .true. )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics_ns%names( params%number_data_fields ) )
-            params%physics_ns%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
-
-        case('3D_navier_stokes') ! -- TODO: remove, once all physics modules are renewed.
-
-            ! error case: try to solve navier stokes equation with less or more than 5 datafields
-            if ( params%number_data_fields /= 5) then
-                write(*,'(80("_"))')
-                write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params%number_data_fields
-                stop
-            end if
-
-            ! domain size
-            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
-            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
-
-            ! physics parameter
-            ! read adiabatic coefficient
-            call read_param_mpi(FILE, 'Physics', 'gamma_', params%physics_ns%gamma_, 0.0_rk )
-            ! read specific gas constant
-            call read_param_mpi(FILE, 'Physics', 'Rs', params%physics_ns%Rs, 0.0_rk )
-            ! calculate isochoric heat capacity
-            params%physics_ns%Cv = params%physics_ns%Rs/(params%physics_ns%gamma_-1.0_rk)
-            ! calculate isobaric heat capacity
-            params%physics_ns%Cp = params%physics_ns%Rs*params%physics_ns%gamma_
-            ! read prandtl number
-            call read_param_mpi(FILE, 'Physics', 'Pr', params%physics_ns%Pr, 0.0_rk )
-            ! read dynamic viscosity
-            call read_param_mpi(FILE, 'Physics', 'mu0', params%physics_ns%mu0, 0.0_rk )
-            ! read switch to turn on|off dissipation
-            call read_param_mpi(FILE, 'Blocks', 'dissipation', params%physics_ns%dissipation , .true. )
-
-            ! read variable names
-            ! allocate names list
-            allocate( params%physics_ns%names( params%number_data_fields ) )
-            params%physics_ns%names = "---"
-            ! read file
-            call read_param_mpi(FILE, 'Physics', 'names_ns', params%physics_ns%names, params%physics_ns%names )
-
-    end select
 
     !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,

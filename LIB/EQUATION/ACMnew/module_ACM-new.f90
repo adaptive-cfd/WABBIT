@@ -109,8 +109,6 @@ contains
     call read_param_mpi(FILE, 'Saving', 'field_names', params_acm%names, (/"ux","uy","p "/) )
 
 
-    call read_param_mpi(FILE, 'ACM-new', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%Lx, 0.5*params_acm%Ly, 0.5*params_acm%Lz/)  )
-    call read_param_mpi(FILE, 'ACM-new', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     ! speed of sound for acm
     call read_param_mpi(FILE, 'ACM-new', 'c_0', params_acm%c_0, 10.0_rk)
     ! viscosity
@@ -127,6 +125,8 @@ contains
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0e-3_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
+    call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%Lx, 0.5*params_acm%Ly, 0.5*params_acm%Lz/)  )
+    call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )

@@ -76,17 +76,6 @@ module module_params
         character(len=80)                            :: initial_cond
         ! files we want to read for inital cond.
         character(len=80), dimension(:), allocatable :: input_files
-        ! width of the initial condition (e.g. Gauss blob)
-        real(kind=rk)                                :: inicond_width
-
-        ! penalization?
-        logical                                      :: penalization
-        ! penalization factor
-        real(kind=rk)                                :: eps_penal
-        ! smooth mask for penalization term
-        logical                                      :: smooth_mask
-        ! geometry for VPM
-        character(len=80)                            :: geometry
 
         ! grid parameter
         integer(kind=ik)                             :: number_domain_nodes

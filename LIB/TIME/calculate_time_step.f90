@@ -76,8 +76,6 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
 ! main body
   dt = 9.0e9_rk
 
-!$$$$$$$$$$$$$$ NEW CODE $$$$$$$$$$$$$$$$
-  ! if (params%physics_type == 'ACM-new'.or.params%physics_type == 'ConvDiff-new') then
     ! --------------------------------------------------------------------------
     ! physics module restrictions on time step
     ! --------------------------------------------------------------------------
@@ -125,84 +123,16 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
         ! time step should also fit in output time step size
         ! criterion: check in time+dt above next output time
         ! if so: truncate time+dt
-        if ( time+dt > params%next_write_time ) then
+        if ( time+dt > params%next_write_time .and. time<params%next_write_time ) then
             dt = params%next_write_time - time
         end if
     end if
     ! do not jump past final time
-    if (time + dt > params%time_max) dt = params%time_max - time
-  !   goto 10
-  ! endif
+    if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time
 
-! !$$$$$$$$$$$$$$ OLD CODE $$$$$$$$$$$$$$$$
-!     select case(params%time_step_calc)
-!         case('fixed')
-!             dt = params%dt
-!
-!         case('CFL_cond')
-!
-!             ! convection_diffusion, advection physics
-!             if (allocated(params%physics%u0)) then
-!                ! calculate time step, loop over all data fields
-!                !> \todo CFL time step calculation do not work with ns physics
-!                if ( params%threeD_case ) then
-!                   do dF = 1, N_dF
-!                      norm_u = norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 3 ))
-!                      ! check for zero velocity to avoid divison by zero
-!                      if (norm_u < 1e-12_rk) norm_u = 9e9_rk
-!                      dt = minval((/dt, params%CFL * dx / norm_u /))
-!                   end do
-!                else
-!                   do dF = 1, N_dF
-!                      norm_u = norm2( params%physics%u0((dF-1)*2 + 1 : (dF-1)*2 + 2 ))
-!                      ! check for zero velocity to avoid divison by zero
-!                      if (norm_u < 1e-12_rk) norm_u = 9e9_rk
-!                      dt = minval((/dt, params%CFL * dx / norm_u /))
-!                   end do
-!                end if
-!
-!             ! ns physics
-!             elseif ( params%physics_type == '2D_navier_stokes' ) then
-!                 ! velocity field numbers
-!                 do dF = 1, N_dF
-!                     if ( params%physics_ns%names(dF) == "Ux" ) UxF = dF
-!                     if ( params%physics_ns%names(dF) == "Uy" ) UyF = dF
-!                     if ( params%physics_ns%names(dF) == "Uz" ) UzF = dF
-!                 end do
-!                 ! max velocity over all blocks
-!                 call get_block_max_velocity_norm( params, hvy_block, hvy_active, hvy_n, (/ UxF, UyF, UzF /), my_norm_u )
-!
-!                 ! synchronize
-!                 call MPI_Allreduce(my_norm_u, norm_u, 1, MPI_REAL8, MPI_MAX, MPI_COMM_WORLD, ierr)
-!
-!                 if (norm_u < 1e-12_rk) norm_u = 9e9_rk
-!
-!                 dt = minval((/dt, params%CFL * dx / norm_u /))
-!
-!             ! fixed value
-!             else
-!                 dt = params%dt
-!             end if
-!
-!         case('lvl_fixed')
-!
-!             ! find Jmax
-!             Jmax = max_active_level( lgt_block, lgt_active, lgt_n )
-!
-!             dt = params%dt / 2**Jmax
-!
-!         case default
-!             write(*,'(80("_"))')
-!             write(*,*) "ERROR: time stepper method ist unknown"
-!             write(*,*) params%time_step_calc
-!             stop
-!
-!     end select
-!     ! penalization stability criterion
-!     if (params%penalization) dt = minval( (/dt, 0.99_rk*params%eps_penal /) )
-
-10 continue
-
+    if (dt <= 0.0_rk) then
+      call abort(12131,"For some reason, we ended up with a negative or zero time step. This is not back to the future!!!")
+    endif
     ! --------------------------------------------------------------------------
     ! log time step to accii file
     ! --------------------------------------------------------------------------

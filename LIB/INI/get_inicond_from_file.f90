@@ -61,6 +61,7 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     ! start time
     t0 = MPI_wtime()
 
+    if (params%rank==0) write(*,*) "Reading initial condition from file"
 !---------------------------------------------------------------------------------------------
 ! main body
 

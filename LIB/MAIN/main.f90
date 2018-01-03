@@ -261,7 +261,7 @@ program main
     !---------------------------------------------------------------------------
     if (rank==0) write(*,*) "starting main time loop"
 
-    do while ( time < params%time_max .and. iteration<params%nt)
+    do while ( time<params%time_max .and. iteration<params%nt)
 
         ! new iteration
         iteration = iteration + 1

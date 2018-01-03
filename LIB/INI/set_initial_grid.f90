@@ -88,8 +88,15 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
     ! choose between reading from files and creating datafields analytically
     if (params%initial_cond == 'read_from_files') then
+        !-----------------------------------------------------------------------
+        ! read initial condition from file
+        !-----------------------------------------------------------------------
+        ! Note that reading from file is something all physics modules share - it
+        ! is a wabbit routine and not affiliated with a specific physics module
+        ! therefore, there is still a grid-level (=wabbit) parameter "params%initial_cond"
+        ! which can be read_from_files or anything else.
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
-        
+
     else
         !---------------------------------------------------------------------------
         ! Create the first mesh on the coarsest treelevel
@@ -175,6 +182,5 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-
 
 end subroutine set_initial_grid

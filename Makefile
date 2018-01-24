@@ -15,8 +15,6 @@ MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wra
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90
-# physics modules
-MFILED += module_2D_navier_stokes.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -65,7 +63,7 @@ FFLAGS += -I$(HDF_INC)
 endif
 
 # Both programs are compiled by default.
-all: directories wabbit #doc
+all: directories wabbit wabbit-post #doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)

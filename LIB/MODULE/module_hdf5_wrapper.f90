@@ -141,6 +141,27 @@ contains
     call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
   end subroutine close_file_hdf5
 
+  subroutine get_size_datafield_2D(file_id, dsetname, dims_file)
+    implicit none
+    integer, parameter                        :: datarank = 2 ! data dimensionality (2D or 3D)
+
+    integer(hid_t), intent(in)                :: file_id
+    character(len=*),intent(in)               :: dsetname
+    integer(hsize_t), dimension(datarank)     :: dims_file, dims_dummy
+    integer(hid_t)                            :: dset_id       ! dataset identifier
+    integer(hid_t)                            :: filespace     ! dataspace identifier in file
+    integer                                   :: error  ! error flags
+
+    ! Open an existing dataset.
+    call h5dopen_f(file_id, dsetname, dset_id, error)
+    ! get its dataspace
+    call h5dget_space_f(dset_id, filespace, error)
+    ! get the dimensions of the field in the file
+    call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
+    ! Close dataset
+    call h5dclose_f(dset_id, error)
+  end subroutine get_size_datafield_2D
+
   subroutine read_int_dset_mpi_hdf5_2D( file_id, dsetname, lbounds, ubounds, field )
     implicit none
     integer, parameter                        :: datarank = 2 ! data dimensionality (2D or 3D)

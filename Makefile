@@ -4,7 +4,7 @@ FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 RHS_2D_navier_stokes.f90 \
 RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 sponge.f90 init_physics_modules.f90
+startup_conditioner.f90 init_physics_modules.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -81,7 +81,7 @@ $(OBJDIR)/module_precision.o: module_precision.f90
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 \
+$(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -156,7 +156,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o \
+	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
 	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
 	read_mesh_and_attributes.f90 check_file_exists.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

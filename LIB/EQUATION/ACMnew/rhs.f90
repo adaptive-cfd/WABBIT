@@ -124,8 +124,12 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
       forcing = 0.0_rk
     end if
 
-    ! call sponge_2D(params_acm, sponge, x0, dx, Bs, g)
-    sponge=0.0_rk!alpha*sponge
+    if (params_acm%sponge_layer) then
+        call sponge_2D_NEW(sponge, x0, dx, Bs, g)
+        sponge = params_acm%alpha*sponge
+    end if
+
+    sponge=0.0_rk
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -149,7 +153,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 
                 div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy)*eps_inv*(u(ix,iy)-us(ix,iy,1)) !-alpha*sponge(ix,iy)*(u(ix,iy)-1.0_rk)
+                penalx = -mask(ix,iy)*eps_inv*(u(ix,iy)-us(ix,iy,1)) !-sponge(ix,iy)*(u(ix,iy)-1.0_rk)
                 penaly = -mask(ix,iy)*eps_inv*(v(ix,iy)-us(ix,iy,2))
 
                 rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx + forcing(1)

@@ -54,7 +54,9 @@ module module_acm_new
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
-    logical :: forcing, penalization,smooth_mask=.True.
+    logical :: forcing, penalization,smooth_mask=.True., sponge_layer
+    ! alpha for sponge
+    real(kind=rk) :: alpha
     integer(kind=ik) :: dim, N_fields_saved
     character(len=80) :: inicond, discretization, geometry="cylinder"
     character(len=80), allocatable :: names(:)
@@ -80,6 +82,7 @@ contains
   include "create_mask_new.f90"
   ! include "dt.f90"
   include "iniconds.f90"
+  include "sponge.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -130,6 +133,9 @@ contains
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
+    ! sponge layer:
+    call read_param_mpi(FILE, 'Physics', 'sponge_layer', params_acm%sponge_layer, .false.)
+    call read_param_mpi(FILE, 'Physics', 'alpha', params_acm%alpha, 100.0_rk)
 
     call clean_ini_file_mpi( FILE )
   end subroutine READ_PARAMETERS_ACM

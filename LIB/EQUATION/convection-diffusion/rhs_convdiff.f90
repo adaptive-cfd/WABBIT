@@ -44,6 +44,7 @@ subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv,nu
     real(kind=rk) :: u_dx, u_dy, u_dxdx, u_dydy
     real(kind=rk) :: u_dz, u_dzdz
+    real(kind=rk) :: xcb, ycb, beta, x,y
     ! loop variables
     integer(kind=ik) :: ix, iy, iz, i, N, ia1, ia2, ib1, ib2, ia, ib
     ! coefficients for Tam&Webb

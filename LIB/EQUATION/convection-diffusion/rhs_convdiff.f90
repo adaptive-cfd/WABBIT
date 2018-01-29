@@ -216,9 +216,12 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
   integer(kind=ik), intent(in) :: g, Bs, i
   real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
   real(kind=rk), intent(inout) :: u0(:,:,:)
+  ! note you cannot change these values without recomputing the coefficients
+  real(kind=rk), parameter :: tau= 0.30_rk, t0=0.0_rk, t1=0.55_rk, t2=1.0_rk, u1=1.0_rk, u2=-1.2221975311385904
+  real(kind=rk) :: u_this
 
   integer :: ix,iy, N
-  real(kind=rk) :: x,y,c0x,c0y, T
+  real(kind=rk) :: x,y,c0x,c0y, T, c0,c1,c2,c3
 
   u0 = 0.0_rk
 
@@ -229,6 +232,77 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
 
 
     select case(params_convdiff%velocity(i))
+    case ("swirl-nonsymmetric")
+
+      ! if ( time <= tau ) then
+      !   c0=-2.500000e+02
+      !   c1=7.500000e+01
+      !   c2=0.000000e+00
+      !   c3=0.000000e+00
+      !   u_this = c0*(time/T)**3 + c1*(time/T)**2 + c2*(time/T) + c3
+      !
+      ! elseif ((time>tau) .and. (time<t1-tau)) then
+      !   u_this = u1
+      !
+      ! elseif ((t1-tau<=time) .and. (time<=t1+tau)) then
+      !   c0=8.33333333752e+01
+      !   c1=-1.50000000075e+02
+      !   c2=8.00000000402e+01
+      !   c3=-1.23333333400e+01
+      !   u_this = c0*(time/T)**3 + c1*(time/T)**2 + c2*(time/T) + c3
+      !
+      ! elseif ((time>t1+tau) .and. (time<t2-tau)) then
+      !   u_this = u2
+      !
+      ! elseif (time>t2-tau) then
+      !   c0=-4.16666667002e+02
+      !   c1=1.12500000090e+03
+      !   c2=-1.00000000080e+03
+      !   c3=2.91666666901e+02
+      !   u_this = c0*(time/T)**3 + c1*(time/T)**2 + c2*(time/T) + c3
+      !
+      ! endif
+      !------------------------------------------------------------------------------------
+      if ( time/T <= t1-tau) then
+        u_this = u1
+
+      elseif ((time/T>t1-tau) .and. (time/T<t1+tau)) then
+        c0=2.0575903066098039e+01
+        c1=-3.3950240059061770e+01
+        c2=1.3117138204637506e+01
+        c3=-4.7889303287579738e-01
+
+        u_this = c0*(time/T)**3 + c1*(time/T)**2 + c2*(time/T) + c3
+
+      elseif (time/T>=t1+tau) then
+        u_this = u2
+
+      endif
+
+      ! if (params%rank==0) then
+        open(14,file='yo.t',status='unknown',position='append')
+        write (14,'(2(g15.8,1x))') time, u_this
+        close(14)
+      ! endif
+      !------------------------------------------------------------------------------------
+      ! if ( time/T <= 0.6666666666666666667_rk) then
+      !   u_this = 1.0
+      !
+      ! elseif (time/T>0.6666666666666666667_rk) then
+      !   u_this = -2.0
+      !
+      ! endif
+
+      do iy = 1, Bs + 2*g
+        do ix = 1, Bs + 2*g
+          x = dble(ix-(g+1)) * dx(1) + x0(1)
+          y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+          u0(ix,iy,1) = u_this * (sin(pi*x))**2 * sin(2*pi*y)
+          u0(ix,iy,2) = u_this * (sin(pi*y))**2 * (-sin(2*pi*x))
+        enddo
+      enddo
+
     case ("swirl")
 
       do iy = 1, Bs + 2*g
@@ -247,7 +321,7 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
       u0(:,:,2) = params_convdiff%u0y(i)
 
     case default
-      call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field')
+      call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')
 
     end select
   endif

@@ -7,15 +7,15 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief computation of the velocity volume integral 
+!> \brief computation of the velocity volume integral
 !
 !>
-!! input:    
+!! input:
 !!           - heavy block data
 !!           - params
 !!           - hvy_active, lgt_block list
 !!
-!! output:   
+!! output:
 !!           - volume integral
 !!
 !!
@@ -55,9 +55,9 @@ subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt
     !> loop variables
     integer(kind=ik)                         :: k, lgt_id
     !> MPI error
-    logical                                  :: mpi_err
+    integer                                  :: mpi_err
 
-   
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -78,8 +78,8 @@ subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt
 
        ! get block spacing for RHS
        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-       
-       if (params%threeD_case) then 
+
+       if (params%threeD_case) then
            int_block(1) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1,hvy_active(k)))*dx(1)*dx(2)*dx(3)
            int_block(2) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,2,hvy_active(k)))*dx(1)*dx(2)*dx(3)
            int_block(3) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,3,hvy_active(k)))*dx(1)*dx(2)*dx(3)
@@ -89,12 +89,12 @@ subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt
        end if
 
        int_local = int_local + int_block
-   
+
     end do
 
 
    call MPI_ALLREDUCE(int_local, volume_int, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpi_err)
 
 
-   
+
 end subroutine volume_integral

@@ -24,7 +24,9 @@ VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion
 
 # Set the default compiler if it's not already set
+ifndef $(FC)
 FC = mpif90
+endif
 
 #-------------------------------------------------------------------------------
 # COMPILER-DEPENDEND PART
@@ -40,10 +42,11 @@ PPFLAG= -cpp #preprocessor flag
 FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
 FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
-# HDF_ROOT is set in environment.
-HDF_LIB = $(HDF_ROOT)/lib64
+# HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
+# to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
+HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
@@ -52,13 +55,13 @@ mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG= -fpp
 FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
-
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
-# HDF_ROOT is set in environment.
-HDF_LIB = $(HDF_ROOT)/lib64
+# HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
+# to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
+HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
@@ -154,7 +157,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o \
+	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
 	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
 	read_mesh_and_attributes.f90 check_file_exists.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

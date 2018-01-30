@@ -75,7 +75,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               call lgt_id_to_hvy_id( hvy_id, lgt_blocks_to_gather(i), owner_rank, params%number_blocks )
 
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-              call MPI_send( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, MPI_COMM_WORLD, status, ierr)
+              call MPI_send( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, MPI_COMM_WORLD, ierr)
 
               ! delete old heavy data
               hvy_block(:,:,:,:,hvy_id) = 4.0e11_rk

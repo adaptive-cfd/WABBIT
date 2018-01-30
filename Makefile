@@ -24,7 +24,9 @@ VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion
 
 # Set the default compiler if it's not already set
+ifndef $(FC)
 FC = mpif90
+endif
 
 #-------------------------------------------------------------------------------
 # COMPILER-DEPENDEND PART
@@ -40,10 +42,11 @@ PPFLAG= -cpp #preprocessor flag
 FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
 FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
-# HDF_ROOT is set in environment.
-HDF_LIB = $(HDF_ROOT)/lib64
+# HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
+# to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
+HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
@@ -52,18 +55,18 @@ mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG= -fpp
 FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
-
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
-# HDF_ROOT is set in environment.
-HDF_LIB = $(HDF_ROOT)/lib64
+# HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
+# to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
+HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
 
 # Both programs are compiled by default.
-all: directories wabbit #wabbit-post #doc
+all: directories wabbit #doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)

@@ -34,7 +34,7 @@
 !!
 !! This array is used for load balancing data exchange. \n
 !!
-!! |dimension 1,2               |dimension 3| dimension 4|
+!! |dimension 1,2,3             |dimension 3| dimension 4|
 !! |----------------------------|-----------|------------|
 !! |node data (with ghost nodes)|datafield  |block id    |
 !!
@@ -43,7 +43,7 @@
 !!
 !! This array is not used for data exchange. \n
 !!
-!! |dimension 1,2               |dimension 3             | dimension 4|
+!! |dimension 1,2,3             |dimension 3             | dimension 4|
 !! |----------------------------|------------------------|------------|
 !! |node data (with ghost nodes)|RK stage and datafield  |block id    |
 !!

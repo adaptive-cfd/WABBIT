@@ -48,7 +48,6 @@ contains
 
     include "unit_test_wavelet_compression.f90"
 
-    !include "unit_test_time_stepper_swirl.f90"
     include "unit_test_treecode.f90"
 
 end module module_unit_test

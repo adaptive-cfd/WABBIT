@@ -154,7 +154,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
         ! want to continue with greater max_treevel, read old treecode and fill up the rest with -1
     else
         ! treecode in input file is greater than the new one, abort and output on screen
-        write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible. aarrrrrrrrrrr!",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') params%max_treelevel, dims_treecode(1)
+        write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') params%max_treelevel, dims_treecode(1)
         call MPI_ABORT( MPI_COMM_WORLD, 10004, ierr)
     end if
 

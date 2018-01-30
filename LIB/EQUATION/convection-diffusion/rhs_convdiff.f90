@@ -3,22 +3,22 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name RHS_2D_acm.f90
+!> \name RHS_2D_convdiff_new.f90
 !> \version 0.5
-!> \author engels, sm
+!> \author msr, engels
 !
-!> \brief RHS for 2D artificial compressibility method
+!> \brief rhs for 2D convection diffusion equation
 !
 !>
-!! input:    - datafield, grid parameter, derivative order \n
+!! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
 !! output:   - RHS(datafield) \n
 !!
 !!
 !! = log ======================================================================================
 !! \n
-!! 27/06/17 - create
+!! 10/11/16 - switch to v0.4
+!!    12/17 - new convection diffusion module (new physics structure)
 ! ********************************************************************************************
-
 subroutine RHS_2D_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
 
 !---------------------------------------------------------------------------------------------

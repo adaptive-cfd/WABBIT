@@ -126,7 +126,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! calculate time step
     call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt)
 
-
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -145,7 +144,6 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     do j = 2, size(rk_coeffs, 1)-1
         ! prepare input for the RK substep
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
-
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid

@@ -37,29 +37,29 @@ def do_test(rootdir, name):
 
 
 #%% convection
-plt.close('all')
-plt.rcParams["text.usetex"] = True
-
-do_test("A_CONV/adapt1","CONV adap-4th-4th-4th (CFL=1.0)")
-do_test("A_CONV/adapt2","CONV adap-2nd-2nd-4th (CFL=1.0)")
-do_test("A_CONV/adapt3","CONV adap-4th-4th-4th (CFL=0.1)")
-
-
-plt.figure(1)
-plt.grid()
-plt.xlabel('$\\varepsilon$')
-plt.ylabel('$||\phi-\phi_{\\mathrm{ex}}||_2/||\phi_{\\mathrm{ex}}||_2$')
-plt.legend()#loc='upper left', bbox_to_anchor=(0,1.02,1,0.2), prop={'size': 6})
-plt.gcf().subplots_adjust(top=0.82)
-plt.gcf().savefig('conv-adaptive-eps.pdf')
-
-plt.figure(2)
-plt.grid()
-plt.xlabel('$\\varepsilon$')
-plt.ylabel('$\max\\left({N_{b}(t)}\\right)$')
-plt.legend()#loc='upper left', bbox_to_anchor=(0,1.02,1,0.2), prop={'size': 6})
-plt.gcf().subplots_adjust(top=0.82)
-plt.gcf().savefig('conv-adaptive-nblocks.pdf')
+#plt.close('all')
+#plt.rcParams["text.usetex"] = True
+#
+#do_test("A_CONV/adapt1","CONV adap-4th-4th-4th (CFL=1.0)")
+#do_test("A_CONV/adapt2","CONV adap-2nd-2nd-4th (CFL=1.0)")
+#do_test("A_CONV/adapt3","CONV adap-4th-4th-4th (CFL=0.1)")
+#
+#
+#plt.figure(1)
+#plt.grid()
+#plt.xlabel('$\\varepsilon$')
+#plt.ylabel('$||\phi-\phi_{\\mathrm{ex}}||_2/||\phi_{\\mathrm{ex}}||_2$')
+#plt.legend()#loc='upper left', bbox_to_anchor=(0,1.02,1,0.2), prop={'size': 6})
+#plt.gcf().subplots_adjust(top=0.82)
+#plt.gcf().savefig('conv-adaptive-eps.pdf')
+#
+#plt.figure(2)
+#plt.grid()
+#plt.xlabel('$\\varepsilon$')
+#plt.ylabel('$\max\\left({N_{b}(t)}\\right)$')
+#plt.legend()#loc='upper left', bbox_to_anchor=(0,1.02,1,0.2), prop={'size': 6})
+#plt.gcf().subplots_adjust(top=0.82)
+#plt.gcf().savefig('conv-adaptive-nblocks.pdf')
 
 
 #%% swirl

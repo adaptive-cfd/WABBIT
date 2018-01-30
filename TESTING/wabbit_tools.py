@@ -10,6 +10,8 @@ def read_wabbit_hdf5(file, return_treecode=False):
     import h5py
     import numpy as np
 
+
+
     fid = h5py.File(file,'r')
     b = fid['coords_origin'][:]
     x0 = np.array(b, dtype=float)
@@ -31,11 +33,17 @@ def read_wabbit_hdf5(file, return_treecode=False):
     iteration = dset_id.attrs.get('iteration')
     box = dset_id.attrs.get('domain-size')
 
-
     fid.close()
 
+    jmin, jmax = get_max_min_level( treecode )
     N = data.shape[0]
     Bs = data.shape[1]
+
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("Reading file %s" % (file) )
+    print("Time=%e it=%i N=%i Bs=%i Jmin=%i Jmax=%i" % (time, iteration, N, Bs, jmin, jmax) )
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~")
+
 
     if return_treecode:
         return data, x0, dx, time, N, Bs, treecode
@@ -286,20 +294,31 @@ def get_max_min_level( treecode ):
 
 
 def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=True, mark_blocks=True, gridonly=False, contour=False ):
+    """ Read a (2D) wabbit file and plot it as a pseudocolor plot.
+
+    Keyword arguments:
+        * savepng directly store a image file
+        * cmap colormap for data
+        * caxis manually specify glbal min / max for color plot
+    """
     import numpy as np
     import matplotlib.patches as patches
     import matplotlib.pyplot as plt
 
-
-
+    # read file
     data, x0, dx, time, N, Bs, treecode = read_wabbit_hdf5(file, return_treecode=True)
 
-    min_level, max_level = get_max_min_level( treecode )
-#    print(min_level, max_level)
-    h =[]
+    # we need these lists to modify the colorscale, as each block usually gets its own
+    # and we would rather like to have a global one.
+    h = []
     c1 = []
     c2 = []
+    # clear current figure
     plt.gcf().clf()
+
+    # if only the grid is plotted, we use grayscale for the blocks, and for
+    # proper scaling we need to know the max/min level in the grid
+    jmin, jmax = get_max_min_level( treecode )
 
     for i in range(N):
         if not gridonly:
@@ -341,56 +360,80 @@ def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=Tru
 
     if title:
         plt.title( "t=%f Nb=%i Bs=%i" % (time,N,Bs) )
-#    plt.axis('equal')
-    plt.axis('tight')
+    plt.axis('equal')
     plt.gcf().canvas.draw()
-
 
     if savepng:
         plt.savefig( file.replace('h5','png') )
 
 
+#%%
 def to_dense_grid( fname, ofile):
+    """ Convert a WABBIT grid to a full dense grid in a single matrix.
+
+    We asssume here that interpolation has already been performed, i.e. all
+    blocks are on the same (finest) level.
+    """
     import numpy as np
     import insect_tools
     import matplotlib.pyplot as plt
+
     data, x0, dx, time, N, Bs, treecode = read_wabbit_hdf5(fname, return_treecode=True)
 
-    jmin, jmax = get_max_min_level( treecode )
-
-    if jmin != jmax:
-        print("ERROR! not an equidistant grid yet...")
-
-    # note skipping of redundant points, hence the -1
-    ny = int( np.sqrt(N)*(Bs-1))
-    nx = int( np.sqrt(N)*(Bs-1))
-    # all spacings should be the same - it does not matter which one we use.
-    ddx = dx[0,0]
-
-
-    print(np.max(data))
-
-    print("Number of blocks %i" % (N))
-    print("Dense field resolution %i x %i" % (nx, ny) )
-    print("Spacing %e domain %e" % (ddx, ddx*nx))
-
-    field = np.zeros([nx,ny])
-
-    for i in range(N):
-        ix0=int(x0[i,0]/dx[i,0])
-        iy0=int(x0[i,1]/dx[i,1])
-        field[ ix0:ix0+Bs-1, iy0:iy0+Bs-1 ] = data[i,0:-1,0:-1]
+    field, box = dense_matrix(  x0, dx, data, treecode )
 
     plt.figure()
     plt.pcolormesh(field)
     plt.axis('equal')
     plt.colorbar()
 
-    insect_tools.write_flusi_HDF5( ofile, time, [ddx*nx, ddx*nx], field)
+    insect_tools.write_flusi_HDF5( ofile, time, box, field)
 
+#%%
+def dense_matrix(  x0, dx, data, treecode ):
+    import numpy as np
+    """ Convert a WABBIT grid to a full dense grid in a single matrix.
 
+    We asssume here that interpolation has already been performed, i.e. all
+    blocks are on the same (finest) level.
 
+    returns the full matrix and the domain size
+    """
+    # number of blocks
+    N = data.shape[0]
+    # size of each block
+    Bs = data.shape[1]
 
+    # check if all blocks are on the same level or not
+    jmin, jmax = get_max_min_level( treecode )
+    if jmin != jmax:
+        print("ERROR! not an equidistant grid yet...")
+
+    # note skipping of redundant points, hence the -1
+    ny = int( np.sqrt(N)*(Bs-1) )
+    nx = int( np.sqrt(N)*(Bs-1) )
+    # all spacings should be the same - it does not matter which one we use.
+    ddx = dx[0,0]
+
+    print("Number of blocks %i" % (N))
+    print("Dense field resolution %i x %i" % (nx, ny) )
+    print("Spacing %e domain %e" % (ddx, ddx*nx))
+
+    # allocate target field
+    field = np.zeros([nx,ny])
+
+    for i in range(N):
+        # get starting index of block
+        ix0 = int(x0[i,0]/dx[i,0])
+        iy0 = int(x0[i,1]/dx[i,1])
+
+        # copy block content to data field
+        field[ ix0:ix0+Bs-1, iy0:iy0+Bs-1 ] = data[i,0:-1,0:-1]
+
+    # domain size
+    box = [dx[0,0]*nx, dx[0,1]*ny]
+
+    return(field, box)
 
 #plot_wabbit_file('B_SWIRL/adaptive1_swirl-tough_0_5.0e-5/phi_000000000000.h5', cmap='gray', contour=True, mark_blocks=True)
 #plot_wabbit_file('B_SWIRL/adaptive1_swirl-tough_0_5.0e-5/phi_000010000000.h5', cmap='gray', contour=True, mark_blocks=True)
@@ -400,5 +443,5 @@ def to_dense_grid( fname, ofile):
 #print(err)
 
 #to_dense_grid('../shear-mario/fixed/Uy_000003000000.h5', '../shear-mario/fixed/denseUy_000003000000.h5')
-to_dense_grid('../shear-mario/1e-2/Uy_000004000000.h5', '../shear-mario/1e-2/denseUy_000004000000.h5')
-to_dense_grid('../shear-mario/1e-2/Ux_000004000000.h5', '../shear-mario/1e-2/denseUx_000004000000.h5')
+#to_dense_grid('../shear-mario/1e-2/Uy_000004000000.h5', '../shear-mario/1e-2/denseUy_000004000000.h5')
+#to_dense_grid('../shear-mario/1e-2/Ux_000004000000.h5', '../shear-mario/1e-2/denseUx_000004000000.h5')

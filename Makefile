@@ -63,7 +63,7 @@ FFLAGS += -I$(HDF_INC)
 endif
 
 # Both programs are compiled by default.
-all: directories wabbit wabbit-post #doc
+all: directories wabbit #doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)

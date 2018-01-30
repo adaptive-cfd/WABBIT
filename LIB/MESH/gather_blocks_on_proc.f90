@@ -36,6 +36,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
 
   integer(kind=ik) :: i, hvy_id, owner_rank, myrank, npoints
   integer(kind=ik) :: lgt_free_id, tag, hvy_free_id, ierr
+  integer :: status(MPI_STATUS_SIZE)
 
   myrank = params%rank
 
@@ -63,7 +64,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, myrank, params%number_blocks )
 
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-              call MPI_recv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, tag, MPI_COMM_WORLD, ierr)
+              call MPI_recv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, tag, MPI_COMM_WORLD, status, ierr)
 
           elseif ( myrank == owner_rank) then
               ! Am I the owner of this block, so will I have to send data?

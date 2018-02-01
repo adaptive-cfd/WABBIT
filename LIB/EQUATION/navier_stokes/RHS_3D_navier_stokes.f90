@@ -20,31 +20,24 @@
 !
 ! ********************************************************************************************
 
-subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
+subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
     ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
-
-    !> physics parameter structure
-    type (type_params_physics_navier_stokes), intent(in)    :: params
-
     !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
     !> rhs parameter
     real(kind=rk), intent(in)                               :: dx, dy, dz
 
-    !> number of datafields
-    integer(kind=ik), intent(in)                            :: N_dF
     !> datafields
-    real(kind=rk), intent(inout)                            :: phi(Bs+2*g, Bs+2*g, Bs+2*g, N_dF)
+    real(kind=rk), intent(in)                              :: phi(:, :, :, :)
 
      ! adiabatic coefficient
     real(kind=rk)                                           :: gamma_
@@ -76,7 +69,7 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
                                                                T_x(Bs+2*g, Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g, Bs+2*g), T_z(Bs+2*g, Bs+2*g, Bs+2*g), &
                                                                div_U(Bs+2*g, Bs+2*g, Bs+2*g)
     ! rhs array
-    real(kind=rk)                                           :: rhs(Bs+2*g, Bs+2*g, Bs+2*g, N_dF)
+    real(kind=rk)                                           :: rhs(:, :, :,:)
 
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g, Bs+2*g)
@@ -88,13 +81,13 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
 ! variables initialization
 
     ! set physics parameters for readability
-    gamma_      = params%gamma_
-    Rs          = params%Rs
-    Cv          = params%Cv
-    Cp          = params%Cp
-    Pr          = params%Pr
-    mu0         = params%mu0
-    dissipation = params%dissipation
+    gamma_      = params_ns%gamma_
+    Rs          = params_ns%Rs
+    Cv          = params_ns%Cv
+    Cp          = params_ns%Cp
+    Pr          = params_ns%Pr
+    mu0         = params_ns%mu0
+    dissipation = params_ns%dissipation
 
     ! variables
     rho         = phi(:,:,:,1)**2
@@ -312,9 +305,6 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
     rhs(:,:,:,4) = rhs(:,:,:,4) / phi(:,:,:,1)
 
     rhs(:,:,:,4) = rhs(:,:,:,4) + fric_w
-
-    ! return rhs
-    phi = rhs
 
 end subroutine RHS_3D_navier_stokes
 

@@ -1,9 +1,12 @@
+#HDF_ROOT=/home/philipp/master_PI/code/libs/hdf5-fortran/hdf5
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib
+#export LD_RUN_PATH=$LD_LIBRARY_PATH
+
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
-RHS_2D_navier_stokes.f90 \
-RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
+f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
 startup_conditioner.f90 init_physics_modules.f90
 
 # Object and module directory:
@@ -14,14 +17,14 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
-	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90
+	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_navier_stokes_new.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
-VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion
+VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/EQUATION/navier_stokes
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -79,10 +82,11 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o \
+	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 RHS_2D_navier_stokes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge.f90 \
+$(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -90,7 +94,7 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser_mpi.o \
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o \
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

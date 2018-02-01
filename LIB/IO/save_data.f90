@@ -75,7 +75,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    if (params%physics_type=='ACM-new' .or.params%physics_type=='ConvDiff-new') then ! TODO: remove this line.
       ! preparatory step. The physics modules have to copy everything they want to
       ! save to disk to the work array. missing qty's shall be computed.
       do k = 1, hvy_n
@@ -131,32 +130,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
       enddo
 
       call toc( params, "save_data", MPI_wtime()-t0 )
-      !!!!!!
-      ! TODO: this will be the end of the new routine,  once all physics modules are renewed.
       return
-      !!!!!!
-    endif
- ! -- TODO: remove, once all physics modules are renewed.
- ! all following lines
-    do k = 1, params%number_data_fields
-
-        ! file name depends on variable names
-        select case(params%physics_type)
-            case('2D_navier_stokes','3D_navier_stokes')
-                ! select corresponding datafield name
-                write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(params%physics_ns%names(k))), nint(time * 1.0e6_rk)
-
-            case default
-                write(*,'(80("_"))')
-                write(*,*) "ERROR: physics type is unknown - can not save data"
-                stop
-
-        end select
-
-        call write_field( fname, time, iteration, k, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
-    end do
-
-    ! timing
-    call toc( params, "save_data", MPI_wtime()-t0 )
+  
 
 end subroutine save_data

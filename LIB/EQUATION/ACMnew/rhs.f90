@@ -125,7 +125,10 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     end if
 
     if (params_acm%sponge_layer) then
-        call sponge_2D_NEW(sponge, x0, dx, Bs, g)
+        !call sponge_2D_NEW(sponge, x0, dx, Bs, g)
+        write(*,*) "[rhs.f90] ERROR! no sponge_2D_NEW in repository!!! commit!"
+        stop
+        !> \todo commit sponge_2D_NEW
         sponge = params_acm%alpha*sponge
     end if
 

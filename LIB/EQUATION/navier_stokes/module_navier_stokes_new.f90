@@ -224,7 +224,7 @@ contains
 
     ! ---------------------------------
     ! save all datafields in u
-    work(:,:,:,:)=u(:,:,:,:)
+    work(:,:,:,1:size(u,4))=u(:,:,:,:)
     ! ---------------------------------
 
 
@@ -254,8 +254,6 @@ contains
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
         work(:,:,:,vort_ind(1:3))=vort(:,:,:,1:3) 
-    else 
-        call abort(123,"[module_navier_stokes.f90] don´t start spinning arround.")
     endif
     deallocate(vort)
 

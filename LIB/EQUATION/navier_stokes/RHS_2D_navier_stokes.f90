@@ -35,6 +35,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
     real(kind=rk), intent(in)                               :: dx, dy
     !> datafields
     real(kind=rk), intent(in)                            :: phi(:, :, :)
+    ! rhs array
+    real(kind=rk), intent(inout)                            :: rhs(:, :, :)
 
      ! adiabatic coefficient
     real(kind=rk)                                           :: gamma_
@@ -62,8 +64,6 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
     real(kind=rk)                                           :: u_x(Bs+2*g, Bs+2*g), u_y(Bs+2*g, Bs+2*g), v_x(Bs+2*g, Bs+2*g), v_y(Bs+2*g, Bs+2*g), &
                                                                p_x(Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g), T_x(Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g),&
                                                                div_U(Bs+2*g, Bs+2*g)
-    ! rhs array
-    real(kind=rk)                                           :: rhs(:, :, :)
 
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g)

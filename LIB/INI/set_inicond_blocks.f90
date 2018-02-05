@@ -65,8 +65,11 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
         case ("ConvDiff-new")
           call INICOND_ConvDiff( 0.0_rk, hvy_block(:,:,:,:,hvy_id), g, x0, dx )
 
+        case ("navier_stokes")
+          call INICOND_NStokes( 0.0_rk, hvy_block(:,:,:,:,hvy_id), g, x0, dx )
+
         case default
-          call abort(999,"unkown params%physics_type. Its getting hard to find qualified personel.")
+          call abort(999,"[set_inicond_blocks.f90:] unkown params%physics_type. Its getting hard to find qualified personel.")
 
         end select
     enddo

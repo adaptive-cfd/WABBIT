@@ -35,11 +35,12 @@ subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
     integer(kind=ik), intent(in)                            :: g, Bs
     !> rhs parameter
     real(kind=rk), intent(in)                               :: dx, dy, dz
-
     !> datafields
     real(kind=rk), intent(in)                              :: phi(:, :, :, :)
+    ! rhs array
+    real(kind=rk),intent(out)                               :: rhs(:, :, :,:)
 
-     ! adiabatic coefficient
+     ! adiabatic coefficien t
     real(kind=rk)                                           :: gamma_
     ! specific gas constant
     real(kind=rk)                                           :: Rs
@@ -68,8 +69,6 @@ subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
                                                                p_x(Bs+2*g, Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g, Bs+2*g), p_z(Bs+2*g, Bs+2*g, Bs+2*g), &
                                                                T_x(Bs+2*g, Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g, Bs+2*g), T_z(Bs+2*g, Bs+2*g, Bs+2*g), &
                                                                div_U(Bs+2*g, Bs+2*g, Bs+2*g)
-    ! rhs array
-    real(kind=rk)                                           :: rhs(:, :, :,:)
 
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g, Bs+2*g)

@@ -36,6 +36,7 @@ module module_IO
     use module_operators, only: compute_vorticity
 use module_ACM_new
 use module_ConvDiff_new
+use module_navier_stokes_new
 !---------------------------------------------------------------------------------------------
 ! variables
 

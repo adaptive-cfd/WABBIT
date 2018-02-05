@@ -97,8 +97,12 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
           call PREPARE_SAVE_DATA_convdiff( time, hvy_block(:,:,:,:,hvy_active(k)), &
           params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
 
+        case ('navier_stokes')
+          call PREPARE_SAVE_DATA_NStokes( time, hvy_block(:,:,:,:,hvy_active(k)), &
+          params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
+
         case default
-          call abort(88119, "unknown physics....")
+          call abort(88119, "[save_data:] unknown physics....")
 
         end select
 
@@ -117,8 +121,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         case ('ConvDiff-new')
           call FIELD_NAMES_convdiff(k, tmp)
 
+         case ('navier_stokes')
+          call FIELD_NAMES_NStokes(k,tmp)
+        
         case default
-          call abort(88119, "unknown physics....")
+          call abort(88119, "[save_data:] unknown physics....")
 
         end select
 

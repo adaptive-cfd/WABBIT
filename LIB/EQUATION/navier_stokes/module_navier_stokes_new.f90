@@ -27,7 +27,8 @@ module module_navier_stokes_new
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity
-  
+  ! generic initial condition
+  use module_initial_conditions
   use mpi
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -48,9 +49,9 @@ module module_navier_stokes_new
   ! and the like. only visible here.
   type :: type_params_ns
         ! Courant-Friedrichs-Lewy 
-        real(kind=rk) :: CFL, T_end
+        real(kind=rk)                               :: CFL, T_end
         ! spatial domain
-        real(kind=rk) :: Lx, Ly, Lz
+        real(kind=rk)                               :: Lx, Ly, Lz
         ! number data fields
         integer(kind=ik)                            :: number_data_fields
         ! dimension
@@ -67,10 +68,14 @@ module module_navier_stokes_new
         real(kind=rk)                               :: Pr
         ! dynamic viscosity
         real(kind=rk)                               :: mu0
+        ! width of initialcond
+        real(kind=rk)                               :: inicond_width
         ! dissipation switch
         logical                                     :: dissipation
         ! variable names
         character(len=80), allocatable              :: names(:)
+        ! înitial condition
+        character(len=80)                           :: inicond
         ! discretization
         character(len=80)                           :: discretization
 
@@ -109,7 +114,6 @@ contains
     type(inifile) :: FILE
     integer(kind=ik)            :: dF
       
-
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
@@ -118,12 +122,12 @@ contains
      ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
     !error case: try to solve navier stokes equation with less or more than 5 datafields
-    if ( params_ns%number_data_fields /= 5) then
-        write(*,'(80("_"))')
-        write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params_ns%number_data_fields
-        stop
-    end if
-    !===================================================================
+    ! if ( params_ns%number_data_fields /= 5) then
+    !     write(*,'(80("_"))')
+    !     write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params_ns%number_data_fields
+    !     stop
+    ! end if
+    ! !===================================================================
     ! physics parameter
     !===================================================================
     ! dimension
@@ -133,40 +137,36 @@ contains
     call read_param_mpi(FILE, 'DomainSize', 'Ly', params_ns%Ly, 1.0_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Lz', params_ns%Lz, 0.0_rk )
     ! read adiabatic coefficient
-    call read_param_mpi(FILE, 'Physics', 'gamma_', params_ns%gamma_, 0.0_rk )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'gamma_', params_ns%gamma_, 0.0_rk )
     ! read specific gas constant
-    call read_param_mpi(FILE, 'Physics', 'Rs', params_ns%Rs, 0.0_rk )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'Rs', params_ns%Rs, 0.0_rk )
     ! calculate isochoric heat capacity
     params_ns%Cv = params_ns%Rs/(params_ns%gamma_-1.0_rk)
     ! calculate isobaric heat capacity
     params_ns%Cp = params_ns%Rs*params_ns%gamma_
     ! read prandtl number
-    call read_param_mpi(FILE, 'Physics', 'Pr', params_ns%Pr, 0.0_rk )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'Pr', params_ns%Pr, 0.0_rk )
     ! read dynamic viscosity
-    call read_param_mpi(FILE, 'Physics', 'mu0', params_ns%mu0, 0.0_rk )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'mu0', params_ns%mu0, 0.0_rk )
     ! read switch to turn on|off dissipation
-    call read_param_mpi(FILE, 'Physics', 'dissipation', params_ns%dissipation, .true. )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'dissipation', params_ns%dissipation, .true. )
+    ! read initial conditions
+    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond', params_ns%inicond, "pressure_blob" )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, 0.1_rk )
+    
 
   ! read variable names
     ! allocate names list
     allocate( params_ns%names( params_ns%number_data_fields ) )
     params_ns%names = "---"
     ! read file
-    call read_param_mpi(FILE, 'Physics', 'names_ns', params_ns%names, params_ns%names )
+    call read_param_mpi(FILE, 'Saving', 'field_names', params_ns%names, params_ns%names )
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
-    allocate( params_ns%names(1:params_ns%N_fields_saved))
-          ! allocate names list
-    allocate( params_ns%names( params_ns%number_data_fields ) )
-    params_ns%names = "---"
-                ! read file
-    call read_param_mpi(FILE, 'Physics', 'names_ns', params_ns%names, params_ns%names )
-
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk   )
-
     ! set global parameters pF,rohF, UxF etc
     UzF=-1
     do dF = 1, params_ns%number_data_fields
@@ -344,7 +344,7 @@ contains
       !
       ! called for each block.
       if (size(u,3)==1) then
-        !call RHS_2D_navier_stokes(g, Bs, dx(1),dx(2), u(:,:,1,:), rhs)
+        call RHS_2D_navier_stokes(g, Bs, dx(1),dx(2),u(:,:,1,:), rhs(:,:,1,:))
       else  
         call RHS_3D_navier_stokes(g, Bs, dx(1),dx(2),dx(3), u, rhs)
       endif
@@ -432,41 +432,42 @@ contains
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     integer(kind=ik) :: ix, iy, Bs,i
-    real(kind=rk) :: x,y,c0x,c0y
+    real(kind=rk) :: x,y,rho0,p0
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
     u = 0.0_rk
 
-    ! do i = 1, params_ns%N_scalars
-    !   c0x = params_NStokes%x0(i)
-    !   c0y = params_NStokes%y0(i)
+    select case( params_ns%inicond )
+    case ("sinus_2d","sinus2d","sin2d")
+    !> \todo implement sinus_2d inicondition
+    call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))             
+    case ("zeros")
+        u = 0.0_rk    
+    case ("pressure_blob")
+        
+        rho0 = 1.0_rk
+        p0 = 1.0e5_rk
+        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )   
+        ! add ambient pressure
+        u( :, :, :, pF) = p0 + 1000.0_rk * u( :, :, :, pF)
+        ! set rho
+        u( :, :, :, rhoF) = rho0
+        ! set Ux
+        u( :, :, :, UxF) = 0.0_rk
+        ! set Uy
+        u( :, :, :, UyF) = 0.0_rk
 
-    !   select case (params_NStokes%inicond(i))
-    !   case("blob")
-    !     ! create gauss pulse
-    !     do ix = g+1,Bs+g
-    !       do iy = g+1,Bs+g
-    !         ! compute x,y coordinates from spacing and origin
-    !         x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-    !         y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+        if (size(u,3).ne.1) then
+            ! set Uz to zero
+            u( :, :, :, UzF) = 0.0_rk
+        endif
 
-    !         if (x<-params_NStokes%Lx/2.0) x = x + params_NStokes%Lx
-    !         if (x>params_NStokes%Lx/2.0) x = x - params_NStokes%Lx
-
-    !         if (y<-params_NStokes%Ly/2.0) y = y + params_NStokes%Ly
-    !         if (y>params_NStokes%Ly/2.0) y = y - params_NStokes%Ly
-
-    !         ! set actual inicond gauss blob
-    !         u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_NStokes%blob_width(i) )
-    !       end do
-    !     end do
-    !   case default
-    !     write(*,*) "errorrroororor"
-    !   end select
-    !enddo
-
+    case default
+        call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))   
+    end select
+    
 
   end subroutine INICOND_NStokes
 

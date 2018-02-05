@@ -214,24 +214,50 @@ contains
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
+    ! output in work array.
+    real(kind=rk), allocatable :: vort(:,:,:,:)
+
     ! local variables
-    integer(kind=ik) :: neqn, nwork, Bs, dF
+    integer(kind=ik) ::  Bs, dF,vort_ind(3)
 
     Bs = size(u,1)-2*g
 
-    ! copy state vector
-    !work(:,:,:,1:size(u,4)) = u(:,:,:,:)
-    if (size(u,3)==1) then
-          work(:,:,:,1) = u(:,:,:,UxF)/u(:,:,:,rhoF)**2 !u
-          work(:,:,:,2) = u(:,:,:,UyF)/u(:,:,:,rhoF)**2 !v
-    else
-        work(:,:,:,1) = u(:,:,:,UxF)/u(:,:,:,rhoF)**2 !u
-        work(:,:,:,2) = u(:,:,:,UyF)/u(:,:,:,rhoF)**2 !v
-        work(:,:,:,3) = u(:,:,:,UzF)/u(:,:,:,rhoF)**2 !w
-    endif
+    ! ---------------------------------
+    ! save all datafields in u
+    work(:,:,:,:)=u(:,:,:,:)
+    ! ---------------------------------
 
-    ! vorticity
-    call compute_vorticity(work(:,:,:,1), work(:,:,:,2), work(:,:,:,3), dx, Bs, g, params_ns%discretization,work(:,:,:,4:6))
+
+
+    ! if vorticity is in filed names compute it and write it to file
+    vort_ind=-1
+    do dF=1,params_ns%number_data_fields
+        if(params_ns%names(dF)=='wx')   vort_ind(1)=dF
+        if(params_ns%names(dF)=='wy')   vort_ind(2)=dF
+        if(params_ns%names(dF)=='wz')   vort_ind(3)=dF
+    enddo
+    ! compute vorticity
+    allocate(vort(size(u,1),size(u,2),size(u,3),3))
+    if (vort_ind(1) .ne. -1 .and. vort_ind(2) .ne. -1) then
+        ! only wx,wy (2D - case)
+        call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF)**2, &
+                                 u(:,:,:,UyF)/u(:,:,:,rhoF)**2, &
+                                 u(:,:,:,UzF)/u(:,:,:,rhoF)**2, &
+                                 dx, Bs, g, params_ns%discretization, &
+                                 vort)
+        work(:,:,:,vort_ind(1:2))=vort(:,:,:,1:2) 
+    elseif (vort_ind(1).ne. -1 .and. vort_ind(2).ne. -1 .and. vort_ind(3).ne. -1 ) then
+        ! wx,wy,wz (3D - case)
+        call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF)**2, &
+                                 u(:,:,:,UyF)/u(:,:,:,rhoF)**2, &
+                                 u(:,:,:,UzF)/u(:,:,:,rhoF)**2, &
+                                 dx, Bs, g, params_ns%discretization, &
+                                 vort)
+        work(:,:,:,vort_ind(1:3))=vort(:,:,:,1:3) 
+    else 
+        call abort(123,"[module_navier_stokes.f90] don´t start spinning arround.")
+    endif
+    deallocate(vort)
 
     ! mask
     !call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )

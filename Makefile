@@ -1,6 +1,3 @@
-#HDF_ROOT=/home/philipp/master_PI/code/libs/hdf5-fortran/hdf5
-#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib
-#export LD_RUN_PATH=$LD_LIBRARY_PATH
 
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
@@ -16,7 +13,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
-	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
+	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 module_initial_conditions.f90\
 	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_navier_stokes_new.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
@@ -82,8 +79,11 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o \
-	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 RHS_2D_navier_stokes.f90
+	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 RHS_2D_navier_stokes.f90 $(OBJDIR)/module_initial_conditions.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 \
@@ -161,8 +161,8 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
-	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
+	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o  \
+	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes_new.o save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
 	read_mesh_and_attributes.f90 check_file_exists.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

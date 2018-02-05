@@ -102,7 +102,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
           params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
 
         case default
-          call abort(88119, "[save_data:] unknown physics....")
+          call abort(88119, "[save_data.f90:] unknown physics....")
 
         end select
 

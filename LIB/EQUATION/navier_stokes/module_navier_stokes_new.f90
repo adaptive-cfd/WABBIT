@@ -177,7 +177,6 @@ contains
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
 
-
     call clean_ini_file_mpi( FILE )
   end subroutine READ_PARAMETERS_NStokes
 
@@ -226,7 +225,6 @@ contains
     ! save all datafields in u
     work(:,:,:,1:size(u,4))=u(:,:,:,:)
     ! ---------------------------------
-
 
 
     ! if vorticity is in filed names compute it and write it to file
@@ -415,21 +413,28 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! loop variables
-    integer(kind=ik)                    :: dF, N_dF, UxF, UyF, UzF
     integer(kind=ik) :: i, ix, iy
     real(kind=rk) :: x,y,unorm,deltax
 
+    dt = 9.9e9_rk
     ! get smallest spatial seperation 
-    deltax=minval(dx)
-    dt = 0.0_rk
+    if(size(u,3)==1) then
+        deltax=minval(dx(1:2))
+    else
+        deltax=minval(dx)
+    endif
+
     if (UzF==-1) then
         unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF))  
     else
         unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF) )
     endif
+        unorm = sqrt(unorm)
     ! max velocity in one block
-    if (unorm < 1e-12_rk) unorm = 9e9_rk
-    dt = min(dt, params_ns%CFL * deltax / unorm)
+    if (unorm < 1e-12_rk) unorm=9e9_rk
+
+     dt = min(dt, params_ns%CFL * deltax / sqrt(unorm))
+ 
   end subroutine GET_DT_BLOCK_NStokes
 
 

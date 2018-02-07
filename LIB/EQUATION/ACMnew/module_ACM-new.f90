@@ -188,7 +188,7 @@ contains
 
     ! vorticity
     call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization,&
-    work(:,:,:,4:6))
+    work(:,:,:,4))
 
     ! mask
     call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )

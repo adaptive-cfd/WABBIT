@@ -1,3 +1,4 @@
+
 !> \file
 !> \callgraph
 ! ********************************************************************************************
@@ -78,7 +79,16 @@ module module_navier_stokes_new
         character(len=80)                           :: inicond
         ! discretization
         character(len=80)                           :: discretization
-
+        ! ------------------------------------------------------------------------------------------       
+        ! penalization
+        logical                                     :: penalization,smooth_mask=.True., sponge_layer
+        ! penalization parameter and sponge parameter
+        real(kind=rk)                               :: C_eta,C_sp
+        ! geometry to display
+        character(len=80)                           :: geometry="cylinder"
+        ! geometric parameters for cylinder (x_0,r)
+        real(kind=rk)                               :: x_cntr(1:3), R_cyl
+           
   end type type_params_ns
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -153,7 +163,17 @@ contains
     ! read initial conditions
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond', params_ns%inicond, "pressure_blob" )
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, 0.1_rk )
-    
+    ! penalization:
+    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
+    call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 1.0e-3_rk)
+    call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_ns%smooth_mask, .true.)
+    call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
+    call read_param_mpi(FILE, 'VPM', 'x_cntr', params_ns%x_cntr, (/0.5*params_ns%Lx, 0.5*params_ns%Ly, 0.5*params_ns%Lz/)  )
+    call read_param_mpi(FILE, 'VPM', 'R_cyl', params_ns%R_cyl, 0.5_rk )
+    ! sponge:
+    call read_param_mpi(FILE, 'Physics', 'sponge_layer', params_ns%sponge_layer, .false.)
+    call read_param_mpi(FILE, 'Physics', 'C_sp', params_ns%C_sp, 100.0_rk)
+
 
   ! read variable names
     ! allocate names list

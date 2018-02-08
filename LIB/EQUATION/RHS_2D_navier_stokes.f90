@@ -94,8 +94,8 @@ subroutine RHS_2D_navier_stokes(params, g, Bs, dx, dy, N_dF, phi)
 
     ! variables
     rho         = phi(:,:,1)**2
-    u           = phi(:,:,2)/rho
-    v           = phi(:,:,3)/rho
+    u           = phi(:,:,2)/phi(:,:,1)
+    v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
 
     ! rhs
@@ -117,7 +117,7 @@ subroutine RHS_2D_navier_stokes(params, g, Bs, dx, dy, N_dF, phi)
     call diff1y_zentral( Bs, g, dy, rho*v, dummy)
     rhs(:,:,1) = rhs(:,:,1) - dummy
 
-    rhs(:,:,1) = rhs(:,:,1) * 0.5_rk/rho
+    rhs(:,:,1) = rhs(:,:,1) * 0.5_rk/phi(:,:,1)
 
     ! friction
     if (dissipation) then

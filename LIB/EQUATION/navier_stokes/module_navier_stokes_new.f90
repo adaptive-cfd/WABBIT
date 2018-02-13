@@ -96,7 +96,8 @@ module module_navier_stokes_new
   type(type_params_ns), save :: params_ns
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
-      
+  
+  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=1.0_rk,v0_=1.0_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -386,9 +387,9 @@ contains
       !
       ! called for each block.
       if (size(u,3)==1) then
-        call RHS_2D_navier_stokes(g, Bs, dx(1),dx(2),u(:,:,1,:), rhs(:,:,1,:))
+        call RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
       else  
-        call RHS_3D_navier_stokes(g, Bs, dx(1),dx(2),dx(3), u, rhs)
+        call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
 
 
@@ -496,8 +497,8 @@ contains
         u = 0.0_rk    
     case ("pressure_blob")
         
-        rho0 = 1.0_rk
-        p0 = 1.0e5_rk
+        rho0 = rho0_
+        p0 = p0_
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )   
         ! add ambient pressure
         u( :, :, :, pF) = p0 + 1000.0_rk * u( :, :, :, pF)

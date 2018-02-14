@@ -4,7 +4,7 @@ FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 RHS_2D_navier_stokes.f90 \
 RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 init_physics_modules.f90
+startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 compute_vorticity_post.f90 keyvalues.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -21,7 +21,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
-VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion
+VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -66,7 +66,7 @@ FFLAGS += -I$(HDF_INC)
 endif
 
 # Both programs are compiled by default.
-all: directories wabbit #doc
+all: directories wabbit wabbit-post #doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)
@@ -159,7 +159,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
 	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
 	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
-	read_mesh_and_attributes.f90 check_file_exists.f90
+	read_mesh.f90 check_file_exists.f90 get_attributes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
@@ -169,6 +169,9 @@ $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_mesh.o $(OBJ
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
+		$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit

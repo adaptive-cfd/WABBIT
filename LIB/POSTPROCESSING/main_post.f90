@@ -53,6 +53,7 @@ program main_post
 
     type (type_params)                  :: params
     character(len=80)                   :: mode
+    character(len=80)                   :: filename
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -89,7 +90,7 @@ program main_post
     if (mode=="--h") then
         help=.true.
     else
-        if (rank==0) write(*,'("Starting postprocessing in", a20, "mode")'), mode
+        if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")'), mode
         help=.false.
     end if
 
@@ -99,14 +100,15 @@ program main_post
     case("--vorticity")
         call compute_vorticity_post(help, params) 
     case("--keyvalues")
-        call keyvalues(help,params)
+        call get_command_argument(3,filename)
+        call keyvalues(filename, params)
     case default
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"
         write(*,*) "--sparse-to-dense"
         write(*,*) "--vorticity"
         write(*,*) "--keyvalues"
-        write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) ", which I don't know"
+        write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
     end if
     end select
 

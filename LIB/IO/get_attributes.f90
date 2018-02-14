@@ -11,7 +11,6 @@
 !
 !>
 !! input:
-!!           - parameter array
 !!           - name of the file we want to read from
 !!
 !! output:
@@ -53,7 +52,6 @@ subroutine get_attributes(fname, lgt_n, time, iteration, domain)
     iteration = iiteration(1)
     call read_attribute(file_id, "blocks", "total_number_blocks", number_blocks)
     lgt_n = number_blocks(1)
-
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
 end subroutine get_attributes

@@ -108,7 +108,7 @@ subroutine sparse_to_dense(help, params)
         ! allocate communication arrays
         call allocate_com_arrays(params, com_lists, com_matrix)
         ! read field
-        call read_mesh_and_attributes(file_in, params, lgt_n, hvy_n, lgt_block, time, iteration)
+        call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
         call read_field(file_in, 1, params, hvy_block, hvy_n)
         ! create lists of active blocks (light and heavy data)
         ! update list of sorted nunmerical treecodes, used for finding blocks

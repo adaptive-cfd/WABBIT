@@ -43,9 +43,9 @@ subroutine sponge_2D_NEW(sponge, x0, dx, Bs, g)
 ! main body
     ddx = 0.1_rk*params_acm%Lx
 
-    do ix=1, Bs+2*g
-       x = dble(ix-(g+1)) * dx(1) + x0(1)
-       do iy=1, Bs+2*g
+    do iy=1, Bs+2*g
+       do ix=1, Bs+2*g
+           x = dble(ix-(g+1)) * dx(1) + x0(1)
            if ((params_acm%Lx-x) <= ddx) then
                sponge(ix,iy) = (x-(params_acm%Lx-ddx))**2
            elseif (x <= ddx) then

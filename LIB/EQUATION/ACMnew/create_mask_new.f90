@@ -12,9 +12,6 @@ subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
 
-    real(kind=rk) :: cx ,cy,R_cyl,x,y,r,h
-    integer :: iy,ix
-
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
 !---------------------------------------------------------------------------------------------
@@ -68,10 +65,10 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
-    do ix=1, Bs+2*g
-       x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
-       do iy=1, Bs+2*g
-           y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+    do iy=1, Bs+2*g
+       y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+       do ix=1, Bs+2*g
+           x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
            if (params_acm%smooth_mask) then
@@ -136,12 +133,12 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
   ! parameter for smoothing function (width)
   h = 1.5_rk*max(dx(1), dx(2))
 
-  do ix=1, Bs+2*g
-    x1 = dble(ix-(g+1)) * dx(1) + x0(1) - cx1
-    x2 = dble(ix-(g+1)) * dx(1) + x0(1) - cx2
-    do iy=1, Bs+2*g
-      y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
-      y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
+  do iy=1, Bs+2*g
+    y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
+    y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
+    do ix=1, Bs+2*g
+      x1 = dble(ix-(g+1)) * dx(1) + x0(1) - cx1
+      x2 = dble(ix-(g+1)) * dx(1) + x0(1) - cx2
       ! distance from center of cylinder 1
       r_1 = dsqrt(x1*x1 + y1*y1)
       ! distance from center of cylinder 2

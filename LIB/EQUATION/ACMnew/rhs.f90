@@ -61,7 +61,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     !>
     real(kind=rk)                                  :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                                                      v_dydy, p_dx, p_dy, penalx, penaly, alpha
+                                                      v_dydy, p_dx, p_dy, penalx, penaly
     ! loop variables
     integer(kind=rk)                               :: ix, iy
     ! coefficients for Tam&Webb
@@ -96,7 +96,6 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     dy2_inv = 1.0_rk / (dx(2)**2)
 
     eps_inv = 1.0_rk / eps
-    alpha = 100.0_rk
 
     if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,3)/=3) call abort(66233,"wrong size, I go for a walk instead.")
 
@@ -128,8 +127,6 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
         call sponge_2D_NEW(sponge, x0, dx, Bs, g)
         sponge = params_acm%alpha*sponge
     end if
-
-    sponge=0.0_rk
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------

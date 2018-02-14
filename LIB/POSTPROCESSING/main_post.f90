@@ -1,26 +1,15 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
 ! WABBIT
-! ============================================================================================
 !> \name    main.f90
 !> \version 0.5
 !> \author  msr
 !
-!> \brief main program, init all data, start time loop, output on screen during program run
+!> \brief main postprocessing program. get command argument to decide which postprocessing mode to run
 !
-!>
-!!
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4 \n
-!! 23/11/16 - use computing time array for simple performance tests \n
-!! 07/12/16 - now uses heavy work data array \n
-!! 25/01/17 - switch to 3D, v0.5
-!! 30/01/18 - start postprocessing/unittesting
+! = log ======================================================================================
+!
+!> \version 30/1/2018 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 ! ********************************************************************************************
-!> \image html rhs.svg width=600
-!> \image html rhs.eps
 
 program main_post
 

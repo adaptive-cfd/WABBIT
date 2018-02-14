@@ -1,20 +1,13 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
 ! WABBIT
-! ============================================================================================
 !> \name get_attributes.f90
 !> \version 0.5
 !> \author sm
 !
 !> \brief postprocessing routine for interpolation of a given field to the desired level
 !
-!>
-!! input: \n
-!!           - help flag, parameter array \n
-!! = log ======================================================================================
-!! \n
-!! 31/01/18 - create
+! = log ======================================================================================
+!> \version  31/01/18 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 
 subroutine sparse_to_dense(help, params)
     use module_precision
@@ -26,7 +19,9 @@ subroutine sparse_to_dense(help, params)
 
     implicit none
 
+    !> help flag
     logical, intent(in)                :: help
+    !> parameter struct
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_in
     character(len=80)      :: file_out

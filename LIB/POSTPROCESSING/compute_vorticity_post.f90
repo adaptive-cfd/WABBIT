@@ -1,20 +1,13 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
 ! WABBIT
-! ============================================================================================
 !> \name compute_vorticity_post.f90
 !> \version 0.5
 !> \author sm
 !
 !> \brief postprocessing routine for subsequent vorticity calculation from datafields ux, uy (, uz) saved in .h5 files
-!
-!>
-!! input: \n
-!!           - help flag, parameter array \n
-!! = log ======================================================================================
-!! \n
-!! 02/02/18 - create
+! = log ======================================================================================
+! 
+!> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 
 subroutine compute_vorticity_post(help, params)
     use module_precision
@@ -27,7 +20,9 @@ subroutine compute_vorticity_post(help, params)
 
     implicit none
 
+    !> help flag
     logical, intent(in)                :: help
+    !> parameter struct
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_ux, file_uy, file_uz
     real(kind=rk)          :: time
@@ -95,8 +90,9 @@ subroutine compute_vorticity_post(help, params)
         params%max_treelevel = int(dims_treecode(1), kind=ik)
         call close_file_hdf5(file_id)
         call get_attributes(file_ux, lgt_n, time, iteration, domain)
-        ! only lgt_n blocks necessary (since we do not want to refine)
-        params%number_blocks = lgt_n
+        ! only lgt_n/number_procs blocks necessary (since we do not want to refine)
+        params%number_blocks = lgt_n/params%number_procs
+        if (params%rank==0) params%number_blocks = params%number_blocks + mod(lgt_n, params%number_procs)
         params%Lx = domain(1)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)

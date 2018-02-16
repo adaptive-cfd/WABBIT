@@ -83,24 +83,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
 
     select case(params%physics_type)
 
-        case('2D_navier_stokes')
-                ! loop over all active heavy data blocks
-                do k = 1, hvy_n
-                    !u_n = u_n +...
-                    hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
-
-                    do j = 2, size(rk_coeffs, 2)
-                        if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
-                        else
-                            ! ... dt*(b1*k1 + b2*k2+ ..)
-                            ! rk_coeffs(size(rk_coeffs,1)) , since we want to access last line,  e.g. b1 = butcher(last line,2)
-                            hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
-                                   + dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( :, :, :, (j-1)*N_dF+1:j*N_dF, hvy_active(k))
-                        end if
-                    end do
-                end do
-
-        case('3D_navier_stokes')
+        case('navier_stokes')
             ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                     !u_n = u_n +...
@@ -136,7 +119,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
             end do
 
         case default
-            call abort(1001,params%physics_type//"ERROR: physics type is unknown")
+            call abort(1001,params%physics_type//"[final_stage_RK.f90]: ERROR: physics type is unknown")
     end select
 
 

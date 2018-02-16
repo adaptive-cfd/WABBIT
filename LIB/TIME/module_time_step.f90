@@ -34,6 +34,7 @@ module module_time_step
     ! to call RHS routines:
     use module_ACM_new
     use module_convdiff_new
+    use module_navier_stokes_new
 
 !---------------------------------------------------------------------------------------------
 ! variables

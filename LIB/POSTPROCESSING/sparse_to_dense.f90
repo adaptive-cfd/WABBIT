@@ -8,13 +8,14 @@
 !
 ! = log ======================================================================================
 !> \version  31/01/18 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
+!-----------------------------------------------------------------------------------------------------
 
 subroutine sparse_to_dense(help, params)
     use module_precision
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization
+    use module_initialization, only: allocate_grid, allocate_com_arrays
     use module_mpi
 
     implicit none
@@ -44,6 +45,7 @@ subroutine sparse_to_dense(help, params)
     integer(kind=ik), allocatable           :: com_matrix(:,:,:)
     integer(kind=ik), allocatable           :: com_lists(:, :, :, :)
     integer(kind=ik)                        :: treecode_size
+!-----------------------------------------------------------------------------------------------------
 
     if (help .eqv. .true.) then
         if (params%rank==0) then

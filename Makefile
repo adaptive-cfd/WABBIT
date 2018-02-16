@@ -1,10 +1,10 @@
+
 # Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
-RHS_2D_navier_stokes.f90 \
-RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 compute_vorticity_post.f90 keyvalues.f90
+f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
+startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90
 
 # Object and module directory:
 OBJDIR = OBJ
@@ -13,15 +13,15 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
-	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
-	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90
+	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 module_initial_conditions.f90\
+	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_navier_stokes_new.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
-VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING
+VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -79,10 +79,14 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge.f90 \
+$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o \
+	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 RHS_2D_navier_stokes.f90 $(OBJDIR)/module_initial_conditions.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge_new.f90\
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -90,7 +94,7 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ini_files_parser_mpi.o \
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o \
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -157,7 +161,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
+	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes_new.o \
 	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
 	read_mesh.f90 check_file_exists.f90 get_attributes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

@@ -8,13 +8,14 @@
 ! = log ======================================================================================
 ! 
 !> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
+!-----------------------------------------------------------------------------------------------------
 
 subroutine compute_vorticity_post(help, params)
     use module_precision
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization
+    use module_initialization, only: allocate_grid, allocate_com_arrays
     use module_mpi
     use module_operators
 
@@ -45,7 +46,9 @@ subroutine compute_vorticity_post(help, params)
     integer(kind=ik), allocatable           :: com_lists(:, :, :, :)
     integer(hsize_t), dimension(2)          :: dims_treecode
 
-    if (help .eqv. .true.) then
+!-----------------------------------------------------------------------------------------------------
+
+    if (help) then
         if (params%rank==0) then
             write(*,*) "wabbit postprocessing routine for subsequent vorticity calculation"
             write(*,*) "./wabbit-post 2D --compute-vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)"

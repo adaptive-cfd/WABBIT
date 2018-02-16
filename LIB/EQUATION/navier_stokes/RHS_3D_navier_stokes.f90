@@ -20,33 +20,27 @@
 !
 ! ********************************************************************************************
 
-subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
+subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
 
 !---------------------------------------------------------------------------------------------
 ! modules
 
     ! global parameters
-    use module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
-
-    !> physics parameter structure
-    type (type_params_physics_navier_stokes), intent(in)    :: params
-
     !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
     !> rhs parameter
     real(kind=rk), intent(in)                               :: dx, dy, dz
-
-    !> number of datafields
-    integer(kind=ik), intent(in)                            :: N_dF
     !> datafields
-    real(kind=rk), intent(inout)                            :: phi(Bs+2*g, Bs+2*g, Bs+2*g, N_dF)
+    real(kind=rk), intent(in)                              :: phi(:, :, :, :)
+    ! rhs array
+    real(kind=rk),intent(out)                               :: rhs(:, :, :,:)
 
-     ! adiabatic coefficient
+     ! adiabatic coefficien t
     real(kind=rk)                                           :: gamma_
     ! specific gas constant
     real(kind=rk)                                           :: Rs
@@ -75,8 +69,6 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
                                                                p_x(Bs+2*g, Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g, Bs+2*g), p_z(Bs+2*g, Bs+2*g, Bs+2*g), &
                                                                T_x(Bs+2*g, Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g, Bs+2*g), T_z(Bs+2*g, Bs+2*g, Bs+2*g), &
                                                                div_U(Bs+2*g, Bs+2*g, Bs+2*g)
-    ! rhs array
-    real(kind=rk)                                           :: rhs(Bs+2*g, Bs+2*g, Bs+2*g, N_dF)
 
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g, Bs+2*g)
@@ -88,19 +80,19 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
 ! variables initialization
 
     ! set physics parameters for readability
-    gamma_      = params%gamma_
-    Rs          = params%Rs
-    Cv          = params%Cv
-    Cp          = params%Cp
-    Pr          = params%Pr
-    mu0         = params%mu0
-    dissipation = params%dissipation
+    gamma_      = params_ns%gamma_
+    Rs          = params_ns%Rs
+    Cv          = params_ns%Cv
+    Cp          = params_ns%Cp
+    Pr          = params_ns%Pr
+    mu0         = params_ns%mu0
+    dissipation = params_ns%dissipation
 
     ! variables
     rho         = phi(:,:,:,1)**2
-    u           = phi(:,:,:,2)/rho
-    v           = phi(:,:,:,3)/rho
-    w           = phi(:,:,:,4)/rho
+    u           = phi(:,:,:,2)/phi(:,:,:,1)
+    v           = phi(:,:,:,3)/phi(:,:,:,1)
+    w           = phi(:,:,:,4)/phi(:,:,:,1)
     p           = phi(:,:,:,5)
 
     ! rhs
@@ -126,7 +118,7 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
     call diff1z_zentral_3D( Bs, g, dz, rho*w, dummy)
     rhs(:,:,:,1) = rhs(:,:,:,1) - dummy
 
-    rhs(:,:,:,1) = rhs(:,:,:,1) * 0.5_rk/rho
+    rhs(:,:,:,1) = rhs(:,:,:,1) * 0.5_rk/phi(:,:,:,1)
 
     ! friction
     if (dissipation) then
@@ -312,9 +304,6 @@ subroutine RHS_3D_navier_stokes(params, g, Bs, dx, dy, dz, N_dF, phi)
     rhs(:,:,:,4) = rhs(:,:,:,4) / phi(:,:,:,1)
 
     rhs(:,:,:,4) = rhs(:,:,:,4) + fric_w
-
-    ! return rhs
-    phi = rhs
 
 end subroutine RHS_3D_navier_stokes
 

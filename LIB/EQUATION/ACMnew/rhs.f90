@@ -1,32 +1,18 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name RHS_2D_acm.f90
+!> \brief Right hand side for 2D artificial compressibility equations
+!>        ---------------------------------------------
+!> The right hand side for the artificial compressibility equations reads:
+!>\f{eqnarray*}{
+!! \partial_t u &=& -u \nabla \cdot u - \nu \nabla^2 u +  \frac{1}{\rho} \nabla p - \chi \frac{1}{C_\eta} (u-u_s)  \\
+!! \partial_t p &=& -c_0^2 \nabla \cdot u - \gamma p
+!!\f}
 !> \version 0.5
-!> \author engels, sm
-!
-!> \brief RHS for 2D artificial compressibility method
-!
-!>
-!! input:    - datafield, grid parameter, derivative order \n
-!! output:   - RHS(datafield) \n
+!> \version  27/06/17 - create
 !!
-!!
-!! = log ======================================================================================
-!! \n
-!! 27/06/17 - create
-! ********************************************************************************************
+!> \author sm, engels
+!--------------------------------------------------------------------------------------------
 
 subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, time, rhs)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    ! global parameters
-    ! use module_params
-    ! use module_operators
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -49,7 +35,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 
 
     !> mask term for every grid point in this block
-    !! todo: evaluate if it is a good idea to have them on the stack (ie defined as
+    !! \todo: evaluate if it is a good idea to have them on the stack (ie defined as
     !! mask(1:Bs+2g....) or on the heap, ie. allocatable
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask, sponge
     !> velocity of the solid
@@ -67,10 +53,8 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     ! coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
     real(kind=rk)                                  :: b(-2:2)
-!> startup conditioner
+    !> startup conditioner
     real(kind=rk)                            :: startup_conditioner
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

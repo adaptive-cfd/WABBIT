@@ -100,9 +100,13 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     case ("ConvDiff-new")
       ! this call is not done for all blocks, but only once, globally.
       call RHS_convdiff( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
+    case ("navier_stokes")
+      ! this call is not done for all blocks, but only once, globally.
+      call RHS_NStokes( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
+
 
     case default
-      call abort(2152000, "physics_type is unknown"//params%physics_type)
+      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
 
     end select
 
@@ -132,8 +136,13 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
         call RHS_convdiff( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
              x0, dx, hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage" )
 
+      case ("navier_stokes")
+        ! input state vector: hvy_block, output RHS vector: hvy_work
+        call RHS_NStokes( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
+             x0, dx, hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage" )
+
       case default
-        call abort(2152000, "physics_type is unknown"//params%physics_type)
+        call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
 
       end select
     enddo
@@ -154,8 +163,13 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
       call RHS_ConvDiff( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
       x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
 
+    case ("navier_stokes")
+      ! this call is not done for all blocks, but only once, globally.
+      call RHS_NStokes( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
+      x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
+
     case default
-      call abort(2152000, "physics_type is unknown"//params%physics_type)
+      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
     end select
 
 
@@ -182,8 +196,13 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
         call RHS_ConvDiff( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
              x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
 
+      case ("navier_stokes")
+        ! input state vector: hvy_block, output RHS vector: hvy_work
+        call RHS_NStokes( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
+             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
+
       case default
-        call abort(2152000, "physics_type is unknown"//params%physics_type)
+        call abort(2152000, " [RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
       end select
     enddo
 

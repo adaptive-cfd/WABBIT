@@ -25,8 +25,6 @@ module module_operators
     use module_params
     ! debug module
     use module_debug
-    ! own MPI module
-    !use module_mpi
     ! use mesh module, since we want to compute origin/spacing of blocks
     use module_mesh, only : get_block_spacing_origin
 

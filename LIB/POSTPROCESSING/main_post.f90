@@ -31,18 +31,12 @@ program main_post
     integer(kind=ik)                    :: rank
     ! number of processes
     integer(kind=ik)                    :: number_procs
-
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1
-
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
     ! if help mode is on we print some output on screen
     logical                             :: help
 
     type (type_params)                  :: params
     character(len=80)                   :: mode
-    character(len=80)                   :: filename
+    character(len=80)                   :: filename, key1, key2
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -60,11 +54,6 @@ program main_post
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
-
-
-    ! start time
-    sub_t0 = MPI_Wtime()
-    call cpu_time(t0)
 
     ! are we running in 2D or 3D mode? Check that from the command line call.
     call decide_if_running_2D_or_3D(params)
@@ -90,13 +79,20 @@ program main_post
         call compute_vorticity_post(help, params) 
     case("--keyvalues")
         call get_command_argument(3,filename)
-        call keyvalues(filename, params)
+        call keyvalues(filename, params, help)
+    case ("--compare-keys")
+        if (rank == 0) then
+            call get_command_argument(3,key1)
+            call get_command_argument(4,key2)
+            call compare_keys(help,key1,key2)
+        end if
     case default
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"
         write(*,*) "--sparse-to-dense"
         write(*,*) "--vorticity"
         write(*,*) "--keyvalues"
+        write(*,*) "--compare-keys"
         write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
     end if
     end select

@@ -3,11 +3,11 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name read_mesh_and_attributes.f90
+!> \name read_mesh.f90
 !> \version 0.5
 !> \author sm
 !
-!> \brief read mesh properties and attributes (iteration and time t) of a field saved in a hdf5-file
+!> \brief read mesh properties of a field saved in a hdf5-file
 !
 !>
 !! input:
@@ -16,7 +16,6 @@
 !!
 !! output:
 !!           - light block array
-!!           - time and iteration
 !!           - number of active blocks (light and heavy)
 !!
 !!
@@ -26,7 +25,7 @@
 !
 ! ********************************************************************************************
 
-subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time, iteration)
+subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -44,10 +43,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     integer(kind=ik), intent(inout)               :: hvy_n, lgt_n
     !> light data array
     integer(kind=ik), intent(inout)               :: lgt_block(:,:)
-    !> time (to be read from file)
-    real(kind=rk), intent(inout)                  :: time
-    !> iteration (to be read from file)
-    integer(kind=ik), intent(inout)               :: iteration
 
     ! file id integer
     integer(hid_t)                                :: file_id
@@ -65,10 +60,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     integer(kind=rk)                              :: lgt_id, k
     ! error variable
     integer(kind=ik)                              :: ierr
-    integer(kind=ik), dimension(1)                :: iiteration, number_blocks
-    real(kind=rk), dimension(1)                   :: ttime
     integer(kind=ik)                              :: treecode_size
-    real(kind=rk), dimension(3)                   :: domain
     integer(hsize_t), dimension(2)                :: dims_treecode
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -89,33 +81,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
-    call read_attribute(file_id, "blocks", "domain-size", domain)
-    if (.not. (params%threeD_case)) domain(3) = params%Lz
-    call read_attribute(file_id, "blocks", "time", ttime)
-    call read_attribute(file_id, "blocks", "iteration", iiteration)
-    call read_attribute(file_id, "blocks", "total_number_blocks", number_blocks)
-
-    time      = ttime(1)
-    lgt_n     = number_blocks(1)
-    iteration = iiteration(1)
-
-    ! print time, iteration and domain on screen
-    if (rank==0) then
-        write(*,'(80("_"))')
-        write(*,'("READING: Reading from file ",A)') trim(adjustl(fname))
-        write(*,'("time=",g12.4," iteration=", i5)') time, iteration
-        write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
-
-        ! if the domain size doesn't match, proceed, but yell.
-        if ((abs(params%Lx-domain(1))>1e-12_rk).or.(abs(params%Ly-domain(2))>1e-12_rk) &
-            .or.(abs(params%Lz-domain(3))>1e-12_rk)) then
-            write (*,'(A)') " WARNING! Domain size mismatch."
-            write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') params%Lx, params%Ly, params%Lz
-            write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
-            write (*,'(A)') "proceed, with fingers crossed."
-        end if
-    end if
-
     if ( (rank == 0) ) then
         write(*,'(80("_"))')
         write(*,'(A)') "READING: initializing grid from file..."
@@ -129,7 +94,6 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     ! Nblocks per CPU
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note
     ! zero indexing as required by MPI
-
     ! set list to the average value
     blocks_per_rank_list = lgt_n / number_procs
 
@@ -146,7 +110,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     hvy_n = blocks_per_rank_list(rank)
 
     ! check what max_level was saved in file (check dimensions of treecode in file)
-    call get_size_datafield_2D(file_id, "block_treecode", dims_treecode)
+    call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
 
     ! compare dimensions
     if (dims_treecode(1)<=params%max_treelevel) then
@@ -154,7 +118,7 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
         ! want to continue with greater max_treevel, read old treecode and fill up the rest with -1
     else
         ! treecode in input file is greater than the new one, abort and output on screen
-        write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') params%max_treelevel, dims_treecode(1)
+        if (params%threeD_case) write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') params%max_treelevel, dims_treecode(1)
         call MPI_ABORT( MPI_COMM_WORLD, 10004, ierr)
     end if
 
@@ -191,4 +155,4 @@ subroutine read_mesh_and_attributes(fname, params, lgt_n, hvy_n, lgt_block, time
     deallocate(my_lgt_block)
     deallocate(block_treecode)
 
-end subroutine read_mesh_and_attributes
+end subroutine read_mesh

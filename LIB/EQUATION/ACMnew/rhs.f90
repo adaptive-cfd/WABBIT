@@ -1,32 +1,18 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name RHS_2D_acm.f90
+!> \brief Right hand side for 2D artificial compressibility equations
+!>        ---------------------------------------------
+!> The right hand side for the artificial compressibility equations reads:
+!>\f{eqnarray*}{
+!! \partial_t u &=& -u \nabla \cdot u - \nu \nabla^2 u +  \frac{1}{\rho} \nabla p - \chi \frac{1}{C_\eta} (u-u_s)  \\
+!! \partial_t p &=& -c_0^2 \nabla \cdot u - \gamma p
+!!\f}
 !> \version 0.5
-!> \author engels, sm
-!
-!> \brief RHS for 2D artificial compressibility method
-!
-!>
-!! input:    - datafield, grid parameter, derivative order \n
-!! output:   - RHS(datafield) \n
+!> \version  27/06/17 - create
 !!
-!!
-!! = log ======================================================================================
-!! \n
-!! 27/06/17 - create
-! ********************************************************************************************
+!> \author sm, engels
+!--------------------------------------------------------------------------------------------
 
 subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, time, rhs)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    ! global parameters
-    ! use module_params
-    ! use module_operators
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -49,7 +35,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 
 
     !> mask term for every grid point in this block
-    !! todo: evaluate if it is a good idea to have them on the stack (ie defined as
+    !! \todo: evaluate if it is a good idea to have them on the stack (ie defined as
     !! mask(1:Bs+2g....) or on the heap, ie. allocatable
     real(kind=rk), dimension(Bs+2*g, Bs+2*g)       :: mask, sponge
     !> velocity of the solid
@@ -61,16 +47,14 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     !>
     real(kind=rk)                                  :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk)                                  :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                                                      v_dydy, p_dx, p_dy, penalx, penaly, alpha
+                                                      v_dydy, p_dx, p_dy, penalx, penaly
     ! loop variables
     integer(kind=rk)                               :: ix, iy
     ! coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
     real(kind=rk)                                  :: b(-2:2)
-!> startup conditioner
+    !> startup conditioner
     real(kind=rk)                            :: startup_conditioner
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -96,7 +80,6 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     dy2_inv = 1.0_rk / (dx(2)**2)
 
     eps_inv = 1.0_rk / eps
-    alpha = 100.0_rk
 
     if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,3)/=3) call abort(66233,"wrong size, I go for a walk instead.")
 
@@ -125,14 +108,9 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     end if
 
     if (params_acm%sponge_layer) then
-        !call sponge_2D_NEW(sponge, x0, dx, Bs, g)
-        write(*,*) "[rhs.f90] ERROR! no sponge_2D_NEW in repository!!! commit!"
-        stop
-        !> \todo commit sponge_2D_NEW
+        call sponge_2D_NEW(sponge, x0, dx, Bs, g)
         sponge = params_acm%alpha*sponge
     end if
-
-    sponge=0.0_rk
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------

@@ -53,7 +53,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! file id integer
     integer(hid_t)                      :: file_id
 
-
     ! process rank
     integer(kind=ik)                    :: rank
     ! grid parameter
@@ -73,9 +72,8 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     rank = params%rank
 
     ! grid parameter
-    Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
-
+    Bs   = params%number_block_nodes
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
     allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
 !---------------------------------------------------------------------------------------------
@@ -84,9 +82,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     call check_file_exists(fname)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
-
     call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
-
     if ( params%threeD_case ) then
 
         ! tell the hdf5 wrapper what part of the global [Bs x Bs x Bs x hvy_n]

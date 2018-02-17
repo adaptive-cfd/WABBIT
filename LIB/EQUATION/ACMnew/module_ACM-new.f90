@@ -1,5 +1,4 @@
 !> \file
-!> \callgraph
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
@@ -82,7 +81,7 @@ contains
   include "create_mask_new.f90"
   ! include "dt.f90"
   include "iniconds.f90"
-  !  include "sponge.f90"
+  include "sponge_new.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads

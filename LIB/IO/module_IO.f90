@@ -34,9 +34,10 @@ module module_IO
     use module_mesh
     ! use module operators for computation of the vorticity field
     use module_operators, only: compute_vorticity
-use module_ACM_new
-use module_ConvDiff_new
-use module_navier_stokes_new
+    ! use physics modules to save the data
+    use module_ACM_new
+    use module_ConvDiff_new
+    use module_navier_stokes_new
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -57,12 +58,14 @@ contains
     include "write_field.f90"
 
     ! read mesh properties and time from input file
-    include "read_mesh_and_attributes.f90"
+    include "read_mesh.f90"
 
     ! read field from input file
     include "read_field.f90"
 
     ! check if input file exists
     include "check_file_exists.f90"
+
+    include "get_attributes.f90"
 
 end module module_IO

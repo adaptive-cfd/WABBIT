@@ -138,6 +138,5 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
       call toc( params, "save_data", MPI_wtime()-t0 )
       return
-  
 
 end subroutine save_data

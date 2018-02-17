@@ -1,26 +1,9 @@
+
+!--------------------------------------------------------------------------------------------------------------------------------------------------------
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name RHS_2D_navier_stokes.f90
-!> \version 0.4
-!> \author msr
-!
-!> \brief RHS for 2D navier stokes equation
-!
-!>
-!! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
-!! output:   - RHS(datafield) \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 08/12/16 - create \n
-!! 08/1/2018- include mask and sponge terms
-! ********************************************************************************************
-!>\details
-!> We implement the right hand side of navier stokes in the skew symmetric form:
+!> \brief Right hand side for 2D navier stokes equation
+!>        ---------------------------------------------
+!> The right hand side of navier stokes in the skew symmetric form is implemented as follows:
 !>\f{eqnarray*}{
 !!     \partial_t \sqrt{\rho} &=& -\frac{1}{2J\sqrt{\rho}} \nabla \cdot (\rho \vec{u})-\frac{1}{\sqrt{\rho}}\frac{1}{C_{\rm SP} } (\rho-\rho^{\rm SP}) \\
 !!    \partial_t (\sqrt{\rho} u_\alpha) &=& -\frac{1}{2J \sqrt{\rho}} 
@@ -30,33 +13,47 @@
 !!                                            \right] 
 !!                                           -\frac{1}{J \sqrt{\rho}} \partial_\beta \tau_{\alpha\beta}
 !!                                           -\frac{1}{\sqrt{\rho}} \partial_\alpha p
-!!                                            -\frac{1}{\sqrt{\rho}} \frac{1}{C_{\rm SP} }(\rho u_\alpha-\rho^{\rm SP} u_\alpha^{\rm SP}) \\
+!!                                            -\frac{1}{\sqrt{\rho}} \frac{1}{C_{\rm SP} }(\rho u_\alpha-\rho^{\rm SP} u_\alpha^{\rm SP}) 
+!!                                           -\frac{\chi}{\sqrt{\rho}C_\eta} (\rho u_\alpha)\\
 !!    \partial_t p &=& -\frac{\gamma}{J} \partial_\beta( u_\beta p) + (\gamma-1)(u_\alpha \partial_\alpha p)
 !!                                      +\frac{\gamma -1}{J}
 !!                                           \left[ 
 !!                                                       \partial_\alpha(u_\beta \tau_{\alpha\beta}+\phi_\alpha) 
-!!                                                       - u_\alpha\partial_\beta \tau_{\alpha\beta}
-!!                                            \right]    
+!!                                                       - u_\alpha\partial_\beta \tau_{\alpha\beta} 
+!!                                            \right]   -\frac{\gamma-1}{C_{\rm SP} } (p-p^{\rm SP})
+!!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
 !!\f}
+!> \version 08/12/16 - create \n
+!> \version 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e3fa52f887d593fad5826afec88)
+!!
+!> \author msr
+!--------------------------------------------------------------------------------------------------------------------------------------------------------
 
-!! where the friction terms \f$ r_1,r_2,r_3 \f$ are
+
+
+
+
+
+
+
+
+
+!>\brief main function of RHS_2D_navier_stokes
 subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
-
 !---------------------------------------------------------------------------------------------
-! variables
-
+!
     implicit none
 
-    !< grid parameter
+    !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
-    !< origin and spacing of the block
+    !> origin and spacing of the block
     real(kind=rk), dimension(2), intent(in)                  :: x0, delta_x
     !> datafields
     real(kind=rk), intent(in)                            :: phi(:, :, :)
-    ! rhs array
+    !> rhs array
     real(kind=rk), intent(inout)                            :: rhs(:, :, :)
 
-     ! adiabatic coefficient
+    ! adiabatic coefficient
     real(kind=rk)                                           :: gamma_
     ! specific gas constant
     real(kind=rk)                                           :: Rs
@@ -104,12 +101,12 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     ! variables
     rho         = phi(:,:,1)**2
     u           = phi(:,:,2)/phi(:,:,1)
-    v           = phi(:,:,3)/phi(:,:,2)
+    v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
     ! discretization constant
     dx=delta_x(1)
     dy=delta_x(2)
-
+    
     ! rhs
     rhs         = 0.0_rk
 
@@ -128,9 +125,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     rhs(:,:,1) = -dummy
     call diff1y_zentral( Bs, g, dy, rho*v, dummy)
     rhs(:,:,1) = rhs(:,:,1) - dummy
-
     rhs(:,:,1) = rhs(:,:,1) * 0.5_rk/phi(:,:,1)
-
+  
     ! friction
     if (dissipation) then
 
@@ -276,7 +272,17 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
         
     endif
 
-
+    if (params_ns%penalization) then
+        ! add spnge 
+        ! sqrt(rho)u component (momentum)
+        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization( Bs, g, x0,delta_x, rho*u, 0.0_rk , params_ns%C_eta)
+        ! sqrt(rho)v component (momentum)
+        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( Bs, g, x0,delta_x, rho*v, 0.0_rk   , params_ns%C_eta)
+        ! p component (preasure/energy)
+        rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *penalization( Bs, g, x0,delta_x, p    , T0_         , params_ns%C_eta)
+        
+    endif
+    
 
 end subroutine RHS_2D_navier_stokes
 
@@ -357,7 +363,6 @@ end subroutine diffx_c
 !---------------------------------------------------------------------------------------------
 
 subroutine  diffy_c( Bs, g, dy, u, dudy)
-    use module_params
     integer(kind=ik), intent(in)    :: g, Bs
     real(kind=rk), intent(in)       :: dy
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
@@ -391,9 +396,11 @@ end subroutine diffy_c
 
 
 !==========================================================================
-!> \brief This function computes a 2d sponge term 
-!!   \f{equation}{
-!!           s(x,y)=\frac{\chi_{\mathrm sp}(x,y)}{C_{\mathrm sp}}(q(x,y)-q_{\mathrm ref})
+!> \brief This function computes a 2d sponge term
+!!          
+!! \details The sponge term is  
+!!   \f{eqnarray*}{
+!!           s_q(x,y)=\frac{\chi_{\mathrm sp}(x,y)}{C_{\mathrm sp}}(q(x,y)-q_{\mathrm ref})
 !!                          \quad \forall x,y \in \Omega_{\mathrm block} 
 !!     \f}
 !! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a> 
@@ -424,19 +431,18 @@ function sponge( Bs, g, x0,dx, q, qref, C_sp)
 
      do ix=1, Bs+2*g
         x = dble(ix-(g+1)) * dx(1) + x0(1)
-        
         do iy=1, Bs+2*g
             y = dble(iy-(g+1)) * dx(2) + x0(2)
 
             if (inside_sponge((/x,y/))) then
                    sponge(ix,iy) = C_sp_inv*(q(ix,iy)-qref)
+                !   write(*,*) sponge(ix,iy)
             else
                    sponge(ix,iy) = 0.0_rk
             end if
 
        end do
     end do
-
 end function sponge
 !==========================================================================
 
@@ -470,171 +476,113 @@ end function inside_sponge
 
 
 
+!==========================================================================
+!> \brief This function computes a penalization term
+!!          
+!! \details The penalization term is  
+!!   \f{eqnarray*}{
+!!           p_q(x,y)=\frac{\chi(x,y)}{C_{\eta}}(q(x,y)-q_{\mathrm s})
+!!                          \quad \forall x,y \in \Omega_{\mathrm block} 
+!!     \f}
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a> 
+!! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$ 
+!! - \f$C_{\rm \eta}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
 
-subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g,geometry )
-
-    ! use module_params
-    ! use module_precision
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in)                    :: Bs, g
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(inout)    :: mask
+function penalization( Bs, g, x0,dx, q, qref, C_eta)
+    !-------------------------------------------------------
+    !> grid parameter
+    integer(kind=ik), intent(in)    :: g, Bs
     !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)         :: x0, dx
-    !< geometry to of body \f$\Omega_s\f$
-     character(len=80), intent(in)                  :: geometry
+    real(kind=rk), intent(in)       :: x0(2), dx(2)                    
+    !> Sponge coefficient
+    real(kind=rk), intent(in)       :: C_eta
+    !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+    real(kind=rk), intent(in)       :: qref
+    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)   
+    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
+    !> penalization term \f$p_q(x,y)\f$
+    real(kind=rk)                   :: penalization(Bs+2*g, Bs+2*g)
+    !--------------------------------------------------------
+    ! loop variables
+    integer                         :: i, n,ix,iy
+    ! inverse C_eta
+    real(kind=rk)                   :: C_eta_inv,x,y,delta,h
+    
+    ! inverse C_eta
+    C_eta_inv=1.0_rk/C_eta
 
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
 
-    real(kind=rk) :: cx ,cy,R_cyl,x,y,r,h
-    integer :: iy,ix
+     do ix=1, Bs+2*g
+        x = dble(ix-(g+1)) * dx(1) + x0(1)
+        do iy=1, Bs+2*g
+            y       = dble(iy-(g+1)) * dx(2) + x0(2)
 
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+            delta   = distance_to_nearest_object((/x,y/))
+            penalization(ix,iy) = characteristic(delta,h)*C_eta_inv*(q(ix,iy)-qref)
+       end do
+    end do
 
-
-    select case(geometry)
-    !case('cylinder')
-      !call draw_cylinder( mask, x0, dx, Bs, g )
-    !case('two-cylinders')
-      !call draw_two_cylinders( mask, x0, dx, Bs, g )
-   ! case('rectangle')
-
-    case default
-      call abort(120001,"ERROR: geometry for VPM is unknown"//geometry)
-    end select
-
-end subroutine create_mask_2D_NEW
-
-
-! subroutine draw_cylinder(mask, x0, dx, Bs, g )
-
-!     use module_params
-!     use module_precision
-
-!     implicit none
-
-!     ! grid
-!     integer(kind=ik), intent(in)                              :: Bs, g
-!     !> mask term for every grid point of this block
-!     real(kind=rk), dimension(:,:), intent(out)     :: mask
-!     !> spacing and origin of block
-!     real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-
-!     ! auxiliary variables
-!     real(kind=rk)                                             :: x, y, r, h
-!     ! loop variables
-!     integer(kind=ik)                                          :: ix, iy
-
-! !---------------------------------------------------------------------------------------------
-! ! variables initialization
-!     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
-
-!     ! reset mask array
-!     mask = 0.0_rk
-
-! !---------------------------------------------------------------------------------------------
-! ! main body
-
-
-!     ! parameter for smoothing function (width)
-!     h = 1.5_rk*max(dx(1), dx(2))
-
-!     do ix=1, Bs+2*g
-!        x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
-!        do iy=1, Bs+2*g
-!            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-!            ! distance from center of cylinder
-!            r = dsqrt(x*x + y*y)
-!            if (params_acm%smooth_mask) then
-!                call smoothstep(mask(ix,iy), r, params_acm%R_cyl, h)
-!            else
-!                ! if point is inside the cylinder, set mask to 1
-!                if (r <= params_acm%R_cyl) then
-!                    mask(ix,iy) = 1.0_rk
-!                else
-!                    mask(ix,iy) = 0.0_rk
-!                end if
-!            end if
-!        end do
-!     end do
-
-! end subroutine draw_cylinder
+end function penalization
+!==========================================================================
 
 
 
-! subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
-!   use module_params
-!   use module_precision
+!==========================================================================
+  !> \brief This subroutine returns the value f of a smooth step function \n
+  !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
+  !> h is the semi-size of the smoothing area, so \n
+  !> f is 1 if delta<=0-h \n
+  !> f is 0 if delta>0+h \n
+  !> f is variable (smooth) in between
+  !> \details
+  !> \image html maskfunction.bmp "plot of chi(delta)"  
+  !> \image latex maskfunction.eps "plot of chi(delta)"  
+function characteristic(delta,h)
 
-!   implicit none
+  implicit none
+  !> distance to object
+  real(kind=rk), intent(in)  :: delta
+  !> smoothing area
+  real(kind=rk), intent(in)  :: h
+  real(kind=rk)              :: characteristic
 
-!   ! grid
-!   integer(kind=ik), intent(in)                              :: Bs, g
-!   !> mask term for every grid point of this block
-!   real(kind=rk), dimension(:,:), intent(out)     :: mask
-!   !> spacing and origin of block
-!   real(kind=rk), dimension(2), intent(in)                   :: x0, dx
+  !-------------------------------------------------
+  ! cos shaped smoothing (compact in phys.space)
+  !-------------------------------------------------
+  if (delta<=-h) then
+    characteristic = 1.0_rk
+  elseif ((-h<delta).and.(delta<+h)) then
+    characteristic = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
+  else
+    characteristic = 0.0_rk
+  endif
 
-!   ! auxiliary variables
-!   real(kind=rk)                                             :: x1, x2, y1, y2, R, cx1, cx2, cy1,&
-!   cy2, r_1, r_2, h, mask1, mask2
-!   ! loop variables
-!   integer(kind=ik)                                          :: ix, iy
-
-!   !---------------------------------------------------------------------------------------------
-!   ! variables initialization
-!   if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
-
-!   ! reset mask array
-!   mask = 0.0_rk
-!   mask1 = 0.0_rk
-!   mask2 = 0.0_rk
-
-!   !---------------------------------------------------------------------------------------------
-!   ! main body
-
-!   ! center of the first cylinder
-!   cx1 = 0.5884_rk*params_acm%Lx
-!   cy1 = 0.4116_rk*params_acm%Ly
-
-!   ! center of the second cylinder
-!   cx2 = 0.4116_rk*params_acm%Lx
-!   cy2 = 0.5884_rk*params_acm%Ly
-
-!   ! radius of the cylinders
-!   R = params_acm%R_cyl
-!   ! parameter for smoothing function (width)
-!   h = 1.5_rk*max(dx(1), dx(2))
-
-!   do ix=1, Bs+2*g
-!     x1 = dble(ix-(g+1)) * dx(1) + x0(1) - cx1
-!     x2 = dble(ix-(g+1)) * dx(1) + x0(1) - cx2
-!     do iy=1, Bs+2*g
-!       y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
-!       y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
-!       ! distance from center of cylinder 1
-!       r_1 = dsqrt(x1*x1 + y1*y1)
-!       ! distance from center of cylinder 2
-!       r_2 = dsqrt(x2*x2 + y2*y2)
-!       if (params_acm%smooth_mask) then
-!         call smoothstep(mask1, r_1, R, h)
-!         call smoothstep(mask2, r_2, R, h)
-!         mask(ix,iy) = mask1 + mask2
-!       else
-!         ! if point is inside one of the cylinders, set mask to 1
-!         if (r_1 <= R) then
-!           mask(ix,iy) = 1.0_rk
-!         elseif ( r_2 <= R) then
-!           mask(ix,iy) = 1.0_rk
-!         else
-!           mask(ix,iy) = 0.0_rk
-!         end if
-!       end if
-!     end do
-!   end do
+end function characteristic
+!==========================================================================
 
 
-! end subroutine draw_two_cylinders
+!==========================================================================
+  !> \brief Calculates the distance from the obe   
+function distance_to_nearest_object(x)
+
+  implicit none
+  !> coordinate
+  real(kind=rk), intent(in)  :: x(2)
+  !> smoothing area
+  real(kind=rk)              :: distance_to_nearest_object
+  real(kind=rk)              :: r_cyl,Radius
+  !-------------------------------------------------
+  ! circle in the middle of the field
+  !-------------------------------------------------
+    Radius=params_ns%Lx/6.0_rk
+    r_cyl=sqrt( (x(1)-params_ns%Lx/2.0_rk)**2+(x(2)-params_ns%Lx/2.0_rk)**2  )
+    distance_to_nearest_object=r_cyl-Radius
+end function distance_to_nearest_object
+!==========================================================================
+
+
+
+

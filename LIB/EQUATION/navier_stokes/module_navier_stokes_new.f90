@@ -1,27 +1,25 @@
+!> \dir 
+!> \brief
+!>Implementation of 3d/2d Navier Stokes Physics
 
+!-----------------------------------------------------------------
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_navier_stokes_new.f90
-!> \version 0.5
-!> \author Pkrah
+!> \brief 
+!! Module of public 2D/3D Navier Stokes equation
+!> \details
+!!    * reads in params 
+!!    * sets initial conditions
+!!    * calls RHS 
+!!    * calculates time step
 !!
-!! \brief module for 2D/3D navier_stokes
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! + creation 23.1.2018
-!!
-! ********************************************************************************************
-
+!> \version 23.1.2018
+!> \author P.Krah
+!-----------------------------------------------------------------
+ 
 module module_navier_stokes_new
 
   !---------------------------------------------------------------------------------------------
   ! modules
-
   use module_precision
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
@@ -97,7 +95,7 @@ module module_navier_stokes_new
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
   
-  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=1.0_rk,v0_=1.0_rk
+  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=1.0_rk,v0_=0.0_rk,T0_=273.15_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -113,12 +111,14 @@ contains
   include "RHS_2D_navier_stokes.f90"
 
   !-----------------------------------------------------------------------------
-  ! main level wrapper routine to read parameters in the physics module. It reads
-  ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
-  ! the parameter struct for wabbit is not available.
+  !> \brief Reads in parameters of physics module
+  !> \details 
+  !> Main level wrapper routine to read parameters in the physics module. It reads
+  !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
+  !> the parameter struct for wabbit is not available.
   subroutine READ_PARAMETERS_NStokes( filename )
     implicit none
-
+    !> name of inifile
     character(len=*), intent(in) :: filename
 
     ! inifile structure
@@ -384,14 +384,14 @@ contains
       !-------------------------------------------------------------------------
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
-      !
+      
+
       ! called for each block.
       if (size(u,3)==1) then
         call RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
       else  
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
-
 
     case default
       call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
@@ -455,7 +455,7 @@ contains
     if (unorm < 1e-12_rk) unorm=9e9_rk
 
      dt = min(dt, params_ns%CFL * deltax / sqrt(unorm))
- 
+  
   end subroutine GET_DT_BLOCK_NStokes
 
 
@@ -505,7 +505,7 @@ contains
         ! set rho
         u( :, :, :, rhoF) = rho0
         ! set Ux
-        u( :, :, :, UxF) = 0.0_rk
+        u( :, :, :, UxF) = U0_/2.0_rk!0.0_rk
         ! set Uy
         u( :, :, :, UyF) = 0.0_rk
 
@@ -513,11 +513,9 @@ contains
             ! set Uz to zero
             u( :, :, :, UzF) = 0.0_rk
         endif
-
     case default
         call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))   
     end select
-    
 
   end subroutine INICOND_NStokes
 

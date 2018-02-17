@@ -179,9 +179,9 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit
-
-docu:
-	doxygen doc_configuration
+.PHONY: doc
+doc:
+	doxygen doc/doc_configuration
 	firefox doc/output/html/index.html
 
 # If the object directory doesn't exist, create it.

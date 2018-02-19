@@ -34,7 +34,7 @@
 !!
 !!                 $ HDF_ROOT=path_2_build_dir
 !!                 $ export HDF_ROOT
-!!                 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib
+!!                 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
 !!                 $ export LD_RUN_PATH=$LD_LIBRARY_PATH
 !!
 !> \section important_sec About WABBIT

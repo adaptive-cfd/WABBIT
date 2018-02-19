@@ -1,21 +1,21 @@
-!> \dir 
+!> \dir
 !> \brief
 !>Implementation of 3d/2d Navier Stokes Physics
 
 !-----------------------------------------------------------------
 !> \file
-!> \brief 
+!> \brief
 !! Module of public 2D/3D Navier Stokes equation
 !> \details
-!!    * reads in params 
+!!    * reads in params
 !!    * sets initial conditions
-!!    * calls RHS 
+!!    * calls RHS
 !!    * calculates time step
 !!
 !> \version 23.1.2018
 !> \author P.Krah
 !-----------------------------------------------------------------
- 
+
 module module_navier_stokes_new
 
   !---------------------------------------------------------------------------------------------
@@ -47,7 +47,7 @@ module module_navier_stokes_new
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params_ns
-        ! Courant-Friedrichs-Lewy 
+        ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
         ! spatial domain
         real(kind=rk)                               :: Lx, Ly, Lz
@@ -77,7 +77,7 @@ module module_navier_stokes_new
         character(len=80)                           :: inicond
         ! discretization
         character(len=80)                           :: discretization
-        ! ------------------------------------------------------------------------------------------       
+        ! ------------------------------------------------------------------------------------------
         ! penalization
         logical                                     :: penalization,smooth_mask=.True., sponge_layer
         ! penalization parameter and sponge parameter
@@ -86,7 +86,7 @@ module module_navier_stokes_new
         character(len=80)                           :: geometry="cylinder"
         ! geometric parameters for cylinder (x_0,r)
         real(kind=rk)                               :: x_cntr(1:3), R_cyl
-           
+
   end type type_params_ns
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -94,8 +94,8 @@ module module_navier_stokes_new
   type(type_params_ns), save :: params_ns
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
-  
-  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=1.0_rk,v0_=0.0_rk,T0_=273.15_rk
+
+  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=6.0_rk,v0_=0.0_rk,T0_=348!273.15_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ contains
 
   !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
-  !> \details 
+  !> \details
   !> Main level wrapper routine to read parameters in the physics module. It reads
   !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   !> the parameter struct for wabbit is not available.
@@ -124,7 +124,7 @@ contains
     ! inifile structure
     type(inifile) :: FILE
     integer(kind=ik)            :: dF
-      
+
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
@@ -264,7 +264,7 @@ contains
                                  u(:,:,:,UzF)/u(:,:,:,rhoF)**2, &
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
-        work(:,:,:,vort_ind(1:2))=vort(:,:,:,1:2) 
+        work(:,:,:,vort_ind(1:2))=vort(:,:,:,1:2)
     elseif (vort_ind(1).ne. -1 .and. vort_ind(2).ne. -1 .and. vort_ind(3).ne. -1 ) then
         ! wx,wy,wz (3D - case)
         call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF)**2, &
@@ -272,7 +272,7 @@ contains
                                  u(:,:,:,UzF)/u(:,:,:,rhoF)**2, &
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
-        work(:,:,:,vort_ind(1:3))=vort(:,:,:,1:3) 
+        work(:,:,:,vort_ind(1:3))=vort(:,:,:,1:3)
     endif
     deallocate(vort)
 
@@ -384,12 +384,12 @@ contains
       !-------------------------------------------------------------------------
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
-      
+
 
       ! called for each block.
       if (size(u,3)==1) then
         call RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-      else  
+      else
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
 
@@ -438,7 +438,7 @@ contains
     real(kind=rk) :: x,y,unorm,deltax
 
     dt = 9.9e9_rk
-    ! get smallest spatial seperation 
+    ! get smallest spatial seperation
     if(size(u,3)==1) then
         deltax=minval(dx(1:2))
     else
@@ -446,7 +446,7 @@ contains
     endif
 
     if (UzF==-1) then
-        unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF))  
+        unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF))
     else
         unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF) )
     endif
@@ -455,7 +455,7 @@ contains
     if (unorm < 1e-12_rk) unorm=9e9_rk
 
      dt = min(dt, params_ns%CFL * deltax / sqrt(unorm))
-  
+
   end subroutine GET_DT_BLOCK_NStokes
 
 
@@ -492,20 +492,24 @@ contains
     select case( params_ns%inicond )
     case ("sinus_2d","sinus2d","sin2d")
     !> \todo implement sinus_2d inicondition
-    call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))             
+    call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
     case ("zeros")
-        u = 0.0_rk    
+      ! add ambient pressure
+      u( :, :, :, pF) = p0_
+      ! set rho
+      u( :, :, :, rhoF) = rho0_
+
     case ("pressure_blob")
-        
+
         rho0 = rho0_
         p0 = p0_
-        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )   
+        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
         u( :, :, :, pF) = p0 + 1000.0_rk * u( :, :, :, pF)
         ! set rho
         u( :, :, :, rhoF) = rho0
         ! set Ux
-        u( :, :, :, UxF) = U0_/2.0_rk!0.0_rk
+        u( :, :, :, UxF) = 0.0_rk
         ! set Uy
         u( :, :, :, UyF) = 0.0_rk
 
@@ -514,7 +518,7 @@ contains
             u( :, :, :, UzF) = 0.0_rk
         endif
     case default
-        call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))   
+        call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))
     end select
 
   end subroutine INICOND_NStokes
@@ -522,4 +526,3 @@ contains
 
 
 end module module_navier_stokes_new
- 

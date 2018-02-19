@@ -6,20 +6,20 @@
 !> The right hand side of navier stokes in the skew symmetric form is implemented as follows:
 !>\f{eqnarray*}{
 !!     \partial_t \sqrt{\rho} &=& -\frac{1}{2J\sqrt{\rho}} \nabla \cdot (\rho \vec{u})-\frac{1}{\sqrt{\rho}}\frac{1}{C_{\rm SP} } (\rho-\rho^{\rm SP}) \\
-!!    \partial_t (\sqrt{\rho} u_\alpha) &=& -\frac{1}{2J \sqrt{\rho}} 
-!!                                          \left[  
+!!    \partial_t (\sqrt{\rho} u_\alpha) &=& -\frac{1}{2J \sqrt{\rho}}
+!!                                          \left[
 !!                                                       (u_\alpha \partial_\beta (\rho u_\beta)+
 !!                                                        u_\beta \rho \partial_\beta u_\alpha)
-!!                                            \right] 
+!!                                            \right]
 !!                                           -\frac{1}{J \sqrt{\rho}} \partial_\beta \tau_{\alpha\beta}
 !!                                           -\frac{1}{\sqrt{\rho}} \partial_\alpha p
-!!                                            -\frac{1}{\sqrt{\rho}} \frac{1}{C_{\rm SP} }(\rho u_\alpha-\rho^{\rm SP} u_\alpha^{\rm SP}) 
-!!                                           -\frac{\chi}{\sqrt{\rho}C_\eta} (\rho u_\alpha)\\
+!!                                            -\frac{1}{\sqrt{\rho}} \frac{1}{C_{\rm SP} }(\rho u_\alpha-\rho^{\rm SP} u_\alpha^{\rm SP})
+!!                                           -\frac{\chi}{2\sqrt{\rho}C_\eta} (\rho u_\alpha)\\
 !!    \partial_t p &=& -\frac{\gamma}{J} \partial_\beta( u_\beta p) + (\gamma-1)(u_\alpha \partial_\alpha p)
 !!                                      +\frac{\gamma -1}{J}
-!!                                           \left[ 
-!!                                                       \partial_\alpha(u_\beta \tau_{\alpha\beta}+\phi_\alpha) 
-!!                                                       - u_\alpha\partial_\beta \tau_{\alpha\beta} 
+!!                                           \left[
+!!                                                       \partial_\alpha(u_\beta \tau_{\alpha\beta}+\phi_\alpha)
+!!                                                       - u_\alpha\partial_\beta \tau_{\alpha\beta}
 !!                                            \right]   -\frac{\gamma-1}{C_{\rm SP} } (p-p^{\rm SP})
 !!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
 !!\f}
@@ -106,7 +106,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     ! discretization constant
     dx=delta_x(1)
     dy=delta_x(2)
-    
+
     ! rhs
     rhs         = 0.0_rk
 
@@ -126,7 +126,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     call diff1y_zentral( Bs, g, dy, rho*v, dummy)
     rhs(:,:,1) = rhs(:,:,1) - dummy
     rhs(:,:,1) = rhs(:,:,1) * 0.5_rk/phi(:,:,1)
-  
+
     ! friction
     if (dissipation) then
 
@@ -260,8 +260,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 
     ! SPONGE (bob)
     if (params_ns%sponge_layer) then
-        ! add spnge 
-        ! rho component (density)  
+        ! add spnge
+        ! rho component (density)
         rhs(:,:,1)=rhs(:,:,1) - 0.5_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho,   rho0_       , params_ns%C_sp)
         ! sqrt(rho)u component (momentum)
         rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*u, rho0_*u0_   , params_ns%C_sp)
@@ -269,20 +269,19 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
         rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*v, rho0_*v0_   , params_ns%C_sp)
         ! p component (preasure/energy)
         rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *sponge( Bs, g, x0,delta_x, p    , p0_         , params_ns%C_sp)
-        
+
     endif
 
     if (params_ns%penalization) then
-        ! add spnge 
+        ! add spnge
         ! sqrt(rho)u component (momentum)
         rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization( Bs, g, x0,delta_x, rho*u, 0.0_rk , params_ns%C_eta)
         ! sqrt(rho)v component (momentum)
         rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( Bs, g, x0,delta_x, rho*v, 0.0_rk   , params_ns%C_eta)
         ! p component (preasure/energy)
         rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *penalization( Bs, g, x0,delta_x, p    , T0_         , params_ns%C_eta)
-        
     endif
-    
+
 
 end subroutine RHS_2D_navier_stokes
 
@@ -397,14 +396,14 @@ end subroutine diffy_c
 
 !==========================================================================
 !> \brief This function computes a 2d sponge term
-!!          
-!! \details The sponge term is  
+!!
+!! \details The sponge term is
 !!   \f{eqnarray*}{
 !!           s_q(x,y)=\frac{\chi_{\mathrm sp}(x,y)}{C_{\mathrm sp}}(q(x,y)-q_{\mathrm ref})
-!!                          \quad \forall x,y \in \Omega_{\mathrm block} 
+!!                          \quad \forall x,y \in \Omega_{\mathrm block}
 !!     \f}
-!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a> 
-!! - the mask function is \f$\chi_{\rm sp}\f$ 
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
+!! - the mask function is \f$\chi_{\rm sp}\f$
 !! - \f$C_{\rm sp}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
 
 function sponge( Bs, g, x0,dx, q, qref, C_sp)
@@ -412,12 +411,12 @@ function sponge( Bs, g, x0,dx, q, qref, C_sp)
     !> grid parameter
     integer(kind=ik), intent(in)    :: g, Bs
     !> spacing and origin of block
-    real(kind=rk), intent(in)       :: x0(2), dx(2)                    
+    real(kind=rk), intent(in)       :: x0(2), dx(2)
     !> Sponge coefficient
     real(kind=rk), intent(in)       :: C_sp
     !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
     real(kind=rk), intent(in)       :: qref
-    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)   
+    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
     real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
     !> sponge term \f$s(x,y)\f$
     real(kind=rk)                   :: sponge(Bs+2*g, Bs+2*g)
@@ -426,7 +425,7 @@ function sponge( Bs, g, x0,dx, q, qref, C_sp)
     integer                         :: i, n,ix,iy
     ! inverse C_sp
     real(kind=rk)                   :: C_sp_inv,x,y
-    
+
     C_sp_inv=1.0_rk/C_sp
 
      do ix=1, Bs+2*g
@@ -454,8 +453,8 @@ end function sponge
 !> f(x) is 0 else  \n
 function inside_sponge(x)
 !> coordinate vector \f$\vec{x}=(x,y,z)\f$ (real 3d or 2d array)
-real(kind=rk), intent(in)       :: x(:)    
-!> logical 
+real(kind=rk), intent(in)       :: x(:)
+!> logical
 logical                         :: inside_sponge
 ! dimension of array x
 integer                         :: dim,i
@@ -463,7 +462,7 @@ integer                         :: dim,i
 real(kind=rk)                   :: length_sponge
 
 !> \todo read in length_sponge or thing of something intelligent here
-        length_sponge=params_ns%Lx*0.05 
+        length_sponge=params_ns%Lx*0.05
         if (x(1)<=length_sponge .and. x(1)>=0) then
             inside_sponge=.true.
         else
@@ -478,14 +477,14 @@ end function inside_sponge
 
 !==========================================================================
 !> \brief This function computes a penalization term
-!!          
-!! \details The penalization term is  
+!!
+!! \details The penalization term is
 !!   \f{eqnarray*}{
 !!           p_q(x,y)=\frac{\chi(x,y)}{C_{\eta}}(q(x,y)-q_{\mathrm s})
-!!                          \quad \forall x,y \in \Omega_{\mathrm block} 
+!!                          \quad \forall x,y \in \Omega_{\mathrm block}
 !!     \f}
-!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a> 
-!! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$ 
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
+!! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$
 !! - \f$C_{\rm \eta}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
 
 function penalization( Bs, g, x0,dx, q, qref, C_eta)
@@ -493,12 +492,12 @@ function penalization( Bs, g, x0,dx, q, qref, C_eta)
     !> grid parameter
     integer(kind=ik), intent(in)    :: g, Bs
     !> spacing and origin of block
-    real(kind=rk), intent(in)       :: x0(2), dx(2)                    
+    real(kind=rk), intent(in)       :: x0(2), dx(2)
     !> Sponge coefficient
     real(kind=rk), intent(in)       :: C_eta
     !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
     real(kind=rk), intent(in)       :: qref
-    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)   
+    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
     real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
     !> penalization term \f$p_q(x,y)\f$
     real(kind=rk)                   :: penalization(Bs+2*g, Bs+2*g)
@@ -507,7 +506,7 @@ function penalization( Bs, g, x0,dx, q, qref, C_eta)
     integer                         :: i, n,ix,iy
     ! inverse C_eta
     real(kind=rk)                   :: C_eta_inv,x,y,delta,h
-    
+
     ! inverse C_eta
     C_eta_inv=1.0_rk/C_eta
 
@@ -538,8 +537,8 @@ end function penalization
   !> f is 0 if delta>0+h \n
   !> f is variable (smooth) in between
   !> \details
-  !> \image html maskfunction.bmp "plot of chi(delta)"  
-  !> \image latex maskfunction.eps "plot of chi(delta)"  
+  !> \image html maskfunction.bmp "plot of chi(delta)"
+  !> \image latex maskfunction.eps "plot of chi(delta)"
 function characteristic(delta,h)
 
   implicit none
@@ -565,7 +564,7 @@ end function characteristic
 
 
 !==========================================================================
-  !> \brief Calculates the distance from the obe   
+  !> \brief Calculates the distance from the obe
 function distance_to_nearest_object(x)
 
   implicit none
@@ -577,12 +576,8 @@ function distance_to_nearest_object(x)
   !-------------------------------------------------
   ! circle in the middle of the field
   !-------------------------------------------------
-    Radius=params_ns%Lx/6.0_rk
+    Radius=min(params_ns%Ly,params_ns%Lx)/6.0_rk
     r_cyl=sqrt( (x(1)-params_ns%Lx/2.0_rk)**2+(x(2)-params_ns%Lx/2.0_rk)**2  )
     distance_to_nearest_object=r_cyl-Radius
 end function distance_to_nearest_object
 !==========================================================================
-
-
-
-

@@ -41,7 +41,7 @@
 !>\brief main function of RHS_2D_navier_stokes
 subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 !---------------------------------------------------------------------------------------------
-!
+!   
     implicit none
 
     !> grid parameter
@@ -74,7 +74,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
                                                                fric_p(Bs+2*g, Bs+2*g), fric_u(Bs+2*g, Bs+2*g), fric_v(Bs+2*g, Bs+2*g), &
                                                                fric_T1(Bs+2*g, Bs+2*g), fric_T2(Bs+2*g, Bs+2*g), &
                                                                tau11(Bs+2*g, Bs+2*g), tau22(Bs+2*g, Bs+2*g), tau33(Bs+2*g, Bs+2*g), &
-                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g)
+                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g)
     ! derivatives
     real(kind=rk)                                           :: u_x(Bs+2*g, Bs+2*g), u_y(Bs+2*g, Bs+2*g), v_x(Bs+2*g, Bs+2*g), v_y(Bs+2*g, Bs+2*g), &
                                                                p_x(Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g), T_x(Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g),&
@@ -274,12 +274,14 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 
     if (params_ns%penalization) then
         ! add spnge
+        call get_mask(mask, x0, delta_x, Bs, g )
         ! sqrt(rho)u component (momentum)
-        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization( Bs, g, x0,delta_x, rho*u, 0.0_rk , params_ns%C_eta)
+        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization(mask, rho*u, 0.0_rk , params_ns%C_eta)
         ! sqrt(rho)v component (momentum)
-        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( Bs, g, x0,delta_x, rho*v, 0.0_rk   , params_ns%C_eta)
+        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( mask, rho*v, 0.0_rk   , params_ns%C_eta)
         ! p component (preasure/energy)
-        rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *penalization( Bs, g, x0,delta_x, p    , T0_         , params_ns%C_eta)
+        rhs(:,:,4)=rhs(:,:,4) -                   penalization( mask, p  ,rho*Rs*T0_  , params_ns%C_eta)
+        !write(*,*) penalization( mask, p   , rho*Rs*T      , params_ns%C_eta)
     endif
 
 
@@ -487,97 +489,25 @@ end function inside_sponge
 !! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$
 !! - \f$C_{\rm \eta}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
 
-function penalization( Bs, g, x0,dx, q, qref, C_eta)
+elemental function penalization( mask, q, qref, C_eta)
+
     !-------------------------------------------------------
     !> grid parameter
-    integer(kind=ik), intent(in)    :: g, Bs
-    !> spacing and origin of block
-    real(kind=rk), intent(in)       :: x0(2), dx(2)
-    !> Sponge coefficient
     real(kind=rk), intent(in)       :: C_eta
     !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
     real(kind=rk), intent(in)       :: qref
     !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    !> penalization term \f$p_q(x,y)\f$
-    real(kind=rk)                   :: penalization(Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: q
+    !> mask \f$p_q(x,y)\f$
+    real(kind=rk), intent(in)       :: mask
     !--------------------------------------------------------
-    ! loop variables
-    integer                         :: i, n,ix,iy
-    ! inverse C_eta
-    real(kind=rk)                   :: C_eta_inv,x,y,delta,h
+    real(kind=rk)                   :: penalization
+    real(kind=rk)                   :: C_eta_inv
 
     ! inverse C_eta
     C_eta_inv=1.0_rk/C_eta
-
-    ! parameter for smoothing function (width)
-    h = 1.5_rk*max(dx(1), dx(2))
-
-     do ix=1, Bs+2*g
-        x = dble(ix-(g+1)) * dx(1) + x0(1)
-        do iy=1, Bs+2*g
-            y       = dble(iy-(g+1)) * dx(2) + x0(2)
-
-            delta   = distance_to_nearest_object((/x,y/))
-            penalization(ix,iy) = characteristic(delta,h)*C_eta_inv*(q(ix,iy)-qref)
-       end do
-    end do
-
+    
+    penalization=mask*C_eta_inv*(q-qref)
 end function penalization
 !==========================================================================
 
-
-
-
-!==========================================================================
-  !> \brief This subroutine returns the value f of a smooth step function \n
-  !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
-  !> h is the semi-size of the smoothing area, so \n
-  !> f is 1 if delta<=0-h \n
-  !> f is 0 if delta>0+h \n
-  !> f is variable (smooth) in between
-  !> \details
-  !> \image html maskfunction.bmp "plot of chi(delta)"
-  !> \image latex maskfunction.eps "plot of chi(delta)"
-function characteristic(delta,h)
-
-  implicit none
-  !> distance to object
-  real(kind=rk), intent(in)  :: delta
-  !> smoothing area
-  real(kind=rk), intent(in)  :: h
-  real(kind=rk)              :: characteristic
-
-  !-------------------------------------------------
-  ! cos shaped smoothing (compact in phys.space)
-  !-------------------------------------------------
-  if (delta<=-h) then
-    characteristic = 1.0_rk
-  elseif ((-h<delta).and.(delta<+h)) then
-    characteristic = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
-  else
-    characteristic = 0.0_rk
-  endif
-
-end function characteristic
-!==========================================================================
-
-
-!==========================================================================
-  !> \brief Calculates the distance from the obe
-function distance_to_nearest_object(x)
-
-  implicit none
-  !> coordinate
-  real(kind=rk), intent(in)  :: x(2)
-  !> smoothing area
-  real(kind=rk)              :: distance_to_nearest_object
-  real(kind=rk)              :: r_cyl,Radius
-  !-------------------------------------------------
-  ! circle in the middle of the field
-  !-------------------------------------------------
-    Radius=min(params_ns%Ly,params_ns%Lx)/6.0_rk
-    r_cyl=sqrt( (x(1)-params_ns%Lx/2.0_rk)**2+(x(2)-params_ns%Lx/2.0_rk)**2  )
-    distance_to_nearest_object=r_cyl-Radius
-end function distance_to_nearest_object
-!==========================================================================

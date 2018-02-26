@@ -21,6 +21,7 @@ module module_navier_stokes_new
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_precision
+  use module_mask
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
@@ -95,7 +96,7 @@ module module_navier_stokes_new
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
 
-  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=6.0_rk,v0_=0.0_rk,T0_=348!273.15_rk
+  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=100.0_rk,v0_=0.0_rk,T0_=348!273.15_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -165,12 +166,15 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond', params_ns%inicond, "pressure_blob" )
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, 0.1_rk )
     ! penalization:
-    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
-    call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 1.0e-3_rk)
-    call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_ns%smooth_mask, .true.)
-    call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
-    call read_param_mpi(FILE, 'VPM', 'x_cntr', params_ns%x_cntr, (/0.5*params_ns%Lx, 0.5*params_ns%Ly, 0.5*params_ns%Lz/)  )
-    call read_param_mpi(FILE, 'VPM', 'R_cyl', params_ns%R_cyl, 0.5_rk )
+     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
+     call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 1.0e-3_rk)
+    ! call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_ns%smooth_mask, .true.)
+    ! call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
+    ! call read_param_mpi(FILE, 'VPM', 'x_cntr', params_ns%x_cntr, (/0.5*params_ns%Lx, 0.5*params_ns%Ly, 0.5*params_ns%Lz/)  )
+    ! call read_param_mpi(FILE, 'VPM', 'R_cyl', params_ns%R_cyl, 0.5_rk )
+    if (params_ns%penalization) then
+      call init_mask(filename)
+    endif
     ! sponge:
     call read_param_mpi(FILE, 'Physics', 'sponge_layer', params_ns%sponge_layer, .false.)
     call read_param_mpi(FILE, 'Physics', 'C_sp', params_ns%C_sp, 100.0_rk)
@@ -178,12 +182,13 @@ contains
 
   ! read variable names
     ! allocate names list
-    allocate( params_ns%names( params_ns%number_data_fields ) )
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
+    allocate( params_ns%names( params_ns%N_fields_saved ) )
     params_ns%names = "---"
     ! read file
     call read_param_mpi(FILE, 'Saving', 'field_names', params_ns%names, params_ns%names )
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
 
+    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
@@ -191,12 +196,13 @@ contains
     ! set global parameters pF,rohF, UxF etc
     UzF=-1
     do dF = 1, params_ns%number_data_fields
-                if ( params_ns%names(dF) == "p" ) pF = dF
+                if ( params_ns%names(dF) == "p" ) pF = dF 
                 if ( params_ns%names(dF) == "rho" ) rhoF = dF
                 if ( params_ns%names(dF) == "Ux" ) UxF = dF
                 if ( params_ns%names(dF) == "Uy" ) UyF = dF
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
+
 
     call clean_ini_file_mpi( FILE )
   end subroutine READ_PARAMETERS_NStokes
@@ -248,36 +254,32 @@ contains
     ! ---------------------------------
 
 
-    ! if vorticity is in filed names compute it and write it to file
-    vort_ind=-1
-    do dF=1,params_ns%number_data_fields
-        if(params_ns%names(dF)=='wx')   vort_ind(1)=dF
-        if(params_ns%names(dF)=='wy')   vort_ind(2)=dF
-        if(params_ns%names(dF)=='wz')   vort_ind(3)=dF
-    enddo
+    !
     ! compute vorticity
     allocate(vort(size(u,1),size(u,2),size(u,3),3))
-    if (vort_ind(1) .ne. -1 .and. vort_ind(2) .ne. -1) then
+
+    if (size(u,3)==1) then
         ! only wx,wy (2D - case)
-        call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF)**2, &
-                                 u(:,:,:,UyF)/u(:,:,:,rhoF)**2, &
-                                 u(:,:,:,UzF)/u(:,:,:,rhoF)**2, &
+        call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
+                                 u(:,:,:,UyF)/u(:,:,:,rhoF), &
+                                 0*u(:,:,:,rhoF), &
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
-        work(:,:,:,vort_ind(1:2))=vort(:,:,:,1:2)
-    elseif (vort_ind(1).ne. -1 .and. vort_ind(2).ne. -1 .and. vort_ind(3).ne. -1 ) then
+        
+        work(:,:,:,size(u,4)+1)=vort(:,:,:,1)
+        call get_mask(work(:,:,1,size(u,4)+2), x0, dx, Bs, g )
+    else
         ! wx,wy,wz (3D - case)
-        call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF)**2, &
-                                 u(:,:,:,UyF)/u(:,:,:,rhoF)**2, &
-                                 u(:,:,:,UzF)/u(:,:,:,rhoF)**2, &
-                                 dx, Bs, g, params_ns%discretization, &
-                                 vort)
-        work(:,:,:,vort_ind(1:3))=vort(:,:,:,1:3)
+   !      call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
+   !                               u(:,:,:,UyF)/u(:,:,:,rhoF), &
+   !                               u(:,:,:,UzF)/u(:,:,:,rhoF), &
+   !                               dx, Bs, g, params_ns%discretization, &
+   !                               vort)
+   ! !     work(:,:,:,=vort(:,:,:,1:3)
     endif
     deallocate(vort)
 
     ! mask
-    !call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )
 
   end subroutine
 
@@ -456,6 +458,14 @@ contains
 
      dt = min(dt, params_ns%CFL * deltax / sqrt(unorm))
 
+    ! penalization requiers dt <= C_eta
+    if (params_ns%penalization ) then
+        dt=min(dt,params_ns%C_eta)
+    endif
+    ! penalization requiers dt <= C_eta
+    if (params_ns%sponge_layer ) then
+        dt=min(dt,params_ns%C_sp)
+    endif
   end subroutine GET_DT_BLOCK_NStokes
 
 
@@ -499,6 +509,20 @@ contains
       ! set rho
       u( :, :, :, rhoF) = rho0_
 
+    case ("mask")
+      ! add ambient pressure
+      u( :, :, :, pF) = p0_
+      ! set rho
+      u( :, :, :, rhoF) = rho0_
+
+      ! set velocity field u(x)=1 for x in mask
+      if (size(u,3)==1 .and. params_ns%penalization) then
+        call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
+        call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
+      endif
+      ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
+      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*U0_
+      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*V0_
     case ("pressure_blob")
 
         rho0 = rho0_
@@ -512,6 +536,15 @@ contains
         u( :, :, :, UxF) = 0.0_rk
         ! set Uy
         u( :, :, :, UyF) = 0.0_rk
+
+         ! set velocity field u(x)=1 for x in mask
+      if (size(u,3)==1 .and. params_ns%penalization) then
+        call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
+        call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
+      endif
+      ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
+      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*U0_
+      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*V0_
 
         if (size(u,3).ne.1) then
             ! set Uz to zero

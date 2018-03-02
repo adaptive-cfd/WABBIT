@@ -27,9 +27,9 @@ do
     i=$((i+1))
 done
 
-echo -e "\t $pass_color sum happy tests: $end_color \t" $happy
-echo -e "\t $fail_color sum sad tests: $end_color \t" $sad
-
+echo " "
+echo "All in all we have: "
+echo " "
 i=0
 for ts in ${summary[@]}
 do
@@ -40,3 +40,7 @@ do
     fi
     i=$((i+1))
 done
+echo " "
+
+echo -e "\t $pass_color sum happy tests: $end_color \t" $happy
+echo -e "\t $fail_color sum sad tests: $end_color \t" $sad

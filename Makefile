@@ -183,10 +183,12 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
-.PHONY: doc
+.PHONY: doc test
 doc:
 	doxygen doc/doc_configuration
 	firefox doc/output/html/index.html &
+test:
+	@cd TESTING/; sh runtests.sh
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

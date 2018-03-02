@@ -1,13 +1,13 @@
 !> \file
 ! WABBIT
-!> \name get_attributes.f90
+!> \name sparse_to_dense.f90
 !> \version 0.5
 !> \author sm
 !
 !> \brief postprocessing routine for interpolation of a given field to the desired level
 !
 ! = log ======================================================================================
-!> \version  31/01/18 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
+!> \date  31/01/18 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 !-----------------------------------------------------------------------------------------------------
 
 subroutine sparse_to_dense(help, params)

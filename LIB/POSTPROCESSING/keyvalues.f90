@@ -17,6 +17,7 @@ subroutine keyvalues(fname, params, help)
     use module_params
     use module_initialization, only: allocate_grid
     use module_mesh
+    use mpi
 
     implicit none
     !> name of the file
@@ -74,7 +75,7 @@ subroutine keyvalues(fname, params, help)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
         params%number_blocks = lgt_n/params%number_procs
-        if (params%rank==0) params%number_blocks = params%number_blocks + mod(lgt_n,params%number_procs)
+        params%number_blocks = params%number_blocks + mod(lgt_n,params%number_procs)
         call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         call read_field(fname, 1, params, hvy_block, hvy_n )
@@ -92,6 +93,7 @@ subroutine keyvalues(fname, params, help)
         squarl = 0.0_rk
         meanl = 0.0_rk
         ql = 0.0_rk
+
         do k = 1,hvy_n
             call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks )
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -112,11 +114,11 @@ subroutine keyvalues(fname, params, help)
             meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_active(k))) 
         end do
 
-        call MPI_ALLREDUCE (ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpicode)
-        call MPI_ALLREDUCE (maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,mpicode)
-        call MPI_ALLREDUCE (minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,mpicode)
-        call MPI_ALLREDUCE (squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpicode)
-        call MPI_ALLREDUCE (meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE (ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE (maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE (minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE (squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE (meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
 
         qi = qi / lgt_n
         squari = squari / lgt_n

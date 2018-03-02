@@ -2,7 +2,7 @@
 ! WABBIT
 !> \name    main.f90
 !> \version 0.5
-!> \author  msr
+!> \author  sm
 !
 !> \brief main postprocessing program. get command argument to decide which postprocessing mode to run
 !
@@ -88,6 +88,10 @@ program main_post
             call get_command_argument(4,key2)
             call compare_keys(help,key1,key2)
         end if
+!    case ("--sfc-test")
+!        call keyvalues_sfc(help, params)
+!    case("--squeeze")
+!        call squeeze(help, params)
     case default
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"
@@ -95,7 +99,11 @@ program main_post
         write(*,*) "--vorticity"
         write(*,*) "--keyvalues"
         write(*,*) "--compare-keys"
-        write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
+        if (mode=="--h" .or. mode=="--help") then
+            write(*,*) "To get more information about each postprocessing tool type: wabbit-post --help --[one of the listed tools]"
+        else
+            write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
+        end if
     end if
     end select
 

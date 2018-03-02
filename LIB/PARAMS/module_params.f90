@@ -192,6 +192,8 @@ contains
           case('3D')
               params%threeD_case = .true.
               params%dim = 3
+          case('--help')
+          case('--h')
           case default
               call abort(1,"ERROR: case dimension is wrong")
       end select

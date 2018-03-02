@@ -67,7 +67,7 @@ subroutine sparse_to_dense(help, params)
             params%order_predictor = "multiresolution_2nd"
             params%number_ghost_nodes = 2_ik
         else
-            call abort("chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
+            call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
         end if
 
         ! get some parameters from file
@@ -119,17 +119,21 @@ subroutine sparse_to_dense(help, params)
         else
             call balance_load_2D(params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
         end if
-
-        ! create lists of active blocks (light and heavy data)
-        ! update list of sorted nunmerical treecodes, used for finding blocks
+        ! create lists of active blocks (light and heavy data) after load balancing (have changed)
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! refine/coarse to attain desired level, respectively
         !coarsen 
         do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
+            ! set refinement status to -1 (coarsen) everywhere
             lgt_block(:, params%max_treelevel +2) = -1
+            ! check where coarsening is actually needed
             call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+            ! this might not be necessary since we start from an admissible grid 
+            call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
+            call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
             call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
             call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
             ! update neighbor relations
@@ -137,10 +141,11 @@ subroutine sparse_to_dense(help, params)
         end do
         ! refine
         do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            ! check where refinement is actually needed
             do k=1, lgt_n
                 if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level) lgt_block(lgt_active(k), params%max_treelevel +2) = 1
             end do
+            call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
             if ( params%threeD_case ) then
                 ! 3D:
                 call refinement_execute_3D( params, lgt_block, hvy_block(:,:,:,:,:), hvy_active, hvy_n )
@@ -151,6 +156,7 @@ subroutine sparse_to_dense(help, params)
             call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
             ! update neighbor relations
             call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end do
         if ( params%threeD_case ) then
             call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
@@ -160,6 +166,9 @@ subroutine sparse_to_dense(help, params)
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         call write_field(file_out, time, iteration, 1, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
 
-        if (params%rank==0 ) write(*,'("Wrote data of input-file",a20," now on uniform grid (level",i3, ") to file",a20)'), trim(file_in), level, trim(file_out)
+        if (params%rank==0 ) then
+            write(*,'("Wrote data of input-file",a20," now on uniform grid (level",i3, ") to file",a20)'), trim(file_in), level, trim(file_out)
+             write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")'), min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
+        end if
     end if
 end subroutine sparse_to_dense

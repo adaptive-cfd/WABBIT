@@ -35,7 +35,7 @@ program main_post
     logical                             :: help
 
     type (type_params)                  :: params
-    character(len=80)                   :: mode
+    character(len=80)                   :: mode, post_mode
     character(len=80)                   :: filename, key1, key2
 
 !---------------------------------------------------------------------------------------------
@@ -63,16 +63,18 @@ program main_post
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
-    call get_command_argument( 2, mode )
+    call get_command_argument( 1, mode )
 
-    if (mode=="--h") then
+    if (mode=="--h" .or. mode=="--help") then
         help=.true.
     else
         if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")'), mode
         help=.false.
     end if
 
-    select case(mode)
+    call get_command_argument( 2, post_mode )
+
+    select case(post_mode)
     case("--sparse-to-dense")
         call sparse_to_dense(help, params)
     case("--vorticity")

@@ -103,7 +103,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     end if
     ! some error control -> did we loose blocks? should never happen.
     if ( sum(blocks_per_rank_list) /= lgt_n) then
-        call abort("ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
+        call abort(1028,"ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
     end if
 
     ! number of active blocks on my process

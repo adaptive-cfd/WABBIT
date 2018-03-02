@@ -74,7 +74,7 @@ subroutine compute_vorticity_post(help, params)
             params%order_discretization = "FD_2nd_central"
             params%number_ghost_nodes = 2_ik
         else
-            call abort("chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
+            call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
         end if
         params%order_predictor = "multiresolution_4th"
 

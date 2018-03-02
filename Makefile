@@ -178,7 +178,7 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 		$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit
+	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
 
 docu:
 	doxygen doc_configuration

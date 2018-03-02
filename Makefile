@@ -14,7 +14,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 module_initial_conditions.f90\
-	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_navier_stokes_new.f90
+	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_navier_stokes_new.f90 module_mask.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -79,10 +79,20 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o \
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o \
+	ini_file_to_params.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_mask.o: module_mask.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_mask.o \
 	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 RHS_2D_navier_stokes.f90 $(OBJDIR)/module_initial_conditions.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -94,17 +104,11 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o \
-	ini_file_to_params.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
 	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90 write_debug_times.f90 write_block_distribution.f90 write_com_list.f90 \
 	write_com_matrix.f90 write_com_matrix_pos.f90 allocate_init_debugging.f90 check_redundant_nodes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -179,10 +183,10 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
-
-docu:
-	doxygen doc_configuration
-	firefox doc/output/html/index.html
+.PHONY: doc
+doc:
+	doxygen doc/doc_configuration
+	firefox doc/output/html/index.html &
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

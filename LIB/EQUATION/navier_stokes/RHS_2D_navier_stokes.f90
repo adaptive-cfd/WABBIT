@@ -1,49 +1,59 @@
+
+!--------------------------------------------------------------------------------------------------------------------------------------------------------
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name RHS_2D_navier_stokes.f90
-!> \version 0.4
-!> \author msr
-!
-!> \brief RHS for 2D navier stokes equation
-!
-!>
-!! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
-!! output:   - RHS(datafield) \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 08/12/16 - create \n
-!! 08/1/2018- include mask and sponge terms
-! ********************************************************************************************
-!>\details
-!> We implement the right hand side of navier stokes equations:
+!> \brief Right hand side for 2D navier stokes equation
+!>        ---------------------------------------------
+!> The right hand side of navier stokes in the skew symmetric form is implemented as follows:
 !>\f{eqnarray*}{
-!!     \partial_t \sqrt{\rho} &=& \frac{1}{2J\sqrt{\rho}} \nabla \cdot (\rho \vec{u})-\frac{1}{C_{\rm SP}} J(\rho-\rho_{\rm SP}) \\
-!!    \partial_t (\rho \vec{u}) &=& -\frac{1}{2J \sqrt{\rho}} ...  
-!! \f}
+!!     \partial_t \sqrt{\rho} &=& -\frac{1}{2J\sqrt{\rho}} \nabla \cdot (\rho \vec{u})-\frac{1}{\sqrt{\rho}}\frac{1}{C_{\rm SP} } (\rho-\rho^{\rm SP}) \\
+!!    \partial_t (\sqrt{\rho} u_\alpha) &=& -\frac{1}{2J \sqrt{\rho}}
+!!                                          \left[
+!!                                                       (u_\alpha \partial_\beta (\rho u_\beta)+
+!!                                                        u_\beta \rho \partial_\beta u_\alpha)
+!!                                            \right]
+!!                                           -\frac{1}{J \sqrt{\rho}} \partial_\beta \tau_{\alpha\beta}
+!!                                           -\frac{1}{\sqrt{\rho}} \partial_\alpha p
+!!                                            -\frac{1}{\sqrt{\rho}} \frac{1}{C_{\rm SP} }(\rho u_\alpha-\rho^{\rm SP} u_\alpha^{\rm SP})
+!!                                           -\frac{\chi}{2\sqrt{\rho}C_\eta} (\rho u_\alpha)\\
+!!    \partial_t p &=& -\frac{\gamma}{J} \partial_\beta( u_\beta p) + (\gamma-1)(u_\alpha \partial_\alpha p)
+!!                                      +\frac{\gamma -1}{J}
+!!                                           \left[
+!!                                                       \partial_\alpha(u_\beta \tau_{\alpha\beta}+\phi_\alpha)
+!!                                                       - u_\alpha\partial_\beta \tau_{\alpha\beta}
+!!                                            \right]   -\frac{\gamma-1}{C_{\rm SP} } (p-p^{\rm SP})
+!!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
+!!\f}
+!> \version 08/12/16 - create \n
+!> \version 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e3fa52f887d593fad5826afec88)
+!!
+!> \author msr
+!--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
 
+
+
+
+
+
+
+
+!>\brief main function of RHS_2D_navier_stokes
+subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 !---------------------------------------------------------------------------------------------
-! variables
-
+!   
     implicit none
 
     !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
-    !> rhs parameter
-    real(kind=rk), intent(in)                               :: dx, dy
+    !> origin and spacing of the block
+    real(kind=rk), dimension(2), intent(in)                  :: x0, delta_x
     !> datafields
     real(kind=rk), intent(in)                            :: phi(:, :, :)
-    ! rhs array
+    !> rhs array
     real(kind=rk), intent(inout)                            :: rhs(:, :, :)
 
-     ! adiabatic coefficient
+    ! adiabatic coefficient
     real(kind=rk)                                           :: gamma_
     ! specific gas constant
     real(kind=rk)                                           :: Rs
@@ -54,7 +64,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
     ! prandtl number
     real(kind=rk)                                           :: Pr
     ! dynamic viscosity
-    real(kind=rk)                                           :: mu0
+    real(kind=rk)                                           :: mu0,dx,dy
     ! dissipation switch
     logical                                                 :: dissipation
 
@@ -64,7 +74,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
                                                                fric_p(Bs+2*g, Bs+2*g), fric_u(Bs+2*g, Bs+2*g), fric_v(Bs+2*g, Bs+2*g), &
                                                                fric_T1(Bs+2*g, Bs+2*g), fric_T2(Bs+2*g, Bs+2*g), &
                                                                tau11(Bs+2*g, Bs+2*g), tau22(Bs+2*g, Bs+2*g), tau33(Bs+2*g, Bs+2*g), &
-                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g)
+                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g)
     ! derivatives
     real(kind=rk)                                           :: u_x(Bs+2*g, Bs+2*g), u_y(Bs+2*g, Bs+2*g), v_x(Bs+2*g, Bs+2*g), v_y(Bs+2*g, Bs+2*g), &
                                                                p_x(Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g), T_x(Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g),&
@@ -91,8 +101,11 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
     ! variables
     rho         = phi(:,:,1)**2
     u           = phi(:,:,2)/phi(:,:,1)
-    v           = phi(:,:,3)/phi(:,:,2)
+    v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
+    ! discretization constant
+    dx=delta_x(1)
+    dy=delta_x(2)
 
     ! rhs
     rhs         = 0.0_rk
@@ -112,10 +125,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
     rhs(:,:,1) = -dummy
     call diff1y_zentral( Bs, g, dy, rho*v, dummy)
     rhs(:,:,1) = rhs(:,:,1) - dummy
-
     rhs(:,:,1) = rhs(:,:,1) * 0.5_rk/phi(:,:,1)
-
-    ! sponge rhs(:,:,1)=rhs(:,:,1)+0.5_rk/phi(:,:,1)*sponge
 
     ! friction
     if (dissipation) then
@@ -131,6 +141,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
         ! tau11
         tau11 = mu * 2.0_rk * u_x
 
+        !> \todo why not just simply div_U= u_x + v_y ?
         call diff1x_zentral( Bs, g, dx, u, dummy)
         div_U = dummy
         call diff1y_zentral( Bs, g, dy, v, dummy)
@@ -247,6 +258,33 @@ subroutine RHS_2D_navier_stokes( g, Bs, dx, dy, phi, rhs)
     rhs(:,:,3) = rhs(:,:,3) + fric_v
 
 
+    ! SPONGE (bob)
+    if (params_ns%sponge_layer) then
+        ! add spnge
+        ! rho component (density)
+        rhs(:,:,1)=rhs(:,:,1) - 0.5_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho,   rho0_       , params_ns%C_sp)
+        ! sqrt(rho)u component (momentum)
+        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*u, rho0_*u0_   , params_ns%C_sp)
+        ! sqrt(rho)v component (momentum)
+        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*v, rho0_*v0_   , params_ns%C_sp)
+        ! p component (preasure/energy)
+        rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *sponge( Bs, g, x0,delta_x, p    , p0_         , params_ns%C_sp)
+
+    endif
+
+    if (params_ns%penalization) then
+        ! add spnge
+        call get_mask(mask, x0, delta_x, Bs, g )
+        ! sqrt(rho)u component (momentum)
+        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization(mask, rho*u, 0.0_rk , params_ns%C_eta)
+        ! sqrt(rho)v component (momentum)
+        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( mask, rho*v, 0.0_rk   , params_ns%C_eta)
+        ! p component (preasure/energy)
+        rhs(:,:,4)=rhs(:,:,4) -                   penalization( mask, p  ,rho*Rs*T0_  , params_ns%C_eta)
+        !write(*,*) penalization( mask, p   , rho*Rs*T      , params_ns%C_eta)
+    endif
+
+
 end subroutine RHS_2D_navier_stokes
 
 !---------------------------------------------------------------------------------------------
@@ -302,7 +340,6 @@ end subroutine diff1y_zentral
 !---------------------------------------------------------------------------------------------
 
 subroutine  diffx_c( Bs, g, dx, u, dudx)
-    use module_params
     integer(kind=ik), intent(in)    :: g, Bs
     real(kind=rk), intent(in)       :: dx
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
@@ -327,7 +364,6 @@ end subroutine diffx_c
 !---------------------------------------------------------------------------------------------
 
 subroutine  diffy_c( Bs, g, dy, u, dudy)
-    use module_params
     integer(kind=ik), intent(in)    :: g, Bs
     real(kind=rk), intent(in)       :: dy
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
@@ -348,3 +384,130 @@ subroutine  diffy_c( Bs, g, dy, u, dudy)
     dudy(:,n)   = ( u(:,n-2) - 8.0_rk*u(:,n-1) + 8.0_rk*u(:,1) - u(:,2) ) / (12.0_rk*dy)
 
 end subroutine diffy_c
+
+
+
+
+
+
+
+!--------------------------------------------------------------------------!
+!               phils sponge stuff
+!--------------------------------------------------------------------------!
+
+
+!==========================================================================
+!> \brief This function computes a 2d sponge term
+!!
+!! \details The sponge term is
+!!   \f{eqnarray*}{
+!!           s_q(x,y)=\frac{\chi_{\mathrm sp}(x,y)}{C_{\mathrm sp}}(q(x,y)-q_{\mathrm ref})
+!!                          \quad \forall x,y \in \Omega_{\mathrm block}
+!!     \f}
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
+!! - the mask function is \f$\chi_{\rm sp}\f$
+!! - \f$C_{\rm sp}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
+
+function sponge( Bs, g, x0,dx, q, qref, C_sp)
+    !-------------------------------------------------------
+    !> grid parameter
+    integer(kind=ik), intent(in)    :: g, Bs
+    !> spacing and origin of block
+    real(kind=rk), intent(in)       :: x0(2), dx(2)
+    !> Sponge coefficient
+    real(kind=rk), intent(in)       :: C_sp
+    !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+    real(kind=rk), intent(in)       :: qref
+    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
+    !> sponge term \f$s(x,y)\f$
+    real(kind=rk)                   :: sponge(Bs+2*g, Bs+2*g)
+    !--------------------------------------------------------
+    ! loop variables
+    integer                         :: i, n,ix,iy
+    ! inverse C_sp
+    real(kind=rk)                   :: C_sp_inv,x,y
+
+    C_sp_inv=1.0_rk/C_sp
+
+     do ix=1, Bs+2*g
+        x = dble(ix-(g+1)) * dx(1) + x0(1)
+        do iy=1, Bs+2*g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+            if (inside_sponge((/x,y/))) then
+                   sponge(ix,iy) = C_sp_inv*(q(ix,iy)-qref)
+                !   write(*,*) sponge(ix,iy)
+            else
+                   sponge(ix,iy) = 0.0_rk
+            end if
+
+       end do
+    end do
+end function sponge
+!==========================================================================
+
+
+
+!==========================================================================
+!> \brief This function f(x) implements \n
+!> f(x) is 1 if x(1)<=Lsponge \n
+!> f(x) is 0 else  \n
+function inside_sponge(x)
+!> coordinate vector \f$\vec{x}=(x,y,z)\f$ (real 3d or 2d array)
+real(kind=rk), intent(in)       :: x(:)
+!> logical
+logical                         :: inside_sponge
+! dimension of array x
+integer                         :: dim,i
+! size of sponge
+real(kind=rk)                   :: length_sponge
+
+!> \todo read in length_sponge or thing of something intelligent here
+        length_sponge=params_ns%Lx*0.05
+        if (x(1)<=length_sponge .and. x(1)>=0) then
+            inside_sponge=.true.
+        else
+            inside_sponge=.false.
+        endif
+
+
+end function inside_sponge
+!==========================================================================
+
+
+
+!==========================================================================
+!> \brief This function computes a penalization term
+!!
+!! \details The penalization term is
+!!   \f{eqnarray*}{
+!!           p_q(x,y)=\frac{\chi(x,y)}{C_{\eta}}(q(x,y)-q_{\mathrm s})
+!!                          \quad \forall x,y \in \Omega_{\mathrm block}
+!!     \f}
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
+!! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$
+!! - \f$C_{\rm \eta}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
+
+elemental function penalization( mask, q, qref, C_eta)
+
+    !-------------------------------------------------------
+    !> grid parameter
+    real(kind=rk), intent(in)       :: C_eta
+    !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+    real(kind=rk), intent(in)       :: qref
+    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+    real(kind=rk), intent(in)       :: q
+    !> mask \f$p_q(x,y)\f$
+    real(kind=rk), intent(in)       :: mask
+    !--------------------------------------------------------
+    real(kind=rk)                   :: penalization
+    real(kind=rk)                   :: C_eta_inv
+
+    ! inverse C_eta
+    C_eta_inv=1.0_rk/C_eta
+    
+    penalization=mask*C_eta_inv*(q-qref)
+end function penalization
+!==========================================================================
+

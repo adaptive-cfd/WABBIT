@@ -328,7 +328,7 @@ contains
 
       elseif (size(u,4) == 4) then
         ! this is a 3d case (ux,uy,uz,p)
-        call abort(888,"3d not yet implemented")
+        call abort(888,"module_ACM-new.f90: 3d not yet implemented")
       endif
 
     case default

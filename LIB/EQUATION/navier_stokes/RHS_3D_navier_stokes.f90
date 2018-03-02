@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
+subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -34,7 +34,7 @@ subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
     !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
     !> rhs parameter
-    real(kind=rk), intent(in)                               :: dx, dy, dz
+    real(kind=rk), dimension(3), intent(in)                 :: x0,delta_x
     !> datafields
     real(kind=rk), intent(in)                              :: phi(:, :, :, :)
     ! rhs array
@@ -51,7 +51,7 @@ subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
     ! prandtl number
     real(kind=rk)                                           :: Pr
     ! dynamic viscosity
-    real(kind=rk)                                           :: mu0
+    real(kind=rk)                                           :: mu0,dx,dy,dz
     ! dissipation switch
     logical                                                 :: dissipation
 
@@ -100,7 +100,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, dx, dy, dz, phi,rhs)
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
+    dx=delta_x(1)
+    dy=delta_x(2)
+    dz=delta_x(3)
     ! derivatives
     call grad_zentral_3D( Bs, g, dx, dy, dz, u, u_x, u_y, u_z)
     call grad_zentral_3D( Bs, g, dx, dy, dz, v, v_x, v_y, v_z)

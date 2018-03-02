@@ -16,6 +16,27 @@
 !! customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name: \n
 !! \n
 !! `wabbit [2D|3D] [your_filename.ini]`
+!> \subsection ste4p HDF5 Libary
+!! This is a short example (/working practice) of how to install hdf5 libary
+!! (Tested for version hdf5-1.10.1).
+!!        1. download source code from <a href="https://www.hdfgroup.org/downloads/hdf5/source-code/">hdf5</a>
+!!        2. open terminal and follow:\n
+!!
+!!                 $ gunzip < hdf5-X.Y.Z.tar.gz | tar xf -
+!!                 $ cd hdf5-X.Y.Z
+!!                 $ ./configure --prefix=path_2_build_dir --enable-fortran --enable-parallel
+!!                 $ make
+!!                 $ make check                # run test suite.
+!!                 $ make install
+!!                 $ make check-install        # verify installation.
+!!
+!!        3. export variables:\n
+!!
+!!                 $ HDF_ROOT=path_2_build_dir
+!!                 $ export HDF_ROOT
+!!                 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
+!!                 $ export LD_RUN_PATH=$LD_LIBRARY_PATH
+!!
 !> \section important_sec About WABBIT
 !> \subsection treecode Treecode in 2D/3D
 !! \image html treecode2d.svg "Treecode in 2D" width=400

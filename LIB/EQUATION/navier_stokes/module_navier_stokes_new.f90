@@ -96,7 +96,7 @@ module module_navier_stokes_new
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
 
-  real(kind=rk)   ,parameter :: rho0_=1.0_rk,p0_=1.0e5_rk,u0_=100.0_rk,v0_=0.0_rk,T0_=348!273.15_rk
+  real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=10.0_rk,T0_=200!273.15_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -107,9 +107,9 @@ module module_navier_stokes_new
 
 contains
 
-  !include "rhs_navier_stokes.f90"
-  include "RHS_3D_navier_stokes.f90"
   include "RHS_2D_navier_stokes.f90"
+  include "RHS_3D_navier_stokes.f90"
+  include "rhs_ns_2D.f90"
 
   !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
@@ -244,7 +244,7 @@ contains
     real(kind=rk), allocatable :: vort(:,:,:,:)
 
     ! local variables
-    integer(kind=ik) ::  Bs, dF,vort_ind(3)
+    integer(kind=ik) ::  Bs
 
     Bs = size(u,1)-2*g
 
@@ -342,8 +342,7 @@ contains
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: Bs, mpierr
-    real(kind=rk) :: tmp(1:3)
+    integer(kind=ik) :: Bs
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -390,7 +389,9 @@ contains
 
       ! called for each block.
       if (size(u,3)==1) then
-        call RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+       ! call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+      
       else
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
@@ -436,8 +437,7 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! loop variables
-    integer(kind=ik) :: i, ix, iy
-    real(kind=rk) :: x,y,unorm,deltax
+    real(kind=rk)               :: unorm,deltax
 
     dt = 9.9e9_rk
     ! get smallest spatial seperation
@@ -491,8 +491,8 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, Bs,i
-    real(kind=rk) :: x,y,rho0,p0
+    integer(kind=ik) :: Bs
+
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -525,13 +525,11 @@ contains
       u( :, :, :, UyF) = (1-u(:,:,:,UyF))*V0_
     case ("pressure_blob")
 
-        rho0 = rho0_
-        p0 = p0_
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = p0 + 1000.0_rk * u( :, :, :, pF)
+        u( :, :, :, pF) = p0_ + 1000.0_rk * u( :, :, :, pF)
         ! set rho
-        u( :, :, :, rhoF) = rho0
+        u( :, :, :, rhoF) = rho0_
         ! set Ux
         u( :, :, :, UxF) = 0.0_rk
         ! set Uy

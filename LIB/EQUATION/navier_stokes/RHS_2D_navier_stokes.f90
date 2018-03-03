@@ -266,7 +266,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
         ! sqrt(rho)u component (momentum)
         rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*u, rho0_*u0_   , params_ns%C_sp)
         ! sqrt(rho)v component (momentum)
-        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*v, rho0_*v0_   , params_ns%C_sp)
+        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*v, 0.0_rk   , params_ns%C_sp)
         ! p component (preasure/energy)
         rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *sponge( Bs, g, x0,delta_x, p    , p0_         , params_ns%C_sp)
 
@@ -426,22 +426,22 @@ function sponge( Bs, g, x0,dx, q, qref, C_sp)
     ! loop variables
     integer                         :: i, n,ix,iy
     ! inverse C_sp
-    real(kind=rk)                   :: C_sp_inv,x,y
+    real(kind=rk)                   :: C_sp_inv,x,y,ddx
 
     C_sp_inv=1.0_rk/C_sp
 
-     do ix=1, Bs+2*g
-        x = dble(ix-(g+1)) * dx(1) + x0(1)
-        do iy=1, Bs+2*g
-            y = dble(iy-(g+1)) * dx(2) + x0(2)
+    ddx = 0.1_rk*params_ns%Lx
 
-            if (inside_sponge((/x,y/))) then
-                   sponge(ix,iy) = C_sp_inv*(q(ix,iy)-qref)
-                !   write(*,*) sponge(ix,iy)
-            else
-                   sponge(ix,iy) = 0.0_rk
-            end if
-
+    do iy=1, Bs+2*g
+       do ix=1, Bs+2*g
+           x = dble(ix-(g+1)) * dx(1) + x0(1)
+           if ((params_ns%Lx-x) <= ddx) then
+               sponge(ix,iy) = C_sp_inv*(x-(params_ns%Lx-ddx))**2*(q(ix,iy)-qref)
+           elseif (x <= ddx) then
+               sponge(ix,iy) = C_sp_inv*(x-ddx)**2*(q(ix,iy)-qref)
+           else
+               sponge(ix,iy) = 0.0_rk
+           end if
        end do
     end do
 end function sponge
@@ -450,30 +450,30 @@ end function sponge
 
 
 !==========================================================================
-!> \brief This function f(x) implements \n
-!> f(x) is 1 if x(1)<=Lsponge \n
-!> f(x) is 0 else  \n
-function inside_sponge(x)
-!> coordinate vector \f$\vec{x}=(x,y,z)\f$ (real 3d or 2d array)
-real(kind=rk), intent(in)       :: x(:)
-!> logical
-logical                         :: inside_sponge
-! dimension of array x
-integer                         :: dim,i
-! size of sponge
-real(kind=rk)                   :: length_sponge
+! !> \brief This function f(x) implements \n
+! !> f(x) is 1 if x(1)<=Lsponge \n
+! !> f(x) is 0 else  \n
+! function inside_sponge(x)
+! !> coordinate vector \f$\vec{x}=(x,y,z)\f$ (real 3d or 2d array)
+! real(kind=rk), intent(in)       :: x(:)
+! !> logical
+! logical                         :: inside_sponge
+! ! dimension of array x
+! integer                         :: dim,i
+! ! size of sponge
+! real(kind=rk)                   :: length_sponge
 
-!> \todo read in length_sponge or thing of something intelligent here
-        length_sponge=params_ns%Lx*0.05
-        if (x(1)<=length_sponge .and. x(1)>=0) then
-            inside_sponge=.true.
-        else
-            inside_sponge=.false.
-        endif
+! !> \todo read in length_sponge or thing of something intelligent here
+!         length_sponge=params_ns%Lx*0.05
+!         if (x(1)<=length_sponge .and. x(1)>=0) then
+!             inside_sponge=.true.
+!         else
+!             inside_sponge=.false.
+!         endif
 
 
-end function inside_sponge
-!==========================================================================
+! end function inside_sponge
+! !==========================================================================
 
 
 

@@ -89,7 +89,7 @@ subroutine compare_keys(help, key1, key2)
 
       if ((e1<1.0e-4_rk) .and. (e2<1.0e-4_rk) .and. (e3<1.0e-4_rk) .and. (e4<1.0e-4_rk) .and. (e0<1.0e-4_rk) .and. (e5<1.0e-4_rk)) then
         ! all cool
-        write (*,*) "OKAY..."
+        write (*,*) "okay!"
 
         ! on some machines, returning an exit code (exit(1)) does not work
         ! so write your exit code in a small txt file as well. this allows unit tests

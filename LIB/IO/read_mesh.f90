@@ -145,7 +145,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         ! set refinement status 
         my_lgt_block(lgt_id, params%max_treelevel+2) = 0
     end do
-
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
     ! be synced. However, the light data has to.

@@ -114,11 +114,8 @@ program main
     ! loop variable
     integer(kind=ik)                    :: k, max_neighbors
 
-    ! status of nodes check: if true: stops program
-    logical                             :: stop_status, my_stop_status
-
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+    real(kind=rk)                       :: sub_t0
 
     ! allocate com lists and com matrix here
     ! communication lists:

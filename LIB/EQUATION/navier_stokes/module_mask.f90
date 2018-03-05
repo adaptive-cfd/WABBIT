@@ -113,7 +113,7 @@ subroutine get_mask(mask, x0, dx, Bs, g )
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if ( penalization .eqv. .false.) return
-    
+
     select case(mask_geometry)
     case('cylinder')
       call draw_cylinder( mask, x0, dx, Bs, g )

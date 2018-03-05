@@ -93,7 +93,7 @@ $(OBJDIR)/module_mask.o: module_mask.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_mask.o \
-	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 RHS_2D_navier_stokes.f90 $(OBJDIR)/module_initial_conditions.o
+	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 rhs_ns_2D.f90 $(OBJDIR)/module_initial_conditions.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge_new.f90\
@@ -188,7 +188,7 @@ doc:
 	doxygen doc/doc_configuration
 	firefox doc/output/html/index.html &
 test:
-	@cd TESTING/; sh runtests.sh
+	@cd TESTING/;  ./runtests.sh
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

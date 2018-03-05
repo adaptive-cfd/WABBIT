@@ -1,28 +1,18 @@
-!> \file
-!> \callgraph
+
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name RHS_wrapper.f90
-!> \version 0.5
-!> \author sm
-!
+!> \file
+!> \callgraph
 !> \brief wrapper for RHS call in time step function, computes RHS in work array
 !! (inplace)
+!> \version 0.5
+!> \author sm
+!! \date 23/05/17 - create
+!!
 !
-!>
+!>\details
 !! calls RHS depending on physics
-!!
-!! input:
-!!           - time variable
-!!           - time step dt
-!!           - params
-!!           - heavy data an lgt_block
-!!           - coefficients for Runge Kutta
-!!           - loop variable from time stepper
-!!
-!! output:
-!!           - hvy_work
 !!
 !! butcher table, e.g.
 !!
@@ -34,9 +24,6 @@
 !! | 0 | b1 | b2 | b3|
 !!
 !!
-!! = log ======================================================================================
-!! \n
-!! 23/05/17 - create
 !
 !**********************************************************************************************
 
@@ -198,7 +185,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
              x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
 
       case default
-        call abort(2152000, " [RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
+        call abort(2152000, "Error [RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
       end select
     enddo
 

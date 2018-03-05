@@ -147,27 +147,6 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
        !-----------------------------------------------------------------------
         do ix = g+1, Bs+g
             do iy = g+1, Bs+g
-
-               
-                ! u_x = (a(-3)*u(ix-3,iy) + a(-2)*u(ix-2,iy) + a(-1)*u(ix-1,iy) + a(0)*u(ix,iy) + a(+1)*u(ix+1,iy) + a(+2)*u(ix+2,iy) + a(+3)*u(ix+3,iy))*dx_inv
-                ! u_y = (a(-3)*u(ix,iy-3) + a(-2)*u(ix,iy-2) + a(-1)*u(ix,iy-1) + a(0)*u(ix,iy) + a(+1)*u(ix,iy+1) + a(+2)*u(ix,iy+2) + a(+3)*u(ix,iy+3))*dy_inv
-                ! v_x = (a(-3)*v(ix-3,iy) + a(-2)*v(ix-2,iy) + a(-1)*v(ix-1,iy) + a(0)*v(ix,iy) + a(+1)*v(ix+1,iy) + a(+2)*v(ix+2,iy) + a(+3)*v(ix+3,iy))*dx_inv
-                ! v_y = (a(-3)*v(ix,iy-3) + a(-2)*v(ix,iy-2) + a(-1)*v(ix,iy-1) + a(0)*v(ix,iy) + a(+1)*v(ix,iy+1) + a(+2)*v(ix,iy+2) + a(+3)*v(ix,iy+3))*dy_inv
-                ! p_x = (a(-3)*p(ix-3,iy) + a(-2)*p(ix-2,iy) + a(-1)*p(ix-1,iy) + a(0)*p(ix,iy) + a(+1)*p(ix+1,iy) + a(+2)*p(ix+2,iy) + a(+3)*p(ix+3,iy))*dx_inv
-                ! p_y = (a(-3)*p(ix,iy-3) + a(-2)*p(ix,iy-2) + a(-1)*p(ix,iy-1) + a(0)*p(ix,iy) + a(+1)*p(ix,iy+1) + a(+2)*p(ix,iy+2) + a(+3)*p(ix,iy+3))*dy_inv
-
-                
-                ! u_xy = 
-
-
-
-                ! u_xx = (b(-2)*u(ix-2,iy) + b(-1)*u(ix-1,iy) + b(0)*u(ix,iy) + b(+1)*u(ix+1,iy) + b(+2)*u(ix+2,iy))*dx2_inv
-                ! u_yy = (b(-2)*u(ix,iy-2) + b(-1)*u(ix,iy-1) + b(0)*u(ix,iy) + b(+1)*u(ix,iy+1) + b(+2)*u(ix,iy+2))*dy2_inv
-                ! v_xx = (b(-2)*v(ix-2,iy) + b(-1)*v(ix-1,iy) + b(0)*v(ix,iy) + b(+1)*v(ix+1,iy) + b(+2)*v(ix+2,iy))*dx2_inv
-                ! v_yy = (b(-2)*v(ix,iy-2) + b(-1)*v(ix,iy-1) + b(0)*v(ix,iy) + b(+1)*v(ix,iy+1) + b(+2)*v(ix,iy+2))*dy2_inv
-
-                
-
                 
                 ! Derivatives
                 !------------
@@ -191,7 +170,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
 
                 ! massflux
                 uRho_x = df_dx_central(uRho,dx,ix,iy)
-                vRho_y = df_dy_central(uRho,dy,ix,iy)
+                vRho_y = df_dy_central(vRho,dy,ix,iy)
 
                 uRhou_x = df_dx_central(uRhou,dx,ix,iy)
                 vRhou_y = df_dy_central(uRhov,dy,ix,iy)
@@ -200,7 +179,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                 vRhov_y = df_dy_central(vRhov,dy,ix,iy)
 
                 uP_x    = df_dx_central(uP,dx,ix,iy)
-                vP_y    = df_dx_central(vP,dy,ix,iy)
+                vP_y    = df_dy_central(vP,dy,ix,iy)
 
                 div_U = u_x + v_y
                 !------------------------------------------------------------------------------------------------------------------
@@ -250,7 +229,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                 !--------------------
 
                 ! conservation of mass
-                rhs(ix,iy,1) = -(uRho_x- vRho_y)*0.5_rk*sqrt_rho_inv
+                rhs(ix,iy,1) = -(uRho_x + vRho_y)*0.5_rk*sqrt_rho_inv
                 ! conservation of momentum
                 rhs(ix,iy,2) = -sqrt_rho_inv*(0.5_rk*                                  &
                                 ( rho(ix,iy)*u(ix,iy)*u_x + rho(ix,iy)*v(ix,iy)*u_y +  &

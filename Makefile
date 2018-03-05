@@ -188,7 +188,7 @@ doc:
 	doxygen doc/doc_configuration
 	firefox doc/output/html/index.html &
 test:
-	@cd TESTING/; sh runtests.sh
+	@cd TESTING/;  ./runtests.sh
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

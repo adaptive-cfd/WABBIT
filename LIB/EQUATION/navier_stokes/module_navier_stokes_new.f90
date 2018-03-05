@@ -155,7 +155,7 @@ contains
     ! calculate isochoric heat capacity
     params_ns%Cv = params_ns%Rs/(params_ns%gamma_-1.0_rk)
     ! calculate isobaric heat capacity
-    params_ns%Cp = params_ns%Rs*params_ns%gamma_
+    params_ns%Cp = params_ns%Cv*params_ns%gamma_
     ! read prandtl number
     call read_param_mpi(FILE, 'Navier_Stokes', 'Pr', params_ns%Pr, 0.0_rk )
     ! read dynamic viscosity
@@ -390,7 +390,7 @@ contains
       ! called for each block.
       if (size(u,3)==1) then
        ! call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-        call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+          call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
       
       else
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)

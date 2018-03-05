@@ -1,4 +1,5 @@
 #!/bin/bash
+
 #--------------------------------
 # WABBIT run unit tests
 #--------------------------------
@@ -16,7 +17,7 @@ sad=0
 i=0
 for ts in ${tests[@]}
 do
-    sh ${ts}
+    bash ${ts}
     if [ $? == 0 ]; then
 	happy=$((happy+1))
 	summary[$i]=0

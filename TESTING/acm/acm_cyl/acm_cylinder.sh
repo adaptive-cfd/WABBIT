@@ -8,7 +8,6 @@ dir="./TESTING/acm/acm_cyl/"
 params=${dir}"acm_test.ini"
 happy=0
 sad=0
-mpi_command="mpiexec -n 4"
 echo "testing artificial compressibility"
 
 # list of prefixes the test generates
@@ -44,19 +43,19 @@ do
             ${mpi_command} ./wabbit-post 2D --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
-              echo -e "\033[92m :) Happy, this looks okay!\033[0m" $keyfile $reffile
+              echo -e " :) Happy, this looks ok!" $keyfile $reffile
               happy=$((happy+1))
             else
-              echo -e "\033[31m:[ Sad, this is failed!\033[0m" $keyfile $reffile
+              echo -e ":[ Sad, this is failed!" $keyfile $reffile
               sad=$((sad+1))
             fi
         else
             sad=$((sad+1))
-            echo -e "\033[31m:[ Sad: Reference file not found\033[0m"
+            echo -e ":[ Sad: Reference file not found"
         fi
     else
         sad=$((sad+1))
-        echo -e "\033[31m:[ Sad: output file not found\033[0m"
+        echo -e ":[ Sad: output file not found"
     fi
     echo " "
     echo " "
@@ -65,8 +64,8 @@ do
 done
 
 
-echo -e "\t \033[92m happy tests:\033[0m \t" $happy
-echo -e "\t \033[31m sad tests:\033[0m \t" $sad
+echo -e "\t  happy tests: \t" $happy
+echo -e "\t  sad tests: \t" $sad
 
 #-------------------------------------------------------------------------------
 #                               RETURN

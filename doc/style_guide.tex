@@ -1,0 +1,163 @@
+\documentclass[11pt]{article}
+\usepackage[left=3cm,right=3cm]{geometry} 			% geometry of document
+\usepackage{amsmath,amssymb,amsthm,amsfonts}		% maths
+\usepackage{booktabs,tabularx}						% tables
+\usepackage{listings,xcolor,textcomp}				% needed for fortran code
+\lstset{language=[90]Fortran,
+  basicstyle=\ttfamily,
+  keywordstyle=\color{red},
+  commentstyle=\color{blue},
+  morecomment=[l]{!\ }% Comment only with space after !
+}
+\usepackage[parfill]{parskip} 						% new line instead of indentation
+
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+
+
+\begin{document}
+\section*{\texttt{WABBIT} style guide}
+T.~Engels, P.~Krah, S.~Mutzel, J.~Rei\ss, M.~Sroka 
+\\[1ex] 
+\today
+\\[2ex]
+\hrule$~$
+
+In the following we summarize some guidelines for writing source code in the \texttt{WABBIT}-software package. 
+\subsection*{Formal Guidelines}
+\begin{itemize}
+    \item indent with 4 spaces
+	\item limit the line length to 80 characters
+	\item all strings are limited to 80 characters
+	\item all programs contain \texttt{implicit none} to force declaration
+\end{itemize}
+
+\subsection*{Name conventions}
+\begin{itemize}
+	\item use \texttt{x,y,z} for coordinates of \texttt{type real}
+	\item use \texttt{ix,iy,iz} for spatial index of \texttt{type integer}
+	\item use \texttt{q\_x,q\_y,q\_z} for partial derivatives, i.e $q_x=\pd{q}{x}$
+\end{itemize}
+
+\begin{table}[htp!]
+	\caption{summary of naming conventions}
+	\label{tab:tablename}
+	\centering
+
+	\begin{tabular}{l>{\tt}l}
+	\toprule
+		\textbf{Names} & \textbf{Scheme} \\
+	\midrule
+	Keywords				&print, select case \\
+	Variables				&time,  dissipation \\
+	Parameters				&PI, E, GAMMA\_EULER\_MASCHERONI \\
+	Procedures/Subroutines  &Timestepper, Distance\_to\_Obj \\
+	Modules  				&module\_Time, module\_Mesh \\
+	Typ 					&typ\_params, type\_circle\\
+	\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection*{Error messaging}
+
+Use the following syntax for error messages:
+\begin{lstlisting}
+call abort(<UNIQUE_INTEGER>,"ERROR [<file>.f90]: my error message!")
+\end{lstlisting}
+\noindent
+where \texttt{<UNIQUE\_INTEGER>} is an Integer you choose (e.g 65432) and \texttt{<file>.f90} the file containing the source code.
+
+\subsection*{Documentation using \texttt{doxygen}}
+
+	\begin{itemize}
+		\item for every new subdirectory use 
+		\begin{lstlisting}
+!> \dir
+!> \brief
+!! Brief description of the subdirectory goes here
+\end{lstlisting}
+		in a main file to give a short description of the entire directory
+
+	\item for every new file use 
+		\begin{lstlisting}
+!> \file
+!> \brief
+!! brief description of the module goes here
+!> \details
+!! detailed description goes here. Use additional elements
+!!    * Markdown style (items or headers etc.)
+!!    * use latex code with the help of \f$ E=mc^2\f$
+!!    * include images: 
+!!		\image html maskfunction.bmp "plot of chi(delta)"
+!!    * Cite code with:
+!!		<a href="your_URL/DOI">Author (2015)</a>
+!!	
+!> \version 0.5
+!> \date 23.1.2018 creation of module (commit b1234)
+!> \date 23.2.2018 subroutine Calculate_Timestep added (commit c14656)
+!> \author M.Mustermann
+!> \author S.Musterfrau
+\end{lstlisting}
+	\item for example on the beginning of the main module inside a subdirectory:
+	
+\begin{lstlisting}
+!-----------------------------------------------------------------
+!> \dir
+!> \brief
+!! Brief description of the subdirectory goes here
+!-----------------------------------------------------------------
+!> \file
+!> \brief
+!! brief description of the module goes here
+!> \details
+!! detailed description goes here. Use additional elements
+!!    * Markdown style (items or headers etc.)
+!!    * use latex code with the help of \f$ E=mc^2\f$
+!!    * include images: 
+!!		\image html maskfunction.bmp "plot of chi(delta)"
+!!    * Cite code with:
+!!		<a href="your_URL/DOI">Author (2015)</a>
+!!	
+!> \version 0.5
+!> \date 23.1.2018 creation of module (commit b1234)
+!> \date 23.2.2018 subroutine Calculate_Timestep added (commit c14656)
+!> \author M.Mustermann
+!> \author S.Musterfrau
+!-----------------------------------------------------------------
+\end{lstlisting}
+
+	\item Documentation of functions 
+
+\begin{lstlisting}
+!-----------------------------------------------------------------
+!> \file
+!> \brief Right hand side for 2D navier stokes equation
+!>        ---------------------------------------------
+!> The right hand side of navier stokes in the skew symmetric form 
+!> is implemented as follows:
+!>\f{eqnarray*}{
+!!     \partial_t \sqrt{\rho} &=& ...
+!!\f}
+!!
+!> \version 0.5
+!> \date 08/12/16 - create \n
+!> \date 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e)
+!!
+!> \author Pkrah
+!-----------------------------------------------------------------
+
+
+!>\brief main function of RHS_2D_navier_stokes
+subroutine Rhs_NS_2D( parameter)
+    implicit none
+
+    !> parameter description
+    integer(kind=ik), intent(in)     :: parameter 
+    ...
+
+end subroutine Rhs_NS_2d
+
+\end{lstlisting}
+
+\end{itemize}
+
+\end{document}

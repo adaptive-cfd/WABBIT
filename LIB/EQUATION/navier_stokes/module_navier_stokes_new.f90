@@ -196,7 +196,7 @@ contains
     ! set global parameters pF,rohF, UxF etc
     UzF=-1
     do dF = 1, params_ns%number_data_fields
-                if ( params_ns%names(dF) == "p" ) pF = dF 
+                if ( params_ns%names(dF) == "p" ) pF = dF
                 if ( params_ns%names(dF) == "rho" ) rhoF = dF
                 if ( params_ns%names(dF) == "Ux" ) UxF = dF
                 if ( params_ns%names(dF) == "Uy" ) UyF = dF
@@ -265,7 +265,7 @@ contains
                                  0*u(:,:,:,rhoF), &
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
-        
+
         work(:,:,:,size(u,4)+1)=vort(:,:,:,1)
         call get_mask(work(:,:,1,size(u,4)+2), x0, dx, Bs, g )
     else
@@ -389,9 +389,9 @@ contains
 
       ! called for each block.
       if (size(u,3)==1) then
-       ! call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-          call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-      
+        call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        !  call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+
       else
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif

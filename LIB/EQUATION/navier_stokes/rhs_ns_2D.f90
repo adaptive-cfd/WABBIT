@@ -23,10 +23,16 @@
 !!                                            \right]   -\frac{\gamma-1}{C_{\rm SP} } (p-p^{\rm SP})
 !!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
 !!\f}
-!> \version 0.5
-!> \date 08/12/16 - create \n
-!> \date 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e3fa52f887d593fad5826afec88)
+!! \details
+!! With the head flux \f$\phi=\lambda T(x,y,t)\f$ and \f$\lambda \in \mathr{R}\f$
+!! The friction term is further expanded:
+!>\f{eqnarray*}{
 !!
+!!    \partial_\alpha(u_\beta \tau_{\alpha\beta}+\phi_\alpha) - u_\alpha\partial_\beta \tau_{\alpha\beta}
+!!    =
+!!\f}
+!> \version 0.5
+!> \date 05/03/18 - create (commit beb3fa44e) \n
 !> \author Pkrah
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -42,7 +48,7 @@
 !>\brief main function of RHS_2D_navier_stokes
 subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
 !---------------------------------------------------------------------------------------------
-!   
+!
     implicit none
 
     !> grid parameter
@@ -79,11 +85,11 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                                                                div_U, uRho_x, uRhou_x, vRhov_y, vRhou_y, vRho_y,uRhov_x, vp_y, up_x
     !friction parameters
     real(kind=rk)                                           ::  mu_d, mu, mu0, lambda
-    
+
     ! friction_terms
     real(kind=rk)                                           ::  fric_p, fric_u, fric_v
-                                                             
-    !loop variables 
+
+    !loop variables
     integer(kind=ik)                                        :: ix,iy
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -117,7 +123,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
     dy=delta_x(2)
     dx2_12_inv=1.0_rk/(12.0_rk*dx**2)
     dy2_12_inv=1.0_rk/(12.0_rk*dy**2)
-    
+
     ! rhs
     rhs         = 0.0_rk
 
@@ -138,8 +144,8 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
 
     if (params_ns%penalization) then
         call get_mask(mask, x0, delta_x, Bs, g )
-        ! mask coefficient 
-        mask = 1.0_rk/params_ns%C_eta*mask             
+        ! mask coefficient
+        mask = 1.0_rk/params_ns%C_eta*mask
     endif
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -147,11 +153,11 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
        !-----------------------------------------------------------------------
         do ix = g+1, Bs+g
             do iy = g+1, Bs+g
-                
+
                 ! Derivatives
                 !------------
 
-                ! velocity (u,v)    u_x=du/dx u_xx=d^2u/dx^2 
+                ! velocity (u,v)    u_x=du/dx u_xx=d^2u/dx^2
                 u_x    = df_dx_central(u,dx,ix,iy)
                 u_xx  = ( -u(ix+2,iy) + 16.0_rk*u(ix+1,iy) - 30.0_rk*u(ix,iy) + 16.0_rk*u(ix-1,iy) - u(ix-2,iy) ) * (dx2_12_inv)
                 u_y    = df_dy_central(u,dy,ix,iy)
@@ -163,7 +169,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                 v_y    = df_dy_central(v,dy,ix,iy)
                 v_yy  = ( -v(ix,iy+2) + 16.0_rk*v(ix,iy+1) - 30.0_rk*v(ix,iy) + 16.0_rk*v(ix,iy-1) - v(ix,iy-2) ) * (dy2_12_inv)
                 v_xy  = df_dxdy_central(v,dx,dy,ix,iy)
-                
+
                 !preasure
                 p_x    = df_dx_central(p,dx,ix,iy)
                 p_y    = df_dy_central(p,dy,ix,iy)
@@ -188,7 +194,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                 sqrt_rho_inv = 1/phi(ix,iy,1)
 
 
-                ! Friction 
+                ! Friction
                 !---------
                 ! this if should go outside the 4 loop
                 if (dissipation) then
@@ -207,7 +213,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                     ! laplace T
                     T_xx  = ( -T(ix+2,iy) + 16.0_rk*T(ix+1,iy) - 30.0_rk*T(ix,iy) + 16.0_rk*T(ix-1,iy) - T(ix-2,iy) ) * (dx2_12_inv)
                     T_yy  = ( -T(ix,iy+2) + 16.0_rk*T(ix,iy+1) - 30.0_rk*T(ix,iy) + 16.0_rk*T(ix,iy-1) - T(ix,iy-2) ) * (dy2_12_inv)
-                    
+
                     ! friction term of velocity
                     fric_u=mu*u_yy + (1.0_rk/3.0_rk*mu+mu_d)*v_xy+(4.0_rk/3.0_rk*mu+mu_d)*u_xx
                     fric_u=fric_u/sqrt_rho_inv
@@ -234,7 +240,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                 rhs(ix,iy,2) = -sqrt_rho_inv*(0.5_rk*                                  &
                                 ( rho(ix,iy)*u(ix,iy)*u_x + rho(ix,iy)*v(ix,iy)*u_y +  &
                                   uRhou_x                 + vRhou_y                  ) &
-                                + p_x) + fric_u  
+                                + p_x) + fric_u
 
                 rhs(ix,iy,3) = -sqrt_rho_inv*(0.5_rk*                                  &
                                 ( rho(ix,iy)*u(ix,iy)*v_x + rho(ix,iy)*v(ix,iy)*v_y +  &
@@ -257,8 +263,8 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                    ! sqrt(rho)v component (momentum)
                    rhs(ix,iy,3)=rhs(ix,iy,3) -         sqrt_rho_inv*sponge(ix,iy) * ( vRho(ix,iy) - 0.0_rk   )
                    ! p component (preasure/energy)
-                   rhs(ix,iy,4)=rhs(ix,iy,4) - (gamma_-1)          *sponge(ix,iy) * ( p(ix,iy)    - p0_ )           
-               endif           
+                   rhs(ix,iy,4)=rhs(ix,iy,4) - (gamma_-1)          *sponge(ix,iy) * ( p(ix,iy)    - p0_ )
+               endif
                if (params_ns%penalization) then
                    ! add mask
                    ! sqrt(rho)u component (momentum)
@@ -267,7 +273,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                    rhs(ix,iy,3)=rhs(ix,iy,3) - sqrt_rho_inv *mask(ix,iy) * ( vRho(ix,iy) - 0.0_rk )
                    ! p component (preasure/energy)
                    rhs(ix,iy,4)=rhs(ix,iy,4) -               mask(ix,iy) * ( p(ix,iy)    - rho(ix,iy)*Rs*T0_ )
-                   !write(*,*) penalization( mask, p   , rho*Rs*T      , params_ns%C_eta)
+                   
                endif
 
 
@@ -289,7 +295,7 @@ pure function  df_dx_central( f,dx,ix,iy)
     real(kind=rk)                   :: df_dx_central
 
     df_dx_central = ( f(ix-2,iy) - 8.0_rk*f(ix-1,iy) + 8.0_rk*f(ix+1,iy) - f(ix+2,iy) ) / (12.0_rk*dx)
-    
+
 end function df_dx_central
 
 
@@ -301,7 +307,7 @@ pure function  df_dy_central(f,dy,ix,iy)
     real(kind=rk)                   :: df_dy_central
 
     df_dy_central = ( f(ix,iy-2) - 8.0_rk*f(ix,iy-1) + 8.0_rk*f(ix,iy+1) - f(ix,iy+2) ) / (12.0_rk*dy)
-    
+
 end function df_dy_central
 
 pure function  df_dxdy_central(f,dx,dy,ix,iy)
@@ -314,8 +320,8 @@ pure function  df_dxdy_central(f,dx,dy,ix,iy)
     df_dxdy_central      = f(ix-2,iy-2) - 8.0_rk    * f(ix-1,iy-2) + 8.0_rk   * f(ix+1,iy-2) - f(ix+2,iy-2) &
                          - f(ix-2,iy-1) + 64.0_rk   * f(ix-1,iy-1) - 64.0_rk  * f(ix+1,iy-1) + f(ix+2,iy-1) &
                          + f(ix-2,iy+1) - 64.0_rk   * f(ix-1,iy+1) + 64.0_rk  * f(ix+1,iy+1) - f(ix+2,iy+1) &
-                         - f(ix-2,iy+2) + 8.0_rk    * f(ix-1,iy+2) - 8.0_rk   * f(ix+1,iy+2) + f(ix+2,iy+2) 
-    df_dxdy_central      = df_dxdy_central/(144.0_rk*dx*dy)    
+                         - f(ix-2,iy+2) + 8.0_rk    * f(ix-1,iy+2) - 8.0_rk   * f(ix+1,iy+2) + f(ix+2,iy+2)
+    df_dxdy_central      = df_dxdy_central/(144.0_rk*dx*dy)
 
 end function df_dxdy_central
 
@@ -378,5 +384,3 @@ subroutine get_sponge(sponge, x0, dx, Bs, g)
     end do
 
 end subroutine get_sponge
-
-

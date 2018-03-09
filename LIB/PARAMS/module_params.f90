@@ -152,6 +152,8 @@ module module_params
         logical                                     :: test_wavelet_comp
         ! unit test treecode flag
         logical                                     :: test_treecode
+        ! unit test ghost nodes synchronization flag
+        logical                                     :: test_ghost_nodes_synch
 
         ! -------------------------------------------------------------------------------------
         ! filter

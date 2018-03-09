@@ -165,10 +165,10 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! allocate com position matrix
     allocate( com_pos(number_procs) )
 
-!    ! reset ghost nodes for all active blocks
-!    if ( params%debug ) then
-!        call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
-!    end if
+    ! reset ghost nodes for all active blocks
+    if ( params%test_ghost_nodes_synch) then
+        call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -357,41 +357,212 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                         if (synch) then
 
                             ! neighborhood
-                            neighborhood = 0
-                            select case (i)
-                                case(1)
-                                    neighborhood = 3
-                                case(2)
-                                    neighborhood = 4
-                                case(3)
-                                    neighborhood = 1
-                                case(4)
-                                    neighborhood = 2
-                                case(5)
-                                    neighborhood = 8
-                                case(6)
-                                    neighborhood = 7
-                                case(7)
-                                    neighborhood = 6
-                                case(8)
-                                    neighborhood = 5
-                                case(9)
-                                    neighborhood = 11
-                                case(10)
-                                    neighborhood = 12
-                                case(11)
-                                    neighborhood = 9
-                                case(12)
-                                    neighborhood = 10
-                                case(13)
-                                    neighborhood = 15
-                                case(14)
-                                    neighborhood = 16
-                                case(15)
-                                    neighborhood = 13
-                                case(16)
-                                    neighborhood = 14
-                            end select
+                            if ( params%threeD_case ) then
+                                neighborhood = 0
+                                select case (i)
+                                    !'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
+                                    case(1)
+                                        neighborhood = 6
+                                    case(2)
+                                        neighborhood = 4
+                                    case(3)
+                                        neighborhood = 5
+                                    case(4)
+                                        neighborhood = 2
+                                    case(5)
+                                        neighborhood = 3
+                                    case(6)
+                                        neighborhood = 1
+                                    !'_12/___', '_13/___', '_14/___', '_15/___'
+                                    case(7)
+                                        neighborhood = 13
+                                    case(8)
+                                        neighborhood = 14
+                                    case(9)
+                                        neighborhood = 11
+                                    case(10)
+                                        neighborhood = 12
+                                    !'_62/___', '_63/___', '_64/___', '_65/___'
+                                    case(11)
+                                        neighborhood = 9
+                                    case(12)
+                                        neighborhood = 10
+                                    case(13)
+                                        neighborhood = 7
+                                    case(14)
+                                        neighborhood = 8
+                                    !'_23/___', '_25/___'
+                                    case(15)
+                                        neighborhood = 18
+                                    case(16)
+                                        neighborhood = 17
+                                    !'_43/___', '_45/___'
+                                    case(17)
+                                        neighborhood = 16
+                                    case(18)
+                                        neighborhood = 15
+                                    !'123/___', '134/___', '145/___', '152/___'
+                                    case(19)
+                                        neighborhood = 25
+                                    case(20)
+                                        neighborhood = 26
+                                    case(21)
+                                        neighborhood = 23
+                                    case(22)
+                                        neighborhood = 24
+                                    !'623/___', '634/___', '645/___', '652/___'
+                                    case(23)
+                                        neighborhood = 21
+                                    case(24)
+                                        neighborhood = 22
+                                    case(25)
+                                        neighborhood = 19
+                                    case(26)
+                                        neighborhood = 20
+                                    !'__1/123', '__1/134', '__1/145', '__1/152'
+                                    case(27)
+                                        neighborhood = 47
+                                    case(28)
+                                        neighborhood = 48
+                                    case(29)
+                                        neighborhood = 49
+                                    case(30)
+                                        neighborhood = 50
+                                    !'__2/123', '__2/623', '__2/152', '__2/652'
+                                    case(31)
+                                        neighborhood = 39
+                                    case(32)
+                                        neighborhood = 40
+                                    case(33)
+                                        neighborhood = 41
+                                    case(34)
+                                        neighborhood = 42
+                                    !'__3/123', '__3/623', '__3/134', '__3/634'
+                                    case(35)
+                                        neighborhood = 45
+                                    case(36)
+                                        neighborhood = 46
+                                    case(37)
+                                        neighborhood = 43
+                                    case(38)
+                                        neighborhood = 44
+                                    !'__4/134', '__4/634', '__4/145', '__4/645'
+                                    case(39)
+                                        neighborhood = 31
+                                    case(40)
+                                        neighborhood = 32
+                                    case(41)
+                                        neighborhood = 33
+                                    case(42)
+                                        neighborhood = 34
+                                    !'__5/145', '__5/645', '__5/152', '__5/652'
+                                    case(43)
+                                        neighborhood = 37
+                                    case(44)
+                                        neighborhood = 38
+                                    case(45)
+                                        neighborhood = 35
+                                    case(46)
+                                        neighborhood = 36
+                                    !'__6/623', '__6/634', '__6/645', '__6/652'
+                                    case(47)
+                                        neighborhood = 27
+                                    case(48)
+                                        neighborhood = 28
+                                    case(49)
+                                        neighborhood = 29
+                                    case(50)
+                                        neighborhood = 30
+                                    !'_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152'
+                                    case(51)
+                                        neighborhood = 63
+                                    case(52)
+                                        neighborhood = 64
+                                    case(53)
+                                        neighborhood = 66!65
+                                    case(54)
+                                        neighborhood = 65!66
+                                    case(55)
+                                        neighborhood = 59
+                                    case(56)
+                                        neighborhood = 60
+                                    case(57)
+                                        neighborhood = 62
+                                    case(58)
+                                        neighborhood = 61
+                                    !'_62/623', '_62/652', '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652'
+                                    case(59)
+                                        neighborhood = 55
+                                    case(60)
+                                        neighborhood = 56
+                                    case(61)
+                                        neighborhood = 58
+                                    case(62)
+                                        neighborhood = 57
+                                    case(63)
+                                        neighborhood = 51
+                                    case(64)
+                                        neighborhood = 52
+                                    case(65)
+                                        neighborhood = 54!53
+                                    case(66)
+                                        neighborhood = 53!54
+                                    !'_23/123', '_23/623', '_25/152', '_25/652'
+                                    case(67)
+                                        neighborhood = 73
+                                    case(68)
+                                        neighborhood = 74
+                                    case(69)
+                                        neighborhood = 71
+                                    case(70)
+                                        neighborhood = 72
+                                    !'_43/134', '_43/634', '_45/145', '_45/645'
+                                    case(71)
+                                        neighborhood = 69
+                                    case(72)
+                                        neighborhood = 70
+                                    case(73)
+                                        neighborhood = 67
+                                    case(74)
+                                        neighborhood = 68
+                                end select
+                            else
+                                neighborhood = 0
+                                select case (i)
+                                    case(1)
+                                        neighborhood = 3
+                                    case(2)
+                                        neighborhood = 4
+                                    case(3)
+                                        neighborhood = 1
+                                    case(4)
+                                        neighborhood = 2
+                                    case(5)
+                                        neighborhood = 8
+                                    case(6)
+                                        neighborhood = 7
+                                    case(7)
+                                        neighborhood = 6
+                                    case(8)
+                                        neighborhood = 5
+                                    case(9)
+                                        neighborhood = 11
+                                    case(10)
+                                        neighborhood = 12
+                                    case(11)
+                                        neighborhood = 9
+                                    case(12)
+                                        neighborhood = 10
+                                    case(13)
+                                        neighborhood = 15
+                                    case(14)
+                                        neighborhood = 16
+                                    case(15)
+                                        neighborhood = 13
+                                    case(16)
+                                        neighborhood = 14
+                                end select
+                            end if
 
                             ! sender block on same or higher level
                             if ( rank == neighbor_rank ) then
@@ -401,7 +572,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                 ! internal neighbor
                                 if ( params%threeD_case ) then
                                     ! 3D:
-                                    !call copy_ghost_nodes_3D( params, hvy_block, hvy_active(k), hvy_id, i, level_diff )
+                                    call copy_ghost_nodes_3D( params, hvy_block, hvy_id, hvy_active(k), neighborhood, level_diff )
                                 else
                                     ! 2D:
                                     call copy_ghost_nodes_2D( params, hvy_block(:, :, 1, :, :), hvy_id, hvy_active(k), neighborhood, level_diff )

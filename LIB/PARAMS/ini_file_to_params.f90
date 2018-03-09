@@ -415,6 +415,8 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Debug', 'test_time_stepper', params%test_time_stepper, .false.)
     ! unit test spatial flag
     call read_param_mpi(FILE, 'Debug', 'test_spatial', params%test_spatial, .false.)
+    ! unit test ghost nodes synchronization flag
+    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
     ! unit test wavelet compression flag
     call read_param_mpi(FILE, 'Debug', 'test_wavelet_comp', params%test_wavelet_comp, .false.)
     ! unit test treecode flag

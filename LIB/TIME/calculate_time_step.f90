@@ -94,13 +94,16 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
         select case (params%physics_type)
         case ('ACM-new')
           ! artificial compressibility
-          call GET_DT_BLOCK_ACM(      time, hvy_block(:,:,:,:,hvy_active(k)), params%number_ghost_nodes, xx0, ddx, dt_tmp )
+          call GET_DT_BLOCK_ACM(      time, hvy_block(:,:,:,:,hvy_active(k)), &
+              params%number_ghost_nodes, xx0, ddx, dt_tmp )
         case ('ConvDiff-new')
           ! convection-diffusion
-          call GET_DT_BLOCK_convdiff( time, hvy_block(:,:,:,:,hvy_active(k)), params%number_block_nodes, params%number_ghost_nodes, xx0, ddx, dt_tmp )
+          call GET_DT_BLOCK_convdiff( time, hvy_block(:,:,:,:,hvy_active(k)), &
+              params%number_block_nodes, params%number_ghost_nodes, xx0, ddx, dt_tmp )
         case ('navier_stokes')
           ! navier stokes
-          call GET_DT_BLOCK_NStokes(  time, hvy_block(:,:,:,:,hvy_active(k)), params%number_block_nodes,params%number_ghost_nodes, xx0, ddx, dt_tmp)
+          call GET_DT_BLOCK_NStokes(  time, hvy_block(:,:,:,:,hvy_active(k)), &
+              params%number_block_nodes,params%number_ghost_nodes, xx0, ddx, dt_tmp)
         case default
           call abort('phycics module unkown.')
 

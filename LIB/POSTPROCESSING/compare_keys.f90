@@ -25,13 +25,14 @@ subroutine compare_keys(help, key1, key2)
 
     if (help) then
          write(*,*) "wabbit postprocessing routine to compare keyvalues of two .key files"
-         write(*,*) "./wabbit-post 2[3]D --compare-keys old.key new.key"
+         write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --compare-keys old.key new.key"
     else
 
         call check_file_exists(key1)
         call check_file_exists(key2)
 
-        write (*,'("comparing files ",a20, a20, " for keyvalues")'), trim(adjustl(key1)), trim(adjustl(key2))
+        write (*,'("comparing files ",a20, a20, " for keyvalues")'), &
+            trim(adjustl(key1)), trim(adjustl(key2))
 
         open(59, file = key1, status = 'unknown', action='read')
         read(59,'(6(es15.8,1x))') t1,a1,b1,c1,d1,q1
@@ -87,7 +88,8 @@ subroutine compare_keys(help, key1, key2)
       write (*,'("err(rel) : time=",es15.8," max=",es15.8," min=",es15.8," sum=",es15.8," sum**2=",es15.8," q=",es15.8)') &
       e0,e1,e2,e3,e4,e5
 
-      if ((e1<1.0e-4_rk) .and. (e2<1.0e-4_rk) .and. (e3<1.0e-4_rk) .and. (e4<1.0e-4_rk) .and. (e0<1.0e-4_rk) .and. (e5<1.0e-4_rk)) then
+      if ((e1<1.0e-4_rk) .and. (e2<1.0e-4_rk) .and. (e3<1.0e-4_rk) .and. &
+          (e4<1.0e-4_rk) .and. (e0<1.0e-4_rk) .and. (e5<1.0e-4_rk)) then
         ! all cool
         write (*,*) "okay!"
 

@@ -8,19 +8,9 @@
 !> \author sm
 !
 !> \brief read attributes saved in a hdf5-file
+! = log ======================================================================================
 !
-!>
-!! input:
-!!           - name of the file we want to read from
-!!
-!! output:
-!!           - time, iteration and domain size
-!!           - number of active blocks (light and heavy)
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 02/02/18 - create
+!> \date 02/02/18 - create
 !
 
 subroutine get_attributes(fname, lgt_n, time, iteration, domain)

@@ -30,29 +30,29 @@ subroutine compute_vorticity_post(help, params)
     integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, max_neighbors
     character(len=2)       :: order
 
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable              :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    integer(hsize_t), dimension(4)          :: size_field
-    character(len=80)                       :: fname
-    real(kind=rk), dimension(3)             :: dx, x0
-    integer(hid_t)                          :: file_id
-    real(kind=rk), dimension(3)             :: domain
-    integer(kind=ik), allocatable           :: com_matrix(:,:,:)
-    integer(kind=ik), allocatable           :: com_lists(:, :, :, :)
-    integer(hsize_t), dimension(2)          :: dims_treecode
+    integer(kind=ik), allocatable      :: lgt_block(:, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
+    integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
+    integer(kind=ik), allocatable      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), allocatable         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    integer(hsize_t), dimension(4)     :: size_field
+    character(len=80)                  :: fname
+    real(kind=rk), dimension(3)        :: dx, x0
+    integer(hid_t)                     :: file_id
+    real(kind=rk), dimension(3)        :: domain
+    integer(kind=ik), allocatable      :: com_matrix(:,:,:)
+    integer(kind=ik), allocatable      :: com_lists(:, :, :, :)
+    integer(hsize_t), dimension(2)     :: dims_treecode
 
 !-----------------------------------------------------------------------------------------------------
 
     if (help) then
         if (params%rank==0) then
             write(*,*) "wabbit postprocessing routine for subsequent vorticity calculation"
-            write(*,*) "./wabbit-post 2D --compute-vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
-            write(*,*) "./wabbit-post 3D --compute-vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post 3D --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
         end if
     else
         ! get values from command line (filename and level for interpolation)
@@ -95,7 +95,8 @@ subroutine compute_vorticity_post(help, params)
         call get_attributes(file_ux, lgt_n, time, iteration, domain)
         ! only lgt_n/number_procs blocks necessary (since we do not want to refine)
         params%number_blocks = lgt_n/params%number_procs
-        if (params%rank==0) params%number_blocks = params%number_blocks + mod(lgt_n, params%number_procs)
+        if (params%rank==0) params%number_blocks = params%number_blocks + &
+            mod(lgt_n, params%number_procs)
         params%Lx = domain(1)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
@@ -103,7 +104,9 @@ subroutine compute_vorticity_post(help, params)
         params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
 
         ! allocate data
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
+            hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
+            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! allocate communication arrays
         call allocate_com_arrays(params, com_lists, com_matrix)
         ! read mesh and field
@@ -113,28 +116,42 @@ subroutine compute_vorticity_post(help, params)
         if (params%threeD_case) call read_field(file_uz, 3, params, hvy_block, hvy_n)
         ! create lists of active blocks (light and heavy data)
         ! update list of sorted nunmerical treecodes, used for finding blocks
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+            hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, &
+            real_send_buffer, real_receive_buffer )
 
         ! calculate vorticity from velocities
         do k=1,hvy_n
             call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
             if (params%threeD_case) then
-                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)),hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)), dx, params%number_block_nodes, params%number_ghost_nodes, params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
+                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
+                    hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
+                    dx, params%number_block_nodes, params%number_ghost_nodes,&
+                    params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
             else
-                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)),hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)), dx, params%number_block_nodes, params%number_ghost_nodes, params%order_discretization, hvy_work(:,:,:,:,hvy_active(k)))
+                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
+                    hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)),&
+                    dx, params%number_block_nodes, params%number_ghost_nodes, &
+                    params%order_discretization, hvy_work(:,:,:,:,hvy_active(k)))
             end if
         end do
         write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
-        call write_field(fname, time, iteration, 1, params, lgt_block, hvy_work, lgt_active, lgt_n, hvy_n)
+        call write_field(fname, time, iteration, 1, params, lgt_block,&
+            hvy_work, lgt_active, lgt_n, hvy_n)
         if (params%threeD_case) then
             write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 2, params, lgt_block, hvy_work, lgt_active, lgt_n, hvy_n)
+            call write_field(fname, time, iteration, 2, params, lgt_block,&
+                hvy_work, lgt_active, lgt_n, hvy_n)
             write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 3, params, lgt_block, hvy_work, lgt_active, lgt_n, hvy_n)
+            call write_field(fname, time, iteration, 3, params, lgt_block, &
+                hvy_work, lgt_active, lgt_n, hvy_n)
         end if
     end if
 end subroutine compute_vorticity_post

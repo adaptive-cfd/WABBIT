@@ -96,17 +96,17 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
   implicit none
 
   ! grid
-  integer(kind=ik), intent(in)                              :: Bs, g
+  integer(kind=ik), intent(in)                   :: Bs, g
   !> mask term for every grid point of this block
   real(kind=rk), dimension(:,:), intent(out)     :: mask
   !> spacing and origin of block
-  real(kind=rk), dimension(2), intent(in)                   :: x0, dx
+  real(kind=rk), dimension(2), intent(in)        :: x0, dx
 
   ! auxiliary variables
-  real(kind=rk)                                             :: x1, x2, y1, y2, R, cx1, cx2, cy1,&
+  real(kind=rk)         :: x1, x2, y1, y2, R, cx1, cx2, cy1,&
   cy2, r_1, r_2, h, mask1, mask2
   ! loop variables
-  integer(kind=ik)                                          :: ix, iy
+  integer(kind=ik)      :: ix, iy
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization

@@ -55,7 +55,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! treecode array
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
     integer(kind=ik), dimension(:,:), allocatable :: my_lgt_block
-    integer(kind=ik)                              :: blocks_per_rank_list(0:params%number_procs-1) 
+    integer(kind=ik)                   :: blocks_per_rank_list(0:params%number_procs-1) 
     ! loop variables
     integer(kind=rk)                              :: lgt_id, k
     ! error variable
@@ -99,7 +99,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
 
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
     if (mod(lgt_n, number_procs) > 0) then
-        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
+        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = &
+            blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
     end if
     ! some error control -> did we loose blocks? should never happen.
     if ( sum(blocks_per_rank_list) /= lgt_n) then
@@ -118,7 +119,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         ! want to continue with greater max_treevel, read old treecode and fill up the rest with -1
     else
         ! treecode in input file is greater than the new one, abort and output on screen
-        if (params%threeD_case) write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') params%max_treelevel, dims_treecode(1)
+        if (params%threeD_case) write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') &
+            params%max_treelevel, dims_treecode(1)
         call MPI_ABORT( MPI_COMM_WORLD, 10004, ierr)
     end if
 
@@ -131,7 +133,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! (note zero-based offset):
     lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
     ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + hvy_n - 1/)
-    call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
+    call read_dset_mpi_hdf5_2D(file_id, "block_treecode", &
+        lbounds, ubounds, block_treecode)
     
         
     ! close file and HDF5 library
@@ -141,7 +144,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         ! copy treecode
         my_lgt_block(lgt_id,1:dims_treecode(1)) = block_treecode(1:dims_treecode(1),k)
         ! set mesh level
-        my_lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k), dims_treecode(1))
+        my_lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k),dims_treecode(1))
         ! set refinement status 
         my_lgt_block(lgt_id, params%max_treelevel+2) = 0
     end do
@@ -149,7 +152,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
     ! be synced. However, the light data has to.
     lgt_block = -1
-    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), &
+        MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
 
     deallocate(my_lgt_block)
     deallocate(block_treecode)

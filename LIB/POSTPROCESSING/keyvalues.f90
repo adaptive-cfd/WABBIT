@@ -50,12 +50,12 @@ subroutine keyvalues(fname, params, help)
     if (help) then
         if (params%rank==0) then
             write(*,*) "WABBIT postprocessing routine to load a specified *.h5 file and create a *.key file that contains  min / max / mean / L2 norm of the field data."
-            write(*,*) "./wabbit-post 2[3]D --keyvalues filename.h5"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --keyvalues filename.h5"
         end if
     else
         call check_file_exists( fname )
 
-        if (params%rank==0) write (*,'("analyzing file ",a20," for keyvalues")'), trim(adjustl(fname))
+        if (params%rank==0) write (*,'("analyzing file ",a20," for keyvalues")') trim(adjustl(fname))
 
         ! ! get some parameters from the file
         call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
@@ -74,12 +74,14 @@ subroutine keyvalues(fname, params, help)
         params%Lx = domain(1)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
-        params%number_blocks = lgt_n/params%number_procs
-        params%number_blocks = params%number_blocks + mod(lgt_n,params%number_procs)
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        params%number_blocks = lgt_n/params%number_procs + mod(lgt_n,params%number_procs)
+        call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
+            hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
+            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         call read_field(fname, 1, params, hvy_block, hvy_n )
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        call create_active_and_sorted_lists( params, lgt_block, &
+            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! compute an additional quantity that depends also on the position
         ! (the others are translation invariant)
         Bs = params%number_block_nodes
@@ -95,7 +97,7 @@ subroutine keyvalues(fname, params, help)
         ql = 0.0_rk
 
         do k = 1,hvy_n
-            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks )
+            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
             do iz = 1, nz
                 do iy = 1, Bs
@@ -114,18 +116,19 @@ subroutine keyvalues(fname, params, help)
             meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_active(k))) 
         end do
 
-        call MPI_REDUCE (ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE (maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE (minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE (squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE (meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
 
         qi = qi / lgt_n
         squari = squari / lgt_n
         meani = meani / lgt_n
 
         if (params%rank == 0) then
-            open  (59, file=fname(1:index(fname,'.'))//'key', status = 'replace', action='write', iostat=ioerr)
+            open  (59, file=fname(1:index(fname,'.'))//'key', &
+                status = 'replace', action='write', iostat=ioerr)
             write (59,'(6(es15.8,1x))') time, maxi, mini, meani, squari, qi
             write (*,'(A)') "Result:"
             write (* ,'(6(A15,1x))') "time","maxval","minval","meanval","sumsquares","Q-integral"

@@ -40,21 +40,19 @@
 !! |c3 | a31| a32|  0|
 !! | 0 | b1 | b2 | b3|
 !!
-!!
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4 \n
-!! 07/12/16 - now uses heavy work data array and work for different physics \n
-!! 31/01/17 - switch to 3D, v0.5 \n
-!! 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method (up to RK of order 4)
 !
+! = log ======================================================================================
+!
+!> \date 08/11/16 - switch to v0.4 \n
+!! \date 07/12/16 - now uses heavy work data array and work for different physics \n
+!! \date 31/01/17 - switch to 3D, v0.5 \n
+!! \date 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method 
+!! (up to RK of order 4)
 ! ********************************************************************************************
 
-subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-!---------------------------------------------------------------------------------------------
-! modules
-
+subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
+    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix,&
+    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -82,30 +80,21 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer(kind=ik), intent(in)        :: hvy_n
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-
     ! communication lists:
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
-
     ! communications matrix:
     integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
     ! loop variables
     integer(kind=ik)                    :: k, j, neq
-
     ! time step, dx
     real(kind=rk)                       :: dt
-
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, sub_t1, t_sum, t
-
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable          :: rk_coeffs(:,:)
-
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -124,10 +113,13 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
-    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt)
+    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
+        lgt_active, lgt_n, dt)
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, &
+        int_receive_buffer, real_send_buffer, real_receive_buffer )
 
     ! copy state vector content to work array.
     do k = 1, hvy_n
@@ -137,7 +129,8 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     ! save data at time t to heavy work array
     ! call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
     j = 1
-    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block(:,:,:,1:neq,:), hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
+    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block(:,:,:,1:neq,:),&
+        hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
 
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1)-1
@@ -146,12 +139,14 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, &
+            hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, &
+            int_receive_buffer, real_send_buffer, real_receive_buffer)
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)
-        call RHS_wrapper(t, params, hvy_block(:,:,:,1:neq,:), hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), &
-        lgt_block, hvy_active, hvy_n)
+        call RHS_wrapper(t, params, hvy_block(:,:,:,1:neq,:), &
+            hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
     end do
 
     ! final stage

@@ -80,12 +80,17 @@ subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt
        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
        if (params%threeD_case) then
-           int_block(1) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1,hvy_active(k)))*dx(1)*dx(2)*dx(3)
-           int_block(2) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,2,hvy_active(k)))*dx(1)*dx(2)*dx(3)
-           int_block(3) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,3,hvy_active(k)))*dx(1)*dx(2)*dx(3)
+           int_block(1) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1,hvy_active(k)))&
+               *dx(1)*dx(2)*dx(3)
+           int_block(2) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,2,hvy_active(k)))&
+               *dx(1)*dx(2)*dx(3)
+           int_block(3) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,3,hvy_active(k)))&
+               *dx(1)*dx(2)*dx(3)
        else
-           int_block(1) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,1,1,hvy_active(k)))*dx(1)*dx(2)
-           int_block(2) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,1,2,hvy_active(k)))*dx(1)*dx(2)
+           int_block(1) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,1,1,hvy_active(k)))&
+               *dx(1)*dx(2)
+           int_block(2) = sum(hvy_block(g+1:Bs+g,g+1:Bs+g,1,2,hvy_active(k)))&
+               *dx(1)*dx(2)
        end if
 
        int_local = int_local + int_block
@@ -93,8 +98,7 @@ subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt
     end do
 
 
-   call MPI_ALLREDUCE(int_local, volume_int, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpi_err)
-
-
+   call MPI_ALLREDUCE(int_local, volume_int, 3, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_WORLD, mpi_err)
 
 end subroutine volume_integral

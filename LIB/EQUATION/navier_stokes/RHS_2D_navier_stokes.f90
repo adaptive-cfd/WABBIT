@@ -23,9 +23,9 @@
 !!                                            \right]   -\frac{\gamma-1}{C_{\rm SP} } (p-p^{\rm SP})
 !!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
 !!\f}
-!> \version 08/12/16 - create \n
-!> \version 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e3fa52f887d593fad5826afec88)
-!!
+!> \version 0.5
+!! \date 08/12/16 - create \n
+!!  \date 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e3fa52f887d593fad5826afec88)
 !> \author msr
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@
 !>\brief main function of RHS_2D_navier_stokes
 subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 !---------------------------------------------------------------------------------------------
-!   
+!
     implicit none
 
     !> grid parameter
@@ -506,8 +506,7 @@ elemental function penalization( mask, q, qref, C_eta)
 
     ! inverse C_eta
     C_eta_inv=1.0_rk/C_eta
-    
+
     penalization=mask*C_eta_inv*(q-qref)
 end function penalization
 !==========================================================================
-

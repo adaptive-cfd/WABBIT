@@ -23,10 +23,16 @@ end_color=$'\033[0m'
 
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers
-tests=("---navier-stokes---"
+tests=("---convection---"
+       "TESTING/conv/blob_convection/blob-convection-adaptive.sh"
+       "TESTING/conv/blob_convection_2nd/blob-convection-adaptive-2nd.sh"
+       "TESTING/conv/blob_convection_2nd_zcurve/blob-conv-adaptive-2nd-zcurve.sh"
+       "---navier-stokes---"
        "TESTING/navier_stokes/pressure_blob/pressure_blob.sh"
        "---acm---"
-       "TESTING/acm/acm_cyl/acm_cylinder.sh")
+       "TESTING/acm/acm_cyl/acm_cylinder.sh"
+       "TESTING/acm/acm_cyl/acm_cylinder_zcurve.sh"
+       )
 
 happy_sum=0
 sad_sum=0

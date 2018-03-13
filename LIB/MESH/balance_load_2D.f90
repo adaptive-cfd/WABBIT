@@ -283,8 +283,8 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 !            end do
 !
 !            ! synchronize light data
-!            lgt_block = 0
-!            call MPI_Allreduce(my_block_list, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+!            call synchronize_lgt_data( params, lgt_block )
+
             deallocate( friends, affinity )
 
 

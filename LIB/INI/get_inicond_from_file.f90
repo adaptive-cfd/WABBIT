@@ -52,7 +52,7 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     ! number of files to read from
     integer(kind=ik)                      :: N_files
     ! loop variable
-    integer(kind=ik)                      :: k, dF
+    integer(kind=ik)                      :: dF
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -78,7 +78,8 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
         if ((abs(params%Lx-domain(1))>1e-12_rk).or.(abs(params%Ly-domain(2))>1e-12_rk) &
             .or.(abs(params%Lz-domain(3))>1e-12_rk)) then
             write (*,'(A)') " WARNING! Domain size mismatch."
-            write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') params%Lx, params%Ly, params%Lz
+            write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') &
+                params%Lx, params%Ly, params%Lz
             write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
             write (*,'(A)') "proceed, with fingers crossed."
         end if

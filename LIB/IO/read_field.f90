@@ -8,21 +8,9 @@
 !> \author engels, sm
 !
 !> \brief read data of a single datafield dF at iteration and time t
+! = log ======================================================================================
 !
-!>
-!! input:
-!!           - name of the file we want to read from
-!!           - number of datafield
-!!           - parameter array
-!!           - number of active blocks (heavy)
-!!
-!! output:
-!!           - heavy data array
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 22/09/17 - create
+!> \date 22/09/17 - create
 !
 ! ********************************************************************************************
 
@@ -47,17 +35,12 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     !> number of heavy and light active blocks
     integer(kind=ik), intent(in)        :: hvy_n
 
-    ! block data buffer, need for compact data storage
-    real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
-
     ! file id integer
     integer(hid_t)                      :: file_id
-
     ! process rank
     integer(kind=ik)                    :: rank
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
-
     ! offset variables
     integer(kind=ik), dimension(4)      :: ubounds3D, lbounds3D
     integer(kind=ik), dimension(3)      :: ubounds2D, lbounds2D
@@ -75,7 +58,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     g    = params%number_ghost_nodes
     Bs   = params%number_block_nodes
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -111,22 +93,15 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! actual reading of file
     if ( params%threeD_case ) then
         ! 3D data case
-        call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
-
+        call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, &
+            hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,1:hvy_n))
     else
         ! 2D data case
-        call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
+        call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, &
+            hvy_block(g+1:Bs+g,g+1:Bs+g,1,dF,1:hvy_n))
     end if
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
 
-    ! copy data to heavy block array (without ghost nodes)
-    if (params%threeD_case) then
-        hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,1:hvy_n) = myblockbuffer(:,:,:,1:hvy_n)
-    else
-        hvy_block(g+1:Bs+g,g+1:Bs+g,1,dF,1:hvy_n) = myblockbuffer(:,:,1,1:hvy_n)
-    end if
-
-    deallocate(myblockbuffer)
 end subroutine read_field

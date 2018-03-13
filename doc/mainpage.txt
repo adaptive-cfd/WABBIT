@@ -3,19 +3,23 @@
 !> \image html rhs.svg  width=600
 !> \section install_sec Installation
 !> \subsection step1 Clone from GitHub
-!! `git clone https://github.com/mario-sroka/WABBIT`
+!!
+!! 	       	   $ git clone https://github.com/mario-sroka/WABBIT
+!!
 !> \subsection step2 Run make
-!! choose compiler with FC option (to v0.2): \n
-!! \n
-!! `make FC=[gfortran|ifort]` \n
-!! \n
-!! choose compiler with FC option (from v0.3): \n
-!! \n
-!! `make FC=[mpif90]` \n
+!! 	  1. choose compiler with FC option (to v0.2): \n
+!! 
+!!                 $ make FC=[gfortran|ifort]
+!!
+!!	  2. choose compiler with FC option (from v0.3): \n
+!! 
+!!                 $ make FC=[mpif90]
+!!
 !> \subsection step3 Run WABBIT
-!! customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name: \n
-!! \n
-!! `wabbit [2D|3D] [your_filename.ini]`
+!! customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name:
+!! 
+!!		   $ wabbit [2D|3D] [your_filename.ini]
+!!
 !> \subsection ste4p HDF5 Libary
 !! This is a short example (/working practice) of how to install hdf5 libary
 !! (Tested for version hdf5-1.10.1).
@@ -37,20 +41,21 @@
 !!                 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
 !!                 $ export LD_RUN_PATH=$LD_LIBRARY_PATH
 !!
-!> \section important_sec About WABBIT
-!> \subsection treecode Treecode in 2D/3D
+-------------------------------------------------------------------------------------------------------------
+!> \page structures Wabbit Structures
+!> \section Treecode Treecode in 2D/3D
 !! \image html treecode2d.svg "Treecode in 2D" width=400
 !! \image html treecode3d.svg "Treecode in 3D" width=400
-!! \subsection data Data Structure
-!! \subsubsection light Light Data Array
+!! \section Data Data Structure
+!! \subsection light Light Data Array
 !! `integer(kind=ik) :: lgt_block(:,:)` \n
 !!
 !! m is the maximal mesh level
 !! |1 ... m |m+1       |                                                     m+2|
 !! |--------|----------|--------------------------------------------------------|
 !! |treecode|mesh level|refinement status (-1 coarsen / 0 no change / +1 refine)|
-!> \subsubsection heavy Heavy Data Arrays
-!! \paragraph block Block Data
+!! \subsection heavy Heavy Data Arrays
+!! \subsubsection block Block Data
 !! `real(kind=rk) :: hvy_block(:,:,:,:)` \n
 !!
 !! This array is used for load balancing data exchange. \n
@@ -59,7 +64,7 @@
 !! |----------------------------|-----------|------------|
 !! |node data (with ghost nodes)|datafield  |block id    |
 !!
-!! \paragraph work Work Data
+!! \subsubsection work Work Data
 !! `real(kind=rk) :: hvy_work(:,:,:,:)` \n
 !!
 !! This array is not used for data exchange. \n
@@ -68,7 +73,7 @@
 !! |----------------------------|------------------------|------------|
 !! |node data (with ghost nodes)|RK stage and datafield  |block id    |
 !!
-!! \paragraph neighbor Neighbor Data
+!! \subsubsection neighbor Neighbor Data
 !! `real(kind=rk) :: hvy_neighbor(:,:)` \n
 !!
 !! |1 ... m                                      |
@@ -76,3 +81,97 @@
 !! |neighbor block row number in light data array|
 !!
 !> \subsection neighborhood Neighborhood Relations
+
+
+----------------------------------------------------------------------------------------------------------------
+!> \page postprocessing Wabbit Postprocessing Tools
+!! The existing postprocessing tools can be found in /LIB/POSTPROCESSING \n
+!! 
+!! Type:
+!!
+!!     $ ./wabbit-post --help or wabbit-post --help --[one of the listed tools] 
+!!
+!! to get more information from WABBIT
+!!
+!! \section sparse Sparse to Dense
+!! \subsection Description
+!! This tool can be used to generate a uniform mesh of one datafield saved in
+!! hdf5 format. The user may decide whether he wants to upsample or downsample (or
+!! something in between) the grid.
+!! \image html sparse_to_dense.svg "Sparse to Dense" width=400
+!! \subsection Run
+!!
+!!     $ ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)
+!!
+!! where source.h5 is the input file, target.h5 is the file where the user
+!! wants the output to be saved, target_treelevel is the desired level and
+!! order-predictor the interpolation order (for upsampling) 
+!! \subsection Implementation
+!!     1. Get blocksize and maximal treelevel of the saved datafield
+!!     2. Compare maximal treelevel to desired treelevel and set
+!!params%max_treelevel to the greater one
+!!     3. Allocate data
+!!     4. Read data from source.h5
+!!     5. First coarsen (check where coarsening is actually needed: if
+!! (max_active_level( lgt_block, lgt_active, lgt_n )>level)
+!!     6. Then refine (check where refining is actually needed: if
+!! (min_active_level( lgt_block, lgt_active, lgt_n )<level)
+!!     7. Write data to target.h5
+!!
+!! \section keys Keyvalues
+!! This tool can be used for testing. It reads a datafield from an existing
+!! hdf5-file, generates a .key file containing several keyvalues and can then
+!! be used to compare to two .key files 
+!! \subsection gen Generate keyvalues
+!! \subsubsection Description
+!! Loads the specified *.h5 file and creates a *.key file that contains
+!! min / max / mean / L2 norm of the field data. This is used for testing
+!! so that we don't need to store entire fields but rather the *.key only
+!! \subsubsection Run
+!!
+!!     $ ./wabbit-post 2[3]D --keyvalues filename.h5
+!!
+!! \subsection com Compare keyvalues
+!! Compares two .key files, prints out the error on the screen and gives back
+!! an exit code
+!! \subsubsection Run 
+!!
+!!     $ ./wabbit-post 2[3]D --compare-keys old.key new.key
+!!
+!! \section vor Compute vorticity
+!! This tool can be used for subsequent calculation of the vorticity from a
+!! given velocity field.
+!! \image html vor.jpg "Vorticity field" width=400
+!!
+!! \subsection run Run
+!! 
+!!     $ ./wabbit-post 2D --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)
+!!     $ ./wabbit-post 3D --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)
+!!
+!!
+!! where derivative order is the order of the finite differences scheme
+!!(second or fourth)
+---------------------------------------------------------------------------------------------------------
+
+!> \page testing Wabbit Testing Tools
+!! \section Description
+!! The existing tests can be found in /TESTING. \n 
+!!
+!! For each test, we have an .ini file (with values set as time, physics etc.) and
+!! .ref files where the keyvalues of these simulations are stored as reference
+!! values. To check whether the current version of the code still gives the
+!! same results we generate new .key files and compare them to the old ones. \n
+!!  
+!!
+!! To add a new test you may create a folder in one of the existing physics 
+!! folders (TESTING/acm, TESTING/navier-stokes, ...) or - for a new right hand
+!! side - you may create a new physics folder. You can then put your .ini file
+!! and your reference files (containing the keyvalues, see also \ref keys)
+!! inside this folder, write a shell script similar to
+!! e.g. /TESTING/acm/acm_cyl/acm_cylinder.sh and add it to
+!! /TESTING/runtests.sh
+!! \section Run
+!!
+!!     $ make test
+!!
+!!

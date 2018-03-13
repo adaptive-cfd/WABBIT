@@ -68,4 +68,6 @@ contains
 
     include "get_attributes.f90"
 
+    include "read_file_flusi.f90"
+
 end module module_IO

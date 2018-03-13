@@ -78,14 +78,17 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     select case(params%physics_type)
     case ("ACM-new")
       ! this call is not done for all blocks, but only once, globally.
-      call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
+      call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(1)), g, x0, dx, &
+          hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
 
     case ("ConvDiff-new")
       ! this call is not done for all blocks, but only once, globally.
-      call RHS_convdiff( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
+      call RHS_convdiff( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0,&
+          dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
     case ("navier_stokes")
       ! this call is not done for all blocks, but only once, globally.
-      call RHS_NStokes( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
+      call RHS_NStokes( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
+          hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
 
 
     case default

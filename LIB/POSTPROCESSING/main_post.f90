@@ -64,15 +64,14 @@ program main_post
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
     call get_command_argument( 1, mode )
+    call get_command_argument( 2, post_mode )
 
     if (mode=="--h" .or. mode=="--help") then
         help=.true.
     else
-        if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")'), mode
+        if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")'), post_mode
         help=.false.
     end if
-
-    call get_command_argument( 2, post_mode )
 
     select case(post_mode)
     case("--sparse-to-dense")
@@ -88,6 +87,8 @@ program main_post
             call get_command_argument(4,key2)
             call compare_keys(help,key1,key2)
         end if
+    case ("--block-to-blocks")
+        call block_to_blocks(help, params)
 !    case ("--sfc-test")
 !        call keyvalues_sfc(help, params)
 !    case("--squeeze")
@@ -99,6 +100,7 @@ program main_post
         write(*,*) "--vorticity"
         write(*,*) "--keyvalues"
         write(*,*) "--compare-keys"
+        write(*,*) "--block-to_blocks"
         if (mode=="--h" .or. mode=="--help") then
             write(*,*) "To get more information about each postprocessing tool type: wabbit-post --help --[one of the listed tools]"
         else

@@ -6,27 +6,15 @@
 !> \name set_RK_input.f90
 !> \version 0.5
 !> \author sm
-!
 !> \brief set input for Runge Kutta time stepper
-!
 !>
-!! gives back the input for the RHS (from which in the final stage the next time step is computed).\n
+!! gives back the input for the RHS (from which in the final stage the next 
+!! time step is computed).\n
 !!
-!! k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_jl*k_l)) (e.g. k3 = RHS(t+dt*c_3, data_field(t) + dt*(a31*k1+a32*k2)) ) \n
+!! k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_jl*k_l)) 
+!! (e.g. k3 = RHS(t+dt*c_3, data_field(t) + dt*(a31*k1+a32*k2)) ) \n
 !!
 !! This routine is in charge of setting the input and saving it in the hvy_work and hvy_block array \n
-!!
-!! input:
-!!           - time step dt
-!!           - params
-!!           - heavy data
-!!           - coefficients for Runge Kutta method
-!!           - loop variable
-!!
-!! output:
-!!           - heavy_work array
-!!
-!!
 !! butcher table, e.g.
 !!
 !! |   |    |    |   |
@@ -36,18 +24,12 @@
 !! |c3 | a31| a32|  0|
 !! | 0 | b1 | b2 | b3|
 !!
-!!
-!! = log ======================================================================================
-!! \n
-!! 22/05/17 - create
+! = log ======================================================================================
 !
+!> \date  22/05/17 - create
 ! ********************************************************************************************
 
 subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_active, hvy_n)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -75,20 +57,16 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
     ! loop variables
     integer(kind=ik)                    :: l, dF, N_dF, k
 
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
     N_dF  = params%number_data_fields
-
 !---------------------------------------------------------------------------------------------
 ! main body
-
 
     ! first: k_j = RHS(data_field(t) + ...
     ! loop over all active heavy data blocks
     do k = 1, hvy_n
-        hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_work( :, :, :, 1:N_dF, hvy_active(k) )
+        hvy_block(:,:,:,1:N_dF,hvy_active(k)) = hvy_work(:,:,:,1:N_dF,hvy_active(k))
     end do
 
     do l = 2, j
@@ -99,8 +77,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
             do k = 1, hvy_n
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block( :, :, :, 1:N_dF, hvy_active(k)) = hvy_block( :, :, :, 1:N_dF, hvy_active(k)) &
-                            + dt * rk_coeffs(l) * hvy_work( :, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
+                hvy_block(:,:,:,1:N_dF,hvy_active(k)) = hvy_block(:,:,:,1:N_dF,hvy_active(k)) &
+                            + dt*rk_coeffs(l)*hvy_work(:,:,:,(l-1)*N_dF+1:l*N_dF,hvy_active(k))
             end do
         end if
     end do

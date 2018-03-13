@@ -42,7 +42,6 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
@@ -55,12 +54,8 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! send/receive buffer, note: size is equal to block data array, because if a block want to send all his data
     real(kind=rk), allocatable          :: buffer_data( :, :, :, : )
     integer(kind=ik), allocatable       :: buffer_light( : )
-
-!    ! light data list for working
-!    integer(kind=ik)                    :: my_block_list( size(lgt_block, 1), params%max_treelevel+2)
     ! light id start
     integer(kind=ik)                    :: my_light_start
-
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
@@ -71,48 +66,24 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: tag
     ! MPI status
     integer                             :: status(MPI_status_size)
-
     ! distribution type
     character(len=80)                   :: distribution
-
     ! block distribution lists
     integer(kind=ik), allocatable       :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
     ! loop variables
-    integer(kind=ik)                    :: k, N, num_blocks, l, com_i, com_N, &
-                                           !id_send, id_recv, send_deficit, recv_deficit, tmp(1), light_id, heavy_id, &
-                                           heavy_id, sfc_id
-
+    integer(kind=ik)                    :: k, N, num_blocks, l, com_i, com_N, heavy_id, sfc_id
     ! com plan
     integer(kind=ik), allocatable       :: com_plan(:,:)
-
     ! size of data array
     integer(kind=ik)                    :: data_size
-
     ! free light/heavy data id
-    integer(kind=ik)                    :: free_light_id, free_heavy_id
-
+    integer(kind=ik)                    :: lgt_free_id, hvy_free_id, lgt_id
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0
-
     ! space filling curve list
     integer(kind=ik), allocatable       :: sfc_com_list(:,:), sfc_sorted_list(:,:)
-
     ! hilbert code
     integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
-
-    ! light data list for working
-    integer(kind=1), allocatable        :: my_lgt_block(:,:)
-
-    ! send/receive buffer for data synchronization
-    integer(kind=1), allocatable        :: my_lgt_block_send_buffer(:,:), my_lgt_block_receive_buffer(:,:)
-
-    ! maximum heavy id, use to synchronize reduced light data array, sum of heavy blocks, start of send buffer
-    integer(kind=ik)                    :: heavy_max, block_sum, buffer_start
-    ! list of max heavy ids, use to build send/receive buffer
-    integer(kind=ik)                    :: proc_heavy_max(params%number_procs), my_proc_heavy_max(params%number_procs)
-
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -131,14 +102,12 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
     ! allocate block to proc lists
     allocate( opt_dist_list(1:number_procs), dist_list(1:number_procs))
-    allocate( affinity(1:params%number_blocks) )
-    allocate( friends( 1:number_procs, 1:number_procs ))
 
     ! allocate com plan, maximal number of communications: every proc send every other proc something
     allocate( com_plan( number_procs*(number_procs-1), 3 ) )
     com_plan = -1
 
-    ! allocate sfc com list, maximal number of communications is when every proc want to send all of his blocks
+    ! allocate sfc com list, maximal number of communications is when every proc wants to send all of his blocks
     allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
     sfc_com_list = -1
 
@@ -161,40 +130,27 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! size of data array, use for readability
     data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3)
 
-    ! allocate lgt data working array
-    allocate( my_lgt_block(N, params%max_treelevel+2 ) )
-    ! set light data list for working, only light data coresponding to proc
-    my_lgt_block = int(lgt_block( rank*N + 1 : rank*N + N, :), kind=1)
-
-    ! reset max heavy id, use current max id
-    if ( hvy_n > 0 ) then
-        ! proc has active heavy data
-        heavy_max = maxval(hvy_active(1:hvy_n))
-    else
-        heavy_max = 0
-    end if
-
-    ! reset send/receive buffer
-    !buffer_data = 9.0e9_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    !---------------------------------------------------------------------------------
+    ! First step: define how many blocks each mpirank should have.
+    !---------------------------------------------------------------------------------
+    call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
+    call write_block_distribution( dist_list, params )
+    ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
+    ! and how many it should have, if equally distributed: "opt_dist_list(myrank+1)"
+
+
     select case(distribution)
-
         case("equal")! simple uniformly distribution
-            !---------------------------------------------------------------------------------
-            ! First step: define how many blocks each mpirank should have.
-            !---------------------------------------------------------------------------------
-            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
 
-            ! write debug infos: distribution list
-            !if ( params%debug ) then
-                call write_block_distribution( dist_list, params )
-            !end if
+            allocate( affinity(1:params%number_blocks) )
+            allocate( friends( 1:number_procs, 1:number_procs ))
 
-            ! at this point, we know how many blocks a mpirank has: "dist_list(myrank)"
-            ! and how many it should have, if equally distributed: "opt_dist_list(myrank)"
+            ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
+            ! and how many it should have, if equally distributed: "opt_dist_list(myrank+1)"
             if (maxval(abs(dist_list-opt_dist_list))==0) then
                 ! the distribution is fine, nothing to do.
                 return
@@ -308,17 +264,17 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 !                    do l = 1,  com_plan(k, 3)
 !
 !                        ! find free "light id", work on reduced light data, so free id is heavy id
-!                        call get_free_light_id( free_heavy_id, my_block_list( my_light_start+1 : my_light_start+params%number_blocks , 1 ), params%number_blocks )
+!                        call get_free_light_id( hvy_free_id, my_block_list( my_light_start+1 : my_light_start+params%number_blocks , 1 ), params%number_blocks )
 !                        ! calculate light id
-!                        free_light_id = my_light_start + free_heavy_id
+!                        lgt_free_id = my_light_start + hvy_free_id
 !
 !                        ! write light data
-!                        my_block_list( free_light_id, :) = lgt_block( buffer_light(l), : )
+!                        my_block_list( lgt_free_id, :) = lgt_block( buffer_light(l), : )
 !
 !                        ! write heavy data
-!                        hvy_block(:, :, :, free_heavy_id) = buffer_data(:, :, :, l)
+!                        hvy_block(:, :, :, hvy_free_id) = buffer_data(:, :, :, l)
 !
-!                        if (my_block_list(free_light_id, 1)<0 .or. my_block_list(free_light_id, 1)>3) then
+!                        if (my_block_list(lgt_free_id, 1)<0 .or. my_block_list(lgt_free_id, 1)>3) then
 !                          write(*,*) "For some reason, someone sent me an empty block (code: 7712345)"
 !                          stop
 !                        endif
@@ -329,139 +285,145 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 !            ! synchronize light data
 !            lgt_block = 0
 !            call MPI_Allreduce(my_block_list, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+            deallocate( friends, affinity )
 
-        case("sfc_z")
 
-            ! current block distribution
-            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
-            ! write debug infos: current distribution list
-            if ( params%debug ) then
-                call write_block_distribution( dist_list, params )
-            end if
-
+        case("sfc_hilbert","sfc_z")
             !---------------------------------------------------------------------------------
-            ! first: calculate space filling curve
+            ! 1st: calculate space filling curve index for all blocks
             !---------------------------------------------------------------------------------
-            ! reset old lists
-            dist_list = 0
-
-            ! loop over active blocks
             do k = 1, lgt_n
-                ! calculate sfc position
-                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                select case (distribution)
+                case("sfc_z")
+                    !-----------------------------------------------------------
+                    ! Z - curve
+                    !-----------------------------------------------------------
+                    call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+
+                case("sfc_hilbert")
+                    !-----------------------------------------------------------
+                    ! Hilbert curve
+                    !-----------------------------------------------------------
+                    ! transfer treecode to hilbertcode
+                    call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                    ! calculate sfc position from hilbertcode
+                    call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
+
+                end select
 
                 ! fill sfc list
                 sfc_sorted_list(k, 1) = sfc_id
                 sfc_sorted_list(k, 2) = lgt_active(k)
-
             end do
 
-            ! sort sfc_list
+            ! sort sfc_list according to the first dimension, thus the position on
+            ! the space filling curve (this was a bug, fixed: Thomas, 13/03/2018)
             if (lgt_n > 1) then
-                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 2)
+                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
             end if
 
             !---------------------------------------------------------------------------------
-            ! second: distribute all blocks
+            ! 2nd: plan communication
             !---------------------------------------------------------------------------------
-            ! equal distribution
-            dist_list = lgt_n / number_procs
-            do k = 1, mod(lgt_n, number_procs)
-                dist_list( k ) = dist_list( k ) + 1
-            end do
-
-            !---------------------------------------------------------------------------------
-            ! third: create com list
-            !---------------------------------------------------------------------------------
-            ! column
-            !    1     sender proc
-            !    2     receiver proc
-            !    3     block light data id
-
             ! proc_dist_id: process responsible for current part of sfc
             ! proc_data_id: process who stores data of sfc element
+
+            ! we start the loop on the root rank (0), then assign the first elements
+            ! of the SFC, then to second rank, etc. (thus: proc_dist_id is a loop variable)
             proc_dist_id = 0
 
+            ! communication counter. each communication (=send and receive) is stored
+            ! in a long list
             com_i = 1
+
             ! loop over sfc_list
             do k = 1, lgt_n
-
-                ! process with heavy data
+                ! find out on which mpirank lies the block that we're looking at
                 call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 
-                ! data has to send
+                ! does this block lie on the right mpirank, i.e., the current part of the
+                ! SFC? if so, nothing needs to be done. otherwise, the following if is active
                 if ( proc_dist_id /= proc_data_id ) then
-                    ! create com plan
-                    sfc_com_list(com_i, 1) = proc_data_id
-                    sfc_com_list(com_i, 2) = proc_dist_id
-                    sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)
+                    ! as this block is one the wrong rank, it will be sent away from its
+                    ! current owner (proc_data_id) to the owner of this part of the
+                    ! SFC (proc_dist_id)
+
+                    ! save this send+receive operation in the list of planned communications
+                    ! column
+                    !    1     sender proc
+                    !    2     receiver proc
+                    !    3     block light data id
+                    sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank
+                    sfc_com_list(com_i, 2) = proc_dist_id           ! receiver mpirank
+                    sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)   ! light id of block
+
+                    ! increase communication index
                     com_i = com_i + 1
-
-                else
-                    ! nothing to do, block is allready on correct proc
-
                 end if
 
-                ! next scf element, so check proc id, switch if last block is distributed
-                dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
-                if ( dist_list( proc_dist_id+1 ) == 0 ) then
+                ! The opt_dist_list defines how many blocks this rank should have, and
+                ! we just treated one (which either already was on the mpirank or will be on
+                ! it after communication), so remove one item from the opt_dist_list
+                opt_dist_list( proc_dist_id+1 ) = opt_dist_list( proc_dist_id+1 ) - 1
+
+                ! if there is no more blocks to be checked, increase mpirank counter by one
+                if ( opt_dist_list( proc_dist_id+1 ) == 0 ) then
                     proc_dist_id = proc_dist_id + 1
                 end if
-
             end do
 
-            ! stop load balancing, if nothing to do
-            if ( com_i == 1 ) then
-                ! the distribution is fine, nothing to do.
-                return
-            endif
-
             !---------------------------------------------------------------------------------
-            ! fourth: communicate
+            ! 3rd: actual communication (send/recv)
             !---------------------------------------------------------------------------------
-            ! loop over com list, create send buffer and send/receive data
+            ! loop over com list, and sen / recv data.
             ! note: delete com list elements after send/receive and if proc not
-            ! responsible for com list entry -> this means: no extra com plan needed
+            ! responsible for com list entry.
+            ! NOTE: we try to send as many blocks as possible at one time, not just one
+            ! block at a time. The com_list already has a very nice structure, there is no
+            ! need to sort them (Thomas, 13/03/2018), on the contrary, sorting ended oup with
+            ! more communications
             do k = 1, com_i
                 ! com list element is active
                 if ( sfc_com_list(k, 1) /= -1 ) then
 
-                    ! proc send data
+                    !-----------------------------------------------------------
+                    ! I am the sender in this operation?
+                    !-----------------------------------------------------------
                     if ( sfc_com_list(k, 1) == rank ) then
 
-                        ! create send buffer, search list
+                        ! create send buffer, search list, send next l blocks to the same receiver
                         l = 0
                         do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
-
+                            lgt_id = sfc_com_list(k+l, 3)
                             ! calculate heavy id from light id
-                            call lgt_id_to_hvy_id( heavy_id, sfc_com_list(k+l, 3), rank, params%number_blocks )
+                            call lgt_id_to_hvy_id( heavy_id, lgt_id, rank, params%number_blocks )
 
                             ! send buffer: fill buffer, heavy data
                             buffer_data(:, :, :, l+1 ) = hvy_block(:, :, :, heavy_id )
                             ! ... light data
-                            buffer_light( l+1 ) = sfc_com_list(k+l, 3)
+                            buffer_light( l+1 ) = lgt_id
 
-                            ! delete heavy data
+                            !..then delete what I just got rid of
                             hvy_block(:, :, :, heavy_id) = 0.0_rk
-                            ! delete light data
-                            my_lgt_block( heavy_id, :) = -1
+                            lgt_block(lgt_id, : ) = -1
 
                             ! go to next element
                             l = l + 1
-
                         end do
 
                         ! send data
-                        call MPI_Send( buffer_light, (l), MPI_INTEGER4, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
-                        call MPI_Send( buffer_data, data_size*(l), MPI_REAL8, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
+                        call MPI_Send( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
+                        call MPI_Send( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
 
                         ! delete all com list elements
                         sfc_com_list(k:k+l-1, :) = -1
 
-                    ! proc receive data
+                    !-----------------------------------------------------------
+                    ! I am the receiver in this operation?
+                    !-----------------------------------------------------------
                     elseif ( sfc_com_list(k, 2) == rank ) then
 
-                        ! count received data sets
+                        ! count received data sets, recv next l blocks from the sender
                         l = 1
                         do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
 
@@ -470,12 +432,11 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
                             ! go to next element
                             l = l + 1
-
                         end do
 
                         ! receive data
-                        call MPI_Recv( buffer_light, (l), MPI_INTEGER4, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
-                        call MPI_Recv( buffer_data, data_size*(l), MPI_REAL8, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
+                        call MPI_Recv( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
+                        call MPI_Recv( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
 
                         ! delete first com list element after receiving data
                         sfc_com_list(k, :) = -1
@@ -485,295 +446,26 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
                         ! loop over all received blocks
                         do l = 1,  com_N
+                            ! fetch a free light id slot on my rank
+                            call get_free_local_light_id( params, rank, lgt_block, lgt_free_id )
+                            call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, rank, N )
 
-                            ! find free "light id", work on reduced light data, so free id is heavy id
-                            call get_free_light_id( free_heavy_id, my_lgt_block( 1 : N , 1 ), N )
-
-                            ! calculate light id
-                            free_light_id = my_light_start + free_heavy_id
-
-                            ! write light data
-                            my_lgt_block( free_heavy_id, : ) = int(lgt_block( buffer_light(l), : ), 1)
-
-                            ! write heavy data
-                            hvy_block(:, :, :, free_heavy_id) = buffer_data(:, :, :, l)
-
-                            ! update max heavy id
-                            ! ignore if old heavy max is deleted in previous communication
-                            heavy_max = max( heavy_max, free_heavy_id)
+                            ! copy the data from the buffers
+                            lgt_block( lgt_free_id, :) = lgt_block( buffer_light(l), : )
+                            hvy_block(:, :, :, hvy_free_id) = buffer_data(:, :, :, l)
 
                         end do
-
-
-                    ! nothing to do
                     else
-                        ! delete com list element
-                        ! note: only to have a clean list
+                        ! I am not concerned by this operation, delete element
                         sfc_com_list(k, :) = -1
-
                     end if
-
                 end if
             end do
 
             !---------------------------------------------------------------------------------
-            ! sixth: synchronize light data
+            ! 4th: synchronize light data
             !---------------------------------------------------------------------------------
-            my_proc_heavy_max = 0
-            my_proc_heavy_max(rank+1) = heavy_max
-
-            ! synchronize array
-            call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-            ! for readability, calc sum of all max heavy ids
-            block_sum = sum(proc_heavy_max)
-
-            ! now we can allocate send/receive buffer arrays
-            allocate( my_lgt_block_send_buffer( block_sum, size(lgt_block,2) ), my_lgt_block_receive_buffer( block_sum, size(lgt_block,2) ) )
-
-            ! reset send buffer
-            my_lgt_block_send_buffer = 0
-            buffer_start = sum(proc_heavy_max(1:rank))
-            my_lgt_block_send_buffer( buffer_start+1 : buffer_start+heavy_max, : ) = my_lgt_block( 1 : heavy_max, :)
-
-            ! synchronize light data
-            call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum*size(lgt_block,2), MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-            ! write synchronized light data
-            ! loop over number of procs and reset lgt_block array
-            do k = 1, params%number_procs
-                ! proc k-1 has send data
-                if ( proc_heavy_max(k) /= 0 ) then
-                    ! write received light data
-                    lgt_block( (k-1)*N+1 : (k-1)*N + proc_heavy_max(k), : ) =  my_lgt_block_receive_buffer( sum(proc_heavy_max(1:k-1))+1 : sum(proc_heavy_max(1:k-1))+proc_heavy_max(k), : )
-                else
-                    ! nothing to do
-                end if
-            end do
-
-        case("sfc_hilbert")
-
-            ! current block distribution
-            call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
-            ! write debug infos: current distribution list
-            if ( params%debug ) then
-                call write_block_distribution( dist_list, params )
-            end if
-
-            !---------------------------------------------------------------------------------
-            ! first: calculate space filling curve
-            !---------------------------------------------------------------------------------
-            ! reset old lists
-            dist_list = 0
-
-            ! loop over active blocks
-            do k = 1, lgt_n
-                ! transfer treecode to hilbertcode
-                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
-                ! calculate sfc position from hilbertcode
-                call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
-
-                ! fill sfc list
-                sfc_sorted_list(k, 1) = sfc_id
-                sfc_sorted_list(k, 2) = lgt_active(k)
-
-            end do
-
-            ! sort sfc_list
-            if (lgt_n > 1) then
-                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 2)
-            end if
-
-            !---------------------------------------------------------------------------------
-            ! second: distribute all blocks
-            !---------------------------------------------------------------------------------
-            ! equal distribution
-            dist_list = lgt_n / number_procs
-            do k = 1, mod(lgt_n, number_procs)
-                dist_list( k ) = dist_list( k ) + 1
-            end do
-
-            !---------------------------------------------------------------------------------
-            ! third: create com list
-            !---------------------------------------------------------------------------------
-            ! column
-            !    1     sender proc
-            !    2     receiver proc
-            !    3     block light data id
-
-            ! proc_dist_id: process responsible for current part of sfc
-            ! proc_data_id: process who stores data of sfc element
-            proc_dist_id = 0
-
-            com_i = 1
-            ! loop over sfc_list
-            !do k = 1, size(sfc_list,1)
-            do k = 1, lgt_n
-
-                ! process with heavy data
-                call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
-
-                ! data has to send
-                if ( proc_dist_id /= proc_data_id ) then
-                    ! create com plan
-                    sfc_com_list(com_i, 1) = proc_data_id
-                    sfc_com_list(com_i, 2) = proc_dist_id
-                    sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)
-                    com_i = com_i + 1
-
-                else
-                    ! nothing to do, block is allready on correct proc
-
-                end if
-
-                ! next scf element, so check proc id, switch if last block is distributed
-                dist_list( proc_dist_id+1 ) = dist_list( proc_dist_id+1 ) - 1
-                if ( dist_list( proc_dist_id+1 ) == 0 ) then
-                    proc_dist_id = proc_dist_id + 1
-                end if
-            end do
-
-            ! stop load balancing, if nothing to do
-            if ( com_i == 1 ) then
-                ! the distribution is fine, nothing to do.
-                return
-            endif
-
-            !---------------------------------------------------------------------------------
-            ! fourth: communicate
-            !---------------------------------------------------------------------------------
-            ! loop over com list, create send buffer and send/receive data
-            ! note: delete com list elements after send/receive and if proc not
-            ! responsible for com list entry -> this means: no extra com plan needed
-            do k = 1, com_i
-                ! com list element is active
-                if ( sfc_com_list(k, 1) /= -1 ) then
-
-                    ! proc send data
-                    if ( sfc_com_list(k, 1) == rank ) then
-
-                        ! create send buffer, search list
-                        l = 0
-                        do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
-
-                            ! calculate heavy id from light id
-                            call lgt_id_to_hvy_id( heavy_id, sfc_com_list(k+l, 3), rank, params%number_blocks )
-
-                            ! send buffer: fill buffer, heavy data
-                            buffer_data(:, :, :, l+1 ) = hvy_block(:, :, :, heavy_id )
-                            ! ... light data
-                            buffer_light( l+1 ) = sfc_com_list(k+l, 3)
-
-                            ! delete heavy data
-                            hvy_block(:, :, :, heavy_id) = 0.0_rk
-                            ! delete light data
-                            my_lgt_block( heavy_id, : ) = -1
-
-                            ! go to next element
-                            l = l + 1
-
-                        end do
-
-                        ! send data
-                        call MPI_Send( buffer_light, (l), MPI_INTEGER4, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
-                        call MPI_Send( buffer_data, data_size*(l), MPI_REAL8, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
-
-                        ! delete all com list elements
-                        sfc_com_list(k:k+l-1, :) = -1
-
-                    ! proc receive data
-                    elseif ( sfc_com_list(k, 2) == rank ) then
-
-                        ! count received data sets
-                        l = 1
-                        do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
-
-                            ! delete element
-                            sfc_com_list(k+l, :) = -1
-
-                            ! go to next element
-                            l = l + 1
-
-                        end do
-
-                        ! receive data
-                        call MPI_Recv( buffer_light, (l), MPI_INTEGER4, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
-                        call MPI_Recv( buffer_data, data_size*(l), MPI_REAL8, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
-
-                        ! delete first com list element after receiving data
-                        sfc_com_list(k, :) = -1
-
-                        ! save comm count
-                        com_N = l
-
-                        ! loop over all received blocks
-                        do l = 1,  com_N
-
-                            ! find free "light id", work on reduced light data, so free id is heavy id
-                            call get_free_light_id( free_heavy_id, int(my_lgt_block( : , 1 ),kind=4) , N )
-
-                            ! save heavy id, if new block id is larger than old one
-                            ! note: heavy id of third block is always larger than id from block 1,2
-                            heavy_max = max(heavy_max, free_heavy_id)
-
-                            ! calculate light id
-                            free_light_id = my_light_start + free_heavy_id
-
-                            ! write light data
-                            my_lgt_block( free_heavy_id, : ) = int(lgt_block( buffer_light(l), : ),1)
-
-                            ! write heavy data
-                            hvy_block(:, :, :, free_heavy_id) = buffer_data(:, :, :, l)
-
-                        end do
-
-
-                    ! nothing to do
-                    else
-                        ! delete com list element
-                        ! note: only to have a clean list
-                        sfc_com_list(k, :) = -1
-
-                    end if
-
-                end if
-            end do
-
-            !---------------------------------------------------------------------------------
-            ! sixth: synchronize light data
-            !---------------------------------------------------------------------------------
-            ! set array for max heavy ids
-            my_proc_heavy_max = 0
-            my_proc_heavy_max(rank+1) = heavy_max
-
-            ! synchronize array
-            call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-            ! for readability, calc sum of all max heavy ids
-            block_sum = sum(proc_heavy_max)
-
-            ! now we can allocate send/receive buffer arrays
-            allocate( my_lgt_block_send_buffer( block_sum, size(lgt_block,2) ), my_lgt_block_receive_buffer( block_sum, size(lgt_block,2) ) )
-
-            ! reset send buffer
-            my_lgt_block_send_buffer = 0
-            buffer_start = sum(proc_heavy_max(1:rank))
-            my_lgt_block_send_buffer( buffer_start+1 : buffer_start+heavy_max, : ) = my_lgt_block( 1 : heavy_max, :)
-
-            ! synchronize light data
-            call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum*size(lgt_block,2), MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-            ! write synchronized light data
-            ! loop over number of procs and reset lgt_block array
-            do k = 1, params%number_procs
-                ! proc k-1 has send data
-                if ( proc_heavy_max(k) /= 0 ) then
-                    ! write received light data
-                    lgt_block( (k-1)*N+1 : (k-1)*N + proc_heavy_max(k), : ) =  my_lgt_block_receive_buffer( sum(proc_heavy_max(1:k-1))+1 : sum(proc_heavy_max(1:k-1))+proc_heavy_max(k), : )
-                else
-                    ! nothing to do
-                end if
-            end do
+            call synchronize_lgt_data( params, lgt_block )
 
         case default
             write(*,'(80("_"))')
@@ -784,7 +476,6 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     end select
 
     ! clean up
-    deallocate( friends, affinity )
     deallocate( opt_dist_list )
     deallocate( dist_list )
     deallocate( com_plan )
@@ -792,8 +483,6 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     deallocate( buffer_data )
     deallocate( buffer_light )
     deallocate( sfc_sorted_list )
-
-    deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer, my_lgt_block )
 
     ! timing
     call toc( params, "balance_load", MPI_wtime()-t0 )

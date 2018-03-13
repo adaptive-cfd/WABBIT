@@ -80,6 +80,7 @@ contains
     include "isend_irecv_data.f90"
 
     include "blocks_per_mpirank.f90"
+    include "synchronize_lgt_data.f90"
 
     ! routine to reset ghost nodes to uniform number (for debuging)
     include "reset_ghost_nodes.f90"

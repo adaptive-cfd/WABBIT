@@ -131,7 +131,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	synchronize_ghosts.f90 copy_ghost_nodes_2D.f90 create_send_buffer_2D.f90 write_receive_buffer_2D.f90 create_external_com_list.f90 \
 	max_com_num.f90 fill_send_buffer.f90 fill_receive_buffer.f90 RMA_lock_unlock_get_data.f90 RMA_lock_unlock_put_data.f90 \
 	isend_irecv_data.f90 copy_ghost_nodes_3D.f90 create_send_buffer_3D.f90 write_receive_buffer_3D.f90 blocks_per_mpirank.f90 \
-	reset_ghost_nodes.f90 copy_redundant_nodes_2D.f90
+	reset_ghost_nodes.f90 copy_redundant_nodes_2D.f90 synchronize_lgt_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o \

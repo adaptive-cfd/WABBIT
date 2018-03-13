@@ -6,7 +6,7 @@
 rootdir="../"
 cd $rootdir
 echo "   "
-echo -e "\t \033[4m WABBIT: run all existing unit tests \033[0m" 
+echo -e "\t \033[4m WABBIT: run all existing unit tests \033[0m"
 echo "   "
 
 if [ -z "$nprocs" ]; then
@@ -21,7 +21,13 @@ fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'
 end_color=$'\033[0m'
 
-tests=("---navier-stokes---" "TESTING/navier_stokes/pressure_blob/pressure_blob.sh" "---acm---" "TESTING/acm/acm_cyl/acm_cylinder.sh")
+# list all tests here. For readability, we include header lines like ---acm---
+# they structure teh output on the screen. Note the three dashes mark those headers
+tests=("---navier-stokes---"
+       "TESTING/navier_stokes/pressure_blob/pressure_blob.sh"
+       "---acm---"
+       "TESTING/acm/acm_cyl/acm_cylinder.sh")
+
 happy_sum=0
 sad_sum=0
 numtests=0
@@ -35,22 +41,28 @@ T="$(date +%s)"
 for ts in ${tests[@]}
 do
     if [[ $ts == "---"* ]]; then
-    	echo $ts
+        # this is a header line - we just need to print it on the screen
+        echo $ts
     else
-	logfile=${ts%%.sh}.log
+        # output usually sent to screen will be written to log file.
+        logfile=${ts%%.sh}.log
         rm -f $logfile
-	touch $logfile
+        touch $logfile
 
-	./${ts} > $logfile
-	if [ $? == 0 ]; then
-	    happy_sum=$((happy_sum+1))
-	    summary[$numtests]=0
-	else
-	    sad_sum=$((sad_sum+1))
-	    summary[$numtests]=1
-	fi
-	numtests=$((numtests+1))
-	rm -f *.key *.h5 *.t *.dat
+        echo "Running test: " ${ts} " writing output to " ${logfile}
+
+        # run the actual test
+        ./${ts} > $logfile
+
+        if [ $? == 0 ]; then
+            happy_sum=$((happy_sum+1))
+            summary[$numtests]=0
+        else
+            sad_sum=$((sad_sum+1))
+            summary[$numtests]=1
+        fi
+        numtests=$((numtests+1))
+        rm -f *.key *.h5 *.t *.dat
     fi
 done
 
@@ -66,12 +78,12 @@ numtests=0
 for ts in ${tests[@]}
 do
     if [[ $ts != "---"* ]]; then
-	if [ ${summary[$numtests]} == 0 ]; then
-	    printf "%-80s %s \n" ${ts} "$pass_color ok $end_color"
-	else
+        if [ ${summary[$numtests]} == 0 ]; then
+            printf "%-80s %s \n" ${ts} "$pass_color ok $end_color"
+        else
             printf "%-80s %s \n" ${ts} "$fail_color X $end_color"
-	fi
-	numtests=$((numtests+1))
+        fi
+        numtests=$((numtests+1))
     fi
 done
 echo " "

@@ -179,7 +179,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
 
             ! sort sfc_list
             if (lgt_n > 1) then
-                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 2)
+                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
             end if
 
             !---------------------------------------------------------------------------------
@@ -376,7 +376,7 @@ subroutine balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy
 
             ! sort sfc_list
             if (lgt_n > 1) then
-                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 2)
+                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
             end if
 
             !---------------------------------------------------------------------------------

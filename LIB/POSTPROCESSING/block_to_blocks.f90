@@ -109,7 +109,6 @@ subroutine block_to_blocks(help, params)
         !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx ))
         !     hvy_block(1:Bs-1,1:Bs-1,1,1,hvy_active(k)) = field_in(floor((x0(1)+((1:Bs-1)-1)*dx(1))/dx_in ),(x0(2) + ((1:Bs-1)-1)*dx(2))/dy_in )
         ! end do
-
         iteration = 0
         call write_field(file_out, time, iteration, 1, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
     end if

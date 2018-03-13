@@ -28,10 +28,11 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   integer(kind=ik)                    :: k, lgt_id, start_x, start_y, start_z
   ! offset variables
   integer(kind=ik), dimension(3)      :: ubounds3D, lbounds3D
-  integer(kind=ik), dimension(2)      :: ubounds2D, lbounds2D
+  integer(kind=ik), dimension(3)      :: ubounds2D, lbounds2D
   real(kind=rk), dimension(3)         :: x0, dx
   ! file id integer
   integer(hid_t)                      :: file_id
+  real(kind=rk), dimension(:,:,:), allocatable   :: myblockbuffer
 !----------------------------------------------------------------------------
   Bs = params%number_block_nodes
 
@@ -43,24 +44,26 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
           trim(adjustl(fname))
   end if
 
+  if (.not. params%threeD_case) allocate( myblockbuffer(1,Bs,Bs))
+
   do k=1, hvy_n
       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
       !dx for flusi and for wabbit are the same!
       start_x = floor(x0(1)/dx(1))
       start_y = floor(x0(2)/dx(2))
-      write(*,*) start_x, start_y
       if (params%threeD_case) then
           start_z = floor(x0(3)/dx(3))
           lbounds3D = (/start_x, start_y , start_z/)
-          ubounds3D = (/start_x+Bs-1,start_y+Bs-1, start_z+Bs-1/) -1
+          ubounds3D = (/start_x+Bs-1,start_y+Bs-1, start_z+Bs-1/)
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds3D, ubounds3D, &
             hvy_block(1:Bs-1, 1:Bs-1, 1:Bs-1, 1, hvy_active(k)))
       else
-          lbounds2D = (/start_x, start_y /)
-          ubounds2D = (/start_x+Bs-1,start_y+Bs-1/) -1
-          call read_dset_mpi_hdf5_2D(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
-            hvy_block(1:Bs-1, 1:Bs-1, 1, 1, hvy_active(k)))
+          lbounds2D = (/0, start_x, start_y /)
+          ubounds2D = (/0, start_x+Bs-1,start_y+Bs-1/)!-1
+          call read_dset_mpi_hdf5_3D_flusi(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
+              myblockbuffer)
+          hvy_block(1:Bs, 1:Bs, 1, 1, hvy_active(k))=myblockbuffer(1,:,:)
       end if
   end do
 

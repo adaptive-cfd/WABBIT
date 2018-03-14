@@ -120,13 +120,9 @@ subroutine sparse_to_dense(help, params)
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         ! balance the load
         params%block_distribution="sfc_hilbert"
-        if (params%threeD_case) then
-            call balance_load_3D(params, lgt_block, hvy_block, &
-                lgt_active, lgt_n, hvy_n)
-        else
-            call balance_load_2D(params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
-        end if
+        call balance_load(params, lgt_block, hvy_block,&
+            hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+
         ! create lists of active blocks (light and heavy data) after load balancing (have changed)
         call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
             lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -138,13 +134,13 @@ subroutine sparse_to_dense(help, params)
             com_matrix, .true., int_send_buffer, int_receive_buffer, &
             real_send_buffer, real_receive_buffer )
         ! refine/coarse to attain desired level, respectively
-        !coarsen 
+        !coarsen
         do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
             ! set refinement status to -1 (coarsen) everywhere
             lgt_block(:, params%max_treelevel +2) = -1
             ! check where coarsening is actually needed
             call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-            ! this might not be necessary since we start from an admissible grid 
+            ! this might not be necessary since we start from an admissible grid
             call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
             call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
             call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
@@ -180,12 +176,9 @@ subroutine sparse_to_dense(help, params)
                 com_matrix, .true., int_send_buffer, int_receive_buffer, &
                 real_send_buffer, real_receive_buffer )
         end do
-        if ( params%threeD_case ) then
-            call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        else
-            call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), &
-                hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        end if
+
+        call balance_load( params, lgt_block, hvy_block, &
+            hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
         call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
             lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         call write_field(file_out, time, iteration, 1, params, lgt_block, &

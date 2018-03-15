@@ -58,32 +58,13 @@ contains
     include "create_equidistant_base_mesh.f90"
     include "allocate_com_arrays.f90"
 
-    ! initial block distribution - 2D case
-    include "initial_block_distribution_2D.f90"
 
     ! subroutine to write new heavy block data
     include "new_block_heavy.f90"
 
-    ! vorticity filaments testcase
-    ! include "inicond_vorticity_filaments.f90"
-    !
-    ! ! initial zeros for all fields
-    include "inicond_zeros.f90"
-
+    ! initial block distribution - 2D case
+    include "initial_block_distribution_2D.f90"
     ! initial block distribution - 3D case
     include "initial_block_distribution_3D.f90"
-
-    ! ! start field, 3D sphere
-    ! include "inicond_sphere.f90"
-    !
-    ! ! richtmyer meshkov instability setup
-    ! include "inicond_richtmyer_meshkov.f90"
-    !
-    ! ! shear layer setup
-    ! include "inicond_shear_layer.f90"
-    !
-    ! ! sinus initialization
-    ! include "inicond_sinus_2D.f90"
-    ! include "inicond_sinus_3D.f90"
 
 end module module_initialization

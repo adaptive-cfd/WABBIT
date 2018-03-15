@@ -40,8 +40,7 @@ PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
 FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
-FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero,invalid -g -ggdb -fimplicit-none -finit-real=nan
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
@@ -122,8 +121,8 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o  \
 	$(OBJDIR)/module_ACM-new.o $(OBJDIR)/module_ConvDiff_new.o \
 	set_initial_grid.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
-	inicond_vorticity_filaments.f90 inicond_zeros.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
-	inicond_richtmyer_meshkov.f90 allocate_grid.f90 reset_grid.f90 \
+	inicond_vorticity_filaments.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
+	allocate_grid.f90 reset_grid.f90 \
 	set_inicond_blocks.f90 allocate_com_arrays.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

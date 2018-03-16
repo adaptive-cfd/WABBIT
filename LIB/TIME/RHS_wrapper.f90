@@ -75,26 +75,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
-    select case(params%physics_type)
-    case ("ACM-new")
-      ! this call is not done for all blocks, but only once, globally.
-      call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(1)), g, x0, dx, &
-          hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
-
-    case ("ConvDiff-new")
-      ! this call is not done for all blocks, but only once, globally.
-      call RHS_convdiff( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0,&
-          dx, hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
-    case ("navier_stokes")
-      ! this call is not done for all blocks, but only once, globally.
-      call RHS_NStokes( time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
-          hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage" )
-
-
-    case default
-      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
-
-    end select
+    call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
+        hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage")
 
     !-------------------------------------------------------------------------
     ! 2nd stage: integral_stage. (called for all blocks)
@@ -110,27 +92,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      !---------- different physics modules ----------
-      select case(params%physics_type)
-      case ("ACM-new")
-        ! input state vector: hvy_block, output RHS vector: hvy_work
-        call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
-             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "integral_stage" )
-
-      case ("ConvDiff-new")
-        ! input state vector: hvy_block, output RHS vector: hvy_work
-        call RHS_convdiff( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
-             x0, dx, hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage" )
-
-      case ("navier_stokes")
-        ! input state vector: hvy_block, output RHS vector: hvy_work
-        call RHS_NStokes( time, hvy_state(:,:,:,:,hvy_active(k)), g, &
-             x0, dx, hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage" )
-
-      case default
-        call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
-
-      end select
+      call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
+          hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage")
     enddo
 
 
@@ -138,25 +101,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
-    select case(params%physics_type)
-    case ("ACM-new")
-      ! this call is not done for all blocks, but only once, globally.
-      call RHS_ACM( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
-      x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
-
-    case ("ConvDiff-new")
-      ! this call is not done for all blocks, but only once, globally.
-      call RHS_ConvDiff( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
-      x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
-
-    case ("navier_stokes")
-      ! this call is not done for all blocks, but only once, globally.
-      call RHS_NStokes( time, hvy_state(:,:,:,:,hvy_active(1)), g, &
-      x0, dx, hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage" )
-
-    case default
-      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
-    end select
+    call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
+        hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage")
 
 
     !-------------------------------------------------------------------------
@@ -170,26 +116,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      !---------- different physics modules ----------
-      select case(params%physics_type)
-      case ("ACM-new")
-        ! input state vector: hvy_block, output RHS vector: hvy_work
-        call RHS_ACM( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
-             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
-
-      case ("ConvDiff-new")
-        ! input state vector: hvy_block, output RHS vector: hvy_work
-        call RHS_ConvDiff( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
-             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
-
-      case ("navier_stokes")
-        ! input state vector: hvy_block, output RHS vector: hvy_work
-        call RHS_NStokes( time, hvy_state(:,:,:,:, hvy_active(k)), g, &
-             x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
-
-      case default
-        call abort(2152000, "Error [RHS_wrapper.f90]: physics_type is unknown"//params%physics_type)
-      end select
+      call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
+           x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
     enddo
 
 

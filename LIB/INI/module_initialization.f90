@@ -32,8 +32,7 @@ module module_initialization
     ! read routines
     use module_IO
     ! to set the initial condition depending on pysics, we have to include them here
-    use module_ConvDiff_new
-    use module_ACM_new
+    use module_physics_metamodule
 !---------------------------------------------------------------------------------------------
 ! variables
 

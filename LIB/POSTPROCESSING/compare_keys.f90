@@ -32,8 +32,8 @@ subroutine compare_keys(help, key1, key2)
         call check_file_exists(key1)
         call check_file_exists(key2)
 
-        write (*,'("comparing files ",a20, a20, " for keyvalues")') &
-        trim(adjustl(key1)), trim(adjustl(key2))
+        write(*,*) "Key1: ", trim(adjustl(key1))
+        write(*,*) "Key2: ", trim(adjustl(key2))
 
         open(59, file = key1, status = 'unknown', action='read')
         read(59,'(6(es15.8,1x))') data1

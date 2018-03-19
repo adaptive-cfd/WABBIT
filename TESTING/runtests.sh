@@ -56,20 +56,24 @@ do
         rm -f $logfile
         touch $logfile
 
-        echo "Running test: " ${ts} " writing output to " ${logfile}
+        echo "Running test: " ${ts}
+        echo "Writing output to: " ${logfile}
 
         # run the actual test
         ./${ts} > $logfile
 
         if [ $? == 0 ]; then
+            printf "%s \n" "${pass_color}pass${end_color}"
             happy_sum=$((happy_sum+1))
             summary[$numtests]=0
         else
+            printf "%s \n" "${fail_color}fail${end_color}"
             sad_sum=$((sad_sum+1))
             summary[$numtests]=1
         fi
         numtests=$((numtests+1))
         rm -f *.key *.h5 *.t *.dat
+        printf "\n"
     fi
 done
 

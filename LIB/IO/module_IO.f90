@@ -35,9 +35,8 @@ module module_IO
     ! use module operators for computation of the vorticity field
     use module_operators, only: compute_vorticity
     ! use physics modules to save the data
-    use module_ACM_new
-    use module_ConvDiff_new
-    use module_navier_stokes_new
+    use module_physics_metamodule
+    
 !---------------------------------------------------------------------------------------------
 ! variables
 

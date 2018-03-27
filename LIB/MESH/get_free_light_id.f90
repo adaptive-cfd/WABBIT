@@ -10,11 +10,11 @@
 !> \brief return light free block id
 !
 !> \details
-!! input:    
+!! input:
 !!           - first column of light data array
 !!           - length of input vector
 !!
-!! output:   
+!! output:
 !!           - id of first passive block
 !!
 !! = log ======================================================================================
@@ -23,7 +23,7 @@
 !
 ! ********************************************************************************************
 
-subroutine get_free_light_id( id, block_list, N )
+subroutine get_free_light_id( id, lgt_block, N )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -36,10 +36,9 @@ subroutine get_free_light_id( id, block_list, N )
 
     implicit none
 
-    !> user defined parameter structure
     integer(kind=ik), intent(in)        :: N
-    !> light data array, first column
-    integer(kind=ik), intent(in)        :: block_list(N)
+    !> light data array, first column only (TODO FIXME: explain why??? does that make any difference??) (Thomas, 13/03/2018)
+    integer(kind=ik), intent(in)        :: lgt_block(N)
 
     !> free id
     integer(kind=ik), intent(out)       :: id
@@ -58,7 +57,7 @@ subroutine get_free_light_id( id, block_list, N )
     ! loop over list
     do k = 1, N
       ! check: if the block is not active, then we found a free block to return
-      if ( block_list(k) == -1 ) then
+      if ( lgt_block(k) == -1 ) then
         id = k
         exit
       end if

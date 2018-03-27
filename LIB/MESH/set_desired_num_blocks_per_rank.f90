@@ -1,25 +1,18 @@
+!--------------------------------------------------------------------------------------------------------------------------------------------------------
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name set_desired_num_blocks_per_rank.f90
-!> \version 0.4
-!> \author engels, msr
-!
-!> \brief create block distribution lists
-!
-!> 
-!! input:    - params, light data, lists of active blocks \n
-!! output:   - distribution arrays \n
+!> \brief Get current distribution of blocks among CPUs, compute optimal #blocks for each mpirank
+!>        ---------------------------------------------
+!! \details
+!! The function returns a list "dist_list" of size mpisize, where the number of blocks for each mpirank
+!! is contained. Note 1-based indexing. \n
+!! In addition we return "opt_dist_list" of size mpisize, where we set the number of blocks for each rank
+!! such that the distribution is as homogeneous as possible and required block transfer is minimized
 !!
 !!
-!! = log ======================================================================================
-!! \n
-!! 28/11/16 - create
-!
-! ********************************************************************************************
-
+!> \version 0.5
+!> \date 13/03/18 \n
+!> \author engels
+!--------------------------------------------------------------------------------------------------------------------------------------------------------
 subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
@@ -33,7 +26,7 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
-    !> block distribution lists
+    !> block distribution lists. Note 1-based indexing.
     integer(kind=ik), intent(out)       :: dist_list(:), opt_dist_list(:)
 
     !> number of active blocks (light data)
@@ -66,11 +59,12 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     my_dist_list = 0
     opt_dist_list = 0
 
-    my_dist_list(rank+1) = hvy_n
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! save my number of active blocks
+    my_dist_list(rank+1) = hvy_n
     ! count number of active blocks and current block distribution
     call MPI_Allreduce(my_dist_list, dist_list, number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
 
@@ -92,7 +86,8 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
         ! first we try to be clever and increase the counter of "desired" blocks for
         ! procs that already have more blocks than they should (by one)
         do proc_id = 1, number_procs
-            ! check if this proc_id has more blocks than it is supposed to and if so, we attribute it one of the excess blocks
+            ! check if this proc_id already has more blocks than it is supposed to
+            ! and if so, we attribute it one of the excess blocks
             if ( dist_list(proc_id) > avg_blocks) then
                 opt_dist_list(proc_id) = opt_dist_list(proc_id) + 1
                 ! we got rid of one excess block
@@ -106,8 +101,8 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
         if (excess_blocks==0) exit
 
         ! second, it may be that this is not enough: there are still bocks to be
-        ! distributed. so now we repeat the loop, but look for mpiranks that have
-        ! enough blocks and give them one more.
+        ! distributed. so now we repeat the loop, but look for mpiranks that already
+        ! have enough blocks and give them one more.
         do proc_id = 1, number_procs
             if ( dist_list(proc_id) == avg_blocks) then
                 opt_dist_list(proc_id) = opt_dist_list(proc_id) + 1
@@ -119,7 +114,8 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
         ! no more blocks to distribute?
         if (excess_blocks==0) exit
 
-        ! third, it may still not be enough...so just pick some
+        ! third, it may still not be enough. so now all procs that currently have
+        ! less than the average get one more block each
         do proc_id = 1, number_procs
             if ( dist_list(proc_id) < avg_blocks) then
                 opt_dist_list(proc_id) = opt_dist_list(proc_id) + 1

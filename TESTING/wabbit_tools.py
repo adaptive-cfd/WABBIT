@@ -5,12 +5,16 @@ Created on Thu Dec 28 15:41:48 2017
 
 @author: engels
 """
-def read_wabbit_hdf5(file, return_treecode=False):
+def read_wabbit_hdf5(file):
+    """ Read a wabbit-type HDF5 of block-structured data.
 
+    Return time, x0, dx, box, data, treecode.
+    Get number of blocks and blocksize as
+
+    N, Bs = data.shape[0], data.shape[1]
+    """
     import h5py
     import numpy as np
-
-
 
     fid = h5py.File(file,'r')
     b = fid['coords_origin'][:]
@@ -44,11 +48,7 @@ def read_wabbit_hdf5(file, return_treecode=False):
     print("Time=%e it=%i N=%i Bs=%i Jmin=%i Jmax=%i" % (time, iteration, N, Bs, jmin, jmax) )
     print("~~~~~~~~~~~~~~~~~~~~~~~~~")
 
-
-    if return_treecode:
-        return data, x0, dx, time, N, Bs, treecode
-    else:
-        return data, x0, dx, time, N, Bs
+    return time, x0, dx, box, data, treecode
 
 
 def wabbit_error(dir, show=False, norm=2):
@@ -60,7 +60,10 @@ def wabbit_error(dir, show=False, norm=2):
     files = glob.glob(dir+'/phi_*.h5')
     files.sort()
 
-    data, x0, dx, tmax, N, Bs = read_wabbit_hdf5(files[-1])
+    # read data
+    time, x0, dx, box, data, treecode = read_wabbit_hdf5(files[-1])
+    # get number of blocks and blocksize
+    N, Bs = data.shape[0], data.shape[1]
 
 
     if show:
@@ -197,7 +200,12 @@ def fetch_Nblocks_dir(dir, return_Bs=False):
 
     files = glob.glob(dir+'/phi_*.h5')
     files.sort()
-    data, x0, dx, tmax, N, Bs = read_wabbit_hdf5(files[-1])
+
+    # read data
+    time, x0, dx, box, data, treecode = read_wabbit_hdf5(files[-1])
+
+    # get number of blocks and blocksize
+    N, Bs = data.shape[0], data.shape[1]
 
     if os.path.isfile(dir+'timesteps_info.t'):
         d = np.loadtxt(dir+'timesteps_info.t')
@@ -235,6 +243,29 @@ def fetch_eps_dir(dir):
 
     return( float(eps) )
 
+def fetch_jmax_dir(dir):
+    import glob
+    import configparser
+
+    if dir[-1] == '/':
+        dir = dir
+    else:
+        dir = dir+'/'
+
+    inifile = glob.glob(dir+'*.ini')
+
+    if (len(inifile) > 1):
+        print('ERROR MORE THAN ONE INI FILE')
+
+    print(inifile[0])
+    config = configparser.ConfigParser()
+    config.read(inifile[0])
+
+
+    eps=config.get('Blocks','max_treelevel',fallback='0')
+    eps = eps.replace(';','')
+
+    return( float(eps) )
 
 
 def convergence_order(N, err):
@@ -293,7 +324,8 @@ def get_max_min_level( treecode ):
 
 
 
-def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=True, mark_blocks=True, gridonly=False, contour=False ):
+def plot_wabbit_file( file, savepng=False, savepdf=False, cmap='rainbow', caxis=None, title=True, mark_blocks=True,
+                     gridonly=False, contour=False, ax=None, fig=None, ticks=True, colorbar=True ):
     """ Read a (2D) wabbit file and plot it as a pseudocolor plot.
 
     Keyword arguments:
@@ -305,16 +337,35 @@ def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=Tru
     import matplotlib.patches as patches
     import matplotlib.pyplot as plt
 
-    # read file
-    data, x0, dx, time, N, Bs, treecode = read_wabbit_hdf5(file, return_treecode=True)
+
+    import h5py
+
+    # read procs table, if we want to draw the grid only
+    if gridonly:
+        fid = h5py.File(file,'r')
+        b = fid['procs'][:]
+        procs = np.array(b, dtype=float)
+        fid.close()
+
+    # read data
+    time, x0, dx, box, data, treecode = read_wabbit_hdf5( file )
+    # get number of blocks and blocksize
+    N, Bs = data.shape[0], data.shape[1]
 
     # we need these lists to modify the colorscale, as each block usually gets its own
     # and we would rather like to have a global one.
     h = []
     c1 = []
     c2 = []
-    # clear current figure
-    plt.gcf().clf()
+
+    if fig is None:
+        fig = plt.gcf()
+        fig.clf()
+    if ax is None:
+        ax = fig.gca()
+
+    # clear axes
+    ax.cla()
 
     # if only the grid is plotted, we use grayscale for the blocks, and for
     # proper scaling we need to know the max/min level in the grid
@@ -325,9 +376,12 @@ def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=Tru
             [X,Y] = np.meshgrid( np.arange(Bs)*dx[i,0]+x0[i,0], np.arange(Bs)*dx[i,1]+x0[i,1])
             block = data[i,:,:].copy().transpose()
             if not contour:
-                hplot = plt.pcolormesh( Y, X, block, cmap=cmap, shading='flat' )
+                hplot = ax.pcolormesh( Y, X, block, cmap=cmap, shading='flat' )
             else:
-                hplot = plt.contour( Y, X, block, [0.1, 0.2, 0.5, 0.75] )
+                hplot = ax.contour( Y, X, block, [0.1, 0.2, 0.5, 0.75] )
+
+            # use rasterization for the patch we just draw
+            hplot.set_rasterized(True)
 
             # unfortunately, each patch of pcolor has its own colorbar, so we have to take care
             # that they all use the same.
@@ -337,12 +391,14 @@ def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=Tru
             c2.append(a[1])
 
         if mark_blocks and not gridonly:
-            plt.gca().add_patch( patches.Rectangle( (x0[i,1],x0[i,0]), (Bs-1)*dx[i,1], (Bs-1)*dx[i,0], fill=False, edgecolor='k' ))
+            ax.add_patch( patches.Rectangle( (x0[i,1],x0[i,0]), (Bs-1)*dx[i,1], (Bs-1)*dx[i,0], fill=False, edgecolor='k' ))
 
         if gridonly:
             level = treecode_level( treecode[i,:] )
-            color = 0.9 - 0.75*(level-min_level)/(max_level-min_level)
-            plt.gca().add_patch( patches.Rectangle( (x0[i,1],x0[i,0]), (Bs-1)*dx[i,1], (Bs-1)*dx[i,0], facecolor=[color,color,color], edgecolor='k' ))
+            color = 0.9 - 0.75*(level-jmin)/(jmax-jmin)
+            color = plt.cm.jet( procs[i]/np.max(procs) )
+#            ax.add_patch( patches.Rectangle( (x0[i,1],x0[i,0]), (Bs-1)*dx[i,1], (Bs-1)*dx[i,0], facecolor=[color,color,color], edgecolor='k' ))
+            ax.add_patch( patches.Rectangle( (x0[i,1],x0[i,0]), (Bs-1)*dx[i,1], (Bs-1)*dx[i,0], facecolor=color, edgecolor='k' ))
 
 
     if not gridonly:
@@ -356,19 +412,43 @@ def plot_wabbit_file( file, savepng=False, cmap='rainbow', caxis=None, title=Tru
             # set fixed (user defined) colorbar for all patches
             for hplots in h:
                 hplots.set_clim( (min(caxis),max(caxis))  )
-        plt.colorbar()
+
+        if colorbar:
+            plt.colorbar(h[0], ax=ax)
 
     if title:
         plt.title( "t=%f Nb=%i Bs=%i" % (time,N,Bs) )
-    plt.axis('equal')
+
+
+    if not ticks:
+        plt.tick_params(
+        axis='x',          # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom='off',      # ticks along the bottom edge are off
+        top='off',         # ticks along the top edge are off
+        labelbottom='off') # labels along the bottom edge are off
+
+        plt.tick_params(
+        axis='y',          # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom='left',      # ticks along the bottom edge are off
+        top='right',         # ticks along the top edge are off
+        labelleft='off') # labels along the bottom edge are off
+
+    plt.axis('tight')
+    plt.axes().set_aspect('equal')
     plt.gcf().canvas.draw()
 
+
     if savepng:
-        plt.savefig( file.replace('h5','png') )
+        plt.savefig( file.replace('h5','png'), dpi=1000, transparent=True )
+
+    if savepdf:
+        plt.savefig( file.replace('h5','pdf') )
 
 
 #%%
-def to_dense_grid( fname, ofile):
+def to_dense_grid( fname_in, fname_out):
     """ Convert a WABBIT grid to a full dense grid in a single matrix.
 
     We asssume here that interpolation has already been performed, i.e. all
@@ -378,8 +458,10 @@ def to_dense_grid( fname, ofile):
     import insect_tools
     import matplotlib.pyplot as plt
 
-    data, x0, dx, time, N, Bs, treecode = read_wabbit_hdf5(fname, return_treecode=True)
+    # read data
+    time, x0, dx, box, data, treecode = read_wabbit_hdf5( fname_in )
 
+    # convert blocks to complete matrix
     field, box = dense_matrix(  x0, dx, data, treecode )
 
     plt.figure()
@@ -387,7 +469,8 @@ def to_dense_grid( fname, ofile):
     plt.axis('equal')
     plt.colorbar()
 
-    insect_tools.write_flusi_HDF5( ofile, time, box, field)
+    # write data to FLUSI-type hdf file
+    insect_tools.write_flusi_HDF5( fname_out, time, box, field)
 
 #%%
 def dense_matrix(  x0, dx, data, treecode ):

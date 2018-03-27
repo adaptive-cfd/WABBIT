@@ -349,7 +349,7 @@ contains
   ! condition, sometimes not. So each physic module must be able to decide on its
   ! time step. This routine is called for all blocks, the smallest returned dt is used.
   !-----------------------------------------------------------------------------
-  subroutine GET_DT_BLOCK_ACM( time, u, g, x0, dx, dt )
+  subroutine GET_DT_BLOCK_ACM( time, u, Bs, g, x0, dx, dt )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -362,7 +362,7 @@ contains
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g
+    integer, intent(in) :: Bs, g
 
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing

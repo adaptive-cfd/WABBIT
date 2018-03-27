@@ -69,7 +69,7 @@ program main_post
     if (mode=="--h" .or. mode=="--help") then
         help=.true.
     else
-        if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")'), post_mode
+        if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') post_mode
         help=.false.
     end if
 
@@ -77,7 +77,7 @@ program main_post
     case("--sparse-to-dense")
         call sparse_to_dense(help, params)
     case("--vorticity")
-        call compute_vorticity_post(help, params) 
+        call compute_vorticity_post(help, params)
     case("--keyvalues")
         call get_command_argument(3,filename)
         call keyvalues(filename, params, help)

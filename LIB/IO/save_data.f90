@@ -88,23 +88,8 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! to disk in the work array. This way, we can also store derived variables
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
-        select case(params%physics_type)
-        case ('ACM-new')
-          call PREPARE_SAVE_DATA_ACM( time, hvy_block(:,:,:,:,hvy_active(k)), &
-          params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
-
-        case ('ConvDiff-new')
-          call PREPARE_SAVE_DATA_convdiff( time, hvy_block(:,:,:,:,hvy_active(k)), &
-          params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
-
-        case ('navier_stokes')
-          call PREPARE_SAVE_DATA_NStokes( time, hvy_block(:,:,:,:,hvy_active(k)), &
-          params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
-
-        case default
-          call abort(88119, "[save_data.f90:] unknown physics....")
-
-        end select
+        call PREPARE_SAVE_DATA(params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
+        params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
 
       enddo
 
@@ -114,20 +99,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
         ! physics modules shall provide an interface for wabbit to know how to label
         ! the components to be stored to hard disk (in the work array)
-        select case(params%physics_type)
-        case ('ACM-new')
-          call FIELD_NAMES_ACM(k, tmp)
-
-        case ('ConvDiff-new')
-          call FIELD_NAMES_convdiff(k, tmp)
-
-         case ('navier_stokes')
-          call FIELD_NAMES_NStokes(k,tmp)
-        
-        case default
-          call abort(88119, "[save_data:] unknown physics....")
-
-        end select
+        call FIELD_NAMES(params%physics_type, k, tmp)
 
         ! create filename
         write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)

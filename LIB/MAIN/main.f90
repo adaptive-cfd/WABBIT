@@ -348,7 +348,11 @@ program main
         ! MPI Barrier before program ends
         call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-        debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
+        if (params%number_procs == 1) then
+            debug%comp_time(:,3) = 0.0_rk
+        else
+            debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
+        end if
 
         ! output
         if (rank==0) then

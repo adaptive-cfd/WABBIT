@@ -283,7 +283,7 @@ contains
       !
       ! called for each block.
 
-      call RHS_2D_convdiff_new(time, g, Bs, dx, x0, u, rhs)
+      call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs)
 
 
     case default
@@ -375,8 +375,8 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, Bs,i
-    real(kind=rk) :: x,y,c0x,c0y
+    integer(kind=ik) :: ix, iy, iz, Bs,i
+    real(kind=rk) :: x,y,c0x,c0y,z,c0z
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -386,28 +386,55 @@ contains
     do i = 1, params_convdiff%N_scalars
       c0x = params_convdiff%x0(i)
       c0y = params_convdiff%y0(i)
+      c0z = params_convdiff%z0(i)
 
       select case (params_convdiff%inicond(i))
       case("blob")
-        ! create gauss pulse
-        do ix = g+1,Bs+g
-          do iy = g+1,Bs+g
-            ! compute x,y coordinates from spacing and origin
-            x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+          if (params_convdiff%dim==2) then
+            ! create gauss pulse
+            do ix = g+1,Bs+g
+              do iy = g+1,Bs+g
+                ! compute x,y coordinates from spacing and origin
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-            if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
-            if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
+                if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
+                if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
 
-            if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
-            if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
+                if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
+                if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
 
-            ! set actual inicond gauss blob
-            u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
-          end do
-        end do
+                ! set actual inicond gauss blob
+                u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
+              end do
+            end do
+        else
+            ! create gauss pulse
+            do ix = g+1,Bs+g
+              do iy = g+1,Bs+g
+                  do iz = g+1,Bs+g
+                    ! compute x,y coordinates from spacing and origin
+                    x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                    y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+                    z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
+
+                    if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
+                    if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
+
+                    if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
+                    if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
+
+                    if (z<-params_convdiff%Lz/2.0) z = z + params_convdiff%Lz
+                    if (z>params_convdiff%Lz/2.0) z = z - params_convdiff%Lz
+
+                    ! set actual inicond gauss blob
+                    u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
+                end do
+              end do
+            end do
+        end if
       case default
-        write(*,*) "errorrroororor"
+        call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
       end select
 
 

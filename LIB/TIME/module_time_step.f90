@@ -32,9 +32,7 @@ module module_time_step
 
     use module_operators, only: volume_integral
     ! to call RHS routines:
-    use module_ACM_new
-    use module_convdiff_new
-    use module_navier_stokes_new
+    use module_physics_metamodule, only : RHS_meta
 
 !---------------------------------------------------------------------------------------------
 ! variables

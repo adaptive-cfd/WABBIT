@@ -511,7 +511,7 @@ contains
 
     ! how many blocks to select from dataspace
     integer(hsize_t),  dimension(datarank) :: count  = 1
-    integer(hssize_t), dimension(datarank) :: offset, offset2, dims2
+    integer(hssize_t), dimension(datarank) :: offset, offset2
     ! stride is spacing between elements, this is one here. striding is done in the
     ! caller; here, we just write the entire (possibly downsampled) field to disk.
     integer(hsize_t),  dimension(datarank) :: stride = 1
@@ -535,7 +535,6 @@ contains
     ! Tell HDF5 how our  data is organized:
     offset = lbounds
     offset2 = (/0, 0, 0/)
-    dims2 = (/0, 32, 32/)
 
     ! Each process knows how much data it has and where to store it.
     ! now, define the dataset chunking. Chunking is largest dimension in
@@ -552,7 +551,7 @@ contains
      ! dataspace in the file: contains all data from all procs
 !    call h5screate_simple_f(datarank, dims_global, filespace, error)
     ! dataspace in memory: contains only local data
-    call h5screate_simple_f(datarank, dims2,memspace, error)!dims_local, memspace, error)
+    call h5screate_simple_f(datarank, dims_local, memspace, error)
 
     ! Create chunked dataset
     call h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
@@ -566,23 +565,20 @@ contains
      call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
     ! dataspace in the file: contains all data from all procs
     call h5screate_simple_f(datarank, dims_file, filespace, error)
-    ! if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
-    !     write(*,*) 'file', dims_file
-    !     write(*,*) 'global', dims_global
-    !   write(*,*) "read_hdf5 error: file dimensions do not match"
-    !   call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
-    ! endif
+
+    write(*,*) memspace
+    write(*,*) filespace
     if (lbounds(3)==0 .and. lbounds(2)==0) then
     ! Select hyperslab in the file.
       call h5sselect_hyperslab_f (filespace,  H5S_SELECT_SET_F, offset, count, &
     error, stride, dims_local)
       call h5sselect_hyperslab_f (memspace,  H5S_SELECT_SET_F, offset2, count, &
-    error, stride, dims2)
+    error, stride, dims_local)
     else
-     call h5sselect_hyperslab_f (filespace,  H5S_SELECT_SET_F, offset, count, &
+      call h5sselect_hyperslab_f (filespace,  H5S_SELECT_OR_F, offset, count, &
     error, stride, dims_local)
       call h5sselect_hyperslab_f (memspace,  H5S_SELECT_OR_F, offset2, count, &
-    error, stride, dims2)
+    error, stride, dims_local)
     end if
 
     ! Create property list for collective dataset read

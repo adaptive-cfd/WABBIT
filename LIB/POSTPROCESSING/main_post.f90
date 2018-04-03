@@ -87,8 +87,11 @@ program main_post
             call get_command_argument(4,key2)
             call compare_keys(help,key1,key2)
         end if
-    case ("--block-to-blocks")
-        call block_to_blocks(help, params)
+    case ("--flusi-to-wabbit")
+        ! does not (yet?) work in parallel....
+        if (rank==0) then
+            call flusi_to_wabbit(help, params)
+        end if
 !    case ("--sfc-test")
 !        call keyvalues_sfc(help, params)
 !    case("--squeeze")
@@ -100,7 +103,7 @@ program main_post
         write(*,*) "--vorticity"
         write(*,*) "--keyvalues"
         write(*,*) "--compare-keys"
-        write(*,*) "--block-to_blocks"
+        write(*,*) "--flusi-to-wabbit"
         if (mode=="--h" .or. mode=="--help") then
             write(*,*) "To get more information about each postprocessing tool type: wabbit-post --help --[one of the listed tools]"
         else

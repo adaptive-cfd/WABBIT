@@ -4,7 +4,7 @@
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 block_to_blocks.f90
+startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90
 
 # Object and module directory:
 OBJDIR = OBJ

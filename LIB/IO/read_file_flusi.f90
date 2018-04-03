@@ -9,7 +9,7 @@
 ! = log ======================================================================
 !> \date  9/3/2018 - create hashcode: commit 
 !-----------------------------------------------------------------------------
-subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params)
+subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params, Bs_f)
 
 
   implicit none
@@ -21,7 +21,7 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   type (type_params), intent(in)         :: params
   integer(kind=ik), intent(in)           :: hvy_active(:)
   integer(kind=ik), intent(in)           :: lgt_block(:, :)
-  integer(kind=ik), intent(in)           :: hvy_n
+  integer(kind=ik), intent(in)           :: hvy_n, Bs_f
 
   ! grid parameter
   integer(kind=ik)                    :: Bs
@@ -32,7 +32,7 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   real(kind=rk), dimension(3)         :: x0, dx
   ! file id integer
   integer(hid_t)                      :: file_id
-  real(kind=rk), dimension(:,:,:), allocatable   :: myblockbuffer
+  real(kind=rk), dimension(:,:,:), allocatable   :: blockbuffer
 !----------------------------------------------------------------------------
   Bs = params%number_block_nodes
 
@@ -44,32 +44,46 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
           trim(adjustl(fname))
   end if
 
-  if (.not. params%threeD_case) allocate( myblockbuffer(1,Bs,Bs))
+  if (params%threeD_case) then
+      allocate( blockbuffer(Bs_f+1,Bs_f+1,Bs_f+1))  
+      lbounds3D = (/0, 0, 0/)
+      ubounds3D = (/Bs_f, Bs_f, Bs_f/)-1
+      call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds3D, ubounds3D, &
+          blockbuffer(1:Bs_f,1:Bs_f, 1:Bs_f))
+  else
+      allocate( blockbuffer(1,Bs_f+1,Bs_f+1))
+      lbounds2D = (/0, 0, 0/)
+      ubounds2D = (/1, Bs_f, Bs_f/)-1
+      call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
+          blockbuffer(1,1:Bs_f,1:Bs_f))
+  end if
+
+  blockbuffer(:,Bs_f+1,:) = blockbuffer(:,1,:)
+  blockbuffer(:,:,Bs_f+1) = blockbuffer(:,:,1)
+  if (params%threeD_case) then
+      blockbuffer(Bs_f+1,:,:) = blockbuffer(1,:,:)
+  end if
+  
 
   do k=1, hvy_n
       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-      !dx for flusi and for wabbit are the same!
-      start_x = floor(x0(1)/dx(1))
-      start_y = floor(x0(2)/dx(2))
+      start_x = floor(x0(1)/dx(1)) + 1
+      start_y = floor(x0(2)/dx(2)) + 1
       if (params%threeD_case) then
-          start_z = floor(x0(3)/dx(3))
-          lbounds3D = (/start_x, start_y , start_z/)
-          ubounds3D = (/start_x+Bs-1,start_y+Bs-1, start_z+Bs-1/)
-          call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds3D, ubounds3D, &
-            hvy_block(1:Bs-1, 1:Bs-1, 1:Bs-1, 1, hvy_active(k)))
-      else
-          lbounds2D = (/0, start_x, start_y /)
-          ubounds2D = (/0, start_x+Bs-1,start_y+Bs-1/)!-1
-          call read_dset_mpi_hdf5_3D_flusi(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
-              myblockbuffer)
-          hvy_block(1:Bs, 1:Bs, 1, 1, hvy_active(k))=myblockbuffer(1,:,:)
+          start_z = floor(x0(3)/dx(3)) + 1
+          hvy_block(1:Bs, 1:Bs, 1:Bs, 1, hvy_active(k)) = blockbuffer(start_x:start_x+Bs-1,&
+              start_y:start_y+Bs-1,start_z:start_z+Bs-1)
+      else 
+          hvy_block(1:Bs, 1:Bs, 1, 1, hvy_active(k)) = blockbuffer(1,&
+              start_x:start_x+Bs-1,start_y:start_y+Bs-1)
       end if
   end do
 
-    ! close file and HDF5 library
-    call close_file_hdf5(file_id)
 
+
+  ! close file and HDF5 library
+  call close_file_hdf5(file_id)
 
 end subroutine read_field_flusi
 

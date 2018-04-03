@@ -40,7 +40,9 @@ subroutine keyvalues(fname, params, help)
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk)                           :: time
     integer(hsize_t), dimension(2)          :: dims_treecode
+    integer(kind=ik), allocatable           :: tree(:), sum_tree(:)
 
+    integer(kind=ik) :: sum_equal, sum_z, sum_hilbert
     real(kind=rk)    :: x,y,z
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
@@ -74,7 +76,7 @@ subroutine keyvalues(fname, params, help)
         params%Lx = domain(1)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
-        params%number_blocks = lgt_n/params%number_procs + mod(lgt_n,params%number_procs)
+        params%number_blocks = lgt_n!/params%number_procs + mod(lgt_n,params%number_procs)
         call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
             hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -82,6 +84,8 @@ subroutine keyvalues(fname, params, help)
         call read_field(fname, 1, params, hvy_block, hvy_n )
         call create_active_and_sorted_lists( params, lgt_block, &
             lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         ! compute an additional quantity that depends also on the position
         ! (the others are translation invariant)
         Bs = params%number_block_nodes
@@ -90,6 +94,58 @@ subroutine keyvalues(fname, params, help)
         else
             nz = 1
         end if
+        
+        allocate(tree(1:params%max_treelevel))
+        allocate(sum_tree(1:params%max_treelevel))
+        ! First, test Hilbert space filling curve
+        tree = 0_ik
+        params%block_distribution='sfc_hilbert'
+        call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
+            lgt_active,lgt_n,hvy_active,hvy_n)
+        call create_active_and_sorted_lists( params, lgt_block, &
+            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        do k=1,hvy_n
+            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+            tree = tree + (params%rank+1)*lgt_block(lgt_id,1:params%max_treelevel)
+        end do
+        call MPI_REDUCE(tree, sum_tree,params%max_treelevel, MPI_INTEGER,&
+            MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        sum_hilbert = sum(sum_tree)
+
+        ! Second, test equal distribution
+        tree = 0_ik
+        params%block_distribution='equal'
+        call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
+            lgt_active,lgt_n,hvy_active,hvy_n)
+        call create_active_and_sorted_lists( params, lgt_block, &
+            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        do k=1,hvy_n
+            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+            tree = tree + (params%rank+1)*lgt_block(lgt_id,1:params%max_treelevel)
+        end do
+        call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
+            MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        sum_equal = sum(sum_tree)
+
+        ! Last, test z-curve
+        tree = 0_ik
+        params%block_distribution='sfc_z'
+        call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
+            lgt_active,lgt_n,hvy_active,hvy_n)
+        call create_active_and_sorted_lists( params, lgt_block, &
+            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        do k=1,hvy_n
+            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+            tree = tree + (params%rank+1)*lgt_block(lgt_id,1:params%max_treelevel)
+        end do
+        call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
+            MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        sum_z = sum(sum_tree)
+
         maxl = 0.0_rk
         minl = 99e99_rk
         squarl = 0.0_rk
@@ -129,10 +185,13 @@ subroutine keyvalues(fname, params, help)
         if (params%rank == 0) then
             open  (59, file=fname(1:index(fname,'.'))//'key', &
                 status = 'replace', action='write', iostat=ioerr)
-            write (59,'(6(es15.8,1x))') time, maxi, mini, meani, squari, qi
+            write (59,'(6(es15.8,1x), 3(i10,1x))') time, maxi, mini, meani, squari, qi , &
+                sum_hilbert, sum_z, sum_equal
             write (*,'(A)') "Result:"
-            write (* ,'(6(A15,1x))') "time","maxval","minval","meanval","sumsquares","Q-integral"
-            write (* ,'(6(es15.8,1x))') time, maxi, mini, meani, squari, qi
+            write (* ,'(6(A15,1x),3(A10,1x))') "time","maxval","minval","meanval","sumsquares", &
+                "Q-integral", "Hilbert", "Z", "Equal"
+            write (* ,'(6(es15.8,1x),3(i10,1x))') time, maxi, mini, meani, squari, qi, &
+                sum_hilbert, sum_z, sum_equal
             write (*,'(A)') "These values can be used to compare two HDF5 files"
             close (59)
         endif

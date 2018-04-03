@@ -109,7 +109,6 @@ contains
 
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
-  include "rhs_ns_2D.f90"
 
   !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
@@ -534,15 +533,6 @@ contains
         u( :, :, :, UxF) = 0.0_rk
         ! set Uy
         u( :, :, :, UyF) = 0.0_rk
-
-         ! set velocity field u(x)=1 for x in mask
-      if (size(u,3)==1 .and. params_ns%penalization) then
-        call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
-        call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
-      endif
-      ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
-      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*U0_
-      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*V0_
 
         if (size(u,3).ne.1) then
             ! set Uz to zero

@@ -74,7 +74,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
                                                                fric_p(Bs+2*g, Bs+2*g), fric_u(Bs+2*g, Bs+2*g), fric_v(Bs+2*g, Bs+2*g), &
                                                                fric_T1(Bs+2*g, Bs+2*g), fric_T2(Bs+2*g, Bs+2*g), &
                                                                tau11(Bs+2*g, Bs+2*g), tau22(Bs+2*g, Bs+2*g), tau33(Bs+2*g, Bs+2*g), &
-                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g)
+                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g),sponge(Bs+2*g, Bs+2*g,4)
     ! derivatives
     real(kind=rk)                                           :: u_x(Bs+2*g, Bs+2*g), u_y(Bs+2*g, Bs+2*g), v_x(Bs+2*g, Bs+2*g), v_y(Bs+2*g, Bs+2*g), &
                                                                p_x(Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g), T_x(Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g),&
@@ -259,18 +259,19 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 
 
     ! SPONGE (bob)
-    if (params_ns%sponge_layer) then
-        ! add spnge
-        ! rho component (density)
-        rhs(:,:,1)=rhs(:,:,1) - 0.5_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho,   rho0_       , params_ns%C_sp)
-        ! sqrt(rho)u component (momentum)
-        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*u, rho0_*u0_   , params_ns%C_sp)
-        ! sqrt(rho)v component (momentum)
-        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*v, 0.0_rk   , params_ns%C_sp)
-        ! p component (preasure/energy)
-        rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *sponge( Bs, g, x0,delta_x, p    , p0_         , params_ns%C_sp)
+     if (params_ns%sponge_layer) then
+    !     ! add spnge
+    !     ! rho component (density)
+          call get_sponge(sponge,Bs, g, x0,delta_x, rho,   u, v , p    , params_ns%C_sp)
+    !     rhs(:,:,1)=rhs(:,:,1) - 0.5_rk/phi(:,:,1)*sponge( :,:,1)
+    !     ! sqrt(rho)u component (momentum)
+    !      rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*sponge( :,:,2)
+    !     ! sqrt(rho)v component (momentum)
+    !      rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( :, :,3)
+    !     ! p component (preasure/energy)
+          rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *sponge( :, :,4)
 
-    endif
+     endif
 
     if (params_ns%penalization) then
         ! add spnge
@@ -424,7 +425,7 @@ function sponge( Bs, g, x0,dx, q, qref, C_sp)
     real(kind=rk)                   :: sponge(Bs+2*g, Bs+2*g)
     !--------------------------------------------------------
     ! loop variables
-    integer                         :: i, n,ix,iy
+    integer                         :: ix,iy
     ! inverse C_sp
     real(kind=rk)                   :: C_sp_inv,x,y,ddx
 

@@ -42,7 +42,7 @@ module module_mask
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: init_mask,get_mask
+  PUBLIC :: init_mask,get_mask,get_sponge
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -80,13 +80,23 @@ module module_mask
 
 
   type :: type_funnel
-      real(kind=rk)       ::dout     ! outer diameter
-      real(kind=rk)       ::dmax     ! maximal inner diameter
-      real(kind=rk)       ::dmin     ! minimal inner diameter
-      integer(kind=ik)    ::Nplate  ! Number of plates
-      real(kind=rk)       ::s        ! seperation between plates
-      real(kind=rk)       ::ds       ! slope of funnel
-      real(kind=rk)       ::offset(2)   ! offset of funnel in x and y
+      real(kind=rk)       ::outer_diameter         ! outer diameter
+      real(kind=rk)       ::max_inner_diameter     ! maximal inner diameter
+      real(kind=rk)       ::min_inner_diameter     ! minimal inner diameter
+      integer(kind=ik)    ::nr_plates              ! Number of plates
+      real(kind=rk)       ::plates_distance        ! distance between origin of plates
+      real(kind=rk)       ::plates_thickness       ! 
+      
+      real(kind=rk)       ::length                 ! total length of funnel
+      real(kind=rk)       ::slope                  ! slope of funnel
+      real(kind=rk)       ::offset(2)              ! offset of funnel in x and y
+      
+      ! parameters of flow inlet outlet
+      real(kind=rk)       ::pump_diameter          
+      real(kind=rk)       ::pump_x_center
+      real(kind=rk)       ::jet_radius             ! slope of funnel
+      real(kind=rk)       ::wall_thickness       ! 
+      
       type(type_funnel_plate), allocatable:: plate(:)
   end type type_funnel
 
@@ -131,20 +141,25 @@ subroutine init_mask(filename)
     
     case ('funnel')
     
-      call read_param_mpi(FILE, 'funnel', 'outer_diameter'        , funnel%dout, domain_size(2)/2 )
-      call read_param_mpi(FILE, 'funnel', 'maximal_inner_diameter', funnel%dmax, domain_size(2)/3 )
-      call read_param_mpi(FILE, 'funnel', 'minimal_inner_diameter', funnel%dmin, domain_size(2)/4 )
-      call read_param_mpi(FILE, 'funnel', 'Number_of_plates'      , funnel%Nplate, 30 )
-      call read_param_mpi(FILE, 'funnel', 'diameter_per_plate'    , funnel%ds, domain_size(2)/30 )
-     
-      funnel%s      = domain_size(1)*0.9_rk/funnel%Nplate
-      funnel%ds     = funnel%ds/funnel%s
-      funnel%offset = (/0.15_rk*domain_size(1), domain_size(2)/2.0_rk/)
-      write(*,*) "s=", funnel%s
-      write(*,*) "ds=", funnel%ds
-      write(*,*) "offset=", funnel%offset 
+      call read_param_mpi(FILE, 'funnel', 'outer_diameter'        , funnel%outer_diameter, domain_size(2)/2.0_rk )
+      call read_param_mpi(FILE, 'funnel', 'maximal_inner_diameter', funnel%max_inner_diameter, domain_size(2)/3.0_rk )
+      call read_param_mpi(FILE, 'funnel', 'minimal_inner_diameter', funnel%min_inner_diameter, domain_size(2)/4.0_rk )
+      call read_param_mpi(FILE, 'funnel', 'Number_of_plates'      , funnel%nr_plates, 30 )
+      call read_param_mpi(FILE, 'funnel', 'diameter_per_plate'    , funnel%slope, domain_size(2)/3.0_rk)     
+      call read_param_mpi(FILE, 'funnel', 'plates_thickness'      , funnel%plates_thickness, domain_size(1)/100.0_rk)     
+      call read_param_mpi(FILE, 'funnel', 'pump_diameter'         , funnel%pump_diameter, domain_size(1)/5.0_rk)     
+      call read_param_mpi(FILE, 'funnel', 'jet_diameter'          , funnel%jet_radius, domain_size(2)/20.0_rk)     
+      call read_param_mpi(FILE, 'funnel', 'pump_x_center'         , funnel%pump_x_center, domain_size(1)*0.5_rk)     
       
-      call init_plates(funnel);
+      funnel%length               = domain_size(1)*0.85_rk
+      funnel%plates_distance      = (funnel%length-funnel%plates_thickness)/(funnel%nr_plates-1)
+      funnel%slope                = funnel%slope/(funnel%plates_distance)
+      funnel%wall_thickness       = 0.02*domain_size(1)
+      funnel%jet_radius           = funnel%jet_radius/2.0_rk
+      write(*,*) "s=", funnel%plates_distance
+      write(*,*) "ds=", funnel%slope
+
+      call init_plates(funnel)
     
     case default
     
@@ -185,6 +200,180 @@ subroutine get_mask(mask, x0, dx, Bs, g )
 
 end subroutine get_mask
 
+!--------------------------------------------------------------------------!
+!               phils sponge stuff
+!--------------------------------------------------------------------------!
+
+
+!==========================================================================
+!> \brief This function computes a 2d sponge term
+!!
+!! \details The sponge term is
+!!   \f{eqnarray*}{
+!!           s_q(x,y)=\frac{\chi_{\mathrm sp}(x,y)}{C_{\mathrm sp}}(q(x,y)-q_{\mathrm ref})
+!!                          \quad \forall x,y \in \Omega_{\mathrm block}
+!!     \f}
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
+!! - the mask function is \f$\chi_{\rm sp}\f$
+!! - \f$C_{\rm sp}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
+
+subroutine get_sponge(sponge,Bs, g, x0,dx, rho, u , v , p , C_sp)
+    !-------------------------------------------------------
+    !> grid parameter
+    integer(kind=ik), intent(in)    :: g, Bs
+    !> spacing and origin of block
+    real(kind=rk), intent(in)       :: x0(2), dx(2)
+    !> Sponge coefficient
+    real(kind=rk), intent(in)       :: C_sp
+    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+    real(kind=rk), intent(in)       :: rho(Bs+2*g, Bs+2*g),u(Bs+2*g, Bs+2*g),v(Bs+2*g, Bs+2*g),p(Bs+2*g, Bs+2*g)
+    !> sponge term \f$s(x,y)\f$
+    real(kind=rk)                   :: sponge(Bs+2*g, Bs+2*g,4),mask
+    !--------------------------------------------------------
+    ! loop variables
+    integer                         :: i, n,ix,iy
+    ! inverse C_sp
+    real(kind=rk)                   :: C_sp_inv,x,y,h
+
+    ! outlets and inlets 
+    real(kind=rk)                   :: v_pump, rho_capillary,u_capillary,v_capillary,p_capillary,p_2nd_pump_stage
+
+    C_sp_inv=1.0_rk/C_sp
+    sponge=0.0_rk
+
+    ! test!
+    v_pump          = 50.0_rk
+    rho_capillary   = 1.645_rk
+    u_capillary     = 50.0_rk
+    v_capillary     = 0.0_rk
+    p_capillary     = 101330.0_rk
+    p_2nd_pump_stage= 50000.0_rk
+
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
+
+    do iy=1, Bs+2*g
+       y = dble(iy-(g+1)) * dx(2) + x0(2)
+       do ix=1, Bs+2*g
+           x = dble(ix-(g+1)) * dx(1) + x0(1)
+            
+
+            !wall in north and south with 2 pumps
+            !------------------------------------
+            if (abs(x-funnel%pump_x_center)< funnel%pump_diameter/2) then
+                   if (y<funnel%wall_thickness+h) then
+                    ! wall in south
+                    mask=soft_bump(y,0+h,funnel%wall_thickness-h,h)
+                    ! velocity in negative direction (v(ix,iy)-(-v_pump))
+                    sponge(ix,iy,3)=C_sp_inv*mask*(v(ix,iy)+v_pump)
+                   else if (y>domain_size(2)-funnel%wall_thickness-h) then
+                    ! wall in north
+                    mask=soft_bump(y,domain_size(2)-funnel%wall_thickness,funnel%wall_thickness-h,h)
+                    sponge(ix,iy,3)=C_sp_inv*mask*(v(ix,iy)-v_pump) 
+                   else
+
+                   endif
+
+            endif         
+
+            ! wall in EAST with capillary
+            !----------------------------
+            if (abs(y-domain_size(2)/2)< funnel%jet_radius .and. x<funnel%wall_thickness + h) then
+                   ! wall in EAST
+                  
+                  ! density
+                  sponge(ix,iy,1)=(rho(ix,iy)-rho_capillary)
+                  ! x-velocity
+                  sponge(ix,iy,2)=(u(ix,iy)-u_capillary)
+                  ! y-velocity
+                  sponge(ix,iy,3)=(v(ix,iy)-v_capillary)
+                  ! preasure
+                 ! sponge(ix,iy,4)=(p(ix,iy)-p_capillary)
+                  
+                  sponge(ix,iy,:)=C_sp_inv*smoothstep(x-funnel%wall_thickness,h)* sponge(ix,iy,:)
+            endif          
+
+            ! wall in West transition to second pumping stage
+            !-------------------------------------------------
+            if (abs(y-domain_size(2)/2)< funnel%min_inner_diameter/2 .and. x>domain_size(1)-funnel%wall_thickness - h) then
+                  ! only pressure is constraint here 
+                  sponge(ix,iy,4)=(p(ix,iy)-p_2nd_pump_stage)
+                  
+                  sponge(ix,iy,:)=C_sp_inv*smoothstep(domain_size(1)-x-funnel%wall_thickness,h)* sponge(ix,iy,:)
+                   ! wall in WEST
+                   
+            endif
+
+
+
+       end do
+    end do
+end subroutine get_sponge
+!==========================================================================
+
+
+
+!==========================================================================
+! !> \brief This function f(x) implements \n
+! !> f(x) is 1 if x(1)<=Lsponge \n
+! !> f(x) is 0 else  \n
+! function inside_sponge(x)
+! !> coordinate vector \f$\vec{x}=(x,y,z)\f$ (real 3d or 2d array)
+! real(kind=rk), intent(in)       :: x(:)
+! !> logical
+! logical                         :: inside_sponge
+! ! dimension of array x
+! integer                         :: dim,i
+! ! size of sponge
+! real(kind=rk)                   :: length_sponge
+
+! !> \todo read in length_sponge or thing of something intelligent here
+!         length_sponge=params_ns%Lx*0.05
+!         if (x(1)<=length_sponge .and. x(1)>=0) then
+!             inside_sponge=.true.
+!         else
+!             inside_sponge=.false.
+!         endif
+
+
+! end function inside_sponge
+! !==========================================================================
+
+
+
+!==========================================================================
+!> \brief This function computes a penalization term
+!!
+!! \details The penalization term is
+!!   \f{eqnarray*}{
+!!           p_q(x,y)=\frac{\chi(x,y)}{C_{\eta}}(q(x,y)-q_{\mathrm s})
+!!                          \quad \forall x,y \in \Omega_{\mathrm block}
+!!     \f}
+!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
+!! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$
+!! - \f$C_{\rm \eta}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
+
+! elemental function penalization( mask, q, qref, C_eta)
+
+!     !-------------------------------------------------------
+!     !> grid parameter
+!     real(kind=rk), intent(in)       :: C_eta
+!     !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+!     real(kind=rk), intent(in)       :: qref
+!     !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
+!     real(kind=rk), intent(in)       :: q
+!     !> mask \f$p_q(x,y)\f$
+!     real(kind=rk), intent(in)       :: mask
+!     !--------------------------------------------------------
+!     real(kind=rk)                   :: penalization
+!     real(kind=rk)                   :: C_eta_inv
+
+!     ! inverse C_eta
+!     C_eta_inv=1.0_rk/C_eta
+
+!     penalization=mask*C_eta_inv*(q-qref)
+! end function penalization
+!==========================================================================
 
 
 
@@ -226,7 +415,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
            if (smooth_mask) then
-               call smoothstep(mask(ix,iy), r, cyl%radius, h)
+               mask(ix,iy) = smoothstep( r - cyl%radius, h)
            else
                ! if point is inside the cylinder, set mask to 1
                if (r <= cyl%radius) then
@@ -254,24 +443,25 @@ end subroutine draw_cylinder
   !> \details
   !> \image html maskfunction.bmp "plot of chi(delta)"
   !> \image latex maskfunction.eps "plot of chi(delta)"
-    subroutine smoothstep(f,x,t,h)
+    function smoothstep(delta,h)
       
       implicit none
-      real(kind=rk), intent(out) :: f
-      real(kind=rk), intent(in)  :: x,t,h
+      real(kind=rk), intent(in)  :: delta,h
 
+      real(kind=rk)              :: smoothstep,f
       !-------------------------------------------------
       ! cos shaped smoothing (compact in phys.space)
       !-------------------------------------------------
-      if (x<=t-h) then
+      if (delta<=-h) then
         f = 1.0_rk 
-      elseif (((t-h)<x).and.(x<(t+h))) then
-        f = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
+      elseif ( -h<delta .and. delta<+h  ) then
+        f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
       else
         f = 0.0_rk
       endif
 
-    end subroutine smoothstep
+      smoothstep=f
+    end function smoothstep
 !==========================================================================
 
 
@@ -318,16 +508,21 @@ subroutine draw_funnel(mask, x0, dx, Bs, g )
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        do ix=1, Bs+2*g
            x = dble(ix-(g+1)) * dx(1) + x0(1)
-           ! distance from center of cylinder
-            do n=1,funnel%Nplate
-                if (x>(funnel%plate(n)%x0(1)-funnel%s/2) .and. &
-                    x<(funnel%plate(n)%x0(1)+funnel%plate(n)%width+funnel%s/2)) then
-                    mask(ix,iy)=mask(ix,iy)+draw_plate(x,y,funnel%plate(n),h)
+           ! distance frommin_inner_diameterter of cylinder
+            do n=1,funnel%nr_plates
+                if (x>(funnel%plate(n)%x0(1)-3*h) .and. &
+                    x<(funnel%plate(n)%x0(1)+funnel%plates_thickness+3*h)) then
                 
+                    mask(ix,iy)=mask(ix,iy)+draw_plate(x,y,funnel%plate(n),h)
                endif
             enddo
+
+            ! draw the walls arround the funnel
+            mask(ix,iy) =mask(ix,iy) + draw_walls(x,y,funnel,h)
+
        end do
     end do
+
 
 end subroutine draw_funnel
 
@@ -348,6 +543,39 @@ function draw_plate(x,y,plate,h)
 end function draw_plate
 
 
+function draw_walls(x,y,funnel,h)
+ 
+  real(kind=rk),    intent(in)          :: x, y, h
+  type(type_funnel),intent(in)          ::funnel
+
+  real(kind=rk)                         ::  mask, draw_walls
+
+  mask=0
+
+  if (abs(x-funnel%pump_x_center)> funnel%pump_diameter/2) then
+         ! wall in south
+         mask=mask+smoothstep(y-funnel%wall_thickness,h)
+         ! wall in north
+         mask=mask+smoothstep(domain_size(2)-y-funnel%wall_thickness,h)
+  endif
+
+  if (abs(y-domain_size(2)/2)> funnel%jet_radius) then
+         ! wall in EAST
+         mask=mask+smoothstep(x-funnel%wall_thickness,h)
+  endif
+
+  if (abs(y-domain_size(2)/2)> funnel%min_inner_diameter/2) then
+         ! wall in WEST
+         mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+  endif
+
+   ! is needed because mask off walls overlap
+  if (mask>1) then
+         mask=1
+  endif
+
+  draw_walls=mask
+end function draw_walls
 
 
 
@@ -357,7 +585,7 @@ function soft_bump(x,x0,width,h)
   real(kind=rk), intent(in)      :: x, x0, h, width
   real(kind=rk)                  :: soft_bump,d 
     
-    d=x-x0;
+    d=x-x0
 
     if (d>=h .and. d<=width-h) then
         soft_bump = 1.0
@@ -392,31 +620,36 @@ end function soft_bump
       !> geometric parameters of ion funnel
       type(type_funnel), intent(inout) :: funnel
 
-      real(kind=rk)                    :: s,LF,L1,width
-      integer(kind=ik)                 :: n
-      type(type_funnel_plate)          :: plate
+      real(kind=rk)                   :: distance,length,length_focus,width
+      integer(kind=ik)                :: n
+      type(type_funnel_plate)         :: plate
 
-
-      allocate(funnel%plate(funnel%Nplate)) 
-      !-------------------------------------------------
-      s       =funnel%s
-      ! total length of funnel
-      LF      =funnel%Nplate*s 
-      L1      = LF - (funnel%dmax-funnel%dmin)/funnel%ds
-      width   =s/2
+      allocate(funnel%plate(funnel%nr_plates)) 
       
+      distance    =funnel%plates_distance
+      length      =funnel%length
+      width       =funnel%plates_thickness
+      ! length of focus area in funnel
+      length_focus           = length - (funnel%max_inner_diameter-funnel%min_inner_diameter)/funnel%slope
+      ! origin of funnel
+      funnel%offset=(/ domain_size(1)-length-funnel%wall_thickness-distance+width, &
+                       domain_size(2)/2/)
+      if(funnel%offset(1)<funnel%wall_thickness) then
+       call abort(13457,'Error [module_mask.f90]: your funnel is to long')
+      endif
 
-      do n=1,funnel%Nplate
-        plate%x0(1)     = funnel%offset(1)+(n-1)*s
+      ! initialicd all plates
+      do n=1,funnel%nr_plates
+        plate%x0(1)     = funnel%offset(1)+(n-1)*distance
         plate%x0(2)     = funnel%offset(2)
         plate%width     = width
-        if (plate%x0(1)-funnel%offset(1)<=L1) then
-           plate%r_in    = funnel%dmax/2
+        if (plate%x0(1)-funnel%offset(1)<=length_focus) then
+           plate%r_in    = funnel%max_inner_diameter/2
         else
-           plate%r_in = plate%r_in - funnel%ds*s/2
+           plate%r_in = plate%r_in - funnel%slope*distance/2
         endif
-        plate%r_out   =funnel%dout/2
-        funnel%plate(n)=plate      
+        plate%r_out   =funnel%outer_diameter/2
+        funnel%plate(n)=plate   
       enddo
       
     end subroutine init_plates

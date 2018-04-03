@@ -40,24 +40,29 @@ subroutine keyvalues(fname, params, help)
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk)                           :: time
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik), allocatable           :: tree(:), sum_tree(:)
+    integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
 
-    integer(kind=ik) :: sum_equal, sum_z, sum_hilbert
+    integer(kind=ik) :: sum_curve(3)
+    character(len=12) :: curves(3)
     real(kind=rk)    :: x,y,z
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr
+    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i
 !-----------------------------------------------------------------------------------------------------
-
+    rank = params%rank
+    curves(1) = 'sfc_hilbert'
+    curves(2) = 'sfc_z'
+    curves(3) = 'equal'
+!-----------------------------------------------------------------------------------------------------
     if (help) then
-        if (params%rank==0) then
+        if (rank==0) then
             write(*,*) "WABBIT postprocessing routine to load a specified *.h5 file and create a *.key file that contains  min / max / mean / L2 norm of the field data."
             write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --keyvalues filename.h5"
         end if
     else
         call check_file_exists( fname )
 
-        if (params%rank==0) write (*,'("analyzing file ",a20," for keyvalues")') trim(adjustl(fname))
+        if (rank==0) write (*,'("analyzing file ",a20," for keyvalues")') trim(adjustl(fname))
 
         ! ! get some parameters from the file
         call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
@@ -94,57 +99,32 @@ subroutine keyvalues(fname, params, help)
         else
             nz = 1
         end if
-        
+
         allocate(tree(1:params%max_treelevel))
         allocate(sum_tree(1:params%max_treelevel))
-        ! First, test Hilbert space filling curve
-        tree = 0_ik
-        params%block_distribution='sfc_hilbert'
-        call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
-            lgt_active,lgt_n,hvy_active,hvy_n)
-        call create_active_and_sorted_lists( params, lgt_block, &
-            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        do k=1,hvy_n
-            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-            tree = tree + (params%rank+1)*lgt_block(lgt_id,1:params%max_treelevel)
-        end do
-        call MPI_REDUCE(tree, sum_tree,params%max_treelevel, MPI_INTEGER,&
-            MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        sum_hilbert = sum(sum_tree)
+        allocate(blocks_per_rank(1:params%number_procs))
 
-        ! Second, test equal distribution
-        tree = 0_ik
-        params%block_distribution='equal'
-        call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
-            lgt_active,lgt_n,hvy_active,hvy_n)
-        call create_active_and_sorted_lists( params, lgt_block, &
-            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        do k=1,hvy_n
-            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-            tree = tree + (params%rank+1)*lgt_block(lgt_id,1:params%max_treelevel)
+        ! test all existing space filling curves
+        do i=1,size(curves)
+            tree = 0_ik
+            params%block_distribution=trim(curves(i))
+            call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
+                lgt_active,lgt_n,hvy_active,hvy_n)
+            call create_active_and_sorted_lists( params, lgt_block, &
+                lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+                lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+            call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &
+                MPI_COMM_WORLD,mpicode)
+            do k=1,hvy_n
+                call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
+            end do
+            call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
+                MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+            sum_curve(i) = sum(sum_tree)
         end do
-        call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
-            MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        sum_equal = sum(sum_tree)
 
-        ! Last, test z-curve
-        tree = 0_ik
-        params%block_distribution='sfc_z'
-        call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
-            lgt_active,lgt_n,hvy_active,hvy_n)
-        call create_active_and_sorted_lists( params, lgt_block, &
-            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        do k=1,hvy_n
-            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-            tree = tree + (params%rank+1)*lgt_block(lgt_id,1:params%max_treelevel)
-        end do
-        call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
-            MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        sum_z = sum(sum_tree)
 
         maxl = 0.0_rk
         minl = 99e99_rk
@@ -182,16 +162,16 @@ subroutine keyvalues(fname, params, help)
         squari = squari / lgt_n
         meani = meani / lgt_n
 
-        if (params%rank == 0) then
+        if (rank == 0) then
             open  (59, file=fname(1:index(fname,'.'))//'key', &
                 status = 'replace', action='write', iostat=ioerr)
             write (59,'(6(es15.8,1x), 3(i10,1x))') time, maxi, mini, meani, squari, qi , &
-                sum_hilbert, sum_z, sum_equal
+                sum_curve(1), sum_curve(2), sum_curve(3) 
             write (*,'(A)') "Result:"
-            write (* ,'(6(A15,1x),3(A10,1x))') "time","maxval","minval","meanval","sumsquares", &
-                "Q-integral", "Hilbert", "Z", "Equal"
-            write (* ,'(6(es15.8,1x),3(i10,1x))') time, maxi, mini, meani, squari, qi, &
-                sum_hilbert, sum_z, sum_equal
+            write (* ,'(6(A15,1x),3(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
+                "Q-integral", curves(1), curves(2), curves(3)
+            write (* ,'(6(es15.8,1x),3(i12,1x))') time, maxi, mini, meani, squari, qi, &
+                sum_curve(1), sum_curve(2), sum_curve(3)
             write (*,'(A)') "These values can be used to compare two HDF5 files"
             close (59)
         endif

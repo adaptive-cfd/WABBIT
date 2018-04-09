@@ -38,7 +38,7 @@ module module_acm_new
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, INICOND_ACM, FIELD_NAMES_ACM
+  PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -49,7 +49,7 @@ module module_acm_new
     real(kind=rk) :: C_eta
     ! nu
     real(kind=rk) :: nu, Lx, Ly, Lz
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3)
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
@@ -58,9 +58,11 @@ module module_acm_new
     real(kind=rk) :: alpha
     integer(kind=ik) :: dim, N_fields_saved
     character(len=80) :: inicond, discretization, geometry="cylinder"
-    character(len=80), allocatable :: names(:)
+    character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3)
+    ! we need to know which mpirank prints output..
+    integer(kind=ik) :: mpirank, mpisize
   end type type_params
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -91,9 +93,14 @@ contains
     implicit none
 
     character(len=*), intent(in) :: filename
+    integer(kind=ik) :: mpicode
 
     ! inifile structure
     type(inifile) :: FILE
+
+    ! we still need to know about mpirank and mpisize, occasionally
+    call MPI_COMM_SIZE (MPI_COMM_WORLD, params_acm%mpisize, mpicode)
+    call MPI_COMM_RANK (MPI_COMM_WORLD, params_acm%mpirank, mpicode)
 
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
@@ -119,6 +126,12 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     ! want to add a forcing term?
     call read_param_mpi(FILE, 'ACM-new', 'forcing', params_acm%forcing, .false.)
+    allocate( params_acm%forcing_type(1:3) )
+    call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
+    call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
+
+
+    ! initial condition
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm %discretization, "FD_2nd_central")
@@ -233,7 +246,7 @@ contains
 
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -249,7 +262,7 @@ contains
     ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
     ! terms that depend on global qtys, such as forces etc, which cannot be computed
     ! from a single block alone, the first stage does that. the second stage can then
-    ! use these integral qtys for the actuall RHS evaluation.
+    ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
     ! local variables
@@ -338,10 +351,105 @@ contains
 
   end subroutine RHS_ACM
 
+
   !-----------------------------------------------------------------------------
-  ! subroutine statistics_acm()
-  !   implicit none
-  ! end subroutine
+  ! main level wrapper to compute statistics (such as mean flow, global energy,
+  ! forces, but potentially also derived stuff such as Integral/Kolmogorov scales)
+  ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
+  ! on individual blocks. This requires one to use the same staging concept as for the RHS.
+  !-----------------------------------------------------------------------------
+  subroutine STATISTICS_ACM( time, u, g, x0, dx, rhs, stage )
+    implicit none
+
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+
+    ! block data, containg the state vector. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+    ! as you are allowed to compute the RHS only in the interior of the field
+    ! you also need to know where 'interior' starts: so we pass the number of ghost points
+    integer, intent(in) :: g
+
+    ! for each block, you'll need to know where it lies in physical space. The first
+    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+    ! output. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
+
+    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
+    ! terms that depend on global qtys, such as forces etc, which cannot be computed
+    ! from a single block alone, the first stage does that. the second stage can then
+    ! use these integral qtys for the actual RHS evaluation.
+    character(len=*), intent(in) :: stage
+
+    ! local variables
+    integer(kind=ik) :: Bs, mpierr
+    real(kind=rk) :: tmp(1:3)
+
+    ! compute the size of blocks
+    Bs = size(u,1) - 2*g
+
+    select case(stage)
+    case ("init_stage")
+      !-------------------------------------------------------------------------
+      ! 1st stage: init_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, not for each block.
+      ! performs initializations in the RHS module, such as resetting integrals
+      params_acm%mean_flow = 0.0_rk
+
+    case ("integral_stage")
+      !-------------------------------------------------------------------------
+      ! 2nd stage: integral_stage.
+      !-------------------------------------------------------------------------
+      ! This stage contains all operations which are running on the blocks
+      !
+      ! called for each block.
+
+      if (maxval(abs(u))>1.0e5) then
+        call abort(6661,"ACM fail: very very large values in state vector.")
+      endif
+
+      if (params_acm%dim == 2) then
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1))*dx(1)*dx(2)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2))*dx(1)*dx(2)
+      else
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
+      endif ! NOTE: MPI_SUM is perfomed in the post_stage.
+
+    case ("post_stage")
+      !-------------------------------------------------------------------------
+      ! 3rd stage: post_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, not for each block.
+
+      tmp = params_acm%mean_flow
+      call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      if (params_acm%dim == 2) then
+        params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
+      else
+        params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+      endif
+
+      if (params_acm%mpirank == 0) then
+        ! write mean flow to disk...
+        open(14,file='meanflow.t',status='unknown',position='append')
+        write (14,'(4(es15.8,1x))') time, params_acm%mean_flow
+        close(14)
+      end if
+
+    case default
+      call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")
+    end select
+
+
+  end subroutine STATISTICS_ACM
 
 
   !-----------------------------------------------------------------------------

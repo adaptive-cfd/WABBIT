@@ -17,7 +17,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES
+    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES, STATISTICS_meta
     !**********************************************************************************************
 
 contains
@@ -150,7 +150,7 @@ contains
 
    ! block data, containg the state vector. In general a 4D field (3 dims+components)
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-   real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
+   real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
    ! as you are allowed to compute the RHS only in the interior of the field
    ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -166,20 +166,17 @@ contains
    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
    ! terms that depend on global qtys, such as forces etc, which cannot be computed
    ! from a single block alone, the first stage does that. the second stage can then
-   ! use these integral qtys for the actuall RHS evaluation.
+   ! use these integral qtys for the actual RHS evaluation.
    character(len=*), intent(in) :: stage
 
    select case(physics)
    case ("ACM-new")
-     ! this call is not done for all blocks, but only once, globally.
      call RHS_ACM( time, u, g, x0, dx,  rhs, stage )
 
    case ("ConvDiff-new")
-     ! this call is not done for all blocks, but only once, globally.
      call RHS_convdiff( time, u, g, x0, dx, rhs, stage )
 
    case ("navier_stokes")
-     ! this call is not done for all blocks, but only once, globally.
      call RHS_NStokes( time, u, g, x0, dx, rhs, stage )
 
    case default
@@ -189,10 +186,56 @@ contains
 
  end subroutine RHS_meta
 
+
  !-----------------------------------------------------------------------------
- ! subroutine statistics()
- !   implicit none
- ! end subroutine
+ ! main level wrapper to compute statistics (such as mean flow, global energy,
+ ! forces, but potentially also derived stuff such as Integral/Kolmogorov scales)
+ ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
+ ! on individual blocks. This requires one to use the same staging concept as for the RHS.
+ !-----------------------------------------------------------------------------
+ subroutine STATISTICS_meta( physics, time, u, g, x0, dx, rhs, stage )
+   implicit none
+
+   character(len=*), intent(in) :: physics
+   ! it may happen that some source terms have an explicit time-dependency
+   ! therefore the general call has to pass time
+   real(kind=rk), intent (in) :: time
+
+   ! block data, containg the state vector. In general a 4D field (3 dims+components)
+   ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+   real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+   ! as you are allowed to compute the RHS only in the interior of the field
+   ! you also need to know where 'interior' starts: so we pass the number of ghost points
+   integer, intent(in) :: g
+
+   ! for each block, you'll need to know where it lies in physical space. The first
+   ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+   real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+   ! output. Note assumed-shape arrays
+   real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
+
+   ! stage. there is 3 stages, init_stage, integral_stage and post_stage. The 1st and 3rd
+   ! stages are called only once, not for every block.
+   character(len=*), intent(in) :: stage
+
+   select case(physics)
+   case ("ACM-new")
+     call STATISTICS_ACM( time, u, g, x0, dx,  rhs, stage )
+
+   case ("ConvDiff-new")
+    !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
+
+   case ("navier_stokes")
+    !  call STATISTICS_NStokes( time, u, g, x0, dx, rhs, stage )
+
+   case default
+     call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
+
+   end select
+
+ end subroutine STATISTICS_meta
 
 
  !-----------------------------------------------------------------------------

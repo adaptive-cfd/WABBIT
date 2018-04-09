@@ -282,6 +282,21 @@ program main
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         endif
 
+        ! statistics
+        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+          ! we need to sync ghost nodes for some derived qtys, for sure
+          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+
+          ! TODO make this nicer
+          if (iteration==1 ) then
+            open (15, file='meanflow.t', status='replace')
+            close(15)
+          endif
+
+          call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+          params%next_stats_time = params%next_stats_time + params%tsave_stats
+        endif
+
         ! write data to disk
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
@@ -312,6 +327,10 @@ program main
              close(14)
         end if
     end do
+    !---------------------------------------------------------------------------
+    ! end of main time loop
+    !---------------------------------------------------------------------------
+    if (rank==0) write(*,*) "This is the end of the main time loop!"
 
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then

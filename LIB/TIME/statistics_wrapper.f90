@@ -27,7 +27,7 @@
 !
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, hvy_n)
+subroutine statistics_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, hvy_n)
 
 !----------------------------------------------------------------------------------------------
 ! modules
@@ -52,13 +52,11 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
-    !> global integral
-    real(kind=rk), dimension(3)         :: volume_int
 
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0
     ! loop variables
-    integer(kind=ik)                    :: k, dF, neqn, lgt_id
+    integer(kind=ik)                    :: k,  lgt_id
     ! grid parameter, error variable
     integer(kind=ik)                    :: Bs, g
 
@@ -71,11 +69,12 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     g     = params%number_ghost_nodes
 !---------------------------------------------------------------------------------------------
 ! main body
+
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
-    call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
+    call STATISTICS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
         hvy_rhs(:,:,:,:,hvy_active(1)), "init_stage")
 
     !-------------------------------------------------------------------------
@@ -92,7 +91,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
+      call STATISTICS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
           hvy_rhs(:,:,:,:,hvy_active(k)), "integral_stage")
     enddo
 
@@ -101,24 +100,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
-    call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
+    call STATISTICS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx,&
         hvy_rhs(:,:,:,:,hvy_active(1)), "post_stage")
 
 
-    !-------------------------------------------------------------------------
-    ! 4th stage: local evaluation of RHS on all blocks (called for all blocks)
-    !-------------------------------------------------------------------------
-    ! the second stage then is what you would usually do: evaluate local differential
-    ! operators etc.
-    do k = 1, hvy_n
-      ! convert given hvy_id to lgt_id for block spacing routine
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-      ! get block spacing for RHS
-      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-      call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
-           x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
-    enddo
-
-
-end subroutine RHS_wrapper
+end subroutine statistics_wrapper

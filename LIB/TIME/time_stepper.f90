@@ -46,7 +46,7 @@
 !> \date 08/11/16 - switch to v0.4 \n
 !! \date 07/12/16 - now uses heavy work data array and work for different physics \n
 !! \date 31/01/17 - switch to 3D, v0.5 \n
-!! \date 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method 
+!! \date 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method
 !! (up to RK of order 4)
 ! ********************************************************************************************
 
@@ -121,16 +121,20 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
         hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, &
         int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-    ! copy state vector content to work array.
-    do k = 1, hvy_n
-        hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
-    end do
-
-    ! save data at time t to heavy work array
-    ! call save_data_t(params, hvy_work, hvy_block, hvy_active, hvy_n)
+    ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
+    ! slots after the copy of the state vector, which is in the first 1:neq slots
     j = 1
     call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block(:,:,:,1:neq,:),&
         hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
+
+    ! save data at time t to heavy work array
+    ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
+    ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
+    ! if the copy part is above, the changes in state vector are ignored
+    do k = 1, hvy_n
+      hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
+    end do
+
 
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1)-1

@@ -21,14 +21,13 @@ module module_navier_stokes_new
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_precision
-  use module_mask
+  use module_ns_penalization
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity
   ! generic initial condition
-  use module_initial_conditions
   use mpi
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -96,7 +95,8 @@ module module_navier_stokes_new
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
 
-  real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=10.0_rk,T0_=200!273.15_rk
+  ! real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=0.0_rk,T0_=200!273.15_rk
+  real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=0.0_rk,T0_=200!273.15_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ contains
 
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
-
+  include "initial_conditions.f90"
   !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -132,15 +132,6 @@ contains
 
      ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
-    !error case: try to solve navier stokes equation with less or more than 5 datafields
-    ! if ( params_ns%number_data_fields /= 5) then
-    !     write(*,'(80("_"))')
-    !     write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params_ns%number_data_fields
-    !     stop
-    ! end if
-    ! !===================================================================
-    ! physics parameter
-    !===================================================================
     ! dimension
     call read_param_mpi(FILE, 'Dimensionality', 'dim', params_ns%dim, 2 )
     ! spatial domain size
@@ -165,20 +156,11 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond', params_ns%inicond, "pressure_blob" )
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, 0.1_rk )
     ! penalization:
-     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
-     call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 1.0e-3_rk)
-    ! call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_ns%smooth_mask, .true.)
-    ! call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
-    ! call read_param_mpi(FILE, 'VPM', 'x_cntr', params_ns%x_cntr, (/0.5*params_ns%Lx, 0.5*params_ns%Ly, 0.5*params_ns%Lz/)  )
-    ! call read_param_mpi(FILE, 'VPM', 'R_cyl', params_ns%R_cyl, 0.5_rk )
+    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
+    
     if (params_ns%penalization) then
       call init_mask(filename)
     endif
-    ! sponge:
-    call read_param_mpi(FILE, 'Physics', 'sponge_layer', params_ns%sponge_layer, .false.)
-    call read_param_mpi(FILE, 'Physics', 'C_sp', params_ns%C_sp, 100.0_rk)
-
-
   ! read variable names
     ! allocate names list
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
@@ -266,7 +248,10 @@ contains
                                  vort)
 
         work(:,:,:,size(u,4)+1)=vort(:,:,:,1)
+
+        !write out mask 
         call get_mask(work(:,:,1,size(u,4)+2), x0, dx, Bs, g )
+
     else
         ! wx,wy,wz (3D - case)
    !      call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
@@ -389,8 +374,6 @@ contains
       ! called for each block.
       if (size(u,3)==1) then
         call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-        !  call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-
       else
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif

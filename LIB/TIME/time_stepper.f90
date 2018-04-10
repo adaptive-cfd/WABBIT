@@ -111,15 +111,15 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! ----------------------------------------------------------------------------------------
-    ! calculate time step
-    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
-        lgt_active, lgt_n, dt)
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
         hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, &
         int_receive_buffer, real_send_buffer, real_receive_buffer )
+    ! ----------------------------------------------------------------------------------------
+    ! calculate time step
+    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
+        lgt_active, lgt_n, dt)
 
     ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
     ! slots after the copy of the state vector, which is in the first 1:neq slots

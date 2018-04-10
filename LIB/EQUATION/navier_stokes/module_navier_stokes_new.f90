@@ -257,7 +257,11 @@ contains
         work(:,:,:,5)=vort(:,:,:,1)
 
         !write out mask 
-        call get_mask(work(:,:,1,6), x0, dx, Bs, g )
+        if (params_ns%penalization) then
+          call get_mask(work(:,:,1,6), x0, dx, Bs, g )
+        else
+          work(:,:,1,6)=0.0_rk
+        endif
 
     else
       call abort(564567,"Error: [module_navier_stokes.f90] 3D case not implemented")
@@ -427,7 +431,7 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! loop variables
-    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax
+    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax,sqrt_rho_min
 
     dt = 9.9e9_rk
     ! get smallest spatial seperation
@@ -447,10 +451,15 @@ contains
     endif
 
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
-    v_physical = v_physical/u(:,:,:,rhoF)
+    
+    sqrt_rho_min=minval(u(g+1:Bs+g,g+1:Bs+g,1,rhoF))
+    if (sqrt_rho_min<=0.00_rk ) then
+      call abort(4754, 'Error [module_navier_stokes_new]: density is zero ):')
+    endif
+    v_physical(g+1:Bs+g,g+1:Bs+g,1) = v_physical(g+1:Bs+g,g+1:Bs+g,1)/u(g+1:Bs+g,g+1:Bs+g,1,rhoF)
     ! max velocity in one block
 
-     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical))
+     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical(g+1:Bs+g,g+1:Bs+g,1)))
 
     ! penalization requiers dt <= C_eta
     if (params_ns%penalization ) then

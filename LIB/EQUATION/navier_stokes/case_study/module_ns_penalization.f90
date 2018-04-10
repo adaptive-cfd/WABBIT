@@ -140,7 +140,7 @@ subroutine init_mask( filename )
 
     select case(mask_geometry)
     
-    case ('vortex_street')
+    case ('vortex_street','cylinder')
       call init_vortex_street(FILE)
     case ('funnel') 
       call init_funnel(FILE)
@@ -168,12 +168,12 @@ subroutine get_mask(mask, x0, dx, Bs, g )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     select case(mask_geometry)
-    case('vortex_street')
+    case('vortex_street','cylinder')
       call draw_cylinder(mask, x0, dx, Bs, g )
     case('funnel')
       call draw_funnel(mask, x0, dx, Bs, g)
     case default
-      call abort(120001,"ERROR: geometry for VPM is unknown"//mask_geometry)
+      call abort(120601,"ERROR: geometry for VPM is unknown"//mask_geometry)
     end select
 
 end subroutine get_mask
@@ -205,12 +205,12 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
     ! 1. compute volume penalization term for the different case studies
     
     select case(mask_geometry)
-    case('vortex_street')
+    case('vortex_street','cylinder')
       call add_cylinder(penalization, x0, dx, Bs, g, phi )
     case('funnel')
       call add_funnel(  penalization, x0, dx, Bs, g, phi )
     case default
-      call abort(120001,"ERROR: geometry for VPM is unknown"//mask_geometry)
+      call abort(120401,"ERROR: geometry for VPM is unknown"//mask_geometry)
     end select
 
     

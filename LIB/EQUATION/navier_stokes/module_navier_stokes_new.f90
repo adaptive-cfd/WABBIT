@@ -159,6 +159,8 @@ contains
     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
     
     if (params_ns%penalization) then
+      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk ) 
+      call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
       call init_mask(filename)
     endif
   ! read variable names
@@ -229,10 +231,6 @@ contains
 
     Bs = size(u,1)-2*g
 
-    ! ---------------------------------
-    ! save all datafields in u
-    work(:,:,:,1:size(u,4))=u(:,:,:,:)
-    ! ---------------------------------
 
 
     !
@@ -240,6 +238,15 @@ contains
     allocate(vort(size(u,1),size(u,2),size(u,3),3))
 
     if (size(u,3)==1) then
+          ! ---------------------------------
+          ! save all datafields in u
+          !density
+          work(:,:,:,rhoF) = u(:,:,:,1)**2
+          work(:,:,:,UxF)  = u(:,:,:,2)/u(:,:,:,1)
+          work(:,:,:,UyF)  = u(:,:,:,3)/u(:,:,:,1)
+          work(:,:,:,pF)   = u(:,:,:,4)
+          ! ---------------------------------
+
         ! only wx,wy (2D - case)
         call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
                                  u(:,:,:,UyF)/u(:,:,:,rhoF), &
@@ -247,12 +254,13 @@ contains
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
 
-        work(:,:,:,size(u,4)+1)=vort(:,:,:,1)
+        work(:,:,:,5)=vort(:,:,:,1)
 
         !write out mask 
-        call get_mask(work(:,:,1,size(u,4)+2), x0, dx, Bs, g )
+        call get_mask(work(:,:,1,6), x0, dx, Bs, g )
 
     else
+      call abort(564567,"Error: [module_navier_stokes.f90] 3D case not implemented")
         ! wx,wy,wz (3D - case)
    !      call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
    !                               u(:,:,:,UyF)/u(:,:,:,rhoF), &
@@ -419,26 +427,30 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! loop variables
-    real(kind=rk)               :: unorm,deltax
+    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax
 
     dt = 9.9e9_rk
     ! get smallest spatial seperation
     if(size(u,3)==1) then
         deltax=minval(dx(1:2))
+        allocate(v_physical(2*g+Bs,2*g+Bs,1))
     else
         deltax=minval(dx)
+        allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
     endif
+
 
     if (UzF==-1) then
-        unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF))
+        v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
-        unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF) )
+        v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
-        unorm = sqrt(unorm)
-    ! max velocity in one block
-    if (unorm < 1e-12_rk) unorm=9e9_rk
 
-     dt = min(dt, params_ns%CFL * deltax / sqrt(unorm))
+    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
+    v_physical = v_physical/u(:,:,:,rhoF)
+    ! max velocity in one block
+
+     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical))
 
     ! penalization requiers dt <= C_eta
     if (params_ns%penalization ) then
@@ -448,6 +460,7 @@ contains
     if (params_ns%sponge_layer ) then
         dt=min(dt,params_ns%C_sp)
     endif
+    deallocate(v_physical)
   end subroutine GET_DT_BLOCK_NStokes
 
 

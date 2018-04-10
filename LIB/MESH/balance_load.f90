@@ -24,7 +24,7 @@
 !> \image html load_balancing.svg width=500
 ! ********************************************************************************************
 
-subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -39,7 +39,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -52,7 +52,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! send/receive buffer, note: size is equal to block data array, because if a block want to send all his data
-    real(kind=rk), allocatable          :: buffer_data( :, :, :, : )
+    real(kind=rk), allocatable          :: buffer_data( :, :, :, :, : )
     integer(kind=ik), allocatable       :: buffer_light( : )
     ! light id start
     integer(kind=ik)                    :: my_light_start
@@ -115,7 +115,8 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     allocate( sfc_sorted_list( lgt_n, 2) )
 
     ! allocate buffer arrays here
-    allocate( buffer_data( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) ) )
+    allocate( buffer_data( size(hvy_block,1), size(hvy_block,2), &
+              size(hvy_block,3), size(hvy_block,4), size(hvy_block,5) ) )
     allocate( buffer_light( params%number_blocks ) )
 
     ! number of blocks
@@ -128,11 +129,16 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     my_light_start = rank*params%number_blocks
 
     ! size of data array, use for readability
-    data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3)
+    data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3) * size(hvy_block,4)
 
 
 !---------------------------------------------------------------------------------------------
 ! main body
+
+    if (params%number_procs == 1) then
+        ! on only one proc, no balancing is required
+        return
+    endif
 
     !---------------------------------------------------------------------------------
     ! First step: define how many blocks each mpirank should have.
@@ -298,16 +304,27 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                     !-----------------------------------------------------------
                     ! Z - curve
                     !-----------------------------------------------------------
-                    call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                    if (params%threeD_case) then
+                        call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                    else
+                        call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                    endif
 
                 case("sfc_hilbert")
                     !-----------------------------------------------------------
                     ! Hilbert curve
                     !-----------------------------------------------------------
-                    ! transfer treecode to hilbertcode
-                    call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
-                    ! calculate sfc position from hilbertcode
-                    call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
+                    if (params%threeD_case) then
+                        ! transfer treecode to hilbertcode
+                        call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                        ! calculate sfc position from hilbertcode
+                        call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
+                    else
+                        ! transfer treecode to hilbertcode
+                        call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                        ! calculate sfc position from hilbertcode
+                        call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
+                    endif
 
                 end select
 
@@ -399,12 +416,12 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                             call lgt_id_to_hvy_id( heavy_id, lgt_id, rank, params%number_blocks )
 
                             ! send buffer: fill buffer, heavy data
-                            buffer_data(:, :, :, l+1 ) = hvy_block(:, :, :, heavy_id )
+                            buffer_data(:, :, :, :, l+1 ) = hvy_block(:, :, :, :, heavy_id )
                             ! ... light data
                             buffer_light( l+1 ) = lgt_id
 
                             !..then delete what I just got rid of
-                            hvy_block(:, :, :, heavy_id) = 0.0_rk
+                            hvy_block(:, :, :, :, heavy_id) = 0.0_rk
                             lgt_block(lgt_id, : ) = -1
 
                             ! go to next element
@@ -452,7 +469,7 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
                             ! copy the data from the buffers
                             lgt_block( lgt_free_id, :) = lgt_block( buffer_light(l), : )
-                            hvy_block(:, :, :, hvy_free_id) = buffer_data(:, :, :, l)
+                            hvy_block(:, :, :, :, hvy_free_id) = buffer_data(:, :, :, :, l)
 
                         end do
                     else
@@ -486,4 +503,4 @@ subroutine balance_load_2D( params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
     ! timing
     call toc( params, "balance_load", MPI_wtime()-t0 )
-end subroutine balance_load_2D
+end subroutine balance_load

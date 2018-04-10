@@ -10,13 +10,13 @@ echo -e "\t \033[4m WABBIT: run all existing unit tests \033[0m"
 echo "   "
 
 if [ -z "$nprocs" ]; then
+    echo "unset"
     nprocs=4
 fi
 
 if [ -z "$mpi_command" ]; then
     export mpi_command="nice mpiexec -n ${nprocs}"
 fi
-
 fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'
 end_color=$'\033[0m'
@@ -43,6 +43,11 @@ echo "employed command for parallel exec: " $mpi_command
 echo "to modify the command, set \$nprocs, \$mpi_command in shell"
 echo "   "
 
+if [ $nprocs != 4 ]; then
+    echo "$fail_color WARNING $end_color"
+    echo "your tests might fail because the keyvalues for load balancing may differ if you don't use nprocs=4 for testing"
+fi
+
 T="$(date +%s)"
 
 for ts in ${tests[@]}
@@ -56,20 +61,24 @@ do
         rm -f $logfile
         touch $logfile
 
-        echo "Running test: " ${ts} " writing output to " ${logfile}
+        echo "Running test: " ${ts}
+        echo "Writing output to: " ${logfile}
 
         # run the actual test
         ./${ts} > $logfile
 
         if [ $? == 0 ]; then
+            printf "%s \n" "${pass_color}pass${end_color}"
             happy_sum=$((happy_sum+1))
             summary[$numtests]=0
         else
+            printf "%s \n" "${fail_color}fail${end_color}"
             sad_sum=$((sad_sum+1))
             summary[$numtests]=1
         fi
         numtests=$((numtests+1))
         rm -f *.key *.h5 *.t *.dat
+        printf "\n"
     fi
 done
 

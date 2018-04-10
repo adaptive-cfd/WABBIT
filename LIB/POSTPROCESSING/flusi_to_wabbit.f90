@@ -1,6 +1,6 @@
 !> \file
 ! WABBIT
-!> \name block_to_blocks.f90
+!> \name flusi_to_wabbit.f90
 !> \version 0.5
 !> \author sm
 !
@@ -11,7 +11,7 @@
 !> \date  07/03/18 - create hashcode: commit 
 !-----------------------------------------------------------------------------------------------------
 !
-subroutine block_to_blocks(help, params)
+subroutine flusi_to_wabbit(help, params)
     use module_precision
     use module_mesh
     use module_params
@@ -49,8 +49,8 @@ subroutine block_to_blocks(help, params)
 !----------------------------------------------
     if (help .eqv. .true.) then
         if (params%rank==0) then
-            write(*,*) "postprocessing subroutine to ................ command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --block_to_blocks source.h5 target.h5 target_blocksize max_level"
+            write(*,*) "postprocessing subroutine to read a file from flusi and convert it to wabbit format. command line:"
+            write(*,*) "mpi_command -n 1 ./wabbit-post 2D --flusi-to-wabbit source.h5 target.h5 target_blocksize max_level"
         end if
     else
         ! get values from command line (filename and desired blocksize)
@@ -72,13 +72,14 @@ subroutine block_to_blocks(help, params)
 
         if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
 
+        Bs_tmp = nxyz(2)/2
         do while (level<max_level)
-            Bs_tmp = nxyz(2)/2 + 1
             level = level + 1
-            if (Bs_tmp==Bs) exit
+            if ((Bs_tmp+1)==Bs) exit
+            Bs_tmp = Bs_tmp/2
         end do
 
-        if (Bs_tmp/=Bs) call abort(2948, "ERROR: I'm afraid your saved blocksize does not match for WABBIT or your input max_level is too small")
+        if ((Bs_tmp+1)/=Bs) call abort(2948, "ERROR: I'm afraid your saved blocksize does not match for WABBIT or your input max_level is too small")
 
         params%max_treelevel=level
         params%Lx = domain(2)
@@ -91,10 +92,12 @@ subroutine block_to_blocks(help, params)
         else
             lgt_n = 4_ik**params%max_treelevel
         end if
-        params%number_blocks = lgt_n/params%number_procs + mod(lgt_n,params%number_procs)
+        params%number_blocks = lgt_n/params%number_procs +&
+            mod(lgt_n,params%number_procs)
         call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor,&
             lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, &
             int_receive_buffer, real_send_buffer, real_receive_buffer )
+
         ! create lists of active blocks (light and heavy data) after load balancing (have changed)
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n,&
             hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -102,15 +105,13 @@ subroutine block_to_blocks(help, params)
         call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor,&
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
             params%max_treelevel, .true.)
-        call read_field_flusi(file_in, hvy_block, lgt_block, hvy_n, hvy_active, params)
 
-        ! do k=1, hvy_n
-        !     call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-        !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx ))
-        !     hvy_block(1:Bs-1,1:Bs-1,1,1,hvy_active(k)) = field_in(floor((x0(1)+((1:Bs-1)-1)*dx(1))/dx_in ),(x0(2) + ((1:Bs-1)-1)*dx(2))/dy_in )
-        ! end do
+        call read_field_flusi(file_in, hvy_block, lgt_block, hvy_n,&
+            hvy_active, params, nxyz(2))
+
         iteration = 0
-        call write_field(file_out, time, iteration, 1, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
+        call write_field(file_out, time, iteration, 1, params, lgt_block,&
+            hvy_block, lgt_active, lgt_n, hvy_n)
     end if
 
-end subroutine block_to_blocks
+end subroutine flusi_to_wabbit

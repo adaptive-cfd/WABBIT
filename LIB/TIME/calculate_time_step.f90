@@ -21,9 +21,7 @@
 ! ********************************************************************************************
 subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
 
-    use module_acm_new,          only : GET_DT_BLOCK_ACM
-
-    use module_navier_stokes_new, only : GET_DT_BLOCK_Nstokes
+    use module_physics_metamodule, only : GET_DT_BLOCK
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -91,23 +89,8 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
         ! physics modules dictate some restrictions due to CFL conditions, penalization
         ! or other operators. Everything that is physics-dependent goes here. it is
         ! computed for each block, then the minimum is used.
-        select case (params%physics_type)
-        case ('ACM-new')
-          ! artificial compressibility
-          call GET_DT_BLOCK_ACM(      time, hvy_block(:,:,:,:,hvy_active(k)), &
-              params%number_ghost_nodes, xx0, ddx, dt_tmp )
-        case ('ConvDiff-new')
-          ! convection-diffusion
-          call GET_DT_BLOCK_convdiff( time, hvy_block(:,:,:,:,hvy_active(k)), &
-              params%number_block_nodes, params%number_ghost_nodes, xx0, ddx, dt_tmp )
-        case ('navier_stokes')
-          ! navier stokes
-          call GET_DT_BLOCK_NStokes(  time, hvy_block(:,:,:,:,hvy_active(k)), &
-              params%number_block_nodes,params%number_ghost_nodes, xx0, ddx, dt_tmp)
-        case default
-          call abort('phycics module unkown.')
-
-        end select
+        call GET_DT_BLOCK( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
+            params%number_block_nodes,params%number_ghost_nodes, xx0, ddx, dt_tmp)
 
         dt = min( dt, dt_tmp )
     end do

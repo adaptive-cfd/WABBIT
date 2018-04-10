@@ -322,7 +322,7 @@ contains
     ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
     ! terms that depend on global qtys, such as forces etc, which cannot be computed
     ! from a single block alone, the first stage does that. the second stage can then
-    ! use these integral qtys for the actuall RHS evaluation.
+    ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
     ! local variables

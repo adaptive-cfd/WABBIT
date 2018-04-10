@@ -8,10 +8,10 @@
 !> \author sm
 !> \brief set input for Runge Kutta time stepper
 !>
-!! gives back the input for the RHS (from which in the final stage the next 
+!! gives back the input for the RHS (from which in the final stage the next
 !! time step is computed).\n
 !!
-!! k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_jl*k_l)) 
+!! k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_jl*k_l))
 !! (e.g. k3 = RHS(t+dt*c_3, data_field(t) + dt*(a31*k1+a32*k2)) ) \n
 !!
 !! This routine is in charge of setting the input and saving it in the hvy_work and hvy_block array \n
@@ -37,7 +37,6 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
 
     !> dt
     real(kind=rk), intent(in)           :: dt
-
     !> array containing Runge-Kutta coefficients
     real(kind=rk), intent(in)           :: rk_coeffs(:)
     !> loop variable
@@ -48,14 +47,13 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
     real(kind=rk), intent(in)           :: hvy_work(:, :, :, :, :)
-
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: l, dF, N_dF, k
+    integer(kind=ik)                    :: l, N_dF, k
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

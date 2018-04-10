@@ -2,7 +2,7 @@
 ! WABBIT
 !> \name keyvalues.f90
 !> \version 0.5
-!> \author sm, engels 
+!> \author sm, engels
 !
 !> \brief loads the specified *.h5 file and creates a *.key file that contains
 !! min / max / mean / L2 norm of the field data. This is used for testing
@@ -20,98 +20,70 @@ subroutine compare_keys(help, key1, key2)
     !> help flag
     logical, intent(in)                     :: help
 
-    real(kind=rk)          :: t1,t2,a1,a2,b1,b2,c1,c2,d1,d2,q1,q2, e0,e1,e2,e3,e4,e5
-!-----------------------------------------------------------------------------------------------------
+    integer(kind=ik) :: i
+    real(kind=rk) :: data1(1:6), data2(1:6), error(1:6)
+    !-----------------------------------------------------------------------------------------------------
 
     if (help) then
-         write(*,*) "wabbit postprocessing routine to compare keyvalues of two .key files"
-         write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --compare-keys old.key new.key"
+        write(*,*) "wabbit postprocessing routine to compare keyvalues of two .key files"
+        write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --compare-keys old.key new.key"
     else
 
         call check_file_exists(key1)
         call check_file_exists(key2)
 
-        write (*,'("comparing files ",a20, a20, " for keyvalues")'), &
-            trim(adjustl(key1)), trim(adjustl(key2))
+        write(*,*) "Key1: ", trim(adjustl(key1))
+        write(*,*) "Key2: ", trim(adjustl(key2))
 
         open(59, file = key1, status = 'unknown', action='read')
-        read(59,'(6(es15.8,1x))') t1,a1,b1,c1,d1,q1
+        read(59,'(6(es15.8,1x))') data1
         close(59)
 
         open(59, file = key2, status = 'unknown', action='read')
-        read(59,'(6(es15.8,1x))') t2,a2,b2,c2,d2,q2
+        read(59,'(6(es15.8,1x))') data2
         close(59)
 
-      write (*,'("present  : time=",es15.8," max=",es15.8," min=",es15.8," sum=",es15.8," sum**2=",es15.8," q=",es15.8)') &
-      t1,a1,b1,c1,d1,q1
+        write (*,'("present  : time=",es15.8," max=",es15.8," min=",es15.8," &
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') data1
 
-      write (*,'("reference: time=",es15.8," max=",es15.8," min=",es15.8," sum=",es15.8," sum**2=",es15.8," q=",es15.8)') &
-      t2,a2,b2,c2,d2,q2
+        write (*,'("reference: time=",es15.8," max=",es15.8," min=",es15.8," &
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') data2
 
-      ! errors:
-      if (dabs(t2)>=1.0e-7_rk) then
-        e0 = dabs( (t2-t1) / t2 )
-      else
-        e0 = dabs( (t2-t1) )
-      endif
+        ! errors:
+        do i = 1, 6
+            if (dabs(data2(i))>=1.0e-7_rk) then
+                error(i) = dabs( (data2(i)-data1(i)) / data2(i) )
+            else
+                error(i) = dabs( (data2(i)-data1(i)) )
+            end if
+        enddo
 
-      if (dabs(a2)>=1.0e-7_rk) then
-        e1 = dabs( (a2-a1) / a2 )
-      else
-        e1 = dabs( (a2-a1) )
-      endif
+        write (*,'("err(rel) : time=",es15.8," max=",es15.8," min=",es15.8," &
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') error
 
-      if (dabs(b2)>=1.0e-7_rk) then
-        e2 = dabs( (b2-b1) / b2 )
-      else
-        e2 = dabs( (b2-b1) )
-      endif
+        if (maxval(error)<1.0e-4) then
+            ! all cool
+            write (*,*) "okay!"
 
-      if (dabs(c2)>=1.0e-7_rk) then
-        e3 = dabs( (c2-c1) / c2 )
-      else
-        e3 = dabs( (c2-c1) )
-      endif
+            ! on some machines, returning an exit code (exit(1)) does not work
+            ! so write your exit code in a small txt file as well. this allows unit tests
+            ! on turing.
+            open (15, file='return', status='replace')
+            write(15,'(i1)') 0
+            close(15)
+            call exit(0)
+        else
+            ! very bad
+            write (*,*) "ERROR"
 
-      if (dabs(d2)>=1.0e-7_rk) then
-        e4 = dabs( (d2-d1) / d2 )
-      else
-        e4 = dabs( (d2-d1) )
-      endif
-
-      if (dabs(q2)>=1.0e-7_rk) then
-        e5 = dabs( (q2-q1) / q2 )
-      else
-        e5 = dabs( (q2-q1) )
-      endif
-
-      write (*,'("err(rel) : time=",es15.8," max=",es15.8," min=",es15.8," sum=",es15.8," sum**2=",es15.8," q=",es15.8)') &
-      e0,e1,e2,e3,e4,e5
-
-      if ((e1<1.0e-4_rk) .and. (e2<1.0e-4_rk) .and. (e3<1.0e-4_rk) .and. &
-          (e4<1.0e-4_rk) .and. (e0<1.0e-4_rk) .and. (e5<1.0e-4_rk)) then
-        ! all cool
-        write (*,*) "okay!"
-
-        ! on some machines, returning an exit code (exit(1)) does not work
-        ! so write your exit code in a small txt file as well. this allows unit tests
-        ! on turing.
-         open (15, file='return', status='replace')
-         write(15,'(i1)') 0
-         close(15)
-        call exit(0)
-      else
-        ! very bad
-        write (*,*) "ERROR"
-
-        ! on some machines, returning an exit code (exit(1)) does not work
-        ! so write your exit code in a small txt file as well. this allows unit tests
-        ! on turing.
-          open (15, file='return', status='replace')
-          write(15,'(i1)') 1
-          close(15)
-        call exit(1)
-      endif
-  end if
+            ! on some machines, returning an exit code (exit(1)) does not work
+            ! so write your exit code in a small txt file as well. this allows unit tests
+            ! on turing.
+            open (15, file='return', status='replace')
+            write(15,'(i1)') 1
+            close(15)
+            call exit(1)
+        endif
+    end if
 
 end subroutine

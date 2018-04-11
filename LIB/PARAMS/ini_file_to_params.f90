@@ -422,6 +422,9 @@ subroutine ini_file_to_params( params, filename )
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
 
+    ! redundant nodes test
+    call read_param_mpi(FILE, 'Debug', 'test_redundant_nodes', params%test_redundant_nodes, .false.)
+
     !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,
     ! wabbit will automatically select the number of blocks per rank to be allocated

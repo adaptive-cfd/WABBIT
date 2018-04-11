@@ -155,6 +155,9 @@ module module_params
         ! unit test ghost nodes synchronization flag
         logical                                     :: test_ghost_nodes_synch
 
+        ! redundant nodes test flag
+        logical                                     :: test_redundant_nodes
+
         ! -------------------------------------------------------------------------------------
         ! filter
         ! -------------------------------------------------------------------------------------

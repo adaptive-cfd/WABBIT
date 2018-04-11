@@ -21,14 +21,13 @@ module module_navier_stokes_new
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_precision
-  use module_mask
+  use module_ns_penalization
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity
   ! generic initial condition
-  use module_initial_conditions
   use mpi
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -96,7 +95,8 @@ module module_navier_stokes_new
   ! statevector
   integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
 
-  real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=10.0_rk,T0_=200!273.15_rk
+  ! real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=0.0_rk,T0_=200!273.15_rk
+  real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=0.0_rk,T0_=200!273.15_rk
 
 
   !---------------------------------------------------------------------------------------------
@@ -109,8 +109,7 @@ contains
 
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
-  include "rhs_ns_2D.f90"
-
+  include "initial_conditions.f90"
   !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -133,15 +132,6 @@ contains
 
      ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
-    !error case: try to solve navier stokes equation with less or more than 5 datafields
-    ! if ( params_ns%number_data_fields /= 5) then
-    !     write(*,'(80("_"))')
-    !     write(*,'("ERROR: try to solve navier stokes equation with", i3, " datafield(s)")') params_ns%number_data_fields
-    !     stop
-    ! end if
-    ! !===================================================================
-    ! physics parameter
-    !===================================================================
     ! dimension
     call read_param_mpi(FILE, 'Dimensionality', 'dim', params_ns%dim, 2 )
     ! spatial domain size
@@ -166,20 +156,13 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond', params_ns%inicond, "pressure_blob" )
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, 0.1_rk )
     ! penalization:
-     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
-     call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 1.0e-3_rk)
-    ! call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_ns%smooth_mask, .true.)
-    ! call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
-    ! call read_param_mpi(FILE, 'VPM', 'x_cntr', params_ns%x_cntr, (/0.5*params_ns%Lx, 0.5*params_ns%Ly, 0.5*params_ns%Lz/)  )
-    ! call read_param_mpi(FILE, 'VPM', 'R_cyl', params_ns%R_cyl, 0.5_rk )
+    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
+    
     if (params_ns%penalization) then
+      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk ) 
+      call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
       call init_mask(filename)
     endif
-    ! sponge:
-    call read_param_mpi(FILE, 'Physics', 'sponge_layer', params_ns%sponge_layer, .false.)
-    call read_param_mpi(FILE, 'Physics', 'C_sp', params_ns%C_sp, 100.0_rk)
-
-
   ! read variable names
     ! allocate names list
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
@@ -248,10 +231,6 @@ contains
 
     Bs = size(u,1)-2*g
 
-    ! ---------------------------------
-    ! save all datafields in u
-    work(:,:,:,1:size(u,4))=u(:,:,:,:)
-    ! ---------------------------------
 
 
     !
@@ -259,6 +238,15 @@ contains
     allocate(vort(size(u,1),size(u,2),size(u,3),3))
 
     if (size(u,3)==1) then
+          ! ---------------------------------
+          ! save all datafields in u
+          !density
+          work(:,:,:,rhoF) = u(:,:,:,1)**2
+          work(:,:,:,UxF)  = u(:,:,:,2)/u(:,:,:,1)
+          work(:,:,:,UyF)  = u(:,:,:,3)/u(:,:,:,1)
+          work(:,:,:,pF)   = u(:,:,:,4)
+          ! ---------------------------------
+
         ! only wx,wy (2D - case)
         call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
                                  u(:,:,:,UyF)/u(:,:,:,rhoF), &
@@ -266,9 +254,17 @@ contains
                                  dx, Bs, g, params_ns%discretization, &
                                  vort)
 
-        work(:,:,:,size(u,4)+1)=vort(:,:,:,1)
-        call get_mask(work(:,:,1,size(u,4)+2), x0, dx, Bs, g )
+        work(:,:,:,5)=vort(:,:,:,1)
+
+        !write out mask 
+        if (params_ns%penalization) then
+          call get_mask(work(:,:,1,6), x0, dx, Bs, g )
+        else
+          work(:,:,1,6)=0.0_rk
+        endif
+
     else
+      call abort(564567,"Error: [module_navier_stokes.f90] 3D case not implemented")
         ! wx,wy,wz (3D - case)
    !      call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
    !                               u(:,:,:,UyF)/u(:,:,:,rhoF), &
@@ -338,7 +334,7 @@ contains
     ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
     ! terms that depend on global qtys, such as forces etc, which cannot be computed
     ! from a single block alone, the first stage does that. the second stage can then
-    ! use these integral qtys for the actuall RHS evaluation.
+    ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
     ! local variables
@@ -390,8 +386,6 @@ contains
       ! called for each block.
       if (size(u,3)==1) then
         call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-        !  call  rhs_ns_2D(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-
       else
         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
@@ -437,26 +431,35 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! loop variables
-    real(kind=rk)               :: unorm,deltax
+    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax,sqrt_rho_min
 
     dt = 9.9e9_rk
     ! get smallest spatial seperation
     if(size(u,3)==1) then
         deltax=minval(dx(1:2))
+        allocate(v_physical(2*g+Bs,2*g+Bs,1))
     else
         deltax=minval(dx)
+        allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
     endif
+
 
     if (UzF==-1) then
-        unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF))
+        v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
-        unorm = maxval( u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF) )
+        v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
-        unorm = sqrt(unorm)
-    ! max velocity in one block
-    if (unorm < 1e-12_rk) unorm=9e9_rk
 
-     dt = min(dt, params_ns%CFL * deltax / sqrt(unorm))
+    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
+    
+    sqrt_rho_min=minval(u(g+1:Bs+g,g+1:Bs+g,1,rhoF))
+    if (sqrt_rho_min<=0.00_rk ) then
+      call abort(4754, 'Error [module_navier_stokes_new]: density is zero ):')
+    endif
+    v_physical(g+1:Bs+g,g+1:Bs+g,1) = v_physical(g+1:Bs+g,g+1:Bs+g,1)/u(g+1:Bs+g,g+1:Bs+g,1,rhoF)
+    ! max velocity in one block
+
+     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical(g+1:Bs+g,g+1:Bs+g,1)))
 
     ! penalization requiers dt <= C_eta
     if (params_ns%penalization ) then
@@ -466,6 +469,7 @@ contains
     if (params_ns%sponge_layer ) then
         dt=min(dt,params_ns%C_sp)
     endif
+    deallocate(v_physical)
   end subroutine GET_DT_BLOCK_NStokes
 
 
@@ -534,15 +538,6 @@ contains
         u( :, :, :, UxF) = 0.0_rk
         ! set Uy
         u( :, :, :, UyF) = 0.0_rk
-
-         ! set velocity field u(x)=1 for x in mask
-      if (size(u,3)==1 .and. params_ns%penalization) then
-        call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
-        call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
-      endif
-      ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
-      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*U0_
-      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*V0_
 
         if (size(u,3).ne.1) then
             ! set Uz to zero

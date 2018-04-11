@@ -29,20 +29,7 @@
 !! 03/02/18
 !!          - included into new physics modules
 ! ********************************************************************************************
-module module_initial_conditions
 
-use module_precision
-
-implicit none
-
-!**********************************************************************************************
-! These are the important routines that are visible to WABBIT:
-!**********************************************************************************************
-PUBLIC :: inicond_gauss_blob
-!**********************************************************************************************
-
-
-contains
 
 subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
 
@@ -142,5 +129,3 @@ subroutine shift_x_y( x, y, Lx, Ly )
     end if
 
 end subroutine shift_x_y
-
-end module module_initial_conditions

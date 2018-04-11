@@ -137,7 +137,10 @@ subroutine ini_file_to_params( params, filename )
     !**************************************************************************
     ! read INITIAL CONDITION parameters
 
-    ! initial condition
+    ! initial condition. NOTE: nowadays, there is only two distinct ones: read_from_files
+    ! which, well, reads some files. This is the same for all physics modules. The only
+    ! other initial condition is "physics-module", which means the modules decide what inicond
+    ! is set.
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
 
@@ -166,6 +169,14 @@ subroutine ini_file_to_params( params, filename )
     ! bogey shock detector threshold
     call read_param_mpi(FILE, 'Discretization', 'r_th', params%r_th, 1e-3_rk )
 
+    !***************************************************************************
+    ! read statistics parameters
+    !
+    ! data exchange method
+    call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params%nsave_stats, 99999999_ik )
+    call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
+    ! assume start at time 0.0 /todo change if start with reloaded data
+    params%next_stats_time = 0.0_rk + params%tsave_stats
 
     !***************************************************************************
     ! read MPI parameters

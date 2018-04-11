@@ -24,7 +24,7 @@
 !!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
 !!\f}
 !! \details
-!! With the head flux \f$\phi=\lambda T(x,y,t)\f$ and \f$\lambda \in \mathr{R}\f$
+!! With the head flux \f$\phi=\lambda T(x,y,t)\f$ and \f$\lambda \in \mathrm{R}\f$
 !! The friction term is further expanded:
 !>\f{eqnarray*}{
 !!
@@ -50,7 +50,6 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
 !---------------------------------------------------------------------------------------------
 !
     implicit none
-
     !> grid parameter
     integer(kind=ik), intent(in)                            :: g, Bs
     !> origin and spacing of the block

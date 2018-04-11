@@ -4,8 +4,8 @@
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90
-
+startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 \
+compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -13,8 +13,9 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_MPI.f90 module_unit_test.f90 \
-	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 module_initial_conditions.f90 module_physics_metamodule.f90 \
-	module_indicators.f90 module_operators.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_navier_stokes_new.f90 module_mask.f90
+	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90\
+	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90\
+	module_physics_metamodule.f90 module_ACM-new.f90 module_ConvDiff_new.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -22,6 +23,7 @@ VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/DEBUG
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
+VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -81,18 +83,15 @@ $(OBJDIR)/module_precision.o: module_precision.f90
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_initial_conditions.o: module_initial_conditions.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o \
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_mask.o: module_mask.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
+$(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_ini_files_parser_mpi.o funnel.f90 vortex_street.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_mask.o \
-	$(OBJDIR)/module_operators.o RHS_3D_navier_stokes.f90 rhs_ns_2D.f90 $(OBJDIR)/module_initial_conditions.o
+$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+	$(OBJDIR)/module_operators.o RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 initial_conditions.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge_new.f90\
@@ -139,7 +138,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
-	wavelet_filter.f90 get_block_max_velocity_norm.f90 bogey_filter.f90
+	wavelet_filter.f90 get_block_max_velocity_norm.f90 bogey_filter.f90 statistics_wrapper.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o \

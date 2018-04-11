@@ -24,7 +24,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     !> origin and spacing of the block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
     !> datafields
-    real(kind=rk), intent(in)               :: phi(:,:,:)
+    real(kind=rk), intent(inout)            :: phi(:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:)
     !> discretization order
     character(len=80), intent(in)           :: order_discretization
@@ -47,7 +47,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     real(kind=rk)       :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
                            v_dydy, p_dx, p_dy, penalx, penaly
     ! loop variables
-    integer(kind=rk)    :: ix, iy
+    integer(kind=rk)    :: ix, iy, idir
     ! coefficients for Tam&Webb
     real(kind=rk)       :: a(-3:3)
     real(kind=rk)       :: b(-2:2)
@@ -100,17 +100,6 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
       call create_mask_2D_NEW(mask, x0, dx, Bs, g)
     end if
 
-    if (params_acm%forcing) then
-      forcing(1) = max(0.0_rk, 1.0_rk-params_acm%mean_flow(1)) &
-          * startup_conditioner(time, 0.0_rk, 0.5_rk)
-      forcing(2) = max(0.0_rk, 0.0_rk-params_acm%mean_flow(2))&
-          * startup_conditioner(time, 0.0_rk, 0.5_rk)
-      forcing(3) = max(0.0_rk, 0.0_rk-params_acm%mean_flow(3))&
-          * startup_conditioner(time, 0.0_rk, 0.5_rk)
-    else
-      forcing = 0.0_rk
-    end if
-
     if (params_acm%sponge_layer) then
         call sponge_2D_NEW(sponge, x0, dx, Bs, g)
         sponge = params_acm%alpha*sponge
@@ -141,10 +130,9 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
                 penalx = -mask(ix,iy)*eps_inv*(u(ix,iy)-us(ix,iy,1)) !-sponge(ix,iy)*(u(ix,iy)-1.0_rk)
                 penaly = -mask(ix,iy)*eps_inv*(v(ix,iy)-us(ix,iy,2))
 
-                rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx &
-                    + nu*(u_dxdx + u_dydy) + penalx + forcing(1)
-                rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy &
-                    + nu*(v_dxdx + v_dydy) + penaly + forcing(2)
+                ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
+                rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
                 rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
 
             end do
@@ -185,10 +173,8 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
             penalx = -mask(ix,iy)*eps_inv*(u(ix,iy)-us(ix,iy,1))
             penaly = -mask(ix,iy)*eps_inv*(v(ix,iy)-us(ix,iy,2))
 
-            rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + &
-                nu*(u_dxdx + u_dydy) + penalx + forcing(1)
-            rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + &
-                nu*(v_dxdx + v_dydy) + penaly + forcing(2)
+            rhs(ix,iy,1) = -u(ix,iy)*u_dx - v(ix,iy)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+            rhs(ix,iy,2) = -u(ix,iy)*v_dx - v(ix,iy)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
             rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*p(ix,iy)
           end do
         end do
@@ -196,6 +182,39 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     else
       call abort(441166, "Discretization unkown "//order_discretization//", I ll walk into the light now." )
     end if
+
+    ! --------------------------------------------------------------------------
+    ! mean flow forcing term
+    ! --------------------------------------------------------------------------
+    ! is mean flow forcing used at all?
+    if (params_acm%forcing) then
+
+      do idir = 1, 2
+
+        select case (params_acm%forcing_type(idir))
+        case('accelerate')
+          forcing(idir) = max(0.0_rk, params_acm%u_mean_set(idir)-params_acm%mean_flow(idir)) &
+                        * startup_conditioner(time, 0.0_rk, 0.5_rk)
+        case('fixed')
+          ! note fixed forcing directly modifies the state vetor and is not a
+          ! forcing term in the conventional sense.
+          forcing(idir) = 0.0_rk
+          phi(:,:,idir) = phi(:,:,idir) - params_acm%mean_flow(idir) + params_acm%u_mean_set(idir)
+
+        case('none')
+          ! do nothing in this direction.
+          forcing(idir) = 0.0_rk
+
+        case default
+          call abort(7710, "ACM::rhs.90::meanflow forcing type unkown")
+        end select
+
+        ! add forcing to right hand side
+        rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
+      end do
+
+    end if
+
 
 end subroutine RHS_2D_acm_new
 

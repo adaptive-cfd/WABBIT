@@ -74,7 +74,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
                                                                fric_p(Bs+2*g, Bs+2*g), fric_u(Bs+2*g, Bs+2*g), fric_v(Bs+2*g, Bs+2*g), &
                                                                fric_T1(Bs+2*g, Bs+2*g), fric_T2(Bs+2*g, Bs+2*g), &
                                                                tau11(Bs+2*g, Bs+2*g), tau22(Bs+2*g, Bs+2*g), tau33(Bs+2*g, Bs+2*g), &
-                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g)
+                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g),sponge(Bs+2*g, Bs+2*g,4)
     ! derivatives
     real(kind=rk)                                           :: u_x(Bs+2*g, Bs+2*g), u_y(Bs+2*g, Bs+2*g), v_x(Bs+2*g, Bs+2*g), v_y(Bs+2*g, Bs+2*g), &
                                                                p_x(Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g), T_x(Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g),&
@@ -258,30 +258,10 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     rhs(:,:,3) = rhs(:,:,3) + fric_v
 
 
-    ! SPONGE (bob)
-    if (params_ns%sponge_layer) then
-        ! add spnge
-        ! rho component (density)
-        rhs(:,:,1)=rhs(:,:,1) - 0.5_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho,   rho0_       , params_ns%C_sp)
-        ! sqrt(rho)u component (momentum)
-        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*u, rho0_*u0_   , params_ns%C_sp)
-        ! sqrt(rho)v component (momentum)
-        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*sponge( Bs, g, x0,delta_x, rho*v, 0.0_rk   , params_ns%C_sp)
-        ! p component (preasure/energy)
-        rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *sponge( Bs, g, x0,delta_x, p    , p0_         , params_ns%C_sp)
-
-    endif
 
     if (params_ns%penalization) then
-        ! add spnge
-        call get_mask(mask, x0, delta_x, Bs, g )
-        ! sqrt(rho)u component (momentum)
-        rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization(mask, rho*u, 0.0_rk , params_ns%C_eta)
-        ! sqrt(rho)v component (momentum)
-        rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( mask, rho*v, 0.0_rk   , params_ns%C_eta)
-        ! p component (preasure/energy)
-        rhs(:,:,4)=rhs(:,:,4) -                   penalization( mask, p  ,rho*Rs*T0_  , params_ns%C_eta)
-        !write(*,*) penalization( mask, p   , rho*Rs*T      , params_ns%C_eta)
+        ! add volume penalization 
+        call add_constraints(rhs,Bs, g, x0,delta_x, phi)
     endif
 
 
@@ -388,125 +368,3 @@ end subroutine diffy_c
 
 
 
-
-
-
-!--------------------------------------------------------------------------!
-!               phils sponge stuff
-!--------------------------------------------------------------------------!
-
-
-!==========================================================================
-!> \brief This function computes a 2d sponge term
-!!
-!! \details The sponge term is
-!!   \f{eqnarray*}{
-!!           s_q(x,y)=\frac{\chi_{\mathrm sp}(x,y)}{C_{\mathrm sp}}(q(x,y)-q_{\mathrm ref})
-!!                          \quad \forall x,y \in \Omega_{\mathrm block}
-!!     \f}
-!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
-!! - the mask function is \f$\chi_{\rm sp}\f$
-!! - \f$C_{\rm sp}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
-
-function sponge( Bs, g, x0,dx, q, qref, C_sp)
-    !-------------------------------------------------------
-    !> grid parameter
-    integer(kind=ik), intent(in)    :: g, Bs
-    !> spacing and origin of block
-    real(kind=rk), intent(in)       :: x0(2), dx(2)
-    !> Sponge coefficient
-    real(kind=rk), intent(in)       :: C_sp
-    !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
-    real(kind=rk), intent(in)       :: qref
-    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    !> sponge term \f$s(x,y)\f$
-    real(kind=rk)                   :: sponge(Bs+2*g, Bs+2*g)
-    !--------------------------------------------------------
-    ! loop variables
-    integer                         :: i, n,ix,iy
-    ! inverse C_sp
-    real(kind=rk)                   :: C_sp_inv,x,y,ddx
-
-    C_sp_inv=1.0_rk/C_sp
-
-    ddx = 0.1_rk*params_ns%Lx
-
-    do iy=1, Bs+2*g
-       do ix=1, Bs+2*g
-           x = dble(ix-(g+1)) * dx(1) + x0(1)
-           if ((params_ns%Lx-x) <= ddx) then
-               sponge(ix,iy) = C_sp_inv*(x-(params_ns%Lx-ddx))**2*(q(ix,iy)-qref)
-           elseif (x <= ddx) then
-               sponge(ix,iy) = C_sp_inv*(x-ddx)**2*(q(ix,iy)-qref)
-           else
-               sponge(ix,iy) = 0.0_rk
-           end if
-       end do
-    end do
-end function sponge
-!==========================================================================
-
-
-
-!==========================================================================
-! !> \brief This function f(x) implements \n
-! !> f(x) is 1 if x(1)<=Lsponge \n
-! !> f(x) is 0 else  \n
-! function inside_sponge(x)
-! !> coordinate vector \f$\vec{x}=(x,y,z)\f$ (real 3d or 2d array)
-! real(kind=rk), intent(in)       :: x(:)
-! !> logical
-! logical                         :: inside_sponge
-! ! dimension of array x
-! integer                         :: dim,i
-! ! size of sponge
-! real(kind=rk)                   :: length_sponge
-
-! !> \todo read in length_sponge or thing of something intelligent here
-!         length_sponge=params_ns%Lx*0.05
-!         if (x(1)<=length_sponge .and. x(1)>=0) then
-!             inside_sponge=.true.
-!         else
-!             inside_sponge=.false.
-!         endif
-
-
-! end function inside_sponge
-! !==========================================================================
-
-
-
-!==========================================================================
-!> \brief This function computes a penalization term
-!!
-!! \details The penalization term is
-!!   \f{eqnarray*}{
-!!           p_q(x,y)=\frac{\chi(x,y)}{C_{\eta}}(q(x,y)-q_{\mathrm s})
-!!                          \quad \forall x,y \in \Omega_{\mathrm block}
-!!     \f}
-!! Where we addopt the notation from <a href="https://arxiv.org/abs/1506.06513">Thomas Engels (2015)</a>
-!! - the mask function is \f$\chi_{\rm \eta}(\vec{x},t)\f$
-!! - \f$C_{\rm \eta}\f$ is the sponge coefficient (normaly \f$10^{-1}\f$)
-
-elemental function penalization( mask, q, qref, C_eta)
-
-    !-------------------------------------------------------
-    !> grid parameter
-    real(kind=rk), intent(in)       :: C_eta
-    !> reference value of quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
-    real(kind=rk), intent(in)       :: qref
-    !> quantity \f$q\f$ (veolcity \f$u\f$, preasure \f$p\f$,etc.)
-    real(kind=rk), intent(in)       :: q
-    !> mask \f$p_q(x,y)\f$
-    real(kind=rk), intent(in)       :: mask
-    !--------------------------------------------------------
-    real(kind=rk)                   :: penalization
-    real(kind=rk)                   :: C_eta_inv
-
-    ! inverse C_eta
-    C_eta_inv=1.0_rk/C_eta
-
-    penalization=mask*C_eta_inv*(q-qref)
-end function penalization
-!==========================================================================

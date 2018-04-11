@@ -29,7 +29,7 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, simulation, hvy_work, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -58,6 +58,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     ! send/receive buffer, integer and real
     integer(kind=ik), allocatable, intent(out)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable, intent(out)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    logical, intent(in)                             :: simulation
+    integer(kind=ik)                                :: rk_steps
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -95,13 +97,14 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
       write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
+    rk_steps = max(size(params%butcher_tableau,1)-1,params%N_fields_saved)
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:
         ! datafields
         allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, N_dF, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*5, number_blocks ) )
+        if (simulation) allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
         ! 3D: maximal 74 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 74 ) )
     else
@@ -109,7 +112,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
         ! datafields
         allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*5, number_blocks ) )
+        if (simulation) allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
         ! 2D: maximal 16 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 16 ) )
     end if
@@ -118,12 +121,13 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
     allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2) )
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
 
-    ! allocate synch buffer
-    allocate( int_send_buffer( buffer_N_int, number_procs) )
-    allocate( int_receive_buffer( buffer_N_int, number_procs) )
-    allocate( real_send_buffer( buffer_N, number_procs) )
-    allocate( real_receive_buffer( buffer_N, number_procs) )
-
+    if (simulation) then
+        ! allocate synch buffer
+        allocate( int_send_buffer( buffer_N_int, number_procs) )
+        allocate( int_receive_buffer( buffer_N_int, number_procs) )
+        allocate( real_send_buffer( buffer_N, number_procs) )
+        allocate( real_receive_buffer( buffer_N, number_procs) )
+    end if
     ! reset data:
     ! all blocks are inactive, reset treecode
     lgt_block(:, 1:params%max_treelevel) = -1
@@ -135,7 +139,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, l
 
     ! reset data
     hvy_block = 9.99e99_rk
-    hvy_work = 9.99e99_rk
+    if (simulation) hvy_work = 9.99e99_rk
     hvy_neighbor = -1
 
     ! allocate active list

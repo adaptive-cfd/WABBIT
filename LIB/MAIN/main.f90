@@ -197,7 +197,9 @@ program main
 
 
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call allocate_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        hvy_active, lgt_sortednumlist,.true., hvy_work, int_send_buffer, &
+        int_receive_buffer, real_send_buffer, real_receive_buffer )
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )

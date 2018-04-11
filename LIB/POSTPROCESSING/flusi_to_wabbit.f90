@@ -59,14 +59,14 @@ subroutine flusi_to_wabbit(help, params)
         call get_command_argument(4, file_out)
         call get_command_argument(5, Bs_read)
         read(Bs_read,*) Bs
-        if (mod(Bs,2)==0) call abort(7844, "ERROR: For WABBIT, we need an odd blocksize!")
+        if (mod(Bs,2)==0) call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
         call get_command_argument(6, level_read)
         read(level_read,*) max_level
 
         ! read attributes such as number of discretisation points, time, domain size
         call get_attributes_flusi(file_in, nxyz, time, domain)
-        if (.not. params%threeD_case .and. nxyz(1)/=1) call &
-            abort(8714, "ERROR: saved datafield is 3D, WABBIT expects 2D")
+        if (.not. params%threeD_case .and. nxyz(1)/=1) &
+            call abort(8714, "ERROR: saved datafield is 3D, WABBIT expects 2D")
 
         if (nxyz(2)/=nxyz(3)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
 
@@ -94,8 +94,8 @@ subroutine flusi_to_wabbit(help, params)
         end if
         params%number_blocks = lgt_n/params%number_procs +&
             mod(lgt_n,params%number_procs)
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor,&
-            lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, &
+        call allocate_grid( params, lgt_block, hvy_block, hvy_neighbor,&
+            lgt_active, hvy_active, lgt_sortednumlist,.false., hvy_work, int_send_buffer, &
             int_receive_buffer, real_send_buffer, real_receive_buffer )
 
         ! create lists of active blocks (light and heavy data) after load balancing (have changed)

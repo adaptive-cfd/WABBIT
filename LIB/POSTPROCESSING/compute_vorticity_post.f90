@@ -104,8 +104,8 @@ subroutine compute_vorticity_post(help, params)
         params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
 
         ! allocate data
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
-            hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
+        call allocate_grid( params, lgt_block, hvy_block, hvy_neighbor, &
+            lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work,&
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! allocate communication arrays
         call allocate_com_arrays(params, com_lists, com_matrix)

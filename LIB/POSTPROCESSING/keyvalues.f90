@@ -81,9 +81,9 @@ subroutine keyvalues(fname, params, help)
         params%Lx = domain(1)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
-        params%number_blocks = lgt_n!/params%number_procs + mod(lgt_n,params%number_procs)
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
-            hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
+        params%number_blocks = lgt_n/params%number_procs + params%number_procs
+        call allocate_grid( params, lgt_block, hvy_block,hvy_neighbor, lgt_active,&
+            hvy_active, lgt_sortednumlist, .false., hvy_work,&
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         call read_field(fname, 1, params, hvy_block, hvy_n )

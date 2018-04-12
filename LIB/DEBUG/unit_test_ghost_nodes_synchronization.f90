@@ -87,6 +87,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! MPI error variable
     integer(kind=ik)                        :: ierr
 
+! ##### TEST ####
+logical :: test
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -213,6 +216,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+
+
+! ##### TEST #####
+call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

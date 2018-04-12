@@ -71,7 +71,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     integer(kind=ik)                    :: N, k, neighborhood, neighbor_num, level_diff
 
     ! id integers
-    integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank
+    integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id
 
     ! type of data bounds
     ! 'exclude_redundant', 'include_redundant', 'only_redundant'
@@ -88,6 +88,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     integer(kind=ik)                                :: Bs, g
     ! number of datafields
     integer(kind=ik)                                :: NdF
+
+    ! type of data writing
+    character(len=25)                   :: data_writing_type
 
 
 !---------------------------------------------------------------------------------------------
@@ -115,7 +118,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     neighbor_num = size(hvy_neighbor, 2)
 
     ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-    data_bounds_type = 'include_redundant'
+    data_bounds_type = 'only_redundant'
+
+    ! 'average', 'simple', 'staging', 'compare'
+    data_writing_type = 'simple'
 
     ! 2D only!
     allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF) )
@@ -133,6 +139,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                 ! 0. ids bestimmen
                 ! neighbor light data id
                 neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
+                ! calculate neighbor rank
+                call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
                 ! calculate light id
                 call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
                 ! calculate the difference between block levels
@@ -155,23 +163,62 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                 ! interpolierte daten stehen in einem extra array
                 ! dessen größe richtet sich nach dem größten möglichen interpolationsgebiet: (Bs+2*g)^3
                 ! auch die vergröberten daten werden in den interpolationbuffer geschrieben und die datengrenzen angepasst
-                if ( level_diff /= 0 ) then
-                    call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
-                end if
+                if ( level_diff == 0 ) then
+                    ! lese nun mit den datengrenzen die daten selbst
+                    ! die gelesenen daten werden als buffervektor umsortiert
+                    ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
+                    ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
+                    call read_hvy_data( params, data_buffer, buffer_size, hvy_block( data_bounds(1,1):data_bounds(2,1), &
+                                                                                     data_bounds(1,2):data_bounds(2,2), &
+                                                                                     data_bounds(1,3):data_bounds(2,3), &
+                                                                                     :, hvy_active(k)) )
 
-                ! lese nun mit den datengrenzen die daten selbst
-                ! die gelesenen daten werden als buffervektor umsortiert
-                ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
-                call read_hvy_data( params, data_buffer, buffer_size, data_bounds, level_diff, hvy_block, hvy_active(k) )
+                else
+                    ! interpoliere daten
+                    call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
+                    ! lese daten, verwende interpolierte daten
+                    call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
+                                                                                        data_bounds(1,2):data_bounds(2,2), &
+                                                                                        data_bounds(1,3):data_bounds(2,3), &
+                                                                                        :) )
+
+                end if
 
                 ! daten werden jetzt entweder in den speicher geschrieben -> schreiberoutine
                 ! oder in den send buffer geschrieben
                 ! schreiberoutine erhält die date grenzen
                 ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
                 ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
-                ! invertierung der nachbarschaftsbeziehung findet beim füllen desn sendbuffer statt
+                ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
                 if ( rank == neighbor_rank ) then
-                call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+
+                    ! interner nachbar
+                    ! data bounds
+                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+                    ! write data, hängt vom jeweiligen Fall ab
+                    ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
+                    ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
+                    ! staging: wende staging konzept an
+                    ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
+                    select case(data_writing_type)
+                        case('simple')
+                            ! neighbor heavy id
+                            call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
+                            ! simply write data
+                            call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+
+                        case('average')
+
+                        case('staging')
+
+                        case('compare')
+
+                    end select
+
+                else
+                    ! external neighbor
+
+                end if
 
                 !
 
@@ -234,7 +281,7 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
     end if
 
     ! reset data bounds
-    data_bounds = 0
+    data_bounds = 1
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -574,8 +621,8 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     ! '__N'
                     case(1)
                         ! first dimension
-                        data_bounds(1,1) = g+1+sh_start
-                        data_bounds(2,1) = g+1+g+sh_end
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
                         ! second dimension
                         data_bounds(1,2) = g+1
                         data_bounds(2,2) = Bs+g
@@ -586,14 +633,14 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                         data_bounds(1,1) = g+1
                         data_bounds(2,1) = Bs+g
                         ! second dimension
-                        data_bounds(1,2) = Bs-sh_end
-                        data_bounds(2,2) = Bs+g-sh_start
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
 
                     ! '__S'
                     case(3)
                         ! first dimension
-                        data_bounds(1,1) = Bs-sh_end
-                        data_bounds(2,1) = Bs+g-sh_start
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
                         ! second dimension
                         data_bounds(1,2) = g+1
                         data_bounds(2,2) = Bs+g
@@ -604,137 +651,61 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                         data_bounds(1,1) = g+1
                         data_bounds(2,1) = Bs+g
                         ! second dimension
-                        data_bounds(1,2) = g+1+sh_start
-                        data_bounds(2,2) = g+1+g+sh_end
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
 
                     ! '_NE'
                     case(5)
-                        if ( level_diff == 0 ) then
-                            ! first dimension
-                            data_bounds(1,1) = g+1+sh_start
-                            data_bounds(2,1) = g+1+g+sh_end
-                            ! second dimension
-                            data_bounds(1,2) = Bs-sh_end
-                            data_bounds(2,2) = Bs+g-sh_start
-
-                        elseif ( level_diff == -1 ) then
-                            ! first dimension
-                            data_bounds(1,1) = g+1
-                            data_bounds(2,1) = g+g
-                            ! second dimension
-                            data_bounds(1,2) = Bs+1
-                            data_bounds(2,2) = Bs+g
-
-                        elseif ( level_diff == 1) then
-                            ! first dimension
-                            data_bounds(1,1) = g+1+sh_start*2
-                            data_bounds(2,1) = g+1+g+g+sh_end*2
-                            ! second dimension
-                            data_bounds(1,2) = Bs-g-sh_end*2
-                            data_bounds(2,2) = Bs+g-sh_start*2
-
-                        end if
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
 
                     ! '_NW'
                     case(6)
-                        if ( level_diff == 0 ) then
-                            ! first dimension
-                            data_bounds(1,1) = g+1+sh_start
-                            data_bounds(2,1) = g+1+g+sh_end
-                            ! second dimension
-                            data_bounds(1,2) = g+1+sh_start
-                            data_bounds(2,2) = g+1+g+sh_end
-
-                        elseif ( level_diff == -1 ) then
-                            ! first dimension
-                            data_bounds(1,1) = g+1
-                            data_bounds(2,1) = g+g
-                            ! second dimension
-                            data_bounds(1,2) = g+1
-                            data_bounds(2,2) = g+g
-
-                        elseif ( level_diff == 1) then
-                            ! first dimension
-                            data_bounds(1,1) = g+1+sh_start*2
-                            data_bounds(2,1) = g+1+g+g+sh_end*2
-                            ! second dimension
-                            data_bounds(1,2) = g+1+sh_start*2
-                            data_bounds(2,2) = g+1+g+g+sh_end*2
-
-                        end if
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
 
                     ! '_SE'
                     case(7)
-                        if ( level_diff == 0 ) then
-                            ! first dimension
-                            data_bounds(1,1) = Bs-sh_end
-                            data_bounds(2,1) = Bs+g-sh_start
-                            ! second dimension
-                            data_bounds(1,2) = Bs-sh_end
-                            data_bounds(2,2) = Bs+g-sh_start
-
-                        elseif ( level_diff == -1 ) then
-                            ! first dimension
-                            data_bounds(1,1) = Bs+1
-                            data_bounds(2,1) = Bs+g
-                            ! second dimension
-                            data_bounds(1,2) = Bs+1
-                            data_bounds(2,2) = Bs+g
-
-                        elseif ( level_diff == 1) then
-                            ! first dimension
-                            data_bounds(1,1) = Bs-g-sh_end*2
-                            data_bounds(2,1) = Bs+g-sh_start*2
-                            ! second dimension
-                            data_bounds(1,2) = Bs-g-sh_end*2
-                            data_bounds(2,2) = Bs+g-sh_start*2
-
-                        end if
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
 
                     ! '_SW'
                     case(8)
-                        if ( level_diff == 0 ) then
-                            ! first dimension
-                            data_bounds(1,1) = Bs-sh_end
-                            data_bounds(2,1) = Bs+g-sh_start
-                            ! second dimension
-                            data_bounds(1,2) = g+1+sh_start
-                            data_bounds(2,2) = g+1+g+sh_end
-
-                        elseif ( level_diff == -1 ) then
-                            ! first dimension
-                            data_bounds(1,1) = Bs+1
-                            data_bounds(2,1) = Bs+g
-                            ! second dimension
-                            data_bounds(1,2) = g+1
-                            data_bounds(2,2) = g+g
-
-                        elseif ( level_diff == 1) then
-                            ! first dimension
-                            data_bounds(1,1) = Bs-g-sh_end*2
-                            data_bounds(2,1) = Bs+g-sh_start*2
-                            ! second dimension
-                            data_bounds(1,2) = g+1+sh_start*2
-                            data_bounds(2,2) = g+1+g+g+sh_end*2
-
-                        end if
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
 
                     ! 'NNE'
                     case(9)
                         if ( level_diff == -1 ) then
                             ! first dimension
-                            data_bounds(1,1) = g+1
-                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
                             ! second dimension
-                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(1,2) = 1
                             data_bounds(2,2) = Bs+g
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
-                            data_bounds(1,1) = g+1+sh_start*2
-                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
                             ! second dimension
-                            data_bounds(1,2) = g+1
+                            data_bounds(1,2) = g+(Bs+1)/2
                             data_bounds(2,2) = Bs+g
 
                         end if
@@ -743,19 +714,19 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     case(10)
                         if ( level_diff == -1 ) then
                             ! first dimension
-                            data_bounds(1,1) = g+1
-                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
                             ! second dimension
                             data_bounds(1,2) = g+1
-                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            data_bounds(2,2) = Bs+g+g
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
-                            data_bounds(1,1) = g+1+sh_start*2
-                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
                             ! second dimension
                             data_bounds(1,2) = g+1
-                            data_bounds(2,2) = Bs+g
+                            data_bounds(2,2) = g+(Bs+1)/2
 
                         end if
 
@@ -763,18 +734,18 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     case(11)
                         if ( level_diff == -1 ) then
                             ! first dimension
-                            data_bounds(1,1) = (Bs+1)/2
-                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
                             ! second dimension
-                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(1,2) = 1
                             data_bounds(2,2) = Bs+g
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
-                            data_bounds(1,1) = Bs-g-sh_end*2
-                            data_bounds(2,1) = Bs+g-sh_start*2
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
                             ! second dimension
-                            data_bounds(1,2) = g+1
+                            data_bounds(1,2) = g+(Bs+1)/2
                             data_bounds(2,2) = Bs+g
 
                         end if
@@ -783,19 +754,19 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     case(12)
                         if ( level_diff == -1 ) then
                             ! first dimension
-                            data_bounds(1,1) = (Bs+1)/2
-                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
                             ! second dimension
                             data_bounds(1,2) = g+1
-                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            data_bounds(2,2) = Bs+g+g
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
-                            data_bounds(1,1) = Bs-g-sh_end*2
-                            data_bounds(2,1) = Bs+g-sh_start*2
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
                             ! second dimension
                             data_bounds(1,2) = g+1
-                            data_bounds(2,2) = Bs+g
+                            data_bounds(2,2) = g+(Bs+1)/2
 
                         end if
 
@@ -804,18 +775,18 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                         if ( level_diff == -1 ) then
                             ! first dimension
                             data_bounds(1,1) = g+1
-                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            data_bounds(2,1) = Bs+g+g
                             ! second dimension
-                            data_bounds(1,2) = (Bs+1)/2
-                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
                             data_bounds(1,1) = g+1
-                            data_bounds(2,1) = Bs+g
+                            data_bounds(2,1) = g+(Bs+1)/2
                             ! second dimension
-                            data_bounds(1,2) = Bs-g-sh_end*2
-                            data_bounds(2,2) = Bs+g-sh_start*2
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
 
                         end if
 
@@ -823,19 +794,19 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     case(14)
                         if ( level_diff == -1 ) then
                             ! first dimension
-                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(1,1) = 1
                             data_bounds(2,1) = Bs+g
                             ! second dimension
-                            data_bounds(1,2) = (Bs+1)/2
-                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
-                            data_bounds(1,1) = g+1
+                            data_bounds(1,1) = g+(Bs+1)/2
                             data_bounds(2,1) = Bs+g
                             ! second dimension
-                            data_bounds(1,2) = Bs-g-sh_end*2
-                            data_bounds(2,2) = Bs+g-sh_start*2
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
 
                         end if
 
@@ -844,18 +815,18 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                         if ( level_diff == -1 ) then
                             ! first dimension
                             data_bounds(1,1) = g+1
-                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            data_bounds(2,1) = Bs+g+g
                             ! second dimension
-                            data_bounds(1,2) = g+1
-                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
                             data_bounds(1,1) = g+1
-                            data_bounds(2,1) = Bs+g
+                            data_bounds(2,1) = g+(Bs+1)/2
                             ! second dimension
-                            data_bounds(1,2) = g+1+sh_start*2
-                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
 
                         end if
 
@@ -863,19 +834,19 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     case(16)
                         if ( level_diff == -1 ) then
                             ! first dimension
-                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(1,1) = 1
                             data_bounds(2,1) = Bs+g
                             ! second dimension
-                            data_bounds(1,2) = g+1
-                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
 
                         elseif ( level_diff == 1 ) then
                             ! first dimension
-                            data_bounds(1,1) = g+1
+                            data_bounds(1,1) = g+(Bs+1)/2
                             data_bounds(2,1) = Bs+g
                             ! second dimension
-                            data_bounds(1,2) = g+1+sh_start*2
-                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
 
                         end if
 
@@ -960,18 +931,83 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                         res_pre_data( 1:iN*2-1, 1:jN*2-1, 1, dF), params%order_predictor)
                     end do
                     ! reset data bounds
-                    select case(data_bounds_type)
-                        case('exclude_redundant')
-                            data_bounds(1,1:2) = 2
-                            data_bounds(2,1:2) = g+1
+                    select case(neighborhood)
+                        ! '_NE'
+                        case(5)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = 2
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = g-1
+                                    data_bounds(2,2) = 2*g-2
 
-                        case('include_redundant')
-                            data_bounds(1,1:2) = 1
-                            data_bounds(2,1:2) = g+1
+                                case('include_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = g-1
+                                    data_bounds(2,2) = 2*g-1
 
-                        case('only_redundant')
-                            data_bounds(1:2,1:2) = 1
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 1
+                                    data_bounds(1:2,2) = 2*g-1
+                            end select
+                        ! '_NW'
+                        case(6)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = 2
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = 2
+                                    data_bounds(2,2) = g+1
 
+                                case('include_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g+1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 1
+                                    data_bounds(1:2,2) = 1
+                            end select
+                        ! '_SE'
+                        case(7)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = g-1
+                                    data_bounds(2,1) = 2*g-2
+                                    data_bounds(1,2) = g-1
+                                    data_bounds(2,2) = 2*g-2
+
+                                case('include_redundant')
+                                    data_bounds(1,1) = g-1
+                                    data_bounds(2,1) = 2*g-1
+                                    data_bounds(1,2) = g-1
+                                    data_bounds(2,2) = 2*g-1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 2*g-1
+                                    data_bounds(1:2,2) = 2*g-1
+                            end select
+                        ! '_SW'
+                        case(8)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = g-1
+                                    data_bounds(2,1) = 2*g-2
+                                    data_bounds(1,2) = 2
+                                    data_bounds(2,2) = g+1
+
+                                case('include_redundant')
+                                    data_bounds(1,1) = g-1
+                                    data_bounds(2,1) = 2*g-1
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g+1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 2*g-1
+                                    data_bounds(1:2,2) = 1
+                            end select
                     end select
 
                 elseif ( level_diff == 1) then
@@ -990,9 +1026,84 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                         end do
                     end do
                     ! reset data bounds
-                    data_bounds(1,1:2) = 1
-                    data_bounds(2,1)   = (iN+1)/2
-                    data_bounds(2,2)   = (jN+1)/2
+                    select case(neighborhood)
+                        ! '_NE'
+                        case(5)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g
+
+                                case('include_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g+1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 1
+                                    data_bounds(1:2,2) = 1
+                            end select
+                        ! '_NW'
+                        case(6)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g
+
+                                case('include_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g+1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 1
+                                    data_bounds(1:2,2) = 1
+                            end select
+                        ! '_SE'
+                        case(7)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g
+
+                                case('include_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g+1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 1
+                                    data_bounds(1:2,2) = 1
+                            end select
+                        ! '_SW'
+                        case(8)
+                            select case(data_bounds_type)
+                                case('exclude_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g
+
+                                case('include_redundant')
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = g+1
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = g+1
+
+                                case('only_redundant')
+                                    data_bounds(1:2,1) = 1
+                                    data_bounds(1:2,2) = 1
+                            end select
+                    end select
 
                 end if
 
@@ -1055,19 +1166,19 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                         case(11)
                             select case(data_bounds_type)
                                 case('exclude_redundant')
-                                    data_bounds(1,1) = Bs+g+1
+                                    data_bounds(1,1) = Bs+g
                                     data_bounds(2,1) = Bs+2*g-1
                                     data_bounds(1,2) = g+1
                                     data_bounds(2,2) = Bs+2*g
 
                                 case('include_redundant')
                                     data_bounds(1,1) = Bs+g
-                                    data_bounds(2,1) = Bs+2*g-1
+                                    data_bounds(2,1) = Bs+2*g
                                     data_bounds(1,2) = g+1
                                     data_bounds(2,2) = Bs+2*g
 
                                 case('only_redundant')
-                                    data_bounds(1:2,1) = Bs+g
+                                    data_bounds(1:2,1) = Bs+2*g
                                     data_bounds(1,2) = g+1
                                     data_bounds(2,2) = Bs+2*g
 
@@ -1077,19 +1188,19 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                         case(12)
                             select case(data_bounds_type)
                                 case('exclude_redundant')
-                                    data_bounds(1,1) = Bs+g+1
+                                    data_bounds(1,1) = Bs+g
                                     data_bounds(2,1) = Bs+2*g-1
                                     data_bounds(1,2) = 1
                                     data_bounds(2,2) = Bs+g
 
                                 case('include_redundant')
                                     data_bounds(1,1) = Bs+g
-                                    data_bounds(2,1) = Bs+2*g-1
+                                    data_bounds(2,1) = Bs+2*g
                                     data_bounds(1,2) = 1
                                     data_bounds(2,2) = Bs+g
 
                                 case('only_redundant')
-                                    data_bounds(1:2,1) = Bs+g
+                                    data_bounds(1:2,1) = Bs+2*g
                                     data_bounds(1,2) = 1
                                     data_bounds(2,2) = Bs+g
 
@@ -1101,19 +1212,19 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                                 case('exclude_redundant')
                                     data_bounds(1,1) = 1
                                     data_bounds(2,1) = Bs+g
-                                    data_bounds(1,2) = Bs+g+1
+                                    data_bounds(1,2) = Bs+g
                                     data_bounds(2,2) = Bs+2*g-1
 
                                 case('include_redundant')
                                     data_bounds(1,1) = 1
                                     data_bounds(2,1) = Bs+g
                                     data_bounds(1,2) = Bs+g
-                                    data_bounds(2,2) = Bs+2*g-1
+                                    data_bounds(2,2) = Bs+2*g
 
                                 case('only_redundant')
                                     data_bounds(1,1) = 1
                                     data_bounds(2,1) = Bs+g
-                                    data_bounds(1:2,2) = Bs+g
+                                    data_bounds(1:2,2) = Bs+2*g
 
                             end select
 
@@ -1123,19 +1234,19 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                                 case('exclude_redundant')
                                     data_bounds(1,1) = g+1
                                     data_bounds(2,1) = Bs+2*g
-                                    data_bounds(1,2) = Bs+g+1
+                                    data_bounds(1,2) = Bs+g
                                     data_bounds(2,2) = Bs+2*g-1
 
                                 case('include_redundant')
                                     data_bounds(1,1) = g+1
                                     data_bounds(2,1) = Bs+2*g
                                     data_bounds(1,2) = Bs+g
-                                    data_bounds(2,2) = Bs+2*g-1
+                                    data_bounds(2,2) = Bs+2*g
 
                                 case('only_redundant')
                                     data_bounds(1,1) = g+1
                                     data_bounds(2,1) = Bs+2*g
-                                    data_bounds(1:2,2) = Bs+g
+                                    data_bounds(1:2,2) = Bs+2*g
 
                             end select
 
@@ -1157,7 +1268,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                                 case('only_redundant')
                                     data_bounds(1,1) = 1
                                     data_bounds(2,1) = Bs+g
-                                    data_bounds(1:2,2) = Bs+g
+                                    data_bounds(1:2,2) = 1
 
                             end select
 
@@ -1179,7 +1290,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                                 case('only_redundant')
                                     data_bounds(1,1) = g+1
                                     data_bounds(2,1) = Bs+2*g
-                                    data_bounds(1:2,2) = Bs+g
+                                    data_bounds(1:2,2) = 1
 
                             end select
 
@@ -1215,7 +1326,7 @@ end subroutine restrict_predict_data
 
 !############################################################################################################
 
-subroutine read_hvy_data( params, data_buffer, buffer_counter, data_bounds, level_diff, hvy_block, hvy_id )
+subroutine read_hvy_data( params, data_buffer, buffer_counter, hvy_data )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -1231,17 +1342,11 @@ subroutine read_hvy_data( params, data_buffer, buffer_counter, data_bounds, leve
     real(kind=rk), intent(out)                 :: data_buffer(:)
     ! buffer size
     integer(kind=ik), intent(out)                 :: buffer_counter
-    !> data_bounds
-    integer(kind=ik), intent(in)                 :: data_bounds(2,3)
-    !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff
-    !> heavy data array - block data
-    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
-    !> hvy id
-    integer(kind=ik), intent(in)                    :: hvy_id
+    !> heavy block data, all data fields
+    real(kind=rk), intent(in)                       :: hvy_data(:, :, :, :)
 
     ! loop variable
-    integer(kind=ik)                                :: i, j, k, dF, iN, jN, kN
+    integer(kind=ik)                                :: i, j, k, dF
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -1252,27 +1357,22 @@ subroutine read_hvy_data( params, data_buffer, buffer_counter, data_bounds, leve
     ! reset buffer size
     buffer_counter = 0
 
-    ! data size
-    iN = data_bounds(2,1) - data_bounds(1,1) + 1
-    jN = data_bounds(2,2) - data_bounds(1,2) + 1
-    kN = data_bounds(2,3) - data_bounds(1,3) + 1
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
     ! loop over all data fields
     do dF = 1, params%number_data_fields
         ! first dimension
-        do i = 1, iN
+        do i = 1, size(hvy_data, 1)
             ! second dimension
-            do j = 1, jN
+            do j = 1, size(hvy_data, 2)
                 ! third dimension, note: for 2D cases kN is allways 1
-                do k = 1, kN
+                do k = 1, size(hvy_data, 3)
 
                     ! increase buffer size
                     buffer_counter = buffer_counter + 1
                     ! write data buffer
-                    data_buffer(buffer_counter)   = hvy_block( i, j, k, dF, hvy_id )
+                    data_buffer(buffer_counter)   = hvy_data( i, j, k, dF )
 
                 end do
             end do
@@ -1281,3 +1381,59 @@ subroutine read_hvy_data( params, data_buffer, buffer_counter, data_bounds, leve
 
 end subroutine read_hvy_data
 
+!############################################################################################################
+
+subroutine write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)                  :: params
+    !> data buffer
+    real(kind=rk), intent(in)                 :: data_buffer(:)
+    !> data_bounds
+    integer(kind=ik), intent(in)                 :: data_bounds(2,3)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
+    !> hvy id
+    integer(kind=ik), intent(in)                    :: hvy_id
+
+    ! loop variable
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    buffer_i = 1
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! loop over all data fields
+    do dF = 1, params%number_data_fields
+        ! first dimension
+        do i = data_bounds(1,1), data_bounds(2,1)
+            ! second dimension
+            do j = data_bounds(1,2), data_bounds(2,2)
+                ! third dimension, note: for 2D cases kN is allways 1
+                do k = data_bounds(1,3), data_bounds(2,3)
+
+                    ! write data buffer
+                    hvy_block( i, j, k, dF, hvy_id ) = data_buffer( buffer_i )
+                    buffer_i = buffer_i + 1
+
+                end do
+            end do
+        end do
+    end do
+
+end subroutine write_hvy_data

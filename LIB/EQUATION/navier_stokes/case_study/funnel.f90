@@ -152,19 +152,19 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             endif                                              
 
 
-            ! ! ! Outlet flow: Transition to 2pump
-            ! ! ! ---------------------
-            ! ! chi=  draw_outlet(x,y,funnel,h)
-            !    chi=  draw_sink(x,y,funnel,h)
+            ! ! Outlet flow: Transition to 2pump
+            ! ! ---------------------
+            ! chi=  draw_outlet(x,y,funnel,h)
+               chi=  draw_sink(x,y,funnel,h)
               
-            !   if (chi>0) then                                 
-            !     mask(ix,iy,1) = mask(ix,iy,1)+chi
-            !     mask(ix,iy,4) = mask(ix,iy,4)+chi
-            !     Phi_ref(ix,iy,1) = rho_capillary                       
-            !     !Phi_ref(ix,iy,2) = 0
-            !     Phi_ref(ix,iy,3) = 0                                      
-            !     Phi_ref(ix,iy,4) = p_2nd_pump_stage
-            !   endif    
+              if (chi>0) then                                 
+                mask(ix,iy,1) = mask(ix,iy,1)+chi
+                mask(ix,iy,4) = mask(ix,iy,4)+chi
+                Phi_ref(ix,iy,1) = rho_capillary                       
+                !Phi_ref(ix,iy,2) = 0
+                Phi_ref(ix,iy,3) = 0                                      
+                Phi_ref(ix,iy,4) = p_2nd_pump_stage
+              endif    
           
 
             ! density

@@ -91,13 +91,13 @@ module module_navier_stokes_new
 
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  type(type_params_ns), save :: params_ns
-  ! statevector
-  integer(kind=ik),save      :: rhoF,UxF,UyF,UzF,pF
+  type(type_params_ns),save :: params_ns
+  ! statevector index
+  integer(kind=ik)    ,save :: rhoF,UxF,UyF,UzF,pF
 
-  ! real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=0.0_rk,T0_=200!273.15_rk
-  real(kind=rk)   ,parameter :: rho0_=1.645_rk,p0_=101330.0_rk,u0_=36.4_rk,v0_=0.0_rk,T0_=200!273.15_rk
-
+  ! real(kind=rk)   ,parameter :: rho_init=1.645_rk,p_init=101330.0_rk,u_init=36.4_rk,v0_=0.0_rk,T_init=200!273.15_rk
+  real(kind=rk)       ,save :: rho_init=1_rk,p_init=1.0_rk,T_init=1!273.15_rk
+  real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,1.0_rk/)
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -153,8 +153,13 @@ contains
     ! read switch to turn on|off dissipation
     call read_param_mpi(FILE, 'Navier_Stokes', 'dissipation', params_ns%dissipation, .true. )
     ! read initial conditions
-    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond', params_ns%inicond, "pressure_blob" )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, 0.1_rk )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, params_ns%Lx*0.1_rk )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_preasure' , p_init, p_init )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
+    
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
     
@@ -431,9 +436,10 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! loop variables
-    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax,sqrt_rho_min
+    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax
 
     dt = 9.9e9_rk
+
     ! get smallest spatial seperation
     if(size(u,3)==1) then
         deltax=minval(dx(1:2))
@@ -443,23 +449,23 @@ contains
         allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
     endif
 
-
+    ! calculate norm of velocity at every spatial point 
     if (UzF==-1) then
         v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
         v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
 
-    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
-    
-    sqrt_rho_min=minval(u(g+1:Bs+g,g+1:Bs+g,1,rhoF))
-    if (sqrt_rho_min<=0.00_rk ) then
-      call abort(4754, 'Error [module_navier_stokes_new]: density is zero ):')
+    if (minval(u(:,:,:,pF))<0) then
+      call abort(64367,"ERROR [module_navier_stokes_new.f90]:CFL number to large")
     endif
-    v_physical(g+1:Bs+g,g+1:Bs+g,1) = v_physical(g+1:Bs+g,g+1:Bs+g,1)/u(g+1:Bs+g,g+1:Bs+g,1,rhoF)
-    ! max velocity in one block
 
-     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical(g+1:Bs+g,g+1:Bs+g,1)))
+    ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
+    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))    
+    v_physical = v_physical/u(:,:,:,rhoF)
+    
+    ! CFL criteria CFL=v_physical/v_numerical where v_numerical=dx/dt
+     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical))
 
     ! penalization requiers dt <= C_eta
     if (params_ns%penalization ) then
@@ -509,31 +515,41 @@ contains
     call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
     case ("zeros")
       ! add ambient pressure
-      u( :, :, :, pF) = p0_
+      u( :, :, :, pF) = p_init
       ! set rho
-      u( :, :, :, rhoF) = rho0_
+      u( :, :, :, rhoF) = sqrt(rho_init)
+      ! set Ux
+      u( :, :, :, UxF) = 0.0_rk
+      ! set Uy
+      u( :, :, :, UyF) = 0.0_rk
 
+      if (size(u,3).ne.1) then
+          ! set Uz to zero
+          u( :, :, :, UzF) = 0.0_rk
+      endif
+    
     case ("mask")
       ! add ambient pressure
-      u( :, :, :, pF) = p0_
+      u( :, :, :, pF) = p_init
       ! set rho
-      u( :, :, :, rhoF) = rho0_
+      u( :, :, :, rhoF) = sqrt(rho_init)
 
       ! set velocity field u(x)=1 for x in mask
       if (size(u,3)==1 .and. params_ns%penalization) then
         call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
         call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
       endif
+     
       ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
-      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*U0_
-      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*V0_
+      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
+      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
     case ("pressure_blob")
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = p0_ + 1000.0_rk * u( :, :, :, pF)
+        u( :, :, :, pF) = p_init + 1000.0_rk * u( :, :, :, pF)
         ! set rho
-        u( :, :, :, rhoF) = rho0_
+        u( :, :, :, rhoF) = sqrt(rho_init)
         ! set Ux
         u( :, :, :, UxF) = 0.0_rk
         ! set Uy

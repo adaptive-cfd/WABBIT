@@ -245,7 +245,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     my_proc_heavy_max(rank+1) = heavy_max
 
     ! synchronize array
-    call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! for readability, calc sum of all max heavy ids
     block_sum = sum(proc_heavy_max)
@@ -259,7 +259,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     my_lgt_block_send_buffer( buffer_start+1 : buffer_start+heavy_max, : ) = my_lgt_block( 1 : heavy_max, :)
 
     ! synchronize light data
-    call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum*size(lgt_block,2), MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum*size(lgt_block,2), MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
 
     ! write synchronized light data
     ! loop over number of procs and reset lgt_block array

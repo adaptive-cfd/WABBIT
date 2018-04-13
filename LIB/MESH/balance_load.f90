@@ -84,6 +84,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), allocatable       :: sfc_com_list(:,:), sfc_sorted_list(:,:)
     ! hilbert code
     integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
+    ! communicator
+    integer(kind=ik)                    :: WABBIT_COMM
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -95,11 +97,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     distribution    = params%block_distribution
 
-    ! determinate process rank
+    ! MPI_parameters
     rank = params%rank
-    ! determinate process number
     number_procs = params%number_procs
-
+    WABBIT_COMM  = params%WABBIT_COMM
     ! allocate block to proc lists
     allocate( opt_dist_list(1:number_procs), dist_list(1:number_procs))
 
@@ -256,15 +257,15 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 !                    end if
 !
 !                    ! send data
-!                    call MPI_Send( buffer_light, (com_N-1), MPI_INTEGER4, com_plan(k, 2), tag, MPI_COMM_WORLD, ierr)
-!                    call MPI_Send( buffer_data, data_size*(com_N-1), MPI_REAL8, com_plan(k, 2), tag, MPI_COMM_WORLD, ierr)
+!                    call MPI_Send( buffer_light, (com_N-1), MPI_INTEGER4, com_plan(k, 2), tag, WABBIT_COMM, ierr)
+!                    call MPI_Send( buffer_data, data_size*(com_N-1), MPI_REAL8, com_plan(k, 2), tag, WABBIT_COMM, ierr)
 !
 !                !*************** RECV CASE
 !                elseif ( com_plan(k, 2) == rank ) then
 !                    ! proc have to receive data
 !                    ! receive data
-!                    call MPI_Recv( buffer_light, com_plan(k, 3), MPI_INTEGER4, com_plan(k, 1), tag, MPI_COMM_WORLD, status, ierr)
-!                    call MPI_Recv( buffer_data, data_size*com_plan(k, 3), MPI_REAL8, com_plan(k, 1), tag, MPI_COMM_WORLD, status, ierr)
+!                    call MPI_Recv( buffer_light, com_plan(k, 3), MPI_INTEGER4, com_plan(k, 1), tag, WABBIT_COMM, status, ierr)
+!                    call MPI_Recv( buffer_data, data_size*com_plan(k, 3), MPI_REAL8, com_plan(k, 1), tag, WABBIT_COMM, status, ierr)
 !
 !                    ! loop over all received blocks
 !                    do l = 1,  com_plan(k, 3)
@@ -429,8 +430,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                         end do
 
                         ! send data
-                        call MPI_Send( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
-                        call MPI_Send( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 2), tag, MPI_COMM_WORLD, ierr)
+                        call MPI_Send( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
+                        call MPI_Send( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
 
                         ! delete all com list elements
                         sfc_com_list(k:k+l-1, :) = -1
@@ -452,8 +453,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                         end do
 
                         ! receive data
-                        call MPI_Recv( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
-                        call MPI_Recv( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 1), tag, MPI_COMM_WORLD, status, ierr)
+                        call MPI_Recv( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
+                        call MPI_Recv( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
 
                         ! delete first com list element after receiving data
                         sfc_com_list(k, :) = -1

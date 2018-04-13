@@ -99,6 +99,6 @@ subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt
 
 
    call MPI_ALLREDUCE(int_local, volume_int, 3, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_WORLD, mpi_err)
+       params%WABBIT_COMM, mpi_err)
 
 end subroutine volume_integral

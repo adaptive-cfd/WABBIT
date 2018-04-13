@@ -105,7 +105,7 @@ subroutine coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n
             end do
           endif
           ! sync light data, as only root sets random coarsening
-          call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, MPI_COMM_WORLD, ierr )
+          call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, params%WABBIT_COMM, ierr )
         endif
 
       case default

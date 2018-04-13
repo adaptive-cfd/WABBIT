@@ -1,3 +1,4 @@
+
 !> \file
 !> \callgraph
 ! ********************************************************************************************
@@ -315,7 +316,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     ! synchronize light data
     lgt_block = 0
-    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! clean up
     deallocate( data_predict_fine  )

@@ -107,7 +107,7 @@ contains
     call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
     ! Modify the property list and store the MPI IO comminucator
     ! information in the file access property list
-    call h5pset_fapl_mpio_f(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL, error)
+    call h5pset_fapl_mpio_f(plist_id, WABBIT_COMM, MPI_INFO_NULL, error)
 
     !---------------------------------------------------------------------------
     ! open the file
@@ -200,8 +200,8 @@ contains
     ! determine size of memory (i.e. the entire array). note we assume the file
     ! contains the right amount of data, which must be ensured outside of this function
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t)
       ! size of array on this cpu
@@ -216,7 +216,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -243,7 +243,7 @@ contains
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -319,8 +319,8 @@ contains
     ! determine size of memory (i.e. the entire array). note we assume the file
     ! contains the right amount of data, which must be ensured outside of this function
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t)
       ! size of array on this cpu
@@ -335,7 +335,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -360,7 +360,7 @@ contains
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -421,8 +421,8 @@ contains
     ! determine size of memory (i.e. the entire array). note we assume the file
     ! contains the right amount of data, which must be ensured outside of this function
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t)
       ! size of array on this cpu
@@ -437,7 +437,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -464,7 +464,7 @@ contains
         write(*,*) 'file', dims_file
         write(*,*) 'global', dims_global
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -524,8 +524,8 @@ contains
     ! determine size of memory (i.e. the entire array). note we assume the file
     ! contains the right amount of data, which must be ensured outside of this function
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i), mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i), maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t)
       ! size of array on this cpu
@@ -540,7 +540,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -566,7 +566,7 @@ contains
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) &
     .or.(dims_global(3)/=dims_file(3)) .or.(dims_global(4)/=dims_file(4))) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(MPI_COMM_WORLD,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -647,8 +647,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -669,7 +669,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -690,7 +690,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset
@@ -783,8 +783,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -805,7 +805,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -826,7 +826,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset
@@ -917,8 +917,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -939,7 +939,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -967,7 +967,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset
@@ -1059,8 +1059,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -1081,7 +1081,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -1109,7 +1109,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset
@@ -1202,8 +1202,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -1224,7 +1224,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -1252,7 +1252,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset
@@ -1343,8 +1343,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -1365,7 +1365,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -1386,7 +1386,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset
@@ -1479,8 +1479,8 @@ contains
     ! which we will write to file.
     ! ----------------------------------------------------------------------------
     do i=1, datarank
-      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,MPI_COMM_WORLD,mpicode)
-      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( lbounds(i),mindim,1,MPI_INTEGER,MPI_MIN,WABBIT_COMM,mpicode)
+      call MPI_ALLREDUCE ( ubounds(i),maxdim,1,MPI_INTEGER,MPI_MAX,WABBIT_COMM,mpicode)
       ! size of the global array
       dims_global(i) = int( maxdim-mindim+1, kind=hsize_t )
       ! size of array on this cpu
@@ -1501,7 +1501,7 @@ contains
     ! each direction, but no more than 128 points (so biggest possible chunk is 128^3
     ! which is about 16MB)
     do i = 1, datarank
-      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,MPI_COMM_WORLD,mpicode)
+      call MPI_ALLREDUCE ( dims_local(i),chunk_dims(i),1,MPI_INTEGER8,MPI_MAX,WABBIT_COMM,mpicode)
       chunk_dims(i) = min(chunk_dims(i), max_chunk )
     enddo
 
@@ -1522,7 +1522,7 @@ contains
     call h5lexists_f(file_id, dsetname, exist, error)
     if (exist) then
       write(*,*) "You are trying to write to an existing dataset...this is not supported."
-      call MPI_ABORT(MPI_COMM_WORLD,4441,mpicode)
+      call MPI_ABORT(WABBIT_COMM,4441,mpicode)
     endif
 
     ! create the dataset

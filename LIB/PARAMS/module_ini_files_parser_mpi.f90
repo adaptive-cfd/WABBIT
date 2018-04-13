@@ -15,10 +15,11 @@ module module_ini_files_parser_mpi
     module procedure param_dbl_mpi, param_int_mpi, param_vct_mpi, param_str_mpi, param_bool_mpi, param_matrix_mpi, param_vct_str_mpi
   end interface
 
-
 !!!!!!!!
 contains
 !!!!!!!!
+  
+
 
   !-----------------------------------------------------------------------------
   ! read an array from an ascii file (SERIAL version, to be executed only on root)
@@ -31,8 +32,12 @@ contains
     real(kind=rk), intent(inout) :: array (1:,1:)
     integer :: nlines, ncols, mpicode, mpirank
 
+    ! check if communicator is set
+    if (WABBIT_COMM==-1) then
+      call abort(3567632,"Error[module_ini_files_parser_mpi.f90]: Communicator not set")
+    endif
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     nlines = size(array,1)
     ncols = size(array,2)
@@ -40,7 +45,7 @@ contains
     ! only root reads from file...
     if (mpirank==0) call read_array_from_ascii_file(file, array, n_header)
     ! ... then broadcast
-    call MPI_BCAST(array,nlines*ncols,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpicode)
+    call MPI_BCAST(array,nlines*ncols,MPI_DOUBLE_PRECISION,0,WABBIT_COMM,mpicode)
   end subroutine read_array_from_ascii_file_mpi
 
 
@@ -55,12 +60,12 @@ contains
     integer :: mpicode, mpirank
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     ! only root reads from file...
     if (mpirank==0) call count_lines_in_ascii_file(file, num_lines, n_header)
     ! ... then broadcast
-    call MPI_BCAST(num_lines,1,MPI_INTEGER,0,MPI_COMM_WORLD,mpicode)
+    call MPI_BCAST(num_lines,1,MPI_INTEGER,0,WABBIT_COMM,mpicode)
   end subroutine count_lines_in_ascii_file_mpi
 
 
@@ -74,7 +79,7 @@ contains
     integer :: mpirank, mpicode
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     if (mpirank == 0) then
       call clean_ini_file(PARAMS)
@@ -94,8 +99,13 @@ contains
     logical, intent(in) :: verbose
     integer :: mpirank, mpicode
 
+    ! check if communicator is set
+    if (WABBIT_COMM==-1) then
+      call abort(3567632,"Error[module_ini_files_parser_mpi.f90]: Communicator not set")
+    endif
+    
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     if (mpirank==0) then
       call read_ini_file( PARAMS, file, verbose )
@@ -127,7 +137,7 @@ contains
     integer :: mpirank
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
     if (mpirank==0) then
@@ -135,7 +145,7 @@ contains
     endif
 
     ! And then broadcast
-    call MPI_BCAST( params_real, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+    call MPI_BCAST( params_real, 1, MPI_DOUBLE_PRECISION, 0, WABBIT_COMM, mpicode )
   end subroutine param_dbl_mpi
 
 
@@ -165,7 +175,7 @@ contains
     integer :: mpirank
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
     if (mpirank==0) then
@@ -173,7 +183,7 @@ contains
     endif
 
     ! And then broadcast
-    call MPI_BCAST( params_string, len(params_string), MPI_CHARACTER, 0, MPI_COMM_WORLD, mpicode)
+    call MPI_BCAST( params_string, len(params_string), MPI_CHARACTER, 0, WABBIT_COMM, mpicode)
   end subroutine param_str_mpi
 
 
@@ -204,7 +214,7 @@ contains
     integer :: mpirank
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     n = size(params_vector,1)
 
@@ -218,7 +228,7 @@ contains
     endif
 
     ! And then broadcast
-    call MPI_BCAST( params_vector, n, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+    call MPI_BCAST( params_vector, n, MPI_DOUBLE_PRECISION, 0, WABBIT_COMM, mpicode )
   end subroutine param_vct_mpi
 
 
@@ -247,7 +257,7 @@ contains
     integer :: mpirank
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     n = size(params_vector,1)
 
@@ -256,7 +266,7 @@ contains
         call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
     endif
 
-    call MPI_BCAST( params_vector, len(params_vector(1))*n, MPI_CHARACTER, 0, MPI_COMM_WORLD, mpicode )
+    call MPI_BCAST( params_vector, len(params_vector(1))*n, MPI_CHARACTER, 0, WABBIT_COMM, mpicode )
   end subroutine param_vct_str_mpi
 
 
@@ -287,7 +297,7 @@ contains
     integer :: mpirank
 
     ! fetch my process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
     if (mpirank==0) then
@@ -297,14 +307,14 @@ contains
     endif
 
     ! And then broadcast
-    call MPI_BCAST(  n, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpicode )
-    call MPI_BCAST(  m, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpicode )
+    call MPI_BCAST(  n, 1, MPI_INTEGER, 0, WABBIT_COMM, mpicode )
+    call MPI_BCAST(  m, 1, MPI_INTEGER, 0, WABBIT_COMM, mpicode )
 
     if ( .not. allocated(matrix) ) then
       allocate(matrix(1:n,1:m))
     endif
 
-    call MPI_BCAST(  matrix, n*m, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+    call MPI_BCAST(  matrix, n*m, MPI_DOUBLE_PRECISION, 0, WABBIT_COMM, mpicode )
   end subroutine param_matrix_mpi
 
     !-------------------------------------------------------------------------------
@@ -329,7 +339,7 @@ contains
       integer :: mpirank
 
       ! fetch my process id
-      call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+      call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
       ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
       if (mpirank==0) then
@@ -337,7 +347,7 @@ contains
       endif
 
       ! And then broadcast
-      call MPI_BCAST( params_int, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpicode )
+      call MPI_BCAST( params_int, 1, MPI_INTEGER, 0, WABBIT_COMM, mpicode )
     end subroutine param_int_mpi
 
 
@@ -362,7 +372,7 @@ contains
         integer :: mpirank, mpicode
 
         ! fetch my process id
-        call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
@@ -370,7 +380,7 @@ contains
         endif
 
         ! And then broadcast
-        call MPI_BCAST( params_bool, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpicode )
+        call MPI_BCAST( params_bool, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
       end subroutine param_bool_mpi
 
 

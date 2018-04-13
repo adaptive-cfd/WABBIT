@@ -41,8 +41,8 @@ program main
     use module_time_step
     ! unit test module
     use module_unit_test
-    ! module of bridge to other mpi worlds
-    use bridgefluid
+    ! bridge implementation of wabbit
+    use module_bridge_interface
     !>TODO is this still needed here ???????
     use module_ACM_new
 

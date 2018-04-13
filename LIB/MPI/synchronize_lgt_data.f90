@@ -78,7 +78,7 @@ subroutine synchronize_lgt_data( params, lgt_block )
     my_proc_lgt_num(:) = 0
     my_proc_lgt_num(mpirank+1) = lgt_num
     ! synchronize array
-    call MPI_Allreduce(my_proc_lgt_num, proc_lgt_num, mpisize, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_proc_lgt_num, proc_lgt_num, mpisize, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
     ! this is the global buffer size
     buffer_size = sum(proc_lgt_num)
 
@@ -107,7 +107,7 @@ subroutine synchronize_lgt_data( params, lgt_block )
 
     ! synchronize the buffer
     call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_recv_buffer, buffer_size*size(lgt_block,2), &
-    MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
+    MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
 
     ! we need to delete the old lgt_block array to avoid any rotting corpses somewhere.
     ! it is a little tricky to see why this is the case, but we found it to be necessary.

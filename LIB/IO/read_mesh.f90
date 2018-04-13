@@ -62,13 +62,14 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     integer(kind=ik)                              :: ierr
     integer(kind=ik)                              :: treecode_size
     integer(hsize_t), dimension(2)                :: dims_treecode
+    integer(kind=ik)                              :: WABBIT_COMM
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
     ! set MPI parameters
     rank         = params%rank
     number_procs = params%number_procs
-
+    WABBIT_COMM  = params%WABBIT_COMM
     ! grid parameter
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
@@ -121,7 +122,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         ! treecode in input file is greater than the new one, abort and output on screen
         if (params%threeD_case) write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') &
             params%max_treelevel, dims_treecode(1)
-        call MPI_ABORT( MPI_COMM_WORLD, 10004, ierr)
+        call MPI_ABORT( WABBIT_COMM, 10004, ierr)
     end if
 
     allocate(block_treecode(1:dims_treecode(1), 1:hvy_n))
@@ -153,7 +154,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! be synced. However, the light data has to.
     lgt_block = -1
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), &
-        MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+        MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
 
     deallocate(my_lgt_block)
     deallocate(block_treecode)

@@ -74,7 +74,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     integer(kind=ik)                    :: heavy_max, block_sum, buffer_start
     ! list of max heavy ids, use to build send/receive buffer
     integer(kind=ik)                    :: proc_heavy_max(params%number_procs), my_proc_heavy_max(params%number_procs)
-
+    !communicator
+    integer(kind=ik)                    :: WABBIT_COMM
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -94,8 +95,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     g  = params%number_ghost_nodes
 
     ! set MPI parameter
-    rank         = params%rank
-
+    rank          = params%rank
+    WABBIT_COMM   = params%WABBIT_COMM  
     ! allocate interpolation fields
     allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
     allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
@@ -191,7 +192,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     my_proc_heavy_max(rank+1) = heavy_max
 
     ! synchronize array
-    call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! for readability, calc sum of all max heavy ids
     block_sum = sum(proc_heavy_max)
@@ -207,7 +208,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     end do
 
     ! synchronize light data
-    call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum, MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum, MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
 
     ! write synchronized light data
     ! loop over number of procs and reset lgt_block array

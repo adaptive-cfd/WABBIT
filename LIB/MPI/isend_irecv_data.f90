@@ -117,12 +117,12 @@ subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_rece
             com_pos(k) = i
 
             ! receive data
-            !call MPI_Irecv( int_receive_buffer(1, receive_pos), size(int_receive_buffer,1), MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
-            call MPI_Irecv( int_receive_buffer(1, i), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            !call MPI_Irecv( int_receive_buffer(1, receive_pos), size(int_receive_buffer,1), MPI_INTEGER4, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
+            call MPI_Irecv( int_receive_buffer(1, i), int_length, MPI_INTEGER4, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
 
             ! send data
-            !call MPI_Isend( int_send_buffer(1, send_pos), size(int_send_buffer,1), MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
-            call MPI_Isend( int_send_buffer(1, i), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            !call MPI_Isend( int_send_buffer(1, send_pos), size(int_send_buffer,1), MPI_INTEGER4, k-1, tag, WABBIT_COMM, send_request(i), ierr)
+            call MPI_Isend( int_send_buffer(1, i), int_length, MPI_INTEGER4, k-1, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
 
@@ -161,15 +161,15 @@ subroutine isend_irecv_data( params, int_send_buffer, real_send_buffer, int_rece
             real_pos = int_receive_buffer(1, i)
 
             ! receive data
-            call MPI_Irecv( real_receive_buffer(1, i), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
-            !call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( real_receive_buffer(1, i), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
+            !call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
 
             ! real buffer length
             real_pos = int_send_buffer(1, i)
 
             ! send data
-            call MPI_Isend( real_send_buffer(1, i), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
-            !call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( real_send_buffer(1, i), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM, send_request(i), ierr)
+            !call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
 

@@ -25,7 +25,8 @@ module module_params
     use mpi
     ! ini file parser module
     use module_ini_files_parser_mpi
-
+    ! MPI general bridge module
+    use module_bridge
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -125,12 +126,42 @@ module module_params
         integer(kind=ik)                            :: rank
         ! number of processes
         integer(kind=ik)                            :: number_procs
+        ! WABBIT communicator
+        integer(kind=ik)                            :: WABBIT_COMM
+        
+        ! -------------------------------------------------------------------------------------
+        ! bridge
+        ! -------------------------------------------------------------------------------------
+        ! bridge for connecting WABBIT to outdoor MPI_WORLD
+        type(bridgeMPI)                             :: bridge
+        ! 
+        logical                                     :: bridge_exists
+        !--------------------------------------------------------------------------------------
+               !! particle connection
+        !--------------------------------------------------------------------------------------
+        !! - description of the connection
+        character(len=80)                :: particleConnection
+        !! - folder where particle data is stored
+        character(len=100)               :: particleDataFolder
+        !! - file name of the particle data
+        character(len=100)               :: particleDataFile
+        !! - file name of the particle data parameters
+        character(len=100)               :: particleDataParams
+        !! - command to use for the particle program (over bridge)
+        character(len=100)               :: particleCommand
+        !! - Usage of a common myWorld_comm
+        logical                          :: bridgeCommonMPI
+        !! - Consideration of the particle side as master in case of several myWorld_comms
+        logical                          :: bridgeFluidMaster
+  
+
 
         ! -------------------------------------------------------------------------------------
         ! saving
         ! -------------------------------------------------------------------------------------
         integer(kind=ik) :: N_fields_saved
         character(len=80), allocatable, dimension(:) :: field_names
+
 
         ! -------------------------------------------------------------------------------------
         ! unit test
@@ -160,6 +191,7 @@ module module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+      
 
 !---------------------------------------------------------------------------------------------
 ! main body

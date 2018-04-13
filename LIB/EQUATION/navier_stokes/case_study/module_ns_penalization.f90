@@ -165,7 +165,6 @@ subroutine get_mask(mask, x0, dx, Bs, g )
     
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-    if penalization
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     select case(mask_geometry)

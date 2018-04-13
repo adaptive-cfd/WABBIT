@@ -66,7 +66,7 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     ! save my number of active blocks
     my_dist_list(rank+1) = hvy_n
     ! count number of active blocks and current block distribution
-    call MPI_Allreduce(my_dist_list, dist_list, number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_dist_list, dist_list, number_procs, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! count global number of blocks on all mpiranks
     num_blocks = lgt_n

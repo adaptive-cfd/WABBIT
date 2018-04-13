@@ -218,7 +218,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! (remove coarsen states, force refinement through neighbors). None of the procs had to
         ! touch the neighboring blocks, there can be no MPI conflicts.
         ! So we can simply snynchronize and know what changes have to be made
-        call MPI_Allreduce(my_refine_change, refine_change, lgt_n, MPI_INTEGER1, MPI_MAX, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(my_refine_change, refine_change, lgt_n, MPI_INTEGER1, MPI_MAX, WABBIT_COMM, ierr)
 
         ! -------------------------------------------------------------------------------------
         ! third: change light data and set grid_changed status

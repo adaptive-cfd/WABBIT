@@ -21,5 +21,5 @@ subroutine blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
   tmp_actual_blocks_per_proc = -1
   tmp_actual_blocks_per_proc(myrank) = hvy_n
   ! call MPI_Allreduce(my_block_list, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-  call MPI_ALLREDUCE(tmp_actual_blocks_per_proc, actual_blocks_per_proc, params%number_procs, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, error)
+  call MPI_ALLREDUCE(tmp_actual_blocks_per_proc, actual_blocks_per_proc, params%number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, error)
 end subroutine

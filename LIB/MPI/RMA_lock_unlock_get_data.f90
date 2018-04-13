@@ -65,6 +65,8 @@ subroutine RMA_lock_unlock_get_data( params, int_send_buffer, real_send_buffer, 
 
     ! loop variable
     integer(kind=ik)                    :: k
+    ! Communicator of WABBIT
+    integer(kind=ik)                    :: WABBIT_COMM
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -75,7 +77,7 @@ subroutine RMA_lock_unlock_get_data( params, int_send_buffer, real_send_buffer, 
     ! set MPI parameters
     rank            = params%rank
     number_procs    = params%number_procs
-
+    WABBIT_COMM     = params%WABBIT_COMM
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -85,11 +87,11 @@ subroutine RMA_lock_unlock_get_data( params, int_send_buffer, real_send_buffer, 
 
     ! integer window
     int_length = size(int_send_buffer,1) * size(int_send_buffer,2) * ik
-    call MPI_Win_create( int_send_buffer(1,1), int_length, ik, MPI_INFO_NULL, MPI_COMM_WORLD, int_win, ierr )
+    call MPI_Win_create( int_send_buffer(1,1), int_length, ik, MPI_INFO_NULL, WABBIT_COMM, int_win, ierr )
 
     ! real window
     real_length = size(real_send_buffer,1) * size(real_send_buffer,2) * rk
-    call MPI_Win_create( real_send_buffer(1,1), real_length, rk, MPI_INFO_NULL, MPI_COMM_WORLD, real_win, ierr )
+    call MPI_Win_create( real_send_buffer(1,1), real_length, rk, MPI_INFO_NULL, WABBIT_COMM, real_win, ierr )
 
     ! ----------------------------------------------------------------------------------------
     ! second: exchange data

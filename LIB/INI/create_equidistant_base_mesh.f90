@@ -187,7 +187,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   allocate ( my_lgt_block(1:size(lgt_block,1),1:size(lgt_block,2)) )
   my_lgt_block = lgt_block
   lgt_block = 0
-  call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+  call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, params%WABBIT_COMM, ierr)
   deallocate( my_lgt_block )
 
   ! as the grid has changed (we created it here), we now update the heavy and light

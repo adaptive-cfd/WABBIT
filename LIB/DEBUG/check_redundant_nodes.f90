@@ -60,7 +60,8 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     integer(kind=ik)                    :: rank
     ! number of processes
     integer(kind=ik)                    :: number_procs
-
+    ! communicator
+    integer(kind=ik)                    :: WABBIT_COMM 
     ! communication lists:
     ! dim 1: list elements
     ! dim 2: columns
@@ -93,9 +94,9 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     g  = params%number_ghost_nodes
 
     ! set MPI parameter
-    rank         = params%rank
-    number_procs = params%number_procs
-
+    rank          = params%rank
+    number_procs  = params%number_procs
+    WABBIT_COMM   = params%WABBIT_COMM
     ! allocate local com_lists
     allocate( com_lists( N*16, 6, number_procs)  )
 
@@ -123,7 +124,7 @@ subroutine check_redundant_nodes(  params, lgt_block, hvy_block, hvy_neighbor, h
     call check_internal_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, my_com_matrix, com_lists, stop_status )
 
     ! synchronize com matrix
-    call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_com_matrix, com_matrix, number_procs*number_procs, MPI_INTEGER4, MPI_SUM, WABBIT_COMM , ierr)
 
     ! symmetrize com matrix - choose max com number
     do i = 1, number_procs
@@ -1006,7 +1007,8 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
 
     ! status of nodes check: if true: stops program
     logical, intent(inout)              :: stop_status
-
+    ! MPI communicator
+    integer(kind=ik)                    :: WABBIT_COMM 
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -1020,8 +1022,9 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
     g  = params%number_ghost_nodes
 
     ! set MPI parameter
-    rank         = params%rank
-    number_procs = params%number_procs
+    rank          = params%rank
+    number_procs  = params%number_procs
+    WABBIT_COMM   = params%WABBIT_COMM
 
     allocate( com_matrix_pos(number_procs, number_procs)  )
 
@@ -1036,7 +1039,7 @@ subroutine check_external_nodes(  params, hvy_block, com_lists, com_matrix, stop
 
     ! synchronize max com number, because if not:
     ! RMA buffer displacement is not fixed, so we need synchronization there
-    call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_n_com, n_com, 1, MPI_INTEGER4, MPI_MAX, WABBIT_COMM , ierr)
 
     ! for proc without neighbors: set n_procs to 1
     ! so we allocate arrays with second dimension=1
@@ -1627,7 +1630,8 @@ subroutine isend_irecv_data_check_redundant( params, int_send_buffer, real_send_
 
     ! loop variable
     integer(kind=ik)                    :: k, i
-
+    ! communicator
+    integer(kind=ik)                    :: WABBIT_COMM
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -1637,7 +1641,7 @@ subroutine isend_irecv_data_check_redundant( params, int_send_buffer, real_send_
     ! set MPI parameters
     rank            = params%rank
     number_procs    = params%number_procs
-
+    WABBIT_COMM     = params%WABBIT_COMM
     ! set message tag
     tag = 0
 
@@ -1672,13 +1676,13 @@ subroutine isend_irecv_data_check_redundant( params, int_send_buffer, real_send_
             receive_pos = com_matrix_pos(rank+1, k)
 
             ! receive data
-            call MPI_Irecv( int_receive_buffer(1, receive_pos), size(int_receive_buffer,1), MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( int_receive_buffer(1, receive_pos), size(int_receive_buffer,1), MPI_INTEGER4, k-1, tag, WABBIT_COMM , recv_request(i), ierr)
 
             ! send buffer column number, read position matrix
             send_pos = com_matrix_pos(rank+1, k)
 
             ! send data
-            call MPI_Isend( int_send_buffer(1, send_pos), size(int_send_buffer,1), MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( int_send_buffer(1, send_pos), size(int_send_buffer,1), MPI_INTEGER4, k-1, tag, WABBIT_COMM , send_request(i), ierr)
 
         end if
 
@@ -1719,8 +1723,8 @@ subroutine isend_irecv_data_check_redundant( params, int_send_buffer, real_send_
             real_pos = int_receive_buffer(1, receive_pos)
 
             ! receive data
-            call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
-            !call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM , recv_request(i), ierr)
+            !call MPI_Irecv( real_receive_buffer(1, receive_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, WABBIT_COMM , recv_request(i), ierr)
 
             ! send buffer column number, read position matrix
             send_pos = com_matrix_pos(rank+1, k)
@@ -1729,8 +1733,8 @@ subroutine isend_irecv_data_check_redundant( params, int_send_buffer, real_send_
             real_pos = int_send_buffer(1, send_pos)
 
             ! send data
-            call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
-            !call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM , send_request(i), ierr)
+            !call MPI_Isend( real_send_buffer(1, send_pos), real_pos, MPI_DOUBLE_PRECISION, k-1, tag, WABBIT_COMM , send_request(i), ierr)
 
         end if
 

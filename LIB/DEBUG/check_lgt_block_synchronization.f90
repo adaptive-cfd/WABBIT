@@ -44,9 +44,10 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
     integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank
-
     ! loop variables
     integer(kind=ik)                    :: k, l, lgt_start
+    !> MPI communicator
+    integer(kind=ik)                    :: WABBIT_COMM
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -55,7 +56,8 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
 ! variables initialization
 
     ! determine process rank
-    rank = params%rank
+    rank        = params%rank
+    WABBIT_COMM = params%WABBIT_COMM
 
     ! light data start id
     call proc_to_lgt_data_start_id( lgt_start, rank, params%number_blocks )
@@ -70,7 +72,7 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
 ! main body
 
     ! gather light data
-    call MPI_Allreduce(my_lgt_block, lgt_block_0, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_lgt_block, lgt_block_0, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! loop over all blocks
     do k = 1, size(lgt_block, 1)

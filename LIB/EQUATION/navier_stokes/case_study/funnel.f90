@@ -154,8 +154,8 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
 
             ! ! Outlet flow: Transition to 2pump
             ! ! ---------------------
-            ! chi=  draw_outlet(x,y,funnel,h)
-               chi=  draw_sink(x,y,funnel,h)
+            chi=  draw_outlet(x,y,funnel,h)
+            !   chi=  draw_sink(x,y,funnel,h)
               
               if (chi>0) then                                 
                 mask(ix,iy,1) = mask(ix,iy,1)+chi
@@ -333,10 +333,7 @@ function draw_funnel_plates(x,y,funnel,h)
   ! loop over all plates
   do n=1,funnel%nr_plates
 
-    if (x>(funnel%plate(n)%x0(1)-3*h) .and. &
-        x<(funnel%plate(n)%x0(1)+funnel%plates_thickness+3*h)) then
-                    draw_funnel_plates=draw_funnel_plates+draw_plate(x,y,funnel%plate(n),h)
-    endif
+      draw_funnel_plates=draw_funnel_plates+draw_plate(x,y,funnel%plate(n),h)
   
   enddo
 
@@ -473,7 +470,9 @@ function draw_outlet(x,y,funnel,h)
 
  if (abs(y-domain_size(2)/2)< funnel%min_inner_diameter/2) then
          ! wall in WEST
-    draw_outlet=smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+    !draw_outlet=smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+    draw_outlet=soft_bump(x,domain_size(1)-funnel%wall_thickness+h,funnel%wall_thickness*0.5_rk-2*h,h)
+  
   else
     draw_outlet=0.0_rk
   endif

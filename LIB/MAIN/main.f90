@@ -41,6 +41,9 @@ program main
     use module_time_step
     ! unit test module
     use module_unit_test
+    ! module of bridge to other mpi worlds
+    use bridgefluid
+    !>TODO is this still needed here ???????
     use module_ACM_new
 
 !---------------------------------------------------------------------------------------------
@@ -161,10 +164,10 @@ program main
     ! init mpi
     call MPI_Init(ierr)
     ! determine process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(WABBIT_COMM, rank, ierr)
     params%rank         = rank
     ! determine process number
-    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    call MPI_Comm_size(WABBIT_COMM, number_procs, ierr)
     params%number_procs = number_procs
     ! output MPI status
     if (rank==0) then
@@ -185,17 +188,17 @@ program main
     call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
-    ! Initialize parameters and grid
+    ! Initialize parameters,bridge and grid
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
     call get_command_argument( 2, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    ! initializes the communicator for Wabbit and creates a bridge if needed
+    call initialize_communicator(params)
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename )
-
-
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     ! reset the grid: all blocks are inactive and empty
@@ -268,6 +271,12 @@ program main
             call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
+     !+++++++++++ serve any data request from the other side +++++++++++++
+        if (params%bridge_exists) then
+            call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
+            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)    
+        endif
+     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -348,24 +357,24 @@ program main
     call timing_next_timestep( params, iteration )
 
     ! MPI Barrier before program ends
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    call MPI_Barrier(WABBIT_COMM, ierr)
 
     ! debug info output
     if ( params%debug ) then
         ! sum times
         debug%comp_time(:,2) = 0.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
         ! MPI Barrier before program ends
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        call MPI_Barrier(WABBIT_COMM, ierr)
 
         ! average times
         debug%comp_time(:,2) = debug%comp_time(:,2) / params%number_procs
         ! standard deviation
         debug%comp_time(:,3) = 0.0_rk
         debug%comp_time(:,4) = (debug%comp_time(:,4) - debug%comp_time(:,2))**2.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
         ! MPI Barrier before program ends
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        call MPI_Barrier(WABBIT_COMM, ierr)
 
         if (params%number_procs == 1) then
             debug%comp_time(:,3) = 0.0_rk

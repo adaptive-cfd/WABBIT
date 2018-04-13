@@ -228,8 +228,8 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         end do
 
         ! synchronize errors
-        call MPI_Allreduce(my_error, error(ifrequ), 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
-        call MPI_Allreduce(my_norm, norm, 1, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(my_error, error(ifrequ), 1, MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
+        call MPI_Allreduce(my_norm, norm, 1, MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
 
         error(ifrequ) = error(ifrequ) / norm
 

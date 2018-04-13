@@ -123,7 +123,7 @@ subroutine init_mask( filename )
     ! inifile structure
     type(inifile) :: FILE
     call read_ini_file_mpi(FILE, filename, .true.)
-
+    
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', mask_geometry, "cylinder")
     call read_param_mpi(FILE, 'VPM', 'C_eta', C_eta_inv, 0.01_rk )
@@ -165,6 +165,7 @@ subroutine get_mask(mask, x0, dx, Bs, g )
     
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
+    if penalization
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     select case(mask_geometry)

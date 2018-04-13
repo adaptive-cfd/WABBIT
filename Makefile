@@ -90,7 +90,7 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_m
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90
+$(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_ini_files_parser_mpi.o funnel.f90 vortex_street.f90

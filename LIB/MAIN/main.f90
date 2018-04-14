@@ -45,7 +45,6 @@ program main
     use module_bridge_interface
     !>TODO is this still needed here ???????
     use module_ACM_new
-
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -146,7 +145,6 @@ program main
     ! large numbers of processes and blocks per process
     integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -164,12 +162,14 @@ program main
     ! init mpi
     call MPI_Init(ierr)
     ! determine process rank
-    call MPI_Comm_rank(WABBIT_COMM, rank, ierr)
-    params%rank         = rank
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    params%rank = rank
     ! determine process number
-    call MPI_Comm_size(WABBIT_COMM, number_procs, ierr)
-    params%number_procs = number_procs
-    ! output MPI status
+    call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
+    params%number_procs=number_procs
+! output MPI status
+    params%WABBIT_COMM=MPI_COMM_WORLD
+   call set_mpi_comm_global(MPI_COMM_WORLD)
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs

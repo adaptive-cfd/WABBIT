@@ -115,13 +115,13 @@ subroutine keyvalues(fname, params, help)
             call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
                 lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
             call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &
-                MPI_COMM_WORLD,mpicode)
+                WABBIT_COMM,mpicode)
             do k=1,hvy_n
                 call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                 tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
             end do
             call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
-                MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+                MPI_SUM,0,WABBIT_COMM,mpicode)
             sum_curve(i) = sum(sum_tree)
         end do
 
@@ -152,11 +152,11 @@ subroutine keyvalues(fname, params, help)
             meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_active(k))) 
         end do
 
-        call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
 
         qi = qi / lgt_n
         squari = squari / lgt_n

@@ -97,7 +97,7 @@ module module_navier_stokes_new
 
   ! real(kind=rk)   ,parameter :: rho_init=1.645_rk,p_init=101330.0_rk,u_init=36.4_rk,v0_=0.0_rk,T_init=200!273.15_rk
   real(kind=rk)       ,save :: rho_init=1_rk,p_init=1.0_rk,T_init=1!273.15_rk
-  real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,1.0_rk/)
+  real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,0.0_rk/)
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -155,11 +155,11 @@ contains
     ! read initial conditions
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, params_ns%Lx*0.1_rk )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_preasure' , p_init, p_init )
+    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
-    
+
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
     
@@ -245,13 +245,12 @@ contains
     if (size(u,3)==1) then
           ! ---------------------------------
           ! save all datafields in u
-          !density
           work(:,:,:,rhoF) = u(:,:,:,1)**2
           work(:,:,:,UxF)  = u(:,:,:,2)/u(:,:,:,1)
           work(:,:,:,UyF)  = u(:,:,:,3)/u(:,:,:,1)
           work(:,:,:,pF)   = u(:,:,:,4)
           ! ---------------------------------
-
+          
         ! only wx,wy (2D - case)
         call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
                                  u(:,:,:,UyF)/u(:,:,:,rhoF), &
@@ -457,11 +456,12 @@ contains
     endif
 
     if (minval(u(:,:,:,pF))<0) then
-      call abort(64367,"ERROR [module_navier_stokes_new.f90]:CFL number to large")
+      v_physical = sqrt(v_physical) 
+    else
+      v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))    
     endif
 
-    ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
-    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))    
+    ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)    
     v_physical = v_physical/u(:,:,:,rhoF)
     
     ! CFL criteria CFL=v_physical/v_numerical where v_numerical=dx/dt
@@ -508,6 +508,12 @@ contains
     Bs = size(u,1) - 2*g
 
     u = 0.0_rk
+
+    if (p_init<=0.0_rk .or. rho_init <=0.0) then
+      call abort(6032, "Error [module_navier_stokes_new.f90]: initial pressure and density must be larger then 0")
+    endif
+    
+
 
     select case( params_ns%inicond )
     case ("sinus_2d","sinus2d","sin2d")

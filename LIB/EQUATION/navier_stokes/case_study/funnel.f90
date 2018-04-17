@@ -6,27 +6,44 @@ subroutine init_funnel(FILE)
     
  ! character(len=*), intent(in) :: filename
   type(inifile) , intent(inout) :: FILE
+  
+  real(kind=rk)                 :: dmax,dmin 
+  integer(kind=ik)              :: nr_focus_plates
    ! inifile structure
   !type(inifile) :: FILE
   !call read_ini_file_mpi(FILE, filename, .true.)
 
+  !===========================================================================================================
+  ! READ IN geometry
+  ! ----------------
   call read_param_mpi(FILE, 'funnel', 'outer_diameter'        , funnel%outer_diameter, domain_size(2)/2.0_rk )
-  call read_param_mpi(FILE, 'funnel', 'maximal_inner_diameter', funnel%max_inner_diameter, domain_size(2)/3.0_rk )
-  call read_param_mpi(FILE, 'funnel', 'minimal_inner_diameter', funnel%min_inner_diameter, domain_size(2)/4.0_rk )
+  call read_param_mpi(FILE, 'funnel', 'maximal_inner_diameter', dmax, domain_size(2)/3.0_rk )
+  call read_param_mpi(FILE, 'funnel', 'minimal_inner_diameter', dmin, domain_size(2)/4.0_rk )
   call read_param_mpi(FILE, 'funnel', 'Number_of_plates'      , funnel%nr_plates, 30 )
-  call read_param_mpi(FILE, 'funnel', 'diameter_per_plate'    , funnel%slope, domain_size(2)/3.0_rk)     
-  call read_param_mpi(FILE, 'funnel', 'plates_thickness'      , funnel%plates_thickness, domain_size(1)/100.0_rk)     
+  call read_param_mpi(FILE, 'funnel', 'Number_of_focus_plates', nr_focus_plates, 15)     
+  call read_param_mpi(FILE, 'funnel', 'Temperatur_of_plates'  , funnel%temperatur, 300.0_rk)     
   call read_param_mpi(FILE, 'funnel', 'pump_diameter'         , funnel%pump_diameter, domain_size(1)/5.0_rk)     
   call read_param_mpi(FILE, 'funnel', 'jet_diameter'          , funnel%jet_radius, domain_size(2)/20.0_rk)     
   call read_param_mpi(FILE, 'funnel', 'pump_x_center'         , funnel%pump_x_center, domain_size(1)*0.5_rk)     
+  funnel%max_inner_diameter   = dmax
+  funnel%min_inner_diameter   = dmin
   funnel%length               = domain_size(1)*0.85_rk
+  funnel%plates_thickness     = funnel%length/(2.0_rk*funnel%nr_plates)
   funnel%plates_distance      = (funnel%length-funnel%plates_thickness)/(funnel%nr_plates-1)
-  funnel%slope                = funnel%slope/(funnel%plates_distance)
+  funnel%slope                = (dmax - dmin)/((nr_focus_plates-1)*funnel%plates_distance)
   funnel%wall_thickness       = 0.02*domain_size(1)
   funnel%jet_radius           = funnel%jet_radius/2.0_rk
-  funnel%temperatur           = 200.0_rk
-  write(*,*) "s=", funnel%plates_distance
-  write(*,*) "ds=", funnel%slope
+  !===========================================================================================================
+  ! READ IN Capillary inlet flow
+  ! ----------------------------
+  funnel%inlet_velocity=(/ 0.0, 0.0 /)
+  call read_param_mpi(FILE, 'funnel', 'inlet_velocity'  , funnel%inlet_velocity ,funnel%inlet_velocity) 
+  call read_param_mpi(FILE, 'funnel', 'inlet_density'   , funnel%inlet_density  , 1.0_rk )
+  call read_param_mpi(FILE, 'funnel', 'inlet_pressure'  , funnel%inlet_pressure, 1.0_rk )
+  call read_param_mpi(FILE, 'funnel', 'pump_speed'      , funnel%pump_speed, 30.0_rk )
+  call read_param_mpi(FILE, 'funnel', 'outlet_pressure' , funnel%outlet_pressure, 1.0_rk)     
+  
+
 
   !initialice geometry of ion funnel plates 
   call init_plates(funnel)
@@ -52,12 +69,13 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     ! auxiliary variables
     real(kind=rk)                                    :: x, y, r, h,velocity
     ! preasure,density velocities
-    real(kind=rk)                                    :: p,rho,u,v,chi
+    real(kind=rk)                                    :: p,rho,u,v,chi,v_ref
     ! loop variables
     integer(kind=ik)                                 :: ix, iy,n
     ! outlets and inlets 
-    real(kind=rk)                   :: velocity_pump,rho_pump, rho_capillary,u_capillary,v_capillary,p_capillary,p_2nd_pump_stage
-
+    real(kind=rk)                                     :: velocity_pump,rho_pump, rho_capillary,u_capillary,v_capillary,p_capillary,p_2nd_pump_stage,rho_2nd_pump_stage
+    ! smooth width of jet
+    real(kind=rk)                                     ::jet_smooth_width,pump_smooth_width
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     if (size(penalization,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
@@ -70,19 +88,41 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     
     ! test!
     !> \todo put into infile
-    velocity_pump   = 50.0_rk
-    rho_capillary   = 1.645_rk
-    rho_pump        = 1.645_rk
-    u_capillary     = 100.0_rk
-    v_capillary     = 0.0_rk
-    p_capillary     = 101330.0_rk
-    p_2nd_pump_stage= 70000.0_rk
+
+    u_capillary       =funnel%inlet_velocity(1)
+    v_capillary       =funnel%inlet_velocity(2)
+    rho_capillary     =funnel%inlet_density
+    rho_pump          =funnel%inlet_density/100.0_rk
+    rho_2nd_pump_stage=funnel%inlet_density/100.0_rk
+    p_capillary       =funnel%inlet_pressure
+    velocity_pump     =funnel%pump_speed
+    p_2nd_pump_stage  =funnel%outlet_pressure
+
+    
 
     ! parameter for smoothing function (width)
-    h = 1.5_rk*max(dx(1), dx(2))
+    h  = 1.5_rk*max(dx(1), dx(2))
 
+    if (3*dx(2)<=0.05_rk*funnel%jet_radius) then
+      jet_smooth_width = 0.05_rk*funnel%jet_radius
+    else
+      jet_smooth_width = 2*h 
+      !call abort('ERROR [funnel.f90]: discretication constant dy to large')  
+    endif
+
+    if (3*dx(1)<=0.1_rk*funnel%pump_diameter) then
+      pump_smooth_width = 0.05_rk*funnel%pump_diameter
+    else
+      pump_smooth_width = 3*dx(1) 
+      !call abort('ERROR [funnel.f90]: discretication constant dy to large')  
+    endif
+
+    
+
+    ! smooth width in x and y direction
     do iy=1, Bs+2*g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
+       r = abs(y-domain_size(2)*0.5_rk)
        do ix=1, Bs+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
 
@@ -119,18 +159,19 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             ! Outlet flow: PUMPS
             ! ------------------
             ! pump volume flow
-            chi=  draw_pumps_volume_flow(x,y,funnel,h)
+            chi=  draw_pumps_volume_flow(x,r,funnel,h)
             if (chi>0) then                                 
-              mask(ix,iy,2:3) = mask(ix,iy,2:3)+chi
+              mask(ix,iy,2:3) = mask(ix,iy,3)+chi
+              v_ref=velocity_pump*jet_stream(abs(x-funnel%pump_x_center),funnel%pump_diameter*0.5_rk,pump_smooth_width)
               if (y>domain_size(2)/2) then
-                Phi_ref(ix,iy,3) = rho*velocity_pump                                       
+                Phi_ref(ix,iy,3) = rho*v_ref                                      
               else
-                Phi_ref(ix,iy,3) = -rho*velocity_pump                                          
+                Phi_ref(ix,iy,3) = -rho*v_ref                                          
               endif                   
             endif 
 
             ! mass and energy sink
-            chi=  draw_pumps_sink(x,y,funnel,h)
+            chi=  draw_pumps_sink(x,r,funnel,h)
             if (chi>0) then                                 
               mask(ix,iy,1) = mask(ix,iy,1)+chi
               mask(ix,iy,4) = mask(ix,iy,4)+chi
@@ -144,11 +185,12 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             ! ---------------------
             chi=  draw_jet(x,y,funnel,h)
             if (chi>0) then                                 
-              mask(ix,iy,1:4) = mask(ix,iy,1:4)+chi
-              Phi_ref(ix,iy,1) = rho_capillary                       
-              Phi_ref(ix,iy,2) = rho_capillary*u_capillary  
-              Phi_ref(ix,iy,3) = rho_capillary*v_capillary                              
-              Phi_ref(ix,iy,4) = p_capillary   
+              mask(ix,iy,1:4)  =  mask(ix,iy,1:4)+chi
+              Phi_ref(ix,iy,1) =  rho_capillary                       
+              Phi_ref(ix,iy,2) =  rho_capillary*u_capillary* &
+                                  jet_stream(r,funnel%jet_radius,jet_smooth_width)
+              Phi_ref(ix,iy,3) =  rho_capillary*v_capillary                              
+              Phi_ref(ix,iy,4) =  p_capillary   
             endif                                              
 
 
@@ -160,7 +202,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
               if (chi>0) then                                 
                 mask(ix,iy,1) = mask(ix,iy,1)+chi
                 mask(ix,iy,4) = mask(ix,iy,4)+chi
-                Phi_ref(ix,iy,1) = rho_capillary                       
+                Phi_ref(ix,iy,1) = rho_2nd_pump_stage                      
                 !Phi_ref(ix,iy,2) = 0
                 Phi_ref(ix,iy,3) = 0                                      
                 Phi_ref(ix,iy,4) = p_2nd_pump_stage
@@ -393,53 +435,38 @@ function draw_walls(x,y,funnel,h)
   draw_walls=mask
 end function draw_walls
 
-function draw_pumps_volume_flow(x,y,funnel,h)
+function draw_pumps_volume_flow(x,r,funnel,h)
  
-  real(kind=rk),    intent(in)          :: x, y, h
+  real(kind=rk),    intent(in)          :: x, r, h
   type(type_funnel),intent(in)          ::funnel
 
-  real(kind=rk)                         ::  mask, draw_pumps_volume_flow,x0,x1,width
+  real(kind=rk)                         ::  mask, draw_pumps_volume_flow,r0,width
 
   mask  =0
-  x0    =funnel%wall_thickness*0.5_rk + h
   width =funnel%wall_thickness*0.5_rk -2.0_rk*h
-  x1    =domain_size(2)-funnel%wall_thickness+h 
+  r0    =(domain_size(2)*0.5_rk-funnel%wall_thickness+h) 
   if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter/2) then
-         ! wall in south
-         !mask=smoothstep(y-funnel%wall_thickness,h)
-         mask=soft_bump(y,x0,width,h)
-         ! wall in north
-         mask=mask+soft_bump(y,x1,width,h)
+         !for r0<r<r0+width apply penalization
+         mask=soft_bump(r,r0,width,h)
   endif
 
-   ! is needed because mask off walls overlap
-  if (mask>1) then
-         mask=1
-  endif
 
   draw_pumps_volume_flow=mask
 end function draw_pumps_volume_flow
 
-function draw_pumps_sink(x,y,funnel,h)
+function draw_pumps_sink(x,r,funnel,h)
  
-  real(kind=rk),    intent(in)          :: x, y, h
+  real(kind=rk),    intent(in)          :: x, r, h
   type(type_funnel),intent(in)          ::funnel
 
-  real(kind=rk)                         ::  mask, draw_pumps_sink
+  real(kind=rk)                         ::r0,  mask, draw_pumps_sink
 
-  mask=0
-
+  mask  = 0.0_rk
+  r0    =(domain_size(2)*0.5_rk-funnel%wall_thickness*0.5_rk)
   if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter/2) then
-         ! wall in south
-         mask=smoothstep(y-funnel%wall_thickness*0.5_rk,h)
-         ! wall in north
-         mask=mask+smoothstep(domain_size(2)-funnel%wall_thickness*0.5_rk-y,h)
+         mask=mask+smoothstep(r0-r,h)
   endif
 
-   ! is needed because mask off walls overlap
-  if (mask>1) then
-         mask=1
-  endif
 
   draw_pumps_sink=mask
 end function draw_pumps_sink
@@ -451,7 +478,7 @@ function draw_jet(x,y,funnel,h)
 
   real(kind=rk)                         ::draw_jet
 
-  if (abs(y-domain_size(2)/2)< funnel%jet_radius) then
+  if (abs(y-domain_size(2)*0.5_rk)< funnel%jet_radius) then
     ! wall in EAST
     draw_jet=smoothstep(x-funnel%wall_thickness,h)-smoothstep(x-funnel%wall_thickness/2,h)
   else
@@ -528,7 +555,7 @@ end function draw_sink
         plate%x0(1)     = funnel%offset(1)+(n-1)*distance
         plate%x0(2)     = funnel%offset(2)
         plate%width     = width
-        if (plate%x0(1)-funnel%offset(1)<=length_focus) then
+        if (plate%x0(1)-funnel%offset(1)<length_focus) then
            plate%r_in    = funnel%max_inner_diameter/2
         else
            plate%r_in = plate%r_in - funnel%slope*distance/2

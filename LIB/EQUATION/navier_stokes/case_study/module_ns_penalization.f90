@@ -76,8 +76,7 @@ module module_ns_penalization
     real(kind=rk) :: r_in
     real(kind=rk) :: r_out   
   end type type_funnel_plate 
-
-
+ 
 
   type :: type_funnel
       real(kind=rk)       ::outer_diameter         ! outer diameter
@@ -98,6 +97,12 @@ module module_ns_penalization
       real(kind=rk)       ::pump_x_center
       real(kind=rk)       ::jet_radius             ! slope of funnel
       real(kind=rk)       ::wall_thickness       ! 
+    
+      real(kind=rk)       ::inlet_velocity(2)       ! 
+      real(kind=rk)       ::inlet_density       ! 
+      real(kind=rk)       ::inlet_pressure       ! 
+      real(kind=rk)       ::outlet_pressure       ! 
+      real(kind=rk)       ::pump_speed       ! 
       
       type(type_funnel_plate), allocatable:: plate(:)
   end type type_funnel
@@ -290,12 +295,12 @@ function soft_bump(x,x0,width,h)
 end function soft_bump
 
 
-function jet_stream(radius,diameter,smooth_width)
+function jet_stream(radius,max_R,smooth_width)
 
-  real(kind=rk), intent(in)      :: radius, smooth_width,diameter
+  real(kind=rk), intent(in)      :: radius, smooth_width,max_R
   real(kind=rk)                  :: jet_stream 
     
-    jet_stream=0.5_rk*(1-tanh((radius-0.5_rk*(diameter-smooth_width))*2*PI/smooth_width ))
+    jet_stream=0.5_rk*(1-tanh((radius-(max_R-0.5_rk*smooth_width))*2*PI/smooth_width ))
 end function jet_stream
 
 

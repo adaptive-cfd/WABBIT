@@ -279,38 +279,38 @@ stop
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-        ! check redundant nodes
-        if ( params%test_redundant_nodes ) then
-
-            ! output
-            if (rank==0) then
-                write(*,'(80("-"))')
-                write(*, '("DEBUG: start redundant nodes test")')
-            end if
-
-            ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-            ! second: check nodes
-            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, my_stop_status )
-
-            ! third: synchronize stop status
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
-            call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
-
-            ! fourth: stop program if necessary
-            if (stop_status) then
-               ! save data
-               call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-               stop
-            end if
-
-            ! output
-            if (rank==0) then
-                write(*, '("DEBUG: redundant nodes: ok!")')
-            end if
-
-        end if
+!        ! check redundant nodes
+!        if ( params%test_redundant_nodes ) then
+!
+!            ! output
+!            if (rank==0) then
+!                write(*,'(80("-"))')
+!                write(*, '("DEBUG: start redundant nodes test")')
+!            end if
+!
+!            ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
+!            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+!
+!            ! second: check nodes
+!            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, my_stop_status )
+!
+!            ! third: synchronize stop status
+!            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+!            call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+!
+!            ! fourth: stop program if necessary
+!            if (stop_status) then
+!               ! save data
+!               call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
+!               stop
+!            end if
+!
+!            ! output
+!            if (rank==0) then
+!                write(*, '("DEBUG: redundant nodes: ok!")')
+!            end if
+!
+!        end if
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then

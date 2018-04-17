@@ -219,7 +219,7 @@ logical :: test
 
 
 ! ##### TEST #####
-call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

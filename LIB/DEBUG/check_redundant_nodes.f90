@@ -26,7 +26,7 @@
 !
 ! ********************************************************************************************
 
-subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
+subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -51,12 +51,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
-    ! communication lists:
-    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
-
-    ! communications matrix:
-    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)
@@ -66,9 +60,11 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
 
     ! MPI parameter
     integer(kind=ik)                    :: rank
+    ! number of processes
+    integer(kind=ik)                    :: number_procs
 
     ! loop variables
-    integer(kind=ik)                    :: N, k, neighborhood, neighbor_num, level_diff
+    integer(kind=ik)                    :: N, k, neighborhood, neighbor_num, level_diff, l
 
     ! id integers
     integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id
@@ -82,7 +78,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     ! restricted/predicted data buffer
     real(kind=rk), allocatable :: data_buffer(:), res_pre_data(:,:,:,:)
     ! data buffer size
-    integer(kind=ik)                        :: buffer_size
+    integer(kind=ik)                        :: buffer_size, buffer_position
 
     ! grid parameter
     integer(kind=ik)                                :: Bs, g
@@ -92,6 +88,13 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     ! type of data writing
     character(len=25)                   :: data_writing_type
 
+    ! communications matrix (only 1 line)
+    ! note: todo: check performance without allocation?
+    ! todo: remove dummy com matrix, needed for old MPI subroutines
+    integer(kind=ik), allocatable     :: com_matrix(:), dummy_matrix(:,:)
+
+    ! position in integer buffer, need for every neighboring process
+    integer(kind=ik), allocatable                                :: int_pos(:)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -110,6 +113,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
 
     ! set MPI parameter
     rank = params%rank
+    number_procs = params%number_procs
 
     ! reset status
     stop_status = .false.
@@ -118,13 +122,39 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     neighbor_num = size(hvy_neighbor, 2)
 
     ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-    data_bounds_type = 'only_redundant'
+    data_bounds_type = 'include_redundant'
 
     ! 'average', 'simple', 'staging', 'compare'
     data_writing_type = 'simple'
 
     ! 2D only!
-    allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF) )
+    allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
+    com_matrix(number_procs), int_pos(number_procs), dummy_matrix(number_procs, number_procs) )
+
+    ! reset ghost nodes for all blocks
+    ! todo: use reseting subroutine from MPI module
+    if ( (params%test_ghost_nodes_synch) .and. (data_bounds_type /= 'only_redundant') ) then
+        !-- x-direction
+        hvy_block(1:g, :, :, :, : )           = 9.0e9_rk
+        hvy_block(Bs+g+1:Bs+2*g, :, :, :, : ) = 9.0e9_rk
+        !-- y-direction
+        hvy_block(:, 1:g, :, :, : )           = 9.0e9_rk
+        hvy_block(:, Bs+g+1:Bs+2*g, :, :, : ) = 9.0e9_rk
+        !-- z-direction
+        if ( params%threeD_case ) then
+            hvy_block(:, :, 1:g, :, : )           = 9.0e9_rk
+            hvy_block(:, :, Bs+g+1:Bs+2*g, :, : ) = 9.0e9_rk
+        end if
+    end if
+
+    ! reset com matrix
+    com_matrix = 0
+    dummy_matrix = 0
+    ! reset integer send buffer position
+    int_pos = 2
+
+    ! reset first in send buffer position
+    int_send_buffer( 1  , : ) = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -143,6 +173,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                 call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
                 ! calculate light id
                 call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                ! neighbor heavy id
+                call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
                 ! calculate the difference between block levels
                 ! define leveldiff: sender - receiver, so +1 means sender on higher level
                 ! sender is active block (me)
@@ -202,8 +234,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                     ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
                     select case(data_writing_type)
                         case('simple')
-                            ! neighbor heavy id
-                            call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
                             ! simply write data
                             call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
@@ -217,17 +247,100 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
 
                 else
                     ! external neighbor
+                    ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
+                    com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
+
+                    ! second: fill real buffer
+                    ! position in real buffer is stored in int buffer
+                    buffer_position = int_send_buffer(1  , neighbor_rank+1 ) + 1
+                    ! real data
+                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer
+
+                    ! third: fill int buffer
+                    ! sum size of single buffers on first element
+                    int_send_buffer(1  , neighbor_rank+1 ) = int_send_buffer(1  , neighbor_rank+1 ) + buffer_size
+                    ! save: neighbor id, neighborhood, level diffenrence, buffer size
+                    int_send_buffer( int_pos(neighbor_rank+1)    , neighbor_rank+1 ) = hvy_id
+                    int_send_buffer( int_pos(neighbor_rank+1)+1  , neighbor_rank+1 ) = neighborhood
+                    int_send_buffer( int_pos(neighbor_rank+1)+2  , neighbor_rank+1 ) = level_diff
+                    int_send_buffer( int_pos(neighbor_rank+1)+3  , neighbor_rank+1 ) = buffer_position
+                    int_send_buffer( int_pos(neighbor_rank+1)+4  , neighbor_rank+1 ) = buffer_size
+                    ! increase int buffer position
+                    int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
 
                 end if
-
-                !
 
             end if
         end do
     end do
 
+    ! alle buffer sind gefüllt, markiere das ende der int buffer, damit der empfänger dies erkennen kann
+    ! loop over all com matrix elements
+    do k = 1, number_procs
+        if ( com_matrix(k) /= 0 ) then
+            int_send_buffer( int_pos(k)  , k ) = -99
+        end if
+    end do
+
+    ! send/receive data
+    ! note: todo, remove dummy subroutine
+    ! note: new dummy subroutine sets receive buffer position accordingly to process rank
+    ! note: todo: use more than non-blocking send/receive
+    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
+
+    ! sortiere den real buffer ein
+    ! loop over all procs
+    do k = 1, number_procs
+        if ( com_matrix(k) /= 0 ) then
+            ! neighboring proc
+            ! first element in int buffer is real buffer size
+            l = 2
+            ! -99 marks end of data
+            do while ( int_receive_buffer(l, k) /= -99 )
+
+                ! hvy id
+                hvy_id = int_receive_buffer(l, k)
+                ! neighborhood
+                neighborhood = int_receive_buffer(l+1, k)
+                ! level diff
+                level_diff = int_receive_buffer(l+2, k)
+                ! buffer position
+                buffer_position = int_receive_buffer(l+3, k)
+                ! buffer size
+                buffer_size = int_receive_buffer(l+4, k)
+
+                ! data buffer
+                data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position + buffer_size, k )
+
+                ! data bounds
+                call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+                ! write data, hängt vom jeweiligen Fall ab
+                ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
+                ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
+                ! staging: wende staging konzept an
+                ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
+                select case(data_writing_type)
+                    case('simple')
+                        ! simply write data
+                        call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+
+                    case('average')
+
+                    case('staging')
+
+                    case('compare')
+
+                end select
+
+                ! increase buffer postion marker
+                l = l + 5
+
+            end do
+        end if
+    end do
+
     ! clean up
-    deallocate( data_buffer, res_pre_data )
+    deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix )
 
 end subroutine check_redundant_nodes
 
@@ -1437,3 +1550,154 @@ subroutine write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
     end do
 
 end subroutine write_hvy_data
+
+!############################################################################################################
+
+subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+
+    !> send/receive buffer, integer and real
+    integer(kind=ik), intent(in)        :: int_send_buffer(:,:)
+    integer(kind=ik), intent(out)       :: int_receive_buffer(:,:)
+
+    real(kind=rk), intent(in)           :: real_send_buffer(:,:)
+    real(kind=rk), intent(out)          :: real_receive_buffer(:,:)
+
+    !> communications matrix: neighboring proc rank
+    !> com matrix pos: position in send buffer
+    integer(kind=ik), intent(in)        :: com_matrix(:)
+
+    ! process rank
+    integer(kind=ik)                    :: rank
+    ! MPI error variable
+    integer(kind=ik)                    :: ierr
+    ! number of processes
+    integer(kind=ik)                    :: number_procs
+    ! MPI status
+    !integer                             :: status(MPI_status_size)
+
+    ! MPI message tag
+    integer(kind=ik)                    :: tag
+    ! MPI request
+    integer(kind=ik)                    :: send_request(size(com_matrix,1)), recv_request(size(com_matrix,1))
+
+    ! column number of send buffer, column number of receive buffer, real data buffer length
+    integer(kind=ik)                    :: real_pos, int_length
+
+    ! loop variable
+    integer(kind=ik)                    :: k, i
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    ! set MPI parameters
+    rank            = params%rank
+    number_procs    = params%number_procs
+
+    ! set message tag
+    tag = 0
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! ----------------------------------------------------------------------------------------
+    ! first: integer data
+
+    ! reset communication counter
+    i = 0
+
+    ! reset request arrays
+    recv_request = MPI_REQUEST_NULL
+    send_request = MPI_REQUEST_NULL
+
+    ! loop over com matrix
+    do k = 1, number_procs
+
+        ! communication between proc rank and proc k-1
+        if ( com_matrix(k) > 0 ) then
+
+            ! legth of integer buffer
+            int_length = 5*com_matrix(k) + 3
+
+            ! increase communication counter
+            i = i + 1
+
+            ! tag
+            tag = rank+1+k
+
+            ! receive data
+            call MPI_Irecv( int_receive_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+
+            ! send data
+            call MPI_Isend( int_send_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+
+        end if
+
+    end do
+
+    !> \todo Please check if waiting twice is really necessary
+    ! synchronize non-blocking communications
+    ! note: single status variable do not work with all compilers, so use MPI_STATUSES_IGNORE instead
+    if (i>0) then
+        call MPI_Waitall( i, send_request(1:i), MPI_STATUSES_IGNORE, ierr) !status, ierr)
+        call MPI_Waitall( i, recv_request(1:i), MPI_STATUSES_IGNORE, ierr) !status, ierr)
+    end if
+
+    ! ----------------------------------------------------------------------------------------
+    ! second: real data
+
+    ! reset communication couter
+    i = 0
+
+    ! reset request arrays
+    recv_request = MPI_REQUEST_NULL
+    send_request = MPI_REQUEST_NULL
+
+    ! loop over corresponding com matrix line
+    do k = 1, number_procs
+
+        ! communication between proc rank and proc k-1
+        if ( com_matrix(k) > 0 ) then
+
+            ! increase communication counter
+            i = i + 1
+
+            tag = number_procs*10*(rank+1+k)
+
+            ! real buffer length
+            real_pos = int_receive_buffer(1, k)
+
+            ! receive data
+            call MPI_Irecv( real_receive_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+
+            ! real buffer length
+            real_pos = int_send_buffer(1, k)
+
+            ! send data
+            call MPI_Isend( real_send_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+
+        end if
+
+    end do
+
+    ! synchronize non-blocking communications
+    if (i>0) then
+        call MPI_Waitall( i, send_request(1:i), MPI_STATUSES_IGNORE, ierr) !status, ierr)
+        call MPI_Waitall( i, recv_request(1:i), MPI_STATUSES_IGNORE, ierr) !status, ierr)
+    end if
+
+end subroutine isend_irecv_data_2
+

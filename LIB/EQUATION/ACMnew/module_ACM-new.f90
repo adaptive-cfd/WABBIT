@@ -53,16 +53,25 @@ module module_acm_new
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
-    logical :: forcing, penalization,smooth_mask=.True., sponge_layer
-    ! alpha for sponge
-    real(kind=rk) :: alpha
+    logical :: forcing, penalization, smooth_mask=.True.
+    ! the mean pressure has no meaning in incompressible fluids, but sometimes it can
+    ! be nice to ensure the mean is zero, e.g., for comparison wit other codes. if set to true
+    ! wabbit removes the mean pressure at every time step.
+    logical :: p_mean_zero
+    ! sponge term:
+    logical :: use_sponge=.false.
+    real(kind=rk) :: C_sponge, L_sponge
+
     integer(kind=ik) :: dim, N_fields_saved
     character(len=80) :: inicond, discretization, geometry="cylinder"
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
-    real(kind=rk) :: mean_flow(1:3)
+    real(kind=rk) :: mean_flow(1:3), mean_p
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
+    !
+    integer(kind=ik) :: Jmax, Bs
+
   end type type_params
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -93,14 +102,22 @@ contains
     implicit none
 
     character(len=*), intent(in) :: filename
-    integer(kind=ik) :: mpicode
+    integer(kind=ik) :: mpicode, nx_max
+    real(kind=rk) :: dx_min, dt_min
 
     ! inifile structure
     type(inifile) :: FILE
 
+
     ! we still need to know about mpirank and mpisize, occasionally
     call MPI_COMM_SIZE (MPI_COMM_WORLD, params_acm%mpisize, mpicode)
     call MPI_COMM_RANK (MPI_COMM_WORLD, params_acm%mpirank, mpicode)
+
+    if (params_acm%mpirank==0) then
+      write(*,'(80("<"))')
+      write(*,*) "Initializing artificial compressibility module!"
+      write(*,'(80("<"))')
+    endif
 
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
@@ -129,6 +146,7 @@ contains
     allocate( params_acm%forcing_type(1:3) )
     call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
+    call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
 
 
     ! initial condition
@@ -143,13 +161,32 @@ contains
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%Lx, 0.5*params_acm%Ly, 0.5*params_acm%Lz/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
 
+    call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
+    call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )
+    call read_param_mpi(FILE, 'Sponge', 'C_sponge', params_acm%C_sponge, 1.0e-2_rk )
+
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
-    ! sponge layer:
-    call read_param_mpi(FILE, 'Physics', 'sponge_layer', params_acm%sponge_layer, .false.)
-    call read_param_mpi(FILE, 'Physics', 'alpha', params_acm%alpha, 100.0_rk)
+
+
+    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_acm%Bs, 1   )
+
 
     call clean_ini_file_mpi( FILE )
+
+
+    if (params_acm%mpirank==0) then
+      write(*,'(80("<"))')
+      write(*,*) "Some information:"
+      write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
+      dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%Lx / real(params_acm%Bs-1, kind=rk)
+      nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
+      dt_min = params_acm%CFL*dx_min/params_acm%c_0
+      write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
+      write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
+      write(*,'(80("<"))')
+    endif
   end subroutine READ_PARAMETERS_ACM
 
 
@@ -198,12 +235,21 @@ contains
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
 
-    ! vorticity
-    call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization,&
-    work(:,:,:,4:6))
+    if (params_acm%N_fields_saved>=4) then
+      ! vorticity
+      call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization,&
+      work(:,:,:,4:6))
+    endif
 
-    ! mask
-    call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )
+    if (params_acm%N_fields_saved>=5) then
+      ! mask for penalization
+      call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )
+    endif
+
+    if (params_acm%N_fields_saved>=6) then
+      ! mask for sponge
+      call sponge_2D_NEW(work(:,:,1,6), x0, dx, Bs, g )
+    endif
 
   end subroutine
 
@@ -267,7 +313,7 @@ contains
 
     ! local variables
     integer(kind=ik) :: Bs, mpierr
-    real(kind=rk) :: tmp(1:3)
+    real(kind=rk) :: tmp(1:3), tmp2
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -281,6 +327,7 @@ contains
       ! performs initializations in the RHS module, such as resetting integrals
 
       params_acm%mean_flow = 0.0_rk
+      params_acm%mean_p = 0.0_rk
 
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -298,16 +345,16 @@ contains
         call abort(6661,"ACM fail: very very large values in state vector.")
       endif
 
-      if (params_acm%forcing) then
-        if (params_acm%dim == 2) then
-          params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1))*dx(1)*dx(2)
-          params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2))*dx(1)*dx(2)
-        else
-          params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1))*dx(1)*dx(2)*dx(3)
-          params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2))*dx(1)*dx(2)*dx(3)
-          params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
-        endif ! NOTE: MPI_SUM is perfomed in the post_stage.
-      endif
+      if (params_acm%dim == 2) then
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1))*dx(1)*dx(2)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2))*dx(1)*dx(2)
+        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 3))*dx(1)*dx(2)
+      else
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 4))*dx(1)*dx(2)*dx(3)
+      endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
     case ("post_stage")
       !-------------------------------------------------------------------------
@@ -315,14 +362,17 @@ contains
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
 
-      if (params_acm%forcing) then
-        tmp = params_acm%mean_flow
-        call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        if (params_acm%dim == 2) then
-          params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
-        else
-          params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-        endif
+      tmp = params_acm%mean_flow
+      call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      tmp2 = params_acm%mean_p
+      call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
+      if (params_acm%dim == 2) then
+        params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
+        params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly)
+      else
+        params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+        params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
       endif
 
     case ("local_stage")
@@ -512,7 +562,13 @@ contains
     select case (params_acm%inicond)
     case("meanflow")
       u = 0.0_rk
-      u(:,:,:,1) = 1.0_rk
+      u(:,:,:,1) = params_acm%u_mean_set(1)
+      u(:,:,:,2) = params_acm%u_mean_set(2)
+      if (params_acm%dim == 3) then
+        u(:,:,:,3) = params_acm%u_mean_set(3)
+      endif
+
+
     case default
       write(*,*) "errorrroororor"
     end select

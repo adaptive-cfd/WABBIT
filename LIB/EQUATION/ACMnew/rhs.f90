@@ -100,10 +100,6 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
       call create_mask_2D_NEW(mask, x0, dx, Bs, g)
     end if
 
-    if (params_acm%sponge_layer) then
-        call sponge_2D_NEW(sponge, x0, dx, Bs, g)
-        sponge = params_acm%alpha*sponge
-    end if
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -127,7 +123,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 
                 div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy)*eps_inv*(u(ix,iy)-us(ix,iy,1)) !-sponge(ix,iy)*(u(ix,iy)-1.0_rk)
+                penalx = -mask(ix,iy)*eps_inv*(u(ix,iy)-us(ix,iy,1))
                 penaly = -mask(ix,iy)*eps_inv*(v(ix,iy)-us(ix,iy,2))
 
                 ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
@@ -184,7 +180,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     end if
 
     ! --------------------------------------------------------------------------
-    ! mean flow forcing term
+    ! mean flow forcing term.
     ! --------------------------------------------------------------------------
     ! is mean flow forcing used at all?
     if (params_acm%forcing) then
@@ -213,6 +209,25 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
         rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
       end do
 
+    end if
+
+    if (params_acm%p_mean_zero) then
+      phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
+    end if
+
+    ! --------------------------------------------------------------------------
+    ! sponge term.
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_sponge) then
+        call sponge_2D_NEW(sponge, x0, dx, Bs, g)
+        eps_inv = 1.0_rk / params_acm%C_sponge
+
+        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+        ! which is different from the penalization term, which acts only on ux,uy and not p
+        rhs(:,:,1) = rhs(:,:,1) - (phi(:,:,1)-params_acm%u_mean_set(1))*sponge*eps_inv
+        rhs(:,:,2) = rhs(:,:,2) - (phi(:,:,2)-params_acm%u_mean_set(2))*sponge*eps_inv
+
+        rhs(:,:,3) = rhs(:,:,3) - phi(:,:,3)*sponge*eps_inv
     end if
 
 

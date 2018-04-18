@@ -28,11 +28,11 @@
 
 subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
-!---------------------------------------------------------------------------------------------
-! modules
+    !---------------------------------------------------------------------------------------------
+    ! modules
 
-!---------------------------------------------------------------------------------------------
-! variables
+    !---------------------------------------------------------------------------------------------
+    ! variables
 
     implicit none
 
@@ -76,11 +76,11 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     integer(kind=ik)                    :: proc_heavy_max(params%number_procs), my_proc_heavy_max(params%number_procs)
     !communicator
     integer(kind=ik)                    :: WABBIT_COMM
-!---------------------------------------------------------------------------------------------
-! interfaces
+    !---------------------------------------------------------------------------------------------
+    ! interfaces
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
 
     ! start time
     sub_t0 = MPI_Wtime()
@@ -96,7 +96,7 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
     ! set MPI parameter
     rank          = params%rank
-    WABBIT_COMM   = params%WABBIT_COMM  
+    WABBIT_COMM   = params%WABBIT_COMM
     ! allocate interpolation fields
     allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
     allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
@@ -107,8 +107,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
     my_refinement_status = 0
 
-!---------------------------------------------------------------------------------------------
-! main body
+    !---------------------------------------------------------------------------------------------
+    ! main body
 
     ! ------------------------------------------------------------------------------------
     ! third: calculate detail and set new refinement status
@@ -121,71 +121,60 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
         ! reset detail
         detail = 0.0_rk
 
-        ! check block level
-        if ( lgt_block( lgt_id, params%max_treelevel+1) == params%max_treelevel ) then
-            ! block is on Jmax level -> discarding all details
-            ! coarsen block, note: all sister block are also on Jmax, so coarsening should allways work
-            my_refinement_status( k ) = -1
+        ! loop over all datafields
+        do dF = 1, params%number_data_fields
+            if ( params%threeD_case ) then
+                ! ********** 3D **********
+                ! copy block data to array u1
+                u1(:,:,:) = hvy_block( :, :, :, dF, hvy_active(k) )
+                ! now, coarsen array u1 (restriction)
+                call restriction_3D( u1, u3 )  ! fine, coarse
+                ! then, re-interpolate to the initial level (prediciton)
+                call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
-        else
-            ! block is not on Jmax -> calculate details
-            ! loop over all datafields
-            do dF = 1, params%number_data_fields
-                if ( params%threeD_case ) then
-                    ! ********** 3D **********
-                    ! copy block data to array u1
-                    u1(:,:,:) = hvy_block( :, :, :, dF, hvy_active(k) )
-                    ! now, coarsen array u1 (restriction)
-                    call restriction_3D( u1, u3 )  ! fine, coarse
-                    ! then, re-interpolate to the initial level (prediciton)
-                    call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
-
-                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                    do i = 1, Bs+2*g
-                        do j = 1, Bs+2*g
-                            do l = 1, Bs+2*g
-                                detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
-                            end do
+                ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                do i = 1, Bs+2*g
+                    do j = 1, Bs+2*g
+                        do l = 1, Bs+2*g
+                            detail = max( detail, abs(u1(i,j,l)-u2(i,j,l)) )
                         end do
                     end do
+                end do
+            else
+                ! ********** 2D **********
+                ! copy block data to array u1
+                u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
+                ! now, coarsen array u1 (restriction)
+                call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
+                ! then, re-interpolate to the initial level (prediciton)
+                call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
 
-                    else
-                        ! ********** 2D **********
-                        ! copy block data to array u1
-                        u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
-                        ! now, coarsen array u1 (restriction)
-                        call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
-                        ! then, re-interpolate to the initial level (prediciton)
-                        call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+                ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                do i = 1, Bs+2*g
+                    do j = 1, Bs+2*g
+                        detail = max( detail, abs(u1(i,j,1)-u2(i,j,1)) )
+                    end do
+                end do
 
-                        ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                        ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                        do i = 1, Bs+2*g
-                            do j = 1, Bs+2*g
-                                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
-                            end do
-                        end do
+            end if
+        end do
 
-                  end if
-              end do
-
-              ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
-              ! the block is tagged as "wants to coarsen" by setting the tag -1
-              ! note gradedness and completeness may prevent it from actually going through with that
-              if (detail < params%eps) then
-              !if (detail < (params%eps * 2**( lgt_block(lgt_id, params%max_treelevel+1) - 1 ) )) then
-                  ! coarsen block, -1
-                  my_refinement_status( k ) = -1
-              end if
-
+        ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
+        ! the block is tagged as "wants to coarsen" by setting the tag -1
+        ! note gradedness and completeness may prevent it from actually going through with that
+        if (detail < params%eps) then
+            !if (detail < (params%eps * 2**( lgt_block(lgt_id, params%max_treelevel+1) - 1 ) )) then
+            ! coarsen block, -1
+            my_refinement_status( k ) = -1
         end if
-
     end do
 
     ! ------------------------------------------------------------------------------------
     ! fourth: synchronize light data
     ! set array for max heavy ids
+     !> \todo FIXME: use synchronize_lgt_data routine for readability, instead of all the below stuff
     my_proc_heavy_max = 0
     heavy_max = maxval(hvy_active)
     if (heavy_max == -1) heavy_max = 0

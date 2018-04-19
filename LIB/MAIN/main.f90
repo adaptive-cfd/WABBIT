@@ -300,6 +300,8 @@ program main
           if (iteration==1 ) then
             open (15, file='meanflow.t', status='replace')
             close(15)
+            open (15, file='forces.t', status='replace')
+            close(15)
           endif
 
           call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)

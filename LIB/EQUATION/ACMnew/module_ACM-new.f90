@@ -49,7 +49,7 @@ module module_acm_new
     real(kind=rk) :: C_eta
     ! nu
     real(kind=rk) :: nu, Lx, Ly, Lz
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3)
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3)
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
@@ -439,6 +439,8 @@ contains
     ! local variables
     integer(kind=ik) :: Bs, mpierr
     real(kind=rk) :: tmp(1:3)
+    real(kind=rk), allocatable :: mask(:,:)
+    real(kind=rk) :: eps_inv
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -448,9 +450,10 @@ contains
       !-------------------------------------------------------------------------
       ! 1st stage: init_stage.
       !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
+      ! this stage is called only once, NOT for each block.
       ! performs initializations in the RHS module, such as resetting integrals
       params_acm%mean_flow = 0.0_rk
+      params_acm%force = 0.0_rk
 
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -473,11 +476,26 @@ contains
         params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
       endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
+      ! compute force
+      allocate(mask(Bs+2*g, Bs+2*g))
+      call create_mask_2D_NEW(mask, x0, dx, Bs, g)
+      eps_inv = 1.0_rk / params_acm%C_eta
+
+      if (params_acm%dim == 2) then
+        params_acm%force(1) = params_acm%force(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1)*mask(g+1:Bs+g, g+1:Bs+g)*eps_inv)*dx(1)*dx(2)
+        params_acm%force(2) = params_acm%force(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2)*mask(g+1:Bs+g, g+1:Bs+g)*eps_inv)*dx(1)*dx(2)
+        params_acm%force(3) = 0.d0
+      else
+        call abort(6661,"ACM 3D not implemented.")
+      endif
+
+      deallocate(mask)
+
     case ("post_stage")
       !-------------------------------------------------------------------------
       ! 3rd stage: post_stage.
       !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
+      ! this stage is called only once, NOT for each block.
 
       tmp = params_acm%mean_flow
       call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -487,10 +505,18 @@ contains
         params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
       endif
 
+      tmp = params_acm%force
+      call MPI_ALLREDUCE(tmp, params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
       if (params_acm%mpirank == 0) then
         ! write mean flow to disk...
         open(14,file='meanflow.t',status='unknown',position='append')
         write (14,'(4(es15.8,1x))') time, params_acm%mean_flow
+        close(14)
+
+        ! write forces to disk...
+        open(14,file='forces.t',status='unknown',position='append')
+        write (14,'(4(es15.8,1x))') time, params_acm%force
         close(14)
       end if
 

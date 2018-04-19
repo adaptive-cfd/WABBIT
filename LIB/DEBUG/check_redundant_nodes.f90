@@ -26,7 +26,7 @@
 !
 ! ********************************************************************************************
 
-subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
+subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -42,6 +42,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
@@ -64,7 +66,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     integer(kind=ik)                    :: number_procs
 
     ! loop variables
-    integer(kind=ik)                    :: N, k, neighborhood, neighbor_num, level_diff, l
+    integer(kind=ik)                    :: N, k, dF, neighborhood, neighbor_num, level_diff, l
 
     ! id integers
     integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id
@@ -122,16 +124,16 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     neighbor_num = size(hvy_neighbor, 2)
 
     ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-    data_bounds_type = 'include_redundant'
+    data_bounds_type = 'exclude_redundant'
 
     ! 'average', 'simple', 'staging', 'compare'
-    data_writing_type = 'simple'
+    data_writing_type = 'average'
 
     ! 2D only!
     allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
     com_matrix(number_procs), int_pos(number_procs), dummy_matrix(number_procs, number_procs) )
 
-    ! reset ghost nodes for all blocks
+    ! reset ghost nodes for all blocks - for debugging
     ! todo: use reseting subroutine from MPI module
     if ( (params%test_ghost_nodes_synch) .and. (data_bounds_type /= 'only_redundant') ) then
         !-- x-direction
@@ -154,13 +156,57 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     int_pos = 2
 
     ! reset first in send buffer position
-    int_send_buffer( 1  , : ) = 0
+    int_send_buffer( 1, : ) = 0
+
+    ! reseting all ghost nodes to zero
+    if ( (data_writing_type == 'average') .and. (data_bounds_type /= 'only_redundant') ) then
+        do k = 1, hvy_n
+            !-- x-direction
+            hvy_block(1:g, :, :, :, hvy_active(k) )               = 0.0_rk
+            hvy_block(Bs+g+1:Bs+2*g, :, :, :, hvy_active(k) )     = 0.0_rk
+            !-- y-direction
+            hvy_block(:, 1:g, :, :, hvy_active(k) )               = 0.0_rk
+            hvy_block(:, Bs+g+1:Bs+2*g, :, :, hvy_active(k) )     = 0.0_rk
+            !-- z-direction
+            if ( params%threeD_case ) then
+                hvy_block(:, :, 1:g, :, hvy_active(k) )           = 0.0_rk
+                hvy_block(:, :, Bs+g+1:Bs+2*g, :, hvy_active(k) ) = 0.0_rk
+            end if
+        end do
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
     ! loop over active heavy data
     do k = 1, hvy_n
+    
+        ! reset synch array
+        ! alles auf null, knoten im block auf 1
+        ! jeder später gespeicherte knoten erhöht wert um 1
+        ! am ende der routine wird der wert aus dem synch array ggf. für die durchschnittsberechnung benutzt
+        ! synch array hat die maximale anzahl von blöcken pro prozess alloziiert, so dass die heavy id unverändert
+        ! benutzt werden kann
+        ! ghost nodes layer auf 1 setzen, wenn nur die redundanten Knoten bearbeitet werden
+        if (data_bounds_type == 'only_redundant') then
+            hvy_synch(:, :, :, hvy_active(k)) = 1
+        else
+            hvy_synch(:, :, :, hvy_active(k)) = 0
+        end if
+        ! alles knoten im block werden auf 1 gesetzt
+        ! todo: ist erstmal einfacher als nur die redundaten zu setzen, aber unnötig
+        ! so gibt es aber nach der synch keine nullen mehr, kann ggf. als synch test verwendet werden?
+        if ( params%threeD_case ) then
+            hvy_synch( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, hvy_active(k)) = 1
+        else
+            hvy_synch( g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) = 1
+        end if
+
+    end do
+
+    ! loop over active heavy data
+    do k = 1, hvy_n
+        
         ! loop over all neighbors
         do neighborhood = 1, neighbor_num
             ! neighbor exists
@@ -238,6 +284,26 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                             call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
                         case('average')
+                            ! treat internal neighbor like external neighbor
+                            ! but do not MPI_send/receive the data
+
+                            ! fill real buffer
+                            ! position in real buffer is stored in int buffer
+                            buffer_position = int_send_buffer(1, rank+1 ) + 1
+                            ! real data
+                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer
+
+                            ! fill int buffer
+                            ! sum size of single buffers on first element
+                            int_send_buffer(1, rank+1 ) = int_send_buffer(1, rank+1 ) + buffer_size
+                            ! save: neighbor id, neighborhood, level diffenrence, buffer size
+                            int_send_buffer( int_pos(rank+1)    , rank+1 ) = hvy_id
+                            int_send_buffer( int_pos(rank+1)+1  , rank+1 ) = neighborhood
+                            int_send_buffer( int_pos(rank+1)+2  , rank+1 ) = level_diff
+                            int_send_buffer( int_pos(rank+1)+3  , rank+1 ) = buffer_position
+                            int_send_buffer( int_pos(rank+1)+4  , rank+1 ) = buffer_size
+                            ! increase int buffer position
+                            int_pos(rank+1) = int_pos(rank+1) + 5
 
                         case('staging')
 
@@ -288,6 +354,17 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     ! note: todo: use more than non-blocking send/receive
     call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
 
+    ! fill receive buffer for internal neighbors for averaging writing type
+    if (data_writing_type == 'average') then
+        ! mark end of buffer
+        int_send_buffer( int_pos(rank+1)  , rank+1 ) = -99
+        ! fill receive buffer
+        int_receive_buffer( 1:int_pos(rank+1)  , rank+1 ) = int_send_buffer( 1:int_pos(rank+1)  , rank+1 )
+        real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) 
+        ! change com matrix, need to sort in buffers in next step
+        com_matrix(rank+1) = 1 
+    end if
+
     ! sortiere den real buffer ein
     ! loop over all procs
     do k = 1, number_procs
@@ -325,6 +402,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                         call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
                     case('average')
+                        ! add data
+                        call add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch, hvy_id )
 
                     case('staging')
 
@@ -338,6 +417,19 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
             end do
         end if
     end do
+
+    ! last averaging step
+    if ( data_writing_type == 'average' ) then
+        ! loop over active heavy data
+        do k = 1, hvy_n
+            do dF = 1, NdF
+  
+                ! calculate average for all nodes, todo: proof performance?
+                hvy_block(:, :, :, dF, hvy_active(k)) = hvy_block(:, :, :, dF, hvy_active(k)) / real( hvy_synch(:, :, :, hvy_active(k)) , kind=rk)
+
+            end do
+        end do
+    end if
 
     ! clean up
     deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix )
@@ -1550,6 +1642,71 @@ subroutine write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
     end do
 
 end subroutine write_hvy_data
+
+!############################################################################################################
+
+subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch, hvy_id )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)                  :: params
+    !> data buffer
+    real(kind=rk), intent(in)                 :: data_buffer(:)
+    !> data_bounds
+    integer(kind=ik), intent(in)                 :: data_bounds(2,3)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
+    !> hvy id
+    integer(kind=ik), intent(in)                    :: hvy_id
+
+    ! loop variable
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    buffer_i = 1
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! loop over all data fields
+    do dF = 1, params%number_data_fields
+        ! first dimension
+        do i = data_bounds(1,1), data_bounds(2,1)
+            ! second dimension
+            do j = data_bounds(1,2), data_bounds(2,2)
+                ! third dimension, note: for 2D cases kN is allways 1
+                do k = data_bounds(1,3), data_bounds(2,3)
+
+                    ! write data buffer
+                    hvy_block( i, j, k, dF, hvy_id ) = hvy_block( i, j, k, dF, hvy_id ) + data_buffer( buffer_i )
+                    
+                    ! count synchronized data
+                    ! note: only for first datafield
+                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1
+
+                    ! increase buffer counter
+                    buffer_i = buffer_i + 1
+
+                end do
+            end do
+        end do
+    end do
+
+end subroutine add_hvy_data
 
 !############################################################################################################
 

@@ -42,9 +42,6 @@ if [ "$test1" == "1" ]; then
 # tough swirl test
 		replace_ini_value.sh $ini Time time_max 10.0
 		replace_ini_value.sh $ini Time CFL 1.0
-
-		cleanhere -f
-
 		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..

@@ -1,6 +1,5 @@
 #!/bin/bash
 
-export mpi="nice mpirun -n 4"
 
 #-------------
 test1=1
@@ -53,7 +52,6 @@ if [ "$test1" == "1" ]; then
 		replace_ini_value.sh $ini Time time_max 4.0
 		replace_ini_value.sh $ini Time CFL 1.0
 
-
 		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
@@ -81,7 +79,7 @@ if [ "$test2" == "1" ]; then
 		number=$jmax
 		pre=adapt_jmax
 		# delete all data:
-#		rm -r ${pre}${number}_*
+		rm -r ${pre}${number}_*
 
 		i=0
 		for eps in ${EPS[@]}
@@ -112,10 +110,9 @@ if [ "$test2" == "1" ]; then
 
 				replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
 				replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
-				# T=4 "easy" test
+# T=4 "easy" test
 				replace_ini_value.sh $ini Time time_max 4.0
 				replace_ini_value.sh $ini Time CFL 1.0
-
 
 				$mpi ./wabbit 2D $ini --memory=3.0GB
 				cd ..

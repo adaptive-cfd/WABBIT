@@ -1,7 +1,4 @@
 #!/bin/bash
-
-export mpi="nice mpirun -n 3"
-
 #-------------
 test1=1
 #-------------
@@ -42,6 +39,7 @@ if [ "$test1" == "1" ]; then
 		replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
 		replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
+# tough swirl test
 		replace_ini_value.sh $ini Time time_max 10.0
 		replace_ini_value.sh $ini Time CFL 1.0
 

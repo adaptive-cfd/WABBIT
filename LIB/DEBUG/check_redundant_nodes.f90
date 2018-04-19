@@ -26,7 +26,8 @@
 !
 ! ********************************************************************************************
 
-subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
+subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -124,7 +125,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     neighbor_num = size(hvy_neighbor, 2)
 
     ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-    data_bounds_type = 'exclude_redundant'
+    data_bounds_type = 'include_redundant'
 
     ! 'average', 'simple', 'staging', 'compare'
     data_writing_type = 'average'
@@ -180,7 +181,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! loop over active heavy data
     do k = 1, hvy_n
-    
+
         ! reset synch array
         ! alles auf null, knoten im block auf 1
         ! jeder später gespeicherte knoten erhöht wert um 1
@@ -206,7 +207,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! loop over active heavy data
     do k = 1, hvy_n
-        
+
         ! loop over all neighbors
         do neighborhood = 1, neighbor_num
             ! neighbor exists
@@ -291,7 +292,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             ! position in real buffer is stored in int buffer
                             buffer_position = int_send_buffer(1, rank+1 ) + 1
                             ! real data
-                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer
+                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer(1:buffer_size)
 
                             ! fill int buffer
                             ! sum size of single buffers on first element
@@ -320,7 +321,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                     ! position in real buffer is stored in int buffer
                     buffer_position = int_send_buffer(1  , neighbor_rank+1 ) + 1
                     ! real data
-                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer
+                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer(1:buffer_size)
 
                     ! third: fill int buffer
                     ! sum size of single buffers on first element
@@ -360,9 +361,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         int_send_buffer( int_pos(rank+1)  , rank+1 ) = -99
         ! fill receive buffer
         int_receive_buffer( 1:int_pos(rank+1)  , rank+1 ) = int_send_buffer( 1:int_pos(rank+1)  , rank+1 )
-        real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) 
+        real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 )
         ! change com matrix, need to sort in buffers in next step
-        com_matrix(rank+1) = 1 
+        com_matrix(rank+1) = 1
     end if
 
     ! sortiere den real buffer ein
@@ -387,7 +388,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                 buffer_size = int_receive_buffer(l+4, k)
 
                 ! data buffer
-                data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position + buffer_size, k )
+                data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
 
                 ! data bounds
                 call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
@@ -423,7 +424,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         ! loop over active heavy data
         do k = 1, hvy_n
             do dF = 1, NdF
-  
+
                 ! calculate average for all nodes, todo: proof performance?
                 hvy_block(:, :, :, dF, hvy_active(k)) = hvy_block(:, :, :, dF, hvy_active(k)) / real( hvy_synch(:, :, :, hvy_active(k)) , kind=rk)
 
@@ -1693,7 +1694,7 @@ subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch,
 
                     ! write data buffer
                     hvy_block( i, j, k, dF, hvy_id ) = hvy_block( i, j, k, dF, hvy_id ) + data_buffer( buffer_i )
-                    
+
                     ! count synchronized data
                     ! note: only for first datafield
                     if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1
@@ -1857,4 +1858,3 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     end if
 
 end subroutine isend_irecv_data_2
-

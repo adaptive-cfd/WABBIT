@@ -40,9 +40,8 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
-#FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-#FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none -finit-real=nan
-#FFLAGS += -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero -g -ggdb -fimplicit-none
+FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan
 # HDF_ROOT is set in environment.
 HDF_LIB = $(HDF_ROOT)/lib64
 HDF_INC = $(HDF_ROOT)/include
@@ -78,7 +77,7 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 # first compile precision module
 $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-	
+
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

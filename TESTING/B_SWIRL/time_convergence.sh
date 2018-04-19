@@ -42,7 +42,7 @@ do
 	../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
 	../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
-	$mpi ./wabbit 2D $ini --memory=0.5GB
+	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
 
@@ -87,7 +87,7 @@ do
 	../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
 	../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
-	$mpi ./wabbit 2D $ini --memory=0.5GB
+	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
 
@@ -134,7 +134,7 @@ do
 	../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
 	../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
-	$mpi ./wabbit 2D $ini --memory=0.5GB
+	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
 
@@ -179,6 +179,6 @@ do
 	../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
 	../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
-	$mpi ./wabbit 2D $ini --memory=0.5GB
+	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done

@@ -41,6 +41,6 @@ do
 	../replace_ini_value.sh $ini nu 0.0 ConvectionDiffusion
 	../replace_ini_value.sh $ini blob_width 0.01 ConvectionDiffusion
 
-	$mpi ./wabbit 2D $ini --memory=1.05GB
+	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done

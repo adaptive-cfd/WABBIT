@@ -64,7 +64,7 @@ if [ "$test1" == "1" ]; then
 
 		cleanhere -f
 
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -119,7 +119,7 @@ if [ "$test2" == "1" ]; then
 
 		cleanhere -f
 
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -178,7 +178,7 @@ if [ "$test3" == "1" ]; then
 
 		cleanhere -f
 
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -236,7 +236,7 @@ if [ "$test4" == "1" ]; then
 
 		cleanhere -f
 
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -295,7 +295,7 @@ if [ "$test5" == "1" ]; then
 
 		cleanhere -f
 
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -354,7 +354,7 @@ if [ "$test6" == "1" ]; then
 
 		cleanhere -f
 
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done

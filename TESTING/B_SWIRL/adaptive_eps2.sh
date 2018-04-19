@@ -54,7 +54,7 @@ if [ "$test1" == "1" ]; then
 		replace_ini_value.sh $ini Time CFL 1.0
 
 
-		$mpi ./wabbit 2D $ini --memory=2.5GB
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -117,7 +117,7 @@ if [ "$test2" == "1" ]; then
 				replace_ini_value.sh $ini Time CFL 1.0
 
 
-				$mpi ./wabbit 2D $ini --memory=2.5GB
+				$mpi ./wabbit 2D $ini --memory=3.0GB
 				cd ..
 			else
 				echo "we skip!"

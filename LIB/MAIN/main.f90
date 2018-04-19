@@ -43,8 +43,7 @@ program main
     use module_unit_test
     ! bridge implementation of wabbit
     use module_bridge_interface
-    !>TODO is this still needed here ???????
-    use module_ACM_new
+
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -271,10 +270,11 @@ program main
             call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
+
      !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)    
+            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)
         endif
      !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

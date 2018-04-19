@@ -162,9 +162,9 @@ contains
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
-    
+
     if (params_ns%penalization) then
-      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk ) 
+      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk )
       call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
       call init_mask(filename)
     endif
@@ -260,7 +260,7 @@ contains
 
         work(:,:,:,5)=vort(:,:,:,1)
 
-        !write out mask 
+        !write out mask
         if (params_ns%penalization) then
           call get_mask(work(:,:,1,6), x0, dx, Bs, g )
         else
@@ -434,8 +434,9 @@ contains
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
 
-    ! loop variables
-    real(kind=rk),allocatable  :: v_physical(:,:,:),deltax
+    ! local variables
+    real(kind=rk),allocatable  :: v_physical(:,:,:)
+    real(kind=rk) :: deltax
 
     dt = 9.9e9_rk
 
@@ -448,7 +449,7 @@ contains
         allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
     endif
 
-    ! calculate norm of velocity at every spatial point 
+    ! calculate norm of velocity at every spatial point
     if (UzF==-1) then
         v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
@@ -461,9 +462,10 @@ contains
       v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))    
     endif
 
-    ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)    
+    ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
+    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
     v_physical = v_physical/u(:,:,:,rhoF)
-    
+
     ! CFL criteria CFL=v_physical/v_numerical where v_numerical=dx/dt
      dt = min(dt, params_ns%CFL * deltax / maxval(v_physical))
 
@@ -567,9 +569,6 @@ contains
        u( :, :, :, UxF) = 0.0_rk
        u( :, :, :, UyF) = 0.0_rk
 
-
-
-
     case ("mask")
       ! add ambient pressure
       u( :, :, :, pF) = p_init
@@ -581,7 +580,7 @@ contains
         call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
         call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
       endif
-     
+
       ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
       u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
       u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y

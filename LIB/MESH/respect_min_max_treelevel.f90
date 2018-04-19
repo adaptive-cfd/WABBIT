@@ -42,15 +42,15 @@ subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! treelevel restrictions
-    integer(kind=ik) :: max_level, min_level
+    integer(kind=ik) :: Jmax, Jmin
     ! loop variables
     integer(kind=ik) :: k
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    max_level = params%max_treelevel
-    min_level = params%min_treelevel
+    Jmax = params%max_treelevel
+    Jmin = params%min_treelevel
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -58,15 +58,14 @@ subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     ! loop over all active blocks
     do k = 1, lgt_n
 
-
-        if ( ( lgt_block( lgt_active(k), max_level+2 ) ==  1) .and. ( lgt_block( lgt_active(k), max_level+1 ) >= max_level ) ) then
-            ! can not refine
-            lgt_block( lgt_active(k), max_level+2 ) = 0
+        if ((lgt_block( lgt_active(k), Jmax+2 ) ==  1).and.(lgt_block( lgt_active(k), Jmax+1 ) >= Jmax)) then
+            ! can not refine (set flag to 0 = stay)
+            lgt_block( lgt_active(k), Jmax+2 ) = 0
         end if
 
-        if ( ( lgt_block( lgt_active(k), max_level+2 ) == -1) .and. ( lgt_block( lgt_active(k), max_level+1 ) <= min_level ) ) then
+        if ((lgt_block( lgt_active(k), Jmax+2 ) == -1).and.(lgt_block( lgt_active(k), Jmax+1 ) <= Jmin)) then
             ! can not coarsen
-            lgt_block( lgt_active(k), max_level+2 ) = 0
+            lgt_block( lgt_active(k), Jmax+2 ) = 0
         end if
 
     end do

@@ -13,7 +13,7 @@ echo "testing artificial compressibility"
 # list of prefixes the test generates
 prefixes=(Ux Uy p mask vor)
 # list of possible times (no need to actually have them)
-times=(000000002000)
+times=(000000000000 000000002000)
 
 # run actual test
 ${mpi_command} ./wabbit 2D ${params} --memory=2GB

@@ -501,7 +501,8 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: Bs
+    integer(kind=ik)          :: Bs,ix
+    real(kind=rk)             :: x
 
 
     ! compute the size of blocks
@@ -517,8 +518,8 @@ contains
 
     select case( params_ns%inicond )
     case ("sinus_2d","sinus2d","sin2d")
-    !> \todo implement sinus_2d inicondition
-    call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
+      !> \todo implement sinus_2d inicondition
+      call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
     case ("zeros")
       ! add ambient pressure
       u( :, :, :, pF) = p_init
@@ -533,7 +534,42 @@ contains
           ! set Uz to zero
           u( :, :, :, UzF) = 0.0_rk
       endif
-    
+    case ("sod_shock_tube")
+      ! Sods test case: shock tube
+      ! ---------------------------
+      !
+      ! Test case for shock capturing filter
+      ! The initial condition is devided into
+      ! Left part x<= Lx/2 
+      !
+      ! rho=1
+      ! p  =1
+      ! u  =0
+      ! 
+      ! Rigth part x> Lx/2
+      !
+      ! rho=0.125
+      ! p  =0.1
+      ! u  =0
+      do ix=1, Bs+2*g
+         x = dble(ix-(g+1)) * dx(1) + x0(1)
+         ! left region
+         if (x <= params_ns%Lx*0.5_rk) then
+           u( ix, :, :, rhoF) = 1.0_rk
+           u( ix, :, :, pF)   = 1.0_rk
+         else
+           u( ix, :, :, rhoF) = sqrt(0.125_rk)
+           u( ix, :, :, pF)   = 0.1_rk
+         endif
+      end do
+
+      ! velocity set to 0
+       u( :, :, :, UxF) = 0.0_rk
+       u( :, :, :, UyF) = 0.0_rk
+
+
+
+
     case ("mask")
       ! add ambient pressure
       u( :, :, :, pF) = p_init

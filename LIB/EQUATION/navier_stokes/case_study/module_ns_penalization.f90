@@ -117,6 +117,7 @@ contains
 
 include "funnel.f90"
 include "vortex_street.f90"
+include "sod_shock_tube.f90"
 
 
 
@@ -144,13 +145,14 @@ subroutine init_mask( filename )
     C_sp_inv =1.0_rk/C_sp_inv
 
     select case(mask_geometry)
-    
+    case ('sod_shock_tube')
+      ! nothing to do
     case ('vortex_street','cylinder')
       call init_vortex_street(FILE)
     case ('funnel') 
       call init_funnel(FILE)
     case default
-      call abort(8546501,"[module_mask.f90] ERROR: geometry for VPM is unknown"//mask_geometry)
+      call abort(8546501,"[module_ns_penalization.f90] ERROR: geometry for VPM is unknown"//mask_geometry)
     
     end select
   
@@ -173,6 +175,8 @@ subroutine get_mask(mask, x0, dx, Bs, g )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     select case(mask_geometry)
+    case('sod_shock_tube')
+     call draw_sod_shock_tube(mask, x0, dx, Bs, g,'boundary')
     case('vortex_street','cylinder')
       call draw_cylinder(mask, x0, dx, Bs, g )
     case('funnel')
@@ -210,6 +214,8 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
     ! 1. compute volume penalization term for the different case studies
     
     select case(mask_geometry)
+    case('sod_shock_tube')
+      call add_sod_shock_tube(penalization, x0, dx, Bs, g, phi )
     case('vortex_street','cylinder')
       call add_cylinder(penalization, x0, dx, Bs, g, phi )
     case('funnel')
@@ -294,6 +300,20 @@ function soft_bump(x,x0,width,h)
 
 end function soft_bump
 
+function soft_bump2(x,x0,width,h)
+
+  real(kind=rk), intent(in)      :: x, x0, h, width
+  real(kind=rk)                  :: soft_bump2,max_R,smooth_width,radius
+    
+  max_R       = width*0.5_rk
+  radius      = abs(x-x0-width*0.5_rk)
+  smooth_width= 0.05_rk*max_R
+  if (3*h>smooth_width) then
+    smooth_width=3.0_rk*h
+  endif
+  soft_bump2=jet_stream(radius,max_R,smooth_width)
+
+end function soft_bump2
 
 function jet_stream(radius,max_R,smooth_width)
 
@@ -302,6 +322,32 @@ function jet_stream(radius,max_R,smooth_width)
     
     jet_stream=0.5_rk*(1-tanh((radius-(max_R-0.5_rk*smooth_width))*2*PI/smooth_width ))
 end function jet_stream
+
+
+!> \brief computes a smooth transition between val_left and val_right
+function transition(x,x0,trans_width,val_left,val_rigth)
+  !> position x
+  real(kind=rk), intent(in)     :: x
+  !> beginning point of transition
+  real(kind=rk), intent(in)     :: x0
+  !> length of transition region 
+  real(kind=rk), intent(in)     :: trans_width
+  !> values at the left and right of the transition region  
+  real(kind=rk), intent(in)     ::val_left,val_rigth
+
+  !--------------------------------------------   
+  real(kind=rk)                  :: s,units,transition
+
+    
+    ! convert transition range from 2pi to trans_width
+    units  = trans_width/(2*PI)
+    ! transition function 0<s<1
+    s         = 0.5_rk+0.5_rk * tanh((x-x0-0.5_rk*trans_width)/units)
+    
+    transition= s * val_rigth + (1-s) * val_left
+end function transition
+
+
 
 
 

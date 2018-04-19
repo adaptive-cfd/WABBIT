@@ -15,32 +15,32 @@ do
 	mkdir $dir
 	cd $dir
 	cp ../$ini .
-	ln -s ../../wabbit
+	ln -s ../../../wabbit
 
 	# time
-	./replace_ini_value.sh $ini time_max 1.0
-	./replace_ini_value.sh $ini dt_fixed 0.0
-	./replace_ini_value.sh $ini dt_max 2.0e-3
-	./replace_ini_value.sh $ini CFL 1.2
+	../replace_ini_value.sh $ini time_max 1.0 Time
+	../replace_ini_value.sh $ini dt_fixed 0.0 Time
+	../replace_ini_value.sh $ini dt_max 2.0e-3 Time
+	../replace_ini_value.sh $ini CFL 1.2 Time
 
 	# order
-	./replace_ini_value.sh $ini order_discretization FD_2nd_central
-	./replace_ini_value.sh $ini order_predictor multiresolution_2nd
+	../replace_ini_value.sh $ini order_discretization FD_2nd_central
+	../replace_ini_value.sh $ini order_predictor multiresolution_2nd
 
 	# blocks
-	./replace_ini_value.sh $ini adapt_mesh 0 
-	./replace_ini_value.sh $ini adapt_inicond 1
-	./replace_ini_value.sh $ini inicond_refinements $ddx
-	./replace_ini_value.sh $ini number_block_nodes 17
-	./replace_ini_value.sh $ini number_ghost_nodes 4
-	./replace_ini_value.sh $ini eps 4.0e-3
-	./replace_ini_value.sh $ini max_treelevel 13
-	./replace_ini_value.sh $ini min_treelevel 2
+	../replace_ini_value.sh $ini adapt_mesh 0 Blocks
+	../replace_ini_value.sh $ini adapt_inicond 1 Blocks
+	../replace_ini_value.sh $ini inicond_refinements $ddx Blocks
+	../replace_ini_value.sh $ini number_block_nodes 17 Blocks
+	../replace_ini_value.sh $ini number_ghost_nodes 4 Blocks
+	../replace_ini_value.sh $ini eps 4.0e-3 Blocks
+	../replace_ini_value.sh $ini max_treelevel 13 Blocks
+	../replace_ini_value.sh $ini min_treelevel 2 Blocks
 
 	# other
-	./replace_ini_value.sh $ini nu 0.0
-	./replace_ini_value.sh $ini blob_width 0.01
-	
-	$mpi ./wabbit 2D $ini --memory=0.5GB
+	../replace_ini_value.sh $ini nu 0.0 ConvectionDiffusion
+	../replace_ini_value.sh $ini blob_width 0.01 ConvectionDiffusion
+
+	$mpi ./wabbit 2D $ini --memory=1.05GB
 	cd ..
 done

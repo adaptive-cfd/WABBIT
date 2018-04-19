@@ -173,7 +173,9 @@ contains
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
 
-    call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1 )
+    if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
+        call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1 )
+    endif
 
   end subroutine
 

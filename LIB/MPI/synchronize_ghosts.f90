@@ -131,7 +131,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
-
+call abort(666,'deactivated, tommy.')
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 

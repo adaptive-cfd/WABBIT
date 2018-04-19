@@ -4,11 +4,11 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief postprocessing routine that generates a WABBIT-readable .h5 file (a field composed in blocks) 
+!> \brief postprocessing routine that generates a WABBIT-readable .h5 file (a field composed in blocks)
 !! from a .h5 file where all data is stored in one block
 !
 ! = log ======================================================================================
-!> \date  07/03/18 - create hashcode: commit 
+!> \date  07/03/18 - create hashcode: commit
 !-----------------------------------------------------------------------------------------------------
 !
 subroutine flusi_to_wabbit(help, params)
@@ -33,6 +33,7 @@ subroutine flusi_to_wabbit(help, params)
     integer(kind=ik), allocatable     :: lgt_block(:, :)
     real(kind=rk), allocatable        :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable     :: hvy_neighbor(:,:)
+    integer(kind=1), allocatable          :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable     :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:)
     integer(kind=ik), allocatable     :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -94,7 +95,7 @@ subroutine flusi_to_wabbit(help, params)
         end if
         params%number_blocks = lgt_n/params%number_procs +&
             mod(lgt_n,params%number_procs)
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor,&
+        call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor,&
             lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, &
             int_receive_buffer, real_send_buffer, real_receive_buffer )
 

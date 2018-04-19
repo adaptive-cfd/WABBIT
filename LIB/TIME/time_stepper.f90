@@ -52,7 +52,7 @@
 
 subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix,&
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch)
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -61,6 +61,7 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     !> time varible
     real(kind=rk), intent(inout)        :: time
 
+integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -95,6 +96,7 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     real(kind=rk)                       :: t0, sub_t1, t_sum, t
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable          :: rk_coeffs(:,:)
+    logical::test
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -113,9 +115,11 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-        hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, &
-        int_receive_buffer, real_send_buffer, real_receive_buffer )
+    ! call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+    !     hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, &
+    !     int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+    hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
     call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
@@ -143,9 +147,11 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, &
-            hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, &
-            int_receive_buffer, real_send_buffer, real_receive_buffer)
+        ! call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, &
+        !     hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, &
+        !     int_receive_buffer, real_send_buffer, real_receive_buffer)
+            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)

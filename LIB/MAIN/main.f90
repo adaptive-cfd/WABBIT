@@ -43,8 +43,7 @@ program main
     use module_unit_test
     ! bridge implementation of wabbit
     use module_bridge_interface
-    !>TODO is this still needed here ???????
-    use module_ACM_new
+
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -114,7 +113,7 @@ program main
     character(len=80)                   :: filename
 
     ! loop variable
-    integer(kind=ik)                    :: k, max_neighbors, Jmax
+    integer(kind=ik)                    :: k, max_neighbors
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0
@@ -272,7 +271,6 @@ program main
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
 
-        if (rank==0) write(*,'("Jmax= (after refinement)",i2)') max_active_level( lgt_block, lgt_active, lgt_n )
      !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
@@ -292,7 +290,6 @@ program main
         if ( params%adapt_mesh ) then
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         endif
-        if (rank==0) write(*,'("Jmax= (after adapt)",i2)') max_active_level( lgt_block, lgt_active, lgt_n )
 
         ! statistics
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then

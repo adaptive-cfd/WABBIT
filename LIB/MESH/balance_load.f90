@@ -483,7 +483,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             !---------------------------------------------------------------------------------
             ! 4th: synchronize light data
             !---------------------------------------------------------------------------------
-            call synchronize_lgt_data( params, lgt_block )
+            call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
         case default
             write(*,'(80("_"))')

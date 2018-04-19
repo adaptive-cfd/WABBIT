@@ -79,7 +79,7 @@ program main_post
 
     select case(post_mode)
     case("--mean")
-        call post_mean(help, params)
+        call post_mean(params, help)
     case("--sparse-to-dense")
         call sparse_to_dense(help, params)
     case("--vorticity")

@@ -50,6 +50,8 @@ module module_ns_penalization
   logical           ,                save        :: smooth_mask
   real(kind=rk)                    , save        :: C_eta_inv,C_sp_inv
   real(kind=rk),                     save        :: domain_size(3)
+  ! radius of domain (Ly/2)
+  real(kind=rk),                     save        :: R_domain
   real(kind=rk),                     save        :: Rs,gamma_
   !------------------------------------------------
   !> \file
@@ -143,6 +145,7 @@ subroutine init_mask( filename )
 
     C_eta_inv=1.0_rk/C_eta_inv
     C_sp_inv =1.0_rk/C_sp_inv
+    R_domain =domain_size(2)*0.5_rk
 
     select case(mask_geometry)
     case ('sod_shock_tube')

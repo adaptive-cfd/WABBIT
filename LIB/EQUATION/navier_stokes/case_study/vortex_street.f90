@@ -101,7 +101,7 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     T0      = 200.0_rk
     rho0    = 1.645_rk
     p0      = 101330.0_rk
-    u0      = 36.4_rk
+    u0      = 62.0_rk
 
     ! parameter for smoothing function (width)
     h       = 1.5_rk*max(dx(1), dx(2))

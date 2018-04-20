@@ -6,7 +6,7 @@
 # what parameter file
 test_dir="./TESTING/"
 dir="./TESTING/navier_stokes/filter/"
-params=${dir}"sod_shock_tube.ini"
+params=${dir}"filter_test.ini"
 happy=0
 sad=0
 echo "testing filters"
@@ -22,7 +22,7 @@ times=(000000050000)
 
 
 
-${dir}/run_all_filter.sh
+${dir}/run_all_filter.sh ${params}
 
 
 	echo "============================"

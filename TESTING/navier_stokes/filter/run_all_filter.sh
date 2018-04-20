@@ -7,7 +7,7 @@
 
 test_dir="./TESTING/"
 dir="./TESTING/navier_stokes/filter/"
-params=${dir}"filter_test.ini"
+params=$1
 # list of prefixes the test generates
 prefixes=(Ux p rho)
 # list of filters

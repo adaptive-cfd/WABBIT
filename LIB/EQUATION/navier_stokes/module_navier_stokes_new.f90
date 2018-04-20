@@ -456,12 +456,6 @@ contains
         v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
 
-    if (minval(u(:,:,:,pF))<0) then
-      v_physical = sqrt(v_physical) 
-    else
-      v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))    
-    endif
-
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
     v_physical = v_physical/u(:,:,:,rhoF)

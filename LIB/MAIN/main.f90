@@ -268,7 +268,7 @@ program main
 
     ! timing
     call toc( params, "init_data", MPI_wtime()-sub_t0 )
-stop
+
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
@@ -297,6 +297,7 @@ stop
             ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
             call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
+            my_stop_status = .false.
             ! second: check nodes
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, my_stop_status )
 

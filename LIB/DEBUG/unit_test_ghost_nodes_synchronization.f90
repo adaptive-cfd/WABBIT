@@ -221,6 +221,7 @@ logical :: test
         hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer,&
         int_receive_buffer, real_send_buffer, real_receive_buffer )
 
+test = .true.
 call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
 hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
 

@@ -184,8 +184,10 @@ module module_params
         character(len=80)                           :: filter_type
         ! frequency
         integer(kind=ik)                            :: filter_freq
-        ! bogey shock detector threshold
+        ! bogey shock detector threshold, detector_method (divU,p), switch(tanh,abs)
         real(kind=rk)                               :: r_th
+        character(len=80)                           ::  detector_method 
+        character(len=80)                           ::  sigma_switch
 
     end type type_params
 

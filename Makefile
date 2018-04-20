@@ -98,7 +98,7 @@ $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
-	$(OBJDIR)/module_operators.o RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 initial_conditions.f90
+	$(OBJDIR)/module_operators.o RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 initial_conditions.f90 inicond_shear_layer.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge_new.f90\

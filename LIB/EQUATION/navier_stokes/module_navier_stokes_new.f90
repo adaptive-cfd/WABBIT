@@ -110,6 +110,7 @@ contains
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
   include "initial_conditions.f90"
+  include "inicond_shear_layer.f90"
   !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -522,6 +523,9 @@ contains
     case ("sinus_2d","sinus2d","sin2d")
       !> \todo implement sinus_2d inicondition
       call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
+    case('shear_layer')
+
+      call inicond_shear_layer(  u, x0, dx ,Bs, g)
     case ("zeros")
       ! add ambient pressure
       u( :, :, :, pF) = p_init

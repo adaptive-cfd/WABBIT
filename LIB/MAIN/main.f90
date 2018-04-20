@@ -57,7 +57,7 @@ program main
     integer(kind=ik)                    :: number_procs
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1
+    real(kind=rk)                       :: t0, t1, t2
 
     ! user defined parameter structure
     type (type_params)                  :: params
@@ -110,6 +110,9 @@ program main
     integer(kind=ik), allocatable       :: hvy_active(:)
     ! number of active blocks (heavy data)
     integer(kind=ik)                    :: hvy_n
+
+    integer(kind=ik), allocatable :: blocks_per_rank(:), blocks_per_rank2(:)
+
 
     ! time loop variables
     real(kind=rk)                       :: time, output_time
@@ -172,6 +175,7 @@ logical::test
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs=number_procs
+    allocate(blocks_per_rank(1:number_procs),blocks_per_rank2(1:number_procs))
 ! output MPI status
     params%WABBIT_COMM=MPI_COMM_WORLD
    call set_mpi_comm_global(MPI_COMM_WORLD)
@@ -273,6 +277,7 @@ logical::test
     if (rank==0) write(*,*) "starting main time loop"
 
     do while ( time<params%time_max .and. iteration<params%nt)
+        t2 = MPI_wtime()
 
         ! new iteration
         iteration = iteration + 1
@@ -346,17 +351,28 @@ logical::test
         ! by what has been done in the last time step, then we flush the current timing to disk.
         call timing_next_timestep( params, iteration )
 
+        blocks_per_rank = 0
+        blocks_per_rank(rank+1) = lgt_n
+        call MPI_Allreduce(blocks_per_rank, blocks_per_rank2, number_procs, MPI_INTEGER, MPI_SUM, WABBIT_COMM, ierr)
+
+        t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
-             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=",i7," Jmin=",i2," Jmax=",i2)') &
+             iteration, time, t2, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
 
              open(14,file='timesteps_info.t',status='unknown',position='append')
-             write (14,'((g15.8,1x),i6,1x,i5,1x,i2,1x,i2)') time, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             write (14,'(2(g15.8,1x),i6,1x,i5,1x,i2,1x,i2)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
              close(14)
+
+             open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
+             write (14,'(g15.8,1x,i6,1x,1024(i4,1x))') time, iteration, blocks_per_rank2
+             close(14)
         end if
+
+
     end do
     !---------------------------------------------------------------------------
     ! end of main time loop
@@ -439,6 +455,7 @@ hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffe
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 
+    deallocate(blocks_per_rank,blocks_per_rank2)
     ! end mpi
     call MPI_Finalize(ierr)
 

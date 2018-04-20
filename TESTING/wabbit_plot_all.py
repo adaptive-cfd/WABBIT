@@ -11,7 +11,7 @@ import wabbit_tools
 import os.path
 import matplotlib.pyplot as plt
 
-files = glob.glob('./C_SWIRL_new/**/phi_*.h5', recursive=True)
+files = glob.glob('./B_SWIRL/adaptive1_swirl-tough_0_5.0e-5/phi_*.h5', recursive=True)
 #files = glob.glob('./B_SWIRL/adaptive1*/phi_000005000000.h5', recursive=True)
 #files.extend(glob.glob('./B_SWIRL/adaptive1*/phi_000002500000.h5', recursive=True))
 #files.extend(glob.glob('./B_SWIRL/adaptive1*/phi_000010000000.h5', recursive=True))
@@ -26,6 +26,7 @@ for file, i in zip(files, range(len(files))):
 
     if not os.path.isfile( f2 ):
         wabbit_tools.plot_wabbit_file( file, savepng=True, cmap='rainbow', caxis=[0,1] )
+        wabbit_tools.plot_wabbit_file( file, savepng=True, gridonly=True )
     else:
         print('already taken care of')
     print("[%i %i]" % (i, len(files)) )

@@ -262,5 +262,6 @@ subroutine ini_file_to_params( params, filename )
     close(15)
     open (15, file='timesteps_info.t', status='replace')
     close(15)
-
+    open (15, file='blocks_per_mpirank.t', status='replace')
+    close(15)
 end subroutine ini_file_to_params

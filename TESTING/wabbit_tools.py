@@ -439,13 +439,18 @@ def plot_wabbit_file( file, savepng=False, savepdf=False, cmap='rainbow', caxis=
     plt.axes().set_aspect('equal')
     plt.gcf().canvas.draw()
 
+    if not gridonly:
+        if savepng:
+            plt.savefig( file.replace('h5','png'), dpi=1000, transparent=True )
 
-    if savepng:
-        plt.savefig( file.replace('h5','png'), dpi=1000, transparent=True )
+        if savepdf:
+            plt.savefig( file.replace('h5','pdf') )
+    else:
+        if savepng:
+            plt.savefig( file.replace('.h5','-grid.png'), dpi=1000, transparent=True )
 
-    if savepdf:
-        plt.savefig( file.replace('h5','pdf') )
-
+        if savepdf:
+            plt.savefig( file.replace('.h5','-grid.pdf') )
 
 #%%
 def to_dense_grid( fname_in, fname_out):

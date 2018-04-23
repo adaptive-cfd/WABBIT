@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------------
 
 ini=blob-convection.ini
-dx=(0 1 2 3 4)
+dx=(0 1 2 3)
 test_number=2
 test_name="nonequi_2nd-2nd-4th"
 
@@ -21,7 +21,7 @@ do
 	../replace_ini_value.sh $ini Time time_max 1.0 Time
 	../replace_ini_value.sh $ini Time dt_fixed 0.0 Time
 	../replace_ini_value.sh $ini Time dt_max 2.0e-3 Time
-	../replace_ini_value.sh $ini Time CFL 1.2 Time
+	../replace_ini_value.sh $ini Time CFL 1.0 Time
 
 	# order
 	../replace_ini_value.sh $ini Discretization order_discretization FD_2nd_central
@@ -39,7 +39,7 @@ do
 
 	# other
 	../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
-	../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01 
+	../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
 	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..

@@ -102,10 +102,27 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
-! write(*,*) "xxtommy", shape(real_send_buffer)
-
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! hack to use subroutine as redundant nodes test and for ghost nodes synchronization
+    if (stop_status) then
+        ! synchronization
+        ! 'exclude_redundant', 'include_redundant', 'only_redundant'
+        data_bounds_type = 'include_redundant'
+        ! 'average', 'simple', 'staging', 'compare'
+        data_writing_type = 'average'
+
+    else
+        ! nodes test
+        ! 'exclude_redundant', 'include_redundant', 'only_redundant'
+        data_bounds_type = 'only_redundant'
+        ! 'average', 'simple', 'staging', 'compare'
+        data_writing_type = 'compare'
+        ! reset status
+        stop_status = .false.
+
+    end if
 
     ! grid parameter
     Bs    = params%number_block_nodes
@@ -120,19 +137,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     rank = params%rank
     number_procs = params%number_procs
 
-    ! reset status
-    stop_status = .false.
-
     ! set loop number for 2D/3D case
     neighbor_num = size(hvy_neighbor, 2)
-
-    ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-    data_bounds_type = 'include_redundant'
-
-    ! 'average', 'simple', 'staging', 'compare'
-    data_writing_type = 'average'
-
-! if (rank==0) write(*,*) "Synching is: "//trim(adjustl(data_writing_type))//" "//trim(adjustl(data_bounds_type))
 
     ! 2D only!
     allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
@@ -288,7 +294,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             ! simply write data
                             call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
-                        case('average')
+                        case('average', 'compare')
                             ! treat internal neighbor like external neighbor
                             ! but do not MPI_send/receive the data
 
@@ -296,10 +302,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             ! position in real buffer is stored in int buffer
                             buffer_position = int_send_buffer(1, rank+1 ) + 1
                             ! real data
-! write(*,*) buffer_position, buffer_position-1 + buffer_size
-! write(*,*) lbound(real_send_buffer)
-! write(*,*) ubound(real_send_buffer), shape(data_buffer)
-                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer(1:buffer_size)! HACK BUG
+                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer(1:buffer_size)
+
                             ! fill int buffer
                             ! sum size of single buffers on first element
                             int_send_buffer(1, rank+1 ) = int_send_buffer(1, rank+1 ) + buffer_size
@@ -314,8 +318,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                         case('staging')
 
-                        case('compare')
-
                     end select
 
                 else
@@ -327,7 +329,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                     ! position in real buffer is stored in int buffer
                     buffer_position = int_send_buffer(1  , neighbor_rank+1 ) + 1
                     ! real data
-                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer(1:buffer_size)! HACK BUG
+                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer(1:buffer_size)
 
                     ! third: fill int buffer
                     ! sum size of single buffers on first element
@@ -362,7 +364,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
 
     ! fill receive buffer for internal neighbors for averaging writing type
-    if (data_writing_type == 'average') then
+    if ( (data_writing_type == 'average') .or. (data_writing_type == 'compare') ) then
         ! mark end of buffer
         int_send_buffer( int_pos(rank+1)  , rank+1 ) = -99
         ! fill receive buffer
@@ -394,7 +396,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                 buffer_size = int_receive_buffer(l+4, k)
 
                 ! data buffer
-        ! HACK BUG
                 data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
 
                 ! data bounds
@@ -416,6 +417,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                     case('staging')
 
                     case('compare')
+                        ! compare data
+                        call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status )
 
                 end select
 
@@ -1704,7 +1707,7 @@ subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch,
 
                     ! count synchronized data
                     ! note: only for first datafield
-                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1_1
+                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1
 
                     ! increase buffer counter
                     buffer_i = buffer_i + 1
@@ -1715,6 +1718,90 @@ subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch,
     end do
 
 end subroutine add_hvy_data
+
+!############################################################################################################
+
+subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)                  :: params
+    !> data buffer
+    real(kind=rk), intent(in)                 :: data_buffer(:)
+    !> data_bounds
+    integer(kind=ik), intent(in)                 :: data_bounds(2,3)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
+    !> hvy id
+    integer(kind=ik), intent(in)                    :: hvy_id
+    ! status of nodes check: if true: stops program
+    logical, intent(inout)              :: stop_status
+
+    ! loop variable
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i
+
+    ! error threshold
+    real(kind=rk)                                   :: eps
+
+    ! error norm
+    real(kind=rk)       :: error_norm
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    buffer_i = 1
+
+    ! set error threshold
+    !eps = 1e-12_rk
+    eps = 1e-7_rk
+
+    ! reset error norm
+    error_norm = 0.0_rk
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! loop over all data fields
+    do dF = 1, params%number_data_fields
+        ! first dimension
+        do i = data_bounds(1,1), data_bounds(2,1)
+            ! second dimension
+            do j = data_bounds(1,2), data_bounds(2,2)
+                ! third dimension, note: for 2D cases kN is allways 1
+                do k = data_bounds(1,3), data_bounds(2,3)
+
+                    ! pointwise error norm
+                    error_norm = error_norm + (hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i ))**2
+
+                    buffer_i = buffer_i + 1
+
+                end do
+            end do
+        end do
+    end do
+
+    error_norm = sqrt(error_norm)
+
+    if ( (error_norm > eps) .and. (stop_status .eqv. .false.) ) then
+        ! error message
+        write(*,*) "ERROR: difference in redundant nodes"
+        ! stop program
+        stop_status = .true.
+        ! mark block
+        hvy_block( :, :, :, :, hvy_id ) = -99.0_rk
+    end if
+
+end subroutine compare_hvy_data
 
 !############################################################################################################
 

@@ -251,6 +251,7 @@ logical::test
         ! save initial condition to disk
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
 !        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        test=.true.
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
 
@@ -285,6 +286,7 @@ logical::test
         ! refine everywhere
         if ( params%adapt_mesh ) then
     !        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    test=.true.
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
@@ -304,6 +306,7 @@ logical::test
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
+            test=.true.
                 call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
 
@@ -321,6 +324,7 @@ logical::test
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes for some derived qtys, for sure
         !   call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        test=.true.
           call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
           hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
           ! TODO make this nicer
@@ -339,6 +343,7 @@ logical::test
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         !  call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        test=.true.
           call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
           hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
           ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
@@ -386,6 +391,7 @@ logical::test
     if ( abs(output_time-time) > 1e-10_rk ) then
       ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
 !      call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+test=.true.
 call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
 hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
       ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These

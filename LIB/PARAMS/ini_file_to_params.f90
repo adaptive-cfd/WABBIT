@@ -166,9 +166,14 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no-filter" )
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
-    ! bogey shock detector threshold
-    call read_param_mpi(FILE, 'Discretization', 'r_th', params%r_th, 1e-3_rk )
-
+    if (params%filter_type=="bogey_shock") then
+        ! bogey shock detector threshold
+        call read_param_mpi(FILE, 'Discretization', 'r_th', params%r_th, 1e-3_rk )
+        ! bogey shock switch tanh
+        call read_param_mpi(FILE, 'Discretization', 'switch', params%sigma_switch, 'tanh' )
+        ! bogey shock detection method (p,divU)
+        call read_param_mpi(FILE, 'Discretization', 'detector_method', params%detector_method, 'divU' )
+    endif
     !***************************************************************************
     ! read statistics parameters
     !
@@ -228,9 +233,14 @@ subroutine ini_file_to_params( params, filename )
                 d = 2
             endif
             params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
+
+            ! note in the above formula, many arrays allocated in allocate_grid are missing
+            ! this even though you want 1.0Gb in total, you end up with about 4Gb. So here
+            ! divide by that empirical factor and reserve a proper formula for future work
+            params%number_blocks = params%number_blocks / 4
+
             if (params%rank==0) write(*,'(80("-"))')
             if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
-
             if (params%rank==0) write(*,'("INIT: we allocated ",i6," blocks per rank (total: ",i7," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
             if (params%rank==0) write(*,'("INIT: consuming total memory of",f12.4,"GB")') maxmem/1000.0/1000.0/1000.0
 

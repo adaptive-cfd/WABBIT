@@ -27,7 +27,8 @@
 ! ********************************************************************************************
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, &
+     real_receive_buffer, stop_status )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -86,7 +87,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! grid parameter
     integer(kind=ik)                                :: Bs, g
     ! number of datafields
-    integer(kind=ik)                                :: NdF
+    integer(kind=ik)                                :: NdF, synch_stage
 
     ! type of data writing
     character(len=25)                   :: data_writing_type
@@ -98,7 +99,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! position in integer buffer, need for every neighboring process
     integer(kind=ik), allocatable                                :: int_pos(:)
-
+logical :: test2
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -122,6 +123,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         ! reset status
         stop_status = .false.
 
+        write(*,*) "testing redundant nodes"
     end if
 
     ! grid parameter
@@ -315,9 +317,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             int_send_buffer( int_pos(rank+1)+4  , rank+1 ) = buffer_size
                             ! increase int buffer position
                             int_pos(rank+1) = int_pos(rank+1) + 5
-
-                        case('staging')
-
+                        case default
+                            call abort(8,'methode non reconnue')
                     end select
 
                 else
@@ -414,17 +415,14 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         ! add data
                         call add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch, hvy_id )
 
-                    case('staging')
-
                     case('compare')
                         ! compare data
-                        call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status )
+                        call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff )
 
                 end select
 
                 ! increase buffer postion marker
                 l = l + 5
-
             end do
         end if
     end do
@@ -444,6 +442,11 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! clean up
     deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix )
+
+    if ( data_writing_type=='compare' ) then
+        test2 = stop_status
+        call MPI_Allreduce(test2, stop_status, 1,MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, k )
+    endif
 
 end subroutine check_redundant_nodes
 
@@ -1721,7 +1724,7 @@ end subroutine add_hvy_data
 
 !############################################################################################################
 
-subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status )
+subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -1740,7 +1743,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     !> heavy data array - block data
     real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
     !> hvy id
-    integer(kind=ik), intent(in)                    :: hvy_id
+    integer(kind=ik), intent(in)                    :: hvy_id, level_diff
     ! status of nodes check: if true: stops program
     logical, intent(inout)              :: stop_status
 
@@ -1762,15 +1765,13 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     buffer_i = 1
 
     ! set error threshold
-    !eps = 1e-12_rk
-    eps = 1e-7_rk
+    eps = 1e-9_rk
 
     ! reset error norm
     error_norm = 0.0_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
     ! loop over all data fields
     do dF = 1, params%number_data_fields
         ! first dimension
@@ -1780,9 +1781,24 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
                 ! third dimension, note: for 2D cases kN is allways 1
                 do k = data_bounds(1,3), data_bounds(2,3)
 
-                    ! pointwise error norm
-                    error_norm = error_norm + (hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i ))**2
-
+                    if (level_diff/=-1) then
+                        ! pointwise error norm
+                        error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                    else
+                        ! if the level diff is -1, I compare with interpolated (upsampled) data. that means every EVEN
+                        ! point is the result of interpolation, and not truely redundant.
+                        ! Note this routine ALWAYS just compares the redundant nodes, so it will mostly be called
+                        ! with a line of points (i.e. one dimension is length one)
+                        !
+                        ! This routine has been tested:
+                        !   - old method (working version): no error found (okay)
+                        !   - old method, non_uniform_mesh_correction=0; in params file -> plenty of errors (okay)
+                        !   - old method, sync stage 4 deactivated: finds all occurances of "3finer blocks on corner problem" (okay)
+                        !   - new method, averaging, no error found (makes sense: okay)
+                        if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)/=0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0))) then
+                            error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                        endif
+                    endif
                     buffer_i = buffer_i + 1
 
                 end do
@@ -1790,15 +1806,16 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         end do
     end do
 
-    error_norm = sqrt(error_norm)
-
-    if ( (error_norm > eps) .and. (stop_status .eqv. .false.) ) then
+    if (error_norm > eps)  then
         ! error message
-        write(*,*) "ERROR: difference in redundant nodes"
+        write(*,*) "ERROR: difference in redundant nodes", error_norm, level_diff
         ! stop program
         stop_status = .true.
-        ! mark block
-        hvy_block( :, :, :, :, hvy_id ) = -99.0_rk
+        ! mark block by putting a dot in the middle. this way, we can identify all
+        ! blocks that have problems. If we set the entire block to 100, then subsequent
+        ! synchronizations fail because of that. If we set just a point in the middle, it
+        ! is far away from the boundary and thus does not affect other sync steps.
+        hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, :, :, hvy_id ) = 100.0_rk
     end if
 
 end subroutine compare_hvy_data

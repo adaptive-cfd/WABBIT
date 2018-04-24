@@ -226,17 +226,14 @@ logical::test
        call unit_test_treecode( params )
     end if
     ! perform a convergence test on ghost node sync'ing
+
     ! I don't see a good reason to skip this test ever - I removed the condition here.
     call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
     hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
     int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
-!    if (params%test_wavelet_comp) then
-!        call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-!    end if
+
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
 
     !---------------------------------------------------------------------------
@@ -247,13 +244,19 @@ logical::test
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, int_send_buffer, &
     int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch )
 
+    ! this should REALLY work
+    ! it is to test the test redundant nodes routine.
+!    write(*,*)"after inicond, the nodes test must be fine - we set it everywhere!"
+!    test=.false.
+!    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+!    hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+
+
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-!        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        test=.true.
-        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -282,13 +285,26 @@ logical::test
 
         ! new iteration
         iteration = iteration + 1
+        !***********
+        write(*,*) "testing at ", iteration
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+
+        test=.false. ! test
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
+
+        if (test) then
+            iteration = 99
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+            call abort(1,"byebyebye")
+        endif
+        !****************
 
         ! refine everywhere
         if ( params%adapt_mesh ) then
-    !        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-    test=.true.
-            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
 
@@ -303,6 +319,7 @@ logical::test
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
         hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
         com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
@@ -323,10 +340,9 @@ logical::test
         ! statistics
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes for some derived qtys, for sure
-        !   call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        test=.true.
-          call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-          hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+          com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+
           ! TODO make this nicer
           if (iteration==1 ) then
             open (15, file='meanflow.t', status='replace')
@@ -342,10 +358,8 @@ logical::test
         ! write data to disk
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        !  call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        test=.true.
-          call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-          hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+          com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
           ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
           ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
           ! slots. the state vector (hvy_block) is copied if desired.
@@ -390,10 +404,8 @@ logical::test
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then
       ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-!      call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-test=.true.
-call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+      com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
       ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
       ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
       ! slots. the state vector (hvy_block) is copied if desired.

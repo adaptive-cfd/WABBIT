@@ -14,6 +14,7 @@ import wabbit_tools
 def do_test2(rootdir, title):
     dirsx = glob.glob( rootdir+'*' )
     dirsx.sort()
+    print(dirsx)
 
     Nblocks=[]
     e=[]
@@ -34,17 +35,19 @@ def do_test2(rootdir, title):
 
 plt.close('all')
 plt.rcParams["text.usetex"] = True
+plt.rcParams["font.family"] = 'serif'
+plt.rcParams["font.serif"] = 'Times'
 
-do_test2('A_CONV/dx1','cnvct-nonequi-4th-4th-4th')
-do_test2('A_CONV/dx2','cnvct-nonequi-2nd-2nd-4th')
-do_test2('A_CONV/dx3','cnvct-equi-4th-4th-4th')
-do_test2('A_CONV/dx4','cnvct-equi-2nd-2nd-4th')
+do_test2('A_CONV/dx1','nonequi (4th-4th-4th)')
+do_test2('A_CONV/dx2','nonequi (2nd-2nd-4th)')
+do_test2('A_CONV/dx3','equi (4th-4th-4th)')
+do_test2('A_CONV/dx4','equi (2nd-2nd-4th)')
 
-
+plt.xlim([1e0, 1e3])
+plt.title('Convection test')
 plt.grid()
 plt.legend() #loc='upper left', bbox_to_anchor=(0,1.02,1,0.2), prop={'size': 6})
 plt.xlabel('$\\sqrt{N_{b} \cdot B_{s}}')
 plt.ylabel('$||\phi-\phi_{\\mathrm{ex}}||_2/||\phi_{\\mathrm{ex}}||_2$')
 plt.gcf().subplots_adjust(top=0.76)
 plt.gcf().savefig('convection-space-nblocks.pdf')
-plt.xlim([1e0, 1e3])

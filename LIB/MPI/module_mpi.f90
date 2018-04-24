@@ -71,10 +71,10 @@ contains
     include "fill_receive_buffer.f90"
 
     ! soubroutine for get data with lock/unlock synchronization
-    include "RMA_lock_unlock_get_data.f90"
+    ! include "RMA_lock_unlock_get_data.f90"
 
     ! soubroutine to put data with lock/unlock synchronization
-    include "RMA_lock_unlock_put_data.f90"
+    ! include "RMA_lock_unlock_put_data.f90"
 
     ! non blocking data transfer
     include "isend_irecv_data.f90"

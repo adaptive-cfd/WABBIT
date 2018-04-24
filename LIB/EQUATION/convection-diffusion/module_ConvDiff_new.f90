@@ -393,9 +393,9 @@ contains
       select case (params_convdiff%inicond(i))
       case("blob")
           if (params_convdiff%dim==2) then
-            ! create gauss pulse
-            do ix = g+1,Bs+g
-              do iy = g+1,Bs+g
+            ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
+            do ix = 1, Bs+2*g
+              do iy = 1, Bs+2*g
                 ! compute x,y coordinates from spacing and origin
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                 y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
@@ -412,9 +412,9 @@ contains
             end do
         else
             ! create gauss pulse
-            do ix = g+1,Bs+g
-              do iy = g+1,Bs+g
-                  do iz = g+1,Bs+g
+            do ix = 1, Bs+2*g
+              do iy = 1, Bs+2*g
+                  do iz = 1, Bs+2*g
                     ! compute x,y coordinates from spacing and origin
                     x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                     y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y

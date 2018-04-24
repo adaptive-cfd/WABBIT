@@ -209,7 +209,12 @@ def fetch_Nblocks_dir(dir, return_Bs=False):
 
     if os.path.isfile(dir+'timesteps_info.t'):
         d = np.loadtxt(dir+'timesteps_info.t')
-        N = np.max(d[:,2])
+        if d.shape[1]==5:
+            # old data has 5 cols
+            N = np.max(d[:,2])
+        else:
+            # new data we added the col for cpu time (...seufz)
+            N = np.max(d[:,3])
     else:
         raise ValueError('timesteps_info.t not found in dir.'+dir)
 
@@ -325,7 +330,7 @@ def get_max_min_level( treecode ):
 
 
 def plot_wabbit_file( file, savepng=False, savepdf=False, cmap='rainbow', caxis=None, title=True, mark_blocks=True,
-                     gridonly=False, contour=False, ax=None, fig=None, ticks=True, colorbar=True ):
+                     gridonly=False, contour=False, ax=None, fig=None, ticks=True, colorbar=True, dpi=300 ):
     """ Read a (2D) wabbit file and plot it as a pseudocolor plot.
 
     Keyword arguments:
@@ -441,13 +446,13 @@ def plot_wabbit_file( file, savepng=False, savepdf=False, cmap='rainbow', caxis=
 
     if not gridonly:
         if savepng:
-            plt.savefig( file.replace('h5','png'), dpi=1000, transparent=True )
+            plt.savefig( file.replace('h5','png'), dpi=dpi, transparent=True )
 
         if savepdf:
             plt.savefig( file.replace('h5','pdf') )
     else:
         if savepng:
-            plt.savefig( file.replace('.h5','-grid.png'), dpi=1000, transparent=True )
+            plt.savefig( file.replace('.h5','-grid.png'), dpi=dpi, transparent=True )
 
         if savepdf:
             plt.savefig( file.replace('.h5','-grid.pdf') )

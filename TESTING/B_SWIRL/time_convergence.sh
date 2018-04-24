@@ -1,8 +1,14 @@
 #!/bin/bash
 
+# note bizarre numbering..
+test3=0 # easy, 4th-4th-3rd, equidistant
+test5=1 #
+test3=0
+test2=0
 
 #---------------------------------------------------------------------------------------------------
 
+if [ "$test3" == 1 ]; then
 ini=swirl_RK3TVD.ini
 dt=(2.5e-3 1.0e-3 5.0e-4 2.5e-4 1.0e-4)
 test_number=3
@@ -45,9 +51,11 @@ do
 	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
+fi
 
 #---------------------------------------------------------------------------------------------------
 
+if [ "$test5" == 1 ]; then
 ini=swirl-nonequi-nonadaptive.ini
 dt=(5.0e-3 4.0e-3 3.0e-3 2.5e-3 1.0e-3 5.0e-4)
 test_number=5
@@ -90,11 +98,11 @@ do
 	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
-
+fi
 
 #---------------------------------------------------------------------------------------------------
 
-
+if [ "$test1" == 1 ]; then
 ini=swirl.ini
 dt=(7.5e-3 5.0e-3 2.5e-3 1.0e-3 5.0e-4)
 test_number=1
@@ -137,9 +145,10 @@ do
 	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
+fi
 
 #---------------------------------------------------------------------------------------------------
-
+if [ "$test2" == 1 ]; then
 ini=swirl.ini
 dt=(7.5e-3 5.0e-3 2.5e-3 1.0e-3 5.0e-4)
 test_number=2
@@ -182,3 +191,4 @@ do
 	$mpi ./wabbit 2D $ini --memory=3.0GB
 	cd ..
 done
+fi

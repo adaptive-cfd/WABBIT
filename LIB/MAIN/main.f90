@@ -287,9 +287,6 @@ logical::test
         iteration = iteration + 1
         !***********
         write(*,*) "testing at ", iteration
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-
         test=.false. ! test
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
@@ -297,7 +294,7 @@ logical::test
         if (test) then
             iteration = 99
             call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
-            call abort(1,"byebyebye")
+            call abort(111111,"byebyebye")
         endif
         !****************
 
@@ -321,14 +318,14 @@ logical::test
         com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
 
-        ! filter
-        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            test=.true.
-                call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
-
-            call filter_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
-        end if
+        ! ! filter
+        ! if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
+        !     test=.true.
+        !         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        ! hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
+        !
+        !     call filter_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
+        ! end if
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then

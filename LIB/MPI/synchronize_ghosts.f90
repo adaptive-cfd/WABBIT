@@ -103,11 +103,13 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
     else
         write(*,*) "Call: ./wabbit 2D PARAMS.ini --memory=2.0GB [--old,--new]"
-        write(*,*) " default is --new"
+        write(*,*) " default is --new!"
         call abort(44, "unknown sync arg")
     endif
 
-
+sync=.false. ! test
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync)
 
 end subroutine sync_ghosts
 

@@ -27,8 +27,7 @@
 ! ********************************************************************************************
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, &
-     real_receive_buffer, stop_status )
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -68,7 +67,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     integer(kind=ik)                    :: number_procs
 
     ! loop variables
-    integer(kind=ik)                    :: N, k, dF, neighborhood, neighbor_num, level_diff, l
+    integer(kind=ik)                    :: N, k, dF, neighborhood, invert_neighborhood, neighbor_num, level_diff, l
 
     ! id integers
     integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id
@@ -87,7 +86,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! grid parameter
     integer(kind=ik)                                :: Bs, g
     ! number of datafields
-    integer(kind=ik)                                :: NdF, synch_stage
+    integer(kind=ik)                                :: NdF
 
     ! type of data writing
     character(len=25)                   :: data_writing_type
@@ -99,11 +98,18 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! position in integer buffer, need for every neighboring process
     integer(kind=ik), allocatable                                :: int_pos(:)
-logical :: test2
+
+    ! synch stage loop variables
+    integer(kind=ik) :: synch_stage, stages
+    ! synch status
+    ! synch == .true. : active block sends data to neighboring block
+    ! neighbor_synch == .true. : neighbor block send data to active block
+    logical    :: synch, neighbor_synch, test2
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
-!---------------------------------------------------------------------------------------------
+ !---------------------------------------------------------------------------------------------
 ! variables initialization
 
     ! hack to use subroutine as redundant nodes test and for ghost nodes synchronization
@@ -112,7 +118,7 @@ logical :: test2
         ! 'exclude_redundant', 'include_redundant', 'only_redundant'
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging', 'compare'
-        data_writing_type = 'average'
+        data_writing_type = 'staging'
 
     else
         ! nodes test
@@ -123,7 +129,6 @@ logical :: test2
         ! reset status
         stop_status = .false.
 
-        write(*,*) "testing redundant nodes"
     end if
 
     ! grid parameter
@@ -165,11 +170,6 @@ logical :: test2
     ! reset com matrix
     com_matrix = 0
     dummy_matrix = 0
-    ! reset integer send buffer position
-    int_pos = 2
-
-    ! reset first in send buffer position
-    int_send_buffer( 1, : ) = 0
 
     ! reseting all ghost nodes to zero
     if ( (data_writing_type == 'average') .and. (data_bounds_type /= 'only_redundant') ) then
@@ -188,265 +188,355 @@ logical :: test2
         end do
     end if
 
+    ! set number of synch stages
+    if ( data_writing_type == 'staging' ) then
+        ! all four stages
+        ! NOTE: WE CAN ACTUALLY SKIP STAGE 4
+        stages = 3
+    else
+        ! only one stage
+        stages = 1
+    end if
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! loop over active heavy data
-    do k = 1, hvy_n
+    ! loop over all synch stages
+    do synch_stage = 1, stages
 
-        ! reset synch array
-        ! alles auf null, knoten im block auf 1
-        ! jeder später gespeicherte knoten erhöht wert um 1
-        ! am ende der routine wird der wert aus dem synch array ggf. für die durchschnittsberechnung benutzt
-        ! synch array hat die maximale anzahl von blöcken pro prozess alloziiert, so dass die heavy id unverändert
-        ! benutzt werden kann
-        ! ghost nodes layer auf 1 setzen, wenn nur die redundanten Knoten bearbeitet werden
-        if (data_bounds_type == 'only_redundant') then
-            hvy_synch(:, :, :, hvy_active(k)) = 1
-        else
-            hvy_synch(:, :, :, hvy_active(k)) = 0
-        end if
-        ! alles knoten im block werden auf 1 gesetzt
-        ! todo: ist erstmal einfacher als nur die redundaten zu setzen, aber unnötig
-        ! so gibt es aber nach der synch keine nullen mehr, kann ggf. als synch test verwendet werden?
-        if ( params%threeD_case ) then
-            hvy_synch( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, hvy_active(k)) = 1
-        else
-            hvy_synch( g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) = 1
-        end if
+        ! reset integer send buffer position
+        int_pos = 2
+        ! reset first in send buffer position
+        int_send_buffer( 1, : ) = 0
+        int_send_buffer( 2, : ) = -99
 
-    end do
-
-    ! loop over active heavy data
-    do k = 1, hvy_n
-
-        ! loop over all neighbors
-        do neighborhood = 1, neighbor_num
-            ! neighbor exists
-            if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
-
-                ! 0. ids bestimmen
-                ! neighbor light data id
-                neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
-                ! calculate neighbor rank
-                call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
-                ! calculate light id
-                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
-                ! neighbor heavy id
-                call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
-                ! calculate the difference between block levels
-                ! define leveldiff: sender - receiver, so +1 means sender on higher level
-                ! sender is active block (me)
-                level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
-
-                ! 1. ich (aktiver block) ist der sender für seinen nachbarn
-                ! lese daten und sortiere diese in bufferform
-                ! wird auch für interne nachbarn gemacht, um gleiche routine für intern/extern zu verwenden
-                ! um diue lesbarkeit zu erhöhen werden zunächst die datengrenzen bestimmt
-                ! diese dann benutzt um die daten zu lesen
-                ! 2D/3D wird bei der datengrenzbestimmung unterschieden, so dass die tatsächliche leseroutine stark vereinfacht ist
-                ! da die interpolation bei leveldiff -1 erst bei der leseroutine stattfindet, werden als datengrenzen die für die interpolation noitwendigen bereiche angegeben
-                ! auch für restriction ist der datengrenzenbereich größer, da dann auch hier später erst die restriction stattfindet
-                call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'sender' )
-
-                ! vor dem schreiben der daten muss ggf interpoliert werden
-                ! hier werden die datengrenzen ebenfalls angepasst
-                ! interpolierte daten stehen in einem extra array
-                ! dessen größe richtet sich nach dem größten möglichen interpolationsgebiet: (Bs+2*g)^3
-                ! auch die vergröberten daten werden in den interpolationbuffer geschrieben und die datengrenzen angepasst
-                if ( level_diff == 0 ) then
-                    ! lese nun mit den datengrenzen die daten selbst
-                    ! die gelesenen daten werden als buffervektor umsortiert
-                    ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
-                    ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
-                    call read_hvy_data( params, data_buffer, buffer_size, hvy_block( data_bounds(1,1):data_bounds(2,1), &
-                                                                                     data_bounds(1,2):data_bounds(2,2), &
-                                                                                     data_bounds(1,3):data_bounds(2,3), &
-                                                                                     :, hvy_active(k)) )
-
-                else
-                    ! interpoliere daten
-                    call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
-                    ! lese daten, verwende interpolierte daten
-                    call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
-                                                                                        data_bounds(1,2):data_bounds(2,2), &
-                                                                                        data_bounds(1,3):data_bounds(2,3), &
-                                                                                        :) )
-
-                end if
-
-                ! daten werden jetzt entweder in den speicher geschrieben -> schreiberoutine
-                ! oder in den send buffer geschrieben
-                ! schreiberoutine erhält die date grenzen
-                ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
-                ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
-                ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
-                if ( rank == neighbor_rank ) then
-
-                    ! interner nachbar
-                    ! data bounds
-                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
-                    ! write data, hängt vom jeweiligen Fall ab
-                    ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
-                    ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
-                    ! staging: wende staging konzept an
-                    ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
-                    select case(data_writing_type)
-                        case('simple')
-                            ! simply write data
-                            call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
-
-                        case('average', 'compare')
-                            ! treat internal neighbor like external neighbor
-                            ! but do not MPI_send/receive the data
-
-                            ! fill real buffer
-                            ! position in real buffer is stored in int buffer
-                            buffer_position = int_send_buffer(1, rank+1 ) + 1
-                            ! real data
-                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer(1:buffer_size)
-
-                            ! fill int buffer
-                            ! sum size of single buffers on first element
-                            int_send_buffer(1, rank+1 ) = int_send_buffer(1, rank+1 ) + buffer_size
-                            ! save: neighbor id, neighborhood, level diffenrence, buffer size
-                            int_send_buffer( int_pos(rank+1)    , rank+1 ) = hvy_id
-                            int_send_buffer( int_pos(rank+1)+1  , rank+1 ) = neighborhood
-                            int_send_buffer( int_pos(rank+1)+2  , rank+1 ) = level_diff
-                            int_send_buffer( int_pos(rank+1)+3  , rank+1 ) = buffer_position
-                            int_send_buffer( int_pos(rank+1)+4  , rank+1 ) = buffer_size
-                            ! increase int buffer position
-                            int_pos(rank+1) = int_pos(rank+1) + 5
-                        case default
-                            call abort(8,'methode non reconnue')
-                    end select
-
-                else
-                    ! external neighbor
-                    ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
-                    com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
-
-                    ! second: fill real buffer
-                    ! position in real buffer is stored in int buffer
-                    buffer_position = int_send_buffer(1  , neighbor_rank+1 ) + 1
-                    ! real data
-                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer(1:buffer_size)
-
-                    ! third: fill int buffer
-                    ! sum size of single buffers on first element
-                    int_send_buffer(1  , neighbor_rank+1 ) = int_send_buffer(1  , neighbor_rank+1 ) + buffer_size
-                    ! save: neighbor id, neighborhood, level diffenrence, buffer size
-                    int_send_buffer( int_pos(neighbor_rank+1)    , neighbor_rank+1 ) = hvy_id
-                    int_send_buffer( int_pos(neighbor_rank+1)+1  , neighbor_rank+1 ) = neighborhood
-                    int_send_buffer( int_pos(neighbor_rank+1)+2  , neighbor_rank+1 ) = level_diff
-                    int_send_buffer( int_pos(neighbor_rank+1)+3  , neighbor_rank+1 ) = buffer_position
-                    int_send_buffer( int_pos(neighbor_rank+1)+4  , neighbor_rank+1 ) = buffer_size
-                    ! increase int buffer position
-                    int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
-
-                end if
-
-            end if
-        end do
-    end do
-
-    ! alle buffer sind gefüllt, markiere das ende der int buffer, damit der empfänger dies erkennen kann
-    ! loop over all com matrix elements
-    do k = 1, number_procs
-        if ( com_matrix(k) /= 0 ) then
-            int_send_buffer( int_pos(k)  , k ) = -99
-        end if
-    end do
-
-    ! send/receive data
-    ! note: todo, remove dummy subroutine
-    ! note: new dummy subroutine sets receive buffer position accordingly to process rank
-    ! note: todo: use more than non-blocking send/receive
-    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
-
-    ! fill receive buffer for internal neighbors for averaging writing type
-    if ( (data_writing_type == 'average') .or. (data_writing_type == 'compare') ) then
-        ! mark end of buffer
-        int_send_buffer( int_pos(rank+1)  , rank+1 ) = -99
-        ! fill receive buffer
-        int_receive_buffer( 1:int_pos(rank+1)  , rank+1 ) = int_send_buffer( 1:int_pos(rank+1)  , rank+1 )
-        real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 )
-        ! change com matrix, need to sort in buffers in next step
-        com_matrix(rank+1) = 1
-    end if
-
-    ! sortiere den real buffer ein
-    ! loop over all procs
-    do k = 1, number_procs
-        if ( com_matrix(k) /= 0 ) then
-            ! neighboring proc
-            ! first element in int buffer is real buffer size
-            l = 2
-            ! -99 marks end of data
-            do while ( int_receive_buffer(l, k) /= -99 )
-
-                ! hvy id
-                hvy_id = int_receive_buffer(l, k)
-                ! neighborhood
-                neighborhood = int_receive_buffer(l+1, k)
-                ! level diff
-                level_diff = int_receive_buffer(l+2, k)
-                ! buffer position
-                buffer_position = int_receive_buffer(l+3, k)
-                ! buffer size
-                buffer_size = int_receive_buffer(l+4, k)
-
-                ! data buffer
-                data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
-
-                ! data bounds
-                call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
-                ! write data, hängt vom jeweiligen Fall ab
-                ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
-                ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
-                ! staging: wende staging konzept an
-                ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
-                select case(data_writing_type)
-                    case('simple')
-                        ! simply write data
-                        call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
-
-                    case('average')
-                        ! add data
-                        call add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch, hvy_id )
-
-                    case('compare')
-                        ! compare data
-                        call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff )
-
-                end select
-
-                ! increase buffer postion marker
-                l = l + 5
-            end do
-        end if
-    end do
-
-    ! last averaging step
-    if ( data_writing_type == 'average' ) then
         ! loop over active heavy data
         do k = 1, hvy_n
-            do dF = 1, NdF
 
-                ! calculate average for all nodes, todo: proof performance?
-                hvy_block(:, :, :, dF, hvy_active(k)) = hvy_block(:, :, :, dF, hvy_active(k)) / real( hvy_synch(:, :, :, hvy_active(k)) , kind=rk)
+            ! reset synch array
+            ! alles auf null, knoten im block auf 1
+            ! jeder später gespeicherte knoten erhöht wert um 1
+            ! am ende der routine wird der wert aus dem synch array ggf. für die durchschnittsberechnung benutzt
+            ! synch array hat die maximale anzahl von blöcken pro prozess alloziiert, so dass die heavy id unverändert
+            ! benutzt werden kann
+            ! ghost nodes layer auf 1 setzen, wenn nur die redundanten Knoten bearbeitet werden
+            if (data_bounds_type == 'only_redundant') then
+                hvy_synch(:, :, :, hvy_active(k)) = 1
+            else
+                hvy_synch(:, :, :, hvy_active(k)) = 0
+            end if
+            ! alles knoten im block werden auf 1 gesetzt
 
+            ! todo: ist erstmal einfacher als nur die redundaten zu setzen, aber unnötig
+            ! so gibt es aber nach der synch keine nullen mehr, kann ggf. als synch test verwendet werden?
+            if ( params%threeD_case ) then
+                hvy_synch( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, hvy_active(k)) = 1
+            else
+                hvy_synch( g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) = 1
+            end if
+
+        end do
+
+        ! loop over active heavy data
+        do k = 1, hvy_n
+            ! loop over all neighbors
+            do neighborhood = 1, neighbor_num
+                ! neighbor exists
+                if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
+
+                    ! 0. ids bestimmen
+                    ! neighbor light data id
+                    neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
+                    ! calculate neighbor rank
+                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+                    ! calculate light id
+                    call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                    ! neighbor heavy id
+                    call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
+                    ! calculate the difference between block levels
+                    ! define leveldiff: sender - receiver, so +1 means sender on higher level
+                    ! sender is active block (me)
+                    level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
+
+                    ! 1. ich (aktiver block) ist der sender für seinen nachbarn
+                    ! lese daten und sortiere diese in bufferform
+                    ! wird auch für interne nachbarn gemacht, um gleiche routine für intern/extern zu verwenden
+                    ! um diue lesbarkeit zu erhöhen werden zunächst die datengrenzen bestimmt
+                    ! diese dann benutzt um die daten zu lesen
+                    ! 2D/3D wird bei der datengrenzbestimmung unterschieden, so dass die tatsächliche leseroutine stark vereinfacht ist
+                    ! da die interpolation bei leveldiff -1 erst bei der leseroutine stattfindet, werden als datengrenzen die für die interpolation noitwendigen bereiche angegeben
+                    ! auch für restriction ist der datengrenzenbereich größer, da dann auch hier später erst die restriction stattfindet
+                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'sender' )
+
+                    ! vor dem schreiben der daten muss ggf interpoliert werden
+                    ! hier werden die datengrenzen ebenfalls angepasst
+                    ! interpolierte daten stehen in einem extra array
+                    ! dessen größe richtet sich nach dem größten möglichen interpolationsgebiet: (Bs+2*g)^3
+                    ! auch die vergröberten daten werden in den interpolationbuffer geschrieben und die datengrenzen angepasst
+                    if ( level_diff == 0 ) then
+                        ! lese nun mit den datengrenzen die daten selbst
+                        ! die gelesenen daten werden als buffervektor umsortiert
+                        ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
+                        ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
+                        call read_hvy_data( params, data_buffer, buffer_size, hvy_block( data_bounds(1,1):data_bounds(2,1), &
+                                                                                         data_bounds(1,2):data_bounds(2,2), &
+                                                                                         data_bounds(1,3):data_bounds(2,3), &
+                                                                                         :, hvy_active(k)) )
+
+                    else
+                        ! interpoliere daten
+                        call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
+                        ! lese daten, verwende interpolierte daten
+                        call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
+                                                                                            data_bounds(1,2):data_bounds(2,2), &
+                                                                                            data_bounds(1,3):data_bounds(2,3), &
+                                                                                            :) )
+
+                    end if
+
+                    ! daten werden jetzt entweder in den speicher geschrieben -> schreiberoutine
+                    ! oder in den send buffer geschrieben
+                    ! schreiberoutine erhält die date grenzen
+                    ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
+                    ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
+                    ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
+                    if ( rank == neighbor_rank ) then
+
+                        ! interner nachbar
+                        ! data bounds
+                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+                        ! write data, hängt vom jeweiligen Fall ab
+                        ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
+                        ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
+                        ! staging: wende staging konzept an
+                        ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
+                        select case(data_writing_type)
+                            case('simple')
+                                ! simply write data
+                                call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+
+                            case('average', 'compare', 'staging')
+                                ! treat internal neighbor like external neighbor
+                                ! but do not MPI_send/receive the data
+
+                                synch = .True.
+                                if (data_writing_type=="staging") then
+                                    call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                                endif
+
+                                if (synch) then
+                                    ! fill int/real buffer (NOTE: rank==neighbor_rank)
+                                    call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), hvy_id, neighborhood, level_diff )
+
+                                    ! increase int buffer position
+                                    int_pos(rank+1) = int_pos(rank+1) + 5
+
+                                    ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
+                                    int_send_buffer( int_pos(rank+1)  , rank+1 ) = -99
+                                endif
+                        end select
+
+                    else
+                        ! synch status for staging method
+                        synch = .true.
+                        if (data_writing_type == 'staging') then
+                            call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                        end if
+
+                        ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
+                        com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
+
+                        if (synch) then
+                            ! active block send data to his neighbor block
+                            ! fill int/real buffer
+                            call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), hvy_id, neighborhood, level_diff )
+
+                        else
+                            ! neighbor block send data to active block
+                            ! write -1 to int_send buffer, placeholder
+                            int_send_buffer( int_pos(neighbor_rank+1) : int_pos(neighbor_rank+1)+4  , neighbor_rank+1 ) = -1
+                        end if
+
+                        ! increase int buffer position
+                        int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
+
+                        ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
+                        int_send_buffer( int_pos(neighbor_rank+1)  , neighbor_rank+1 ) = -99
+
+                    end if
+
+                end if
             end do
         end do
-    end if
 
-    ! clean up
-    deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix )
+        ! send/receive data
+        ! note: todo, remove dummy subroutine
+        ! note: new dummy subroutine sets receive buffer position accordingly to process rank
+        ! note: todo: use more than non-blocking send/receive
+        call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
+
+        ! fill receive buffer for internal neighbors for averaging writing type
+        if ( (data_writing_type == 'average') .or. (data_writing_type == 'compare') .or. (data_writing_type == 'staging') ) then
+            ! fill receive buffer
+            int_receive_buffer( 1:int_pos(rank+1)  , rank+1 ) = int_send_buffer( 1:int_pos(rank+1)  , rank+1 )
+            real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 )
+            ! change com matrix, need to sort in buffers in next step
+            com_matrix(rank+1) = 1
+        end if
+
+        ! Daten einsortieren
+        ! für simple, average, compare: einfach die buffer einsortieren, Reihenfolge ist egal
+        ! staging: erneuter loop über alle blöcke und nachbarschaften, wenn daten notwendig, werden diese in den buffern gesucht
+        if ( data_writing_type /= 'staging' ) then
+            ! sortiere den real buffer ein
+            ! loop over all procs
+            do k = 1, number_procs
+                if ( com_matrix(k) /= 0 ) then
+                    ! neighboring proc
+                    ! first element in int buffer is real buffer size
+                    l = 2
+                    ! -99 marks end of data
+                    do while ( int_receive_buffer(l, k) /= -99 )
+
+                        ! hvy id
+                        hvy_id = int_receive_buffer(l, k)
+                        ! neighborhood
+                        neighborhood = int_receive_buffer(l+1, k)
+                        ! level diff
+                        level_diff = int_receive_buffer(l+2, k)
+                        ! buffer position
+                        buffer_position = int_receive_buffer(l+3, k)
+                        ! buffer size
+                        buffer_size = int_receive_buffer(l+4, k)
+
+                        ! data buffer
+                        data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
+
+                        ! data bounds
+                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+                        ! write data, hängt vom jeweiligen Fall ab
+                        ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
+                        ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
+                        ! staging: wende staging konzept an
+                        ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
+                        select case(data_writing_type)
+                            case('simple')
+                                ! simply write data
+                                call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+
+                            case('average')
+                                ! add data
+                                call add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch, hvy_id )
+
+                            case('compare')
+                                ! compare data
+                                call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff )
+
+                        end select
+
+                        ! increase buffer postion marker
+                        l = l + 5
+
+                    end do
+                end if
+            end do
+
+            ! last averaging step
+            if ( data_writing_type == 'average' ) then
+                ! loop over active heavy data
+                do k = 1, hvy_n
+                    do dF = 1, NdF
+
+                        ! calculate average for all nodes, todo: proof performance?
+                        hvy_block(:, :, :, dF, hvy_active(k)) = hvy_block(:, :, :, dF, hvy_active(k)) / real( hvy_synch(:, :, :, hvy_active(k)) , kind=rk)
+
+                    end do
+                end do
+            end if
+
+        else
+            ! staging type
+            ! loop over active heavy data
+            do k = 1, hvy_n
+                ! loop over all neighbors
+                do neighborhood = 1, neighbor_num
+                    ! neighbor exists
+                    if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
+
+                        ! invert neighborhood, needed for in buffer searching, because sender proc has invert neighborhood relation
+                        call calc_invert_neighborhood( params, neighborhood, invert_neighborhood)
+
+                        ! 0. ids bestimmen
+                        ! neighbor light data id
+                        neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
+                        ! calculate neighbor rank
+                        call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+                        ! calculate light id
+                        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                        ! calculate the difference between block levels
+                        ! define leveldiff: sender - receiver, so +1 means sender on higher level
+                        ! sender is active block (me)
+                        level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
+
+                        ! set synch status
+                        call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                        ! synch == .true. bedeutet, dass der aktive block seinem nachbarn daten gibt
+                        ! hier sind wir aber auf der seite des empfängers, das bedeutet, neighbor_synch muss ausgewertet werden
+
+                        if (neighbor_synch) then
+
+                            ! search buffers for synchronized data
+                            ! first element in int buffer is real buffer size
+                            l = 2
+
+                            ! -99 marks end of data
+                            do while ( int_receive_buffer(l, neighbor_rank+1) /= -99 )
+
+                                ! proof heavy id and neighborhood id
+                                if (  (int_receive_buffer( l,   neighbor_rank+1 ) == hvy_active(k) ) &
+                                .and. (int_receive_buffer( l+1, neighbor_rank+1 ) == invert_neighborhood) ) then
+
+                                    ! set parameter
+                                    ! level diff, read from buffer because calculated level_diff is not sender-receiver
+                                    level_diff = int_receive_buffer(l+2, neighbor_rank+1)
+                                    ! buffer position
+                                    buffer_position = int_receive_buffer(l+3, neighbor_rank+1)
+                                    ! buffer size
+                                    buffer_size = int_receive_buffer(l+4, neighbor_rank+1)
+
+                                    ! data buffer
+                                    data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 )
+
+                                    ! data bounds
+                                    call calc_data_bounds( params, data_bounds, invert_neighborhood, level_diff, data_bounds_type, 'receiver' )
+
+                                    ! write data
+                                    call write_hvy_data( params, data_buffer(1:buffer_size), data_bounds, hvy_block, hvy_active(k) )
+
+                                end if
+
+                                ! increase buffer postion marker
+                                l = l + 5
+
+                            end do
+
+                        end if
+
+                    end if
+                end do
+            end do
+
+        end if
+
+    end do ! loop over stages
 
     if ( data_writing_type=='compare' ) then
         test2 = stop_status
         call MPI_Allreduce(test2, stop_status, 1,MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, k )
     endif
+
+    ! clean up
+    deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix )
 
 end subroutine check_redundant_nodes
 
@@ -1808,7 +1898,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
 
     if (error_norm > eps)  then
         ! error message
-        write(*,*) "ERROR: difference in redundant nodes", error_norm, level_diff
+        write(*,*) "ERROR: difference in redundant nodes", error_norm, level_diff, hvy_id, params%rank
         ! stop program
         stop_status = .true.
         ! mark block by putting a dot in the middle. this way, we can identify all
@@ -1969,3 +2059,413 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     end if
 
 end subroutine isend_irecv_data_2
+
+!############################################################################################################
+
+subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_id, neighborhood )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    ! synch stage
+    integer(kind=ik), intent(in)        :: synch_stage
+
+    ! synch status
+    logical, intent(inout)    :: synch, neighbor_synch
+
+    ! level diffenrence
+    integer(kind=ik), intent(in)        :: level_diff
+
+    ! heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+
+    ! list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_id
+
+    !> neighborhood relation, id from dirs
+    integer(kind=ik), intent(in)                    :: neighborhood
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! set synch stage
+    ! stage 1: level +1
+    ! stage 2: level 0
+    ! stage 3: level -1
+    ! stage 4: special
+    synch = .false.
+    neighbor_synch = .false.
+
+    ! stage 1
+    if ( (synch_stage == 1) .and. (level_diff == 1) ) then
+        ! block send data
+        synch = .true.
+    elseif ( (synch_stage == 1) .and. (level_diff == -1) ) then
+        ! neighbor send data
+        neighbor_synch = .true.
+    end if
+
+    ! stage 2
+    if ( (synch_stage == 2) .and. (level_diff == 0) ) then
+        ! block send data
+        synch = .true.
+        ! neighbor send data
+        neighbor_synch = .true.
+    end if
+
+    ! stage 3
+    if ( (synch_stage == 3) .and. (level_diff == -1) ) then
+        ! block send data
+        synch = .true.
+    elseif ( (synch_stage == 3) .and. (level_diff == 1) ) then
+        ! neighbor send data
+        neighbor_synch = .true.
+    end if
+
+    ! stage 4
+    if ( (synch_stage == 4) .and. (level_diff == 0) ) then
+        ! neighborhood NE
+        if ( neighborhood == 5 ) then
+            if ( (hvy_neighbor( hvy_id, 9) /= -1) .or. (hvy_neighbor( hvy_id, 13) /= -1) ) then
+                synch = .true.
+                neighbor_synch = .true.
+            end if
+        end if
+        ! neighborhood NW
+        if ( neighborhood == 6 ) then
+            if ( (hvy_neighbor( hvy_id, 10) /= -1) .or. (hvy_neighbor( hvy_id, 15) /= -1) ) then
+                synch = .true.
+                neighbor_synch = .true.
+            end if
+        end if
+        ! neighborhood SE
+        if ( neighborhood == 7 ) then
+            if ( (hvy_neighbor( hvy_id, 11) /= -1) .or. (hvy_neighbor( hvy_id, 14) /= -1) ) then
+                synch = .true.
+                neighbor_synch = .true.
+            end if
+        end if
+        ! neighborhood SW
+        if ( neighborhood == 8 ) then
+            if ( (hvy_neighbor( hvy_id, 12) /= -1) .or. (hvy_neighbor( hvy_id, 16) /= -1) ) then
+                synch = .true.
+                neighbor_synch = .true.
+            end if
+        end if
+    end if
+
+end subroutine set_synch_status
+
+!############################################################################################################
+
+subroutine write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos, hvy_id, neighborhood, level_diff )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> send buffers, integer and real
+    integer(kind=ik), intent(inout)        :: int_send_buffer(:,:)
+    real(kind=rk), intent(inout)           :: real_send_buffer(:,:)
+
+    ! data buffer size
+    integer(kind=ik), intent(in)           :: buffer_size
+
+    ! id integer
+    integer(kind=ik), intent(in)           :: neighbor_rank
+
+    ! restricted/predicted data buffer
+    real(kind=rk), intent(in)              :: data_buffer(:)
+
+    ! integer buffer position
+    integer(kind=ik), intent(in)           :: int_pos
+
+    ! data buffer intergers, receiver heavy id, neighborhood id, level diffenrence
+    integer(kind=ik), intent(in)           :: hvy_id, neighborhood, level_diff
+
+    ! buffer position
+    integer(kind=ik)                       :: buffer_position
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! fill real buffer
+    ! position in real buffer is stored in int buffer
+    buffer_position = int_send_buffer(1  , neighbor_rank+1 ) + 1
+
+    ! real data
+    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer(1:buffer_size)
+
+    ! fill int buffer
+    ! sum size of single buffers on first element
+    int_send_buffer(1  , neighbor_rank+1 ) = int_send_buffer(1  , neighbor_rank+1 ) + buffer_size
+
+    ! save: neighbor id, neighborhood, level diffenrence, buffer size
+    int_send_buffer( int_pos,   neighbor_rank+1 ) = hvy_id
+    int_send_buffer( int_pos+1, neighbor_rank+1 ) = neighborhood
+    int_send_buffer( int_pos+2, neighbor_rank+1 ) = level_diff
+    int_send_buffer( int_pos+3, neighbor_rank+1 ) = buffer_position
+    int_send_buffer( int_pos+4, neighbor_rank+1 ) = buffer_size
+
+end subroutine write_buffers
+
+!############################################################################################################
+
+subroutine calc_invert_neighborhood( params, neighborhood, invert_neighborhood )
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)                  :: params
+    !> neighborhood id
+    integer(kind=ik), intent(in)                 :: neighborhood
+    !> invert neighborhood id
+    integer(kind=ik), intent(out)                       :: invert_neighborhood
+
+!---------------------------------------------------------------------------------------------
+! interfaces
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+    ! neighborhood
+    if ( params%threeD_case ) then
+
+        select case (neighborhood)
+            !'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
+            case(1)
+                invert_neighborhood = 6
+            case(2)
+                invert_neighborhood = 4
+            case(3)
+                invert_neighborhood = 5
+            case(4)
+                invert_neighborhood = 2
+            case(5)
+                invert_neighborhood = 3
+            case(6)
+                invert_neighborhood = 1
+            !'_12/___', '_13/___', '_14/___', '_15/___'
+            case(7)
+                invert_neighborhood = 13
+            case(8)
+                invert_neighborhood = 14
+            case(9)
+                invert_neighborhood = 11
+            case(10)
+                invert_neighborhood = 12
+            !'_62/___', '_63/___', '_64/___', '_65/___'
+            case(11)
+                invert_neighborhood = 9
+            case(12)
+                invert_neighborhood = 10
+            case(13)
+                invert_neighborhood = 7
+            case(14)
+                invert_neighborhood = 8
+            !'_23/___', '_25/___'
+            case(15)
+                invert_neighborhood = 18
+            case(16)
+                invert_neighborhood = 17
+            !'_43/___', '_45/___'
+            case(17)
+                invert_neighborhood = 16
+            case(18)
+                invert_neighborhood = 15
+            !'123/___', '134/___', '145/___', '152/___'
+            case(19)
+                invert_neighborhood = 25
+            case(20)
+                invert_neighborhood = 26
+            case(21)
+                invert_neighborhood = 23
+            case(22)
+                invert_neighborhood = 24
+            !'623/___', '634/___', '645/___', '652/___'
+            case(23)
+                invert_neighborhood = 21
+            case(24)
+                invert_neighborhood = 22
+            case(25)
+                invert_neighborhood = 19
+            case(26)
+                invert_neighborhood = 20
+            !'__1/123', '__1/134', '__1/145', '__1/152'
+            case(27)
+                invert_neighborhood = 47
+            case(28)
+                invert_neighborhood = 48
+            case(29)
+                invert_neighborhood = 49
+            case(30)
+                invert_neighborhood = 50
+            !'__2/123', '__2/623', '__2/152', '__2/652'
+            case(31)
+                invert_neighborhood = 39
+            case(32)
+                invert_neighborhood = 40
+            case(33)
+                invert_neighborhood = 41
+            case(34)
+                invert_neighborhood = 42
+            !'__3/123', '__3/623', '__3/134', '__3/634'
+            case(35)
+                invert_neighborhood = 45
+            case(36)
+                invert_neighborhood = 46
+            case(37)
+                invert_neighborhood = 43
+            case(38)
+                invert_neighborhood = 44
+            !'__4/134', '__4/634', '__4/145', '__4/645'
+            case(39)
+                invert_neighborhood = 31
+            case(40)
+                invert_neighborhood = 32
+            case(41)
+                invert_neighborhood = 33
+            case(42)
+                invert_neighborhood = 34
+            !'__5/145', '__5/645', '__5/152', '__5/652'
+            case(43)
+                invert_neighborhood = 37
+            case(44)
+                invert_neighborhood = 38
+            case(45)
+                invert_neighborhood = 35
+            case(46)
+                invert_neighborhood = 36
+            !'__6/623', '__6/634', '__6/645', '__6/652'
+            case(47)
+                invert_neighborhood = 27
+            case(48)
+                invert_neighborhood = 28
+            case(49)
+                invert_neighborhood = 29
+            case(50)
+                invert_neighborhood = 30
+            !'_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152'
+            case(51)
+                invert_neighborhood = 63
+            case(52)
+                invert_neighborhood = 64
+            case(53)
+                invert_neighborhood = 66!65
+            case(54)
+                invert_neighborhood = 65!66
+            case(55)
+                invert_neighborhood = 59
+            case(56)
+                invert_neighborhood = 60
+            case(57)
+                invert_neighborhood = 62
+            case(58)
+                invert_neighborhood = 61
+            !'_62/623', '_62/652', '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652'
+            case(59)
+                invert_neighborhood = 55
+            case(60)
+                invert_neighborhood = 56
+            case(61)
+                invert_neighborhood = 58
+            case(62)
+                invert_neighborhood = 57
+            case(63)
+                invert_neighborhood = 51
+            case(64)
+                invert_neighborhood = 52
+            case(65)
+                invert_neighborhood = 54!53
+            case(66)
+                invert_neighborhood = 53!54
+            !'_23/123', '_23/623', '_25/152', '_25/652'
+            case(67)
+                invert_neighborhood = 73
+            case(68)
+                invert_neighborhood = 74
+            case(69)
+                invert_neighborhood = 71
+            case(70)
+                invert_neighborhood = 72
+            !'_43/134', '_43/634', '_45/145', '_45/645'
+            case(71)
+                invert_neighborhood = 69
+            case(72)
+                invert_neighborhood = 70
+            case(73)
+                invert_neighborhood = 67
+            case(74)
+                invert_neighborhood = 68
+        end select
+    else
+
+        select case (neighborhood)
+            case(1)
+                invert_neighborhood = 3
+            case(2)
+                invert_neighborhood = 4
+            case(3)
+                invert_neighborhood = 1
+            case(4)
+                invert_neighborhood = 2
+            case(5)
+                invert_neighborhood = 8
+            case(6)
+                invert_neighborhood = 7
+            case(7)
+                invert_neighborhood = 6
+            case(8)
+                invert_neighborhood = 5
+            case(9)
+                invert_neighborhood = 11
+            case(10)
+                invert_neighborhood = 12
+            case(11)
+                invert_neighborhood = 9
+            case(12)
+                invert_neighborhood = 10
+            case(13)
+                invert_neighborhood = 15
+            case(14)
+                invert_neighborhood = 16
+            case(15)
+                invert_neighborhood = 13
+            case(16)
+                invert_neighborhood = 14
+        end select
+    end if
+
+end subroutine calc_invert_neighborhood
+
+!############################################################################################################

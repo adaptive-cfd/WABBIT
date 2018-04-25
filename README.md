@@ -8,7 +8,7 @@ how to get a copy of WABBIT and compile the code
 ### clone from github
 
 ```
-git clone https://github.com/mario-sroka/WABBIT
+git clone https://github.com/adaptive-cfd/WABBIT
 ```
 
 ### run make

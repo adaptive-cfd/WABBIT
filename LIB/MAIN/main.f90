@@ -219,7 +219,7 @@ program main
     ! perform a convergence test on ghost node sync'ing
     ! all unit tests should be deselectable
     if (params%test_ghost_nodes_synch) then
-        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     end if
 
@@ -232,7 +232,7 @@ program main
     if ( params%test_time_stepper ) then
         ! time stepper convergence order
         ! note: test do approx. 600 time steps on finest mesh level, so maybe skip the test
-        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active , lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! reset the grid: all blocks are inactive and empty
         call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     end if
@@ -248,7 +248,7 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, params%adapt_mesh, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, params%adapt_mesh, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk
@@ -283,7 +283,7 @@ program main
         endif
 
         ! advance in time
-        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call time_stepper( time, params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
         ! check redundant nodes
         if ( params%test_redundant_nodes ) then
@@ -295,7 +295,7 @@ program main
             end if
 
             ! first: synchronize ghost nodes to remove differences on redundant nodes after time step
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
             my_stop_status = .false.
             ! second: check nodes
@@ -321,12 +321,12 @@ program main
 
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end if
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         endif
 
         ! output on screen
@@ -342,7 +342,7 @@ program main
         ! write data to disk
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
           call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
           call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
           call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
@@ -359,7 +359,7 @@ program main
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then
       ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-      call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+      call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
       call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
       call write_vorticity(hvy_work, hvy_block(:,:,:,:,:), lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
       call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)

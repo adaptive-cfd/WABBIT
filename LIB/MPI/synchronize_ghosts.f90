@@ -57,7 +57,7 @@
 !
 ! ********************************************************************************************
 
-subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -73,6 +73,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -129,6 +131,17 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! MPI error variable
     integer(kind=ik)                    :: ierr
 
+!#######################################
+! TEST: switch for new synch routine
+! synch switch
+logical                             :: new_synch_routine
+
+! synch switch
+! .true. == synchronize ghost, .false. == compare redundant nodes
+logical                             :: synch_method
+
+!#######################################
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -142,6 +155,18 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
         time_sum = 0.0_rk
     end if
+
+
+!#######################################
+new_synch_routine = .true.
+
+if (new_synch_routine) then
+
+    synch_method = .true.
+    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, synch_method )
+
+! old routine
+else
 
     N = params%number_blocks
 
@@ -821,6 +846,8 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 
     ! clean up
     deallocate( com_pos )
+
+end if
 
     if ( params%debug ) then
         call MPI_Barrier(MPI_COMM_WORLD, ierr)

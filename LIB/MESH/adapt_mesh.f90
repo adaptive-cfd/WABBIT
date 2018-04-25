@@ -33,7 +33,7 @@
 !********************************************************************************************
 !> \image html adapt_mesh.svg width=400
 
-subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -50,6 +50,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -109,7 +111,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 

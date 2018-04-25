@@ -21,7 +21,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -36,6 +36,8 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)          :: hvy_synch(:, :, :, :)
     !> heavy work array  )
     real(kind=rk),  intent(inout)           :: hvy_work (:, :, :, :, :)
     !> neighbor array (heavy data)
@@ -286,7 +288,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         ! time stepper
         !-----------------------------------------------------------------------
         do l = 1, num_dt(idt)*10
-            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end do
 
         if ( idt == 1 ) then

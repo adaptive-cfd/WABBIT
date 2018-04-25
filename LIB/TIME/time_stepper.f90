@@ -50,7 +50,7 @@
 !
 ! ********************************************************************************************
 
-subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -69,6 +69,8 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
     !> heavy data array - neighbor data
@@ -190,7 +192,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
     ! restart time
     sub_t0 = MPI_Wtime()
@@ -214,7 +216,7 @@ subroutine time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neigh
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+        call synchronize_ghosts(params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
         ! restart time
         sub_t0 = MPI_Wtime()

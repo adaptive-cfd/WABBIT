@@ -24,7 +24,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -88,9 +88,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
     ! MPI error variable
     integer(kind=ik)                        :: ierr
-
-! ##### TEST ####
-logical :: test
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -158,7 +155,7 @@ logical :: test
         ! refine some blocks
         call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
         ! random adapt some blocks
-        call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     end do
 
     if (params%rank == 0) then
@@ -217,13 +214,9 @@ logical :: test
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer,&
         int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-test = .true.
-call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

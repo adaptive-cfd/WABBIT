@@ -21,7 +21,7 @@
 !
 ! ********************************************************************************************
 
-subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -38,6 +38,8 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -169,7 +171,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     end if
 
     ! synchronize ghostnodes
-    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
     ! start time
     sub_t0 = MPI_Wtime()

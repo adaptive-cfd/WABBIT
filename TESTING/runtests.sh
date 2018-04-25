@@ -8,6 +8,10 @@ cd $rootdir
 echo "   "
 echo -e "\t \033[4m WABBIT: run all existing unit tests \033[0m"
 echo "   "
+echo -e "\t \033[4m wARNING ALL UNIT TESTS ARE COMPATIBLE WITH NEW METHOD (STAGING!!!!) DO NOT FORGET \033[0m"
+echo "   "
+echo -e "\t \033[4m wARNING ALL UNIT TESTS ARE COMPATIBLE WITH NEW METHOD (STAGING!!!!) DO NOT FORGET \033[0m"
+echo "   "
 
 if [ -z "$nprocs" ]; then
     echo "unset"

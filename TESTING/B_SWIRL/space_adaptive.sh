@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export mpi="nice mpirun -n 4"
-
 #-------------
 test1=1
 #-------------

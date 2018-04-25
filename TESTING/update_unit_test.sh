@@ -10,7 +10,19 @@ inifile=$(basename $test)
 echo "We will update the unit test "
 echo $test "(NOTE THIS SHOULD BE AN INI FILE)"
 echo "Dir=" $dir
+
+if [ ! -d "$dir" ]; then
+    echo "dir not found.."
+    exit 67
+fi
+
 echo "inifile=" $inifile
+
+if [ ! -f "$dir"/"$inifile" ]; then
+    echo "inifile not found.."
+    exit 67
+fi
+
 echo "mpi_command=" $mpi
 echo "with the current version of the code"
 echo "be very very sure what you are doing!! you need to know EXACTLY why the test fails"
@@ -34,7 +46,6 @@ $mpi ./wabbit 2D $inifile --memory=0.25GB
 
 ./create_ref_files.sh
 
-rm -f *times.dat 
+rm -f *times.dat
 
 rm wabbit wabbit-post create_ref_files.sh
-

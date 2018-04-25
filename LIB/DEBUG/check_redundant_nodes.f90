@@ -278,10 +278,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         ! die gelesenen daten werden als buffervektor umsortiert
                         ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
                         ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
-                        call read_hvy_data( params, data_buffer, buffer_size, hvy_block( data_bounds(1,1):data_bounds(2,1), &
-                                                                                         data_bounds(1,2):data_bounds(2,2), &
-                                                                                         data_bounds(1,3):data_bounds(2,3), &
-                                                                                         :, hvy_active(k)) )
+                        call read_hvy_data( params, data_buffer, buffer_size, &
+                        hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
 
                     else
                         ! interpoliere daten
@@ -300,41 +298,13 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                     ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
                     ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
                     ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
-                    if ( rank == neighbor_rank ) then
-
-                        ! interner nachbar
+                    if ( (rank==neighbor_rank).and.(data_writing_type=='simple') ) then
+                        ! internal neighbor and direct writing method: copy the ghost nodes as soon as possible, without passing
+                        ! via the buffers first.
                         ! data bounds
                         call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
-                        ! write data, hängt vom jeweiligen Fall ab
-                        ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
-                        ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
-                        ! staging: wende staging konzept an
-                        ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
-                        select case(data_writing_type)
-                            case('simple')
-                                ! simply write data
-                                call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
-
-                            case('average', 'compare', 'staging')
-                                ! treat internal neighbor like external neighbor
-                                ! but do not MPI_send/receive the data
-
-                                synch = .True.
-                                if (data_writing_type=="staging") then
-                                    call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
-                                endif
-
-                                if (synch) then
-                                    ! fill int/real buffer (NOTE: rank==neighbor_rank)
-                                    call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), hvy_id, neighborhood, level_diff )
-
-                                    ! increase int buffer position
-                                    int_pos(rank+1) = int_pos(rank+1) + 5
-
-                                    ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
-                                    int_send_buffer( int_pos(rank+1)  , rank+1 ) = -99
-                                endif
-                        end select
+                        ! simply write data. No care
+                        call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
                     else
                         ! synch status for staging method
@@ -369,6 +339,14 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
             end do
         end do
 
+        ! pretent that no communication with myself takes place, in order to skip the
+        ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
+        ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
+        com_matrix(rank+1) = 0
+
+        !***********************************************************************
+        ! transfer part (send/recv)
+        !***********************************************************************
         ! send/receive data
         ! note: todo, remove dummy subroutine
         ! note: new dummy subroutine sets receive buffer position accordingly to process rank
@@ -384,6 +362,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
             com_matrix(rank+1) = 1
         end if
 
+        !***********************************************************************
+        ! Unpack received data in the ghost node layers
+        !***********************************************************************
         ! Daten einsortieren
         ! für simple, average, compare: einfach die buffer einsortieren, Reihenfolge ist egal
         ! staging: erneuter loop über alle blöcke und nachbarschaften, wenn daten notwendig, werden diese in den buffern gesucht
@@ -512,7 +493,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                                     ! write data
                                     call write_hvy_data( params, data_buffer(1:buffer_size), data_bounds, hvy_block, hvy_active(k) )
-
+                                    ! done, exit the while loop?
+                                    exit
                                 end if
 
                                 ! increase buffer postion marker

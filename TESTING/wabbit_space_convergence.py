@@ -39,7 +39,7 @@ plt.rcParams["font.family"] = 'serif'
 plt.rcParams["font.serif"] = 'Times'
 
 do_test2('A_CONV/dx1','nonequi (4th-4th-4th)')
-do_test2('A_CONV/dx2','nonequi (2nd-2nd-4th)')
+#do_test2('A_CONV/dx2','nonequi (2nd-2nd-4th)')
 do_test2('A_CONV/dx3','equi (4th-4th-4th)')
 do_test2('A_CONV/dx4','equi (2nd-2nd-4th)')
 

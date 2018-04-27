@@ -268,7 +268,7 @@ program main
 
     ! timing
     call toc( params, "init_data", MPI_wtime()-sub_t0 )
-
+stop
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
@@ -389,7 +389,11 @@ program main
         ! MPI Barrier before program ends
         call MPI_Barrier(MPI_COMM_WORLD, ierr)
 
-        debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
+        if ( params%number_procs > 1  ) then 
+            debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
+        else
+            debug%comp_time(:,3) = sqrt(debug%comp_time(:,3))
+        end if
 
         ! output
         if (rank==0) then

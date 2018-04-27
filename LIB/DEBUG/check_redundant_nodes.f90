@@ -118,7 +118,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         ! 'exclude_redundant', 'include_redundant', 'only_redundant'
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging', 'compare'
-        data_writing_type = 'staging'
+        data_writing_type = 'average'
 
     else
         ! nodes test
@@ -191,7 +191,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! set number of synch stages
     if ( data_writing_type == 'staging' ) then
         ! all four stages
-        stages = 4
+        stages = 3!4
     else
         ! only one stage
         stages = 1
@@ -202,6 +202,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! loop over all synch stages
     do synch_stage = 1, stages
+
+        if (synch_stage==3) then
+            data_bounds_type = 'exclude_redundant'
+        end if
 
         ! reset integer send buffer position
         int_pos = 2
@@ -527,6 +531,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                                     ! write data
                                     call write_hvy_data( params, data_buffer(1:buffer_size), data_bounds, hvy_block, hvy_active(k) )
+
+                                    ! done, exit the while loop?
+                                    exit
 
                                 end if
 
@@ -1810,7 +1817,7 @@ subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch,
 
                     ! count synchronized data
                     ! note: only for first datafield
-                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1
+                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + int(1,kind=1)
 
                     ! increase buffer counter
                     buffer_i = buffer_i + 1

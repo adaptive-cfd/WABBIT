@@ -144,6 +144,8 @@ program main
     ! large numbers of processes and blocks per process
     integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    ! decide if data is saved or not
+    logical                             :: it_is_time_to_save_data
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -264,6 +266,7 @@ program main
 
         ! new iteration
         iteration = iteration + 1
+    
 
         ! refine everywhere
         if ( params%adapt_mesh ) then
@@ -281,11 +284,19 @@ program main
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
-        ! filter
-        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
+            (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+            
+            it_is_time_to_save_data=.true.
+        else
+            
+            it_is_time_to_save_data=.false.
+        endif
 
-            call filter_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
+        ! filter
+        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
+            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call filter_block( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active,it_is_time_to_save_data )
         end if
 
         ! adapt the mesh
@@ -301,7 +312,7 @@ program main
           ! TODO make this nicer
           if (iteration==1 ) then
             open (15, file='meanflow.t', status='replace')
-            close(15)
+            close(15)   
             open (15, file='forces.t', status='replace')
             close(15)
           endif
@@ -311,7 +322,7 @@ program main
         endif
 
         ! write data to disk
-        if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
+        if ( it_is_time_to_save_data) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
           call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
@@ -347,6 +358,13 @@ program main
 
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then
+       
+      ! filter before write out
+      if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
+        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call filter_block( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active,.true.)
+      end if
+
       ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
       call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 

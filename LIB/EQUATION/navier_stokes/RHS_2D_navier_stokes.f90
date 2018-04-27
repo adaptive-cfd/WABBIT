@@ -258,13 +258,6 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     rhs(:,:,3) = rhs(:,:,3) + fric_v
 
 
-
-    if (params_ns%penalization) then
-        ! add volume penalization 
-        call add_constraints(rhs,Bs, g, x0,delta_x, phi)
-    endif
-
-
 end subroutine RHS_2D_navier_stokes
 
 !---------------------------------------------------------------------------------------------

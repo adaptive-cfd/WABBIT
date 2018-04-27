@@ -162,6 +162,7 @@ contains
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
+    call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
 
     if (params_ns%penalization) then
       call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk )
@@ -340,6 +341,8 @@ contains
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
+    ! Area of mean_density
+    real(kind=rk)                 :: A,tmp
 
     ! local variables
     integer(kind=ik) :: Bs
@@ -368,16 +371,22 @@ contains
       ! them nicer, two RHS stages have to be defined: integral / local stage.
       !
       ! called for each block.
+      if (params_ns%penalization .and. params_ns%geometry=="funnel") then
+        ! calculate mean_density in blocks close to the pump
+        call area_density(u(:,:,1,1)**2,g,Bs,x0,dx) 
+      endif
 
-      return
 
     case ("post_stage")
       !-------------------------------------------------------------------------
       ! 3rd stage: post_stage.
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
-
-      return
+      if (params_ns%penalization .and. params_ns%geometry=="funnel") then
+        ! reduce sum on each block to global sum
+        call mean_density_on_outlet()
+        
+      endif
 
     case ("local_stage")
       !-------------------------------------------------------------------------
@@ -390,8 +399,14 @@ contains
       ! called for each block.
       if (size(u,3)==1) then
         call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        
+        if (params_ns%penalization) then
+        ! add volume penalization 
+          call add_constraints(rhs(:,:,1,:),Bs, g, x0,(/dx(1),dx(2)/),u(:,:,1,:))
+        endif
+
       else
-        call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
+         call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
 
     case default

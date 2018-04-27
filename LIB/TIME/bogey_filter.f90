@@ -19,7 +19,7 @@
 !! 21/09/17 - create
 ! ********************************************************************************************
 
-subroutine bogey_filter( params, g, Bs, N_df, block_data, xx0, ddx, level)
+subroutine bogey_filter( params,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -31,18 +31,13 @@ subroutine bogey_filter( params, g, Bs, N_df, block_data, xx0, ddx, level)
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-
-    !> grid parameter
-    integer(kind=ik), intent(in)        :: g, Bs,N_dF
-
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-
+    !> heavy work    
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
     ! spacing and origin of a block
     real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3)
 
-    ! block mesh level
-    integer(kind=ik), intent(in)        :: level
 
     ! loop parameter
     integer(kind=ik)                    :: i, j, l, dF
@@ -58,13 +53,15 @@ subroutine bogey_filter( params, g, Bs, N_df, block_data, xx0, ddx, level)
               Dthetamag_y(Bs+2*g, Bs+2*g), c_2(Bs+2*g, Bs+2*g), rho(Bs+2*g, Bs+2*g), u(Bs+2*g, Bs+2*g), v(Bs+2*g, Bs+2*g), p(Bs+2*g, Bs+2*g)
 
     ! stencil array, note: size is fixed
-    real(kind=rk)                       :: stencil(3),gamma_
+    real(kind=rk)                       :: stencil(3),gamma_,r_rs(2)
 
     ! filter position (array postion of value to filter)
     integer(kind=ik)                    :: stencil_size
 
     ! /todo: move to ini file
-    character(len=20)                   :: detector_method, sigma_method
+    character(len=80)                   :: detector_method, sigma_method
+    !> grid parameter
+    integer(kind=ik)                    :: g, Bs,N_dF
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -73,15 +70,16 @@ subroutine bogey_filter( params, g, Bs, N_df, block_data, xx0, ddx, level)
 ! variables initialization
 !
     ! grid parameter
-!    Bs = params%number_block_nodes
-!    g  = params%number_ghost_nodes
-
-!    N_dF = params%number_data_fields
+    ! Bs  = params%number_block_nodes
+    ! g   = params%number_ghost_nodes
+    ! N_dF= params%number_data_fields
 
     ! allocate old data array
 !    allocate( block_old(Bs+2*g, Bs+2*g, Bs+2*g, N_dF), r_x(Bs+2*g, Bs+2*g), r_y(Bs+2*g, Bs+2*g), sigma_x(Bs+2*g, Bs+2*g), sigma_y(Bs+2*g, Bs+2*g), theta(Bs+2*g, Bs+2*g), &
 !              u_x(Bs+2*g, Bs+2*g),v_y(Bs+2*g, Bs+2*g), Dtheta_x(Bs+2*g, Bs+2*g), Dtheta_y(Bs+2*g, Bs+2*g), Dthetamag_x(Bs+2*g, Bs+2*g), &
 !              Dthetamag_y(Bs+2*g, Bs+2*g), c_2(Bs+2*g, Bs+2*g), rho(Bs+2*g, Bs+2*g), u(Bs+2*g, Bs+2*g), v(Bs+2*g, Bs+2*g), p(Bs+2*g, Bs+2*g) )
+    sigma_x=0.0_rk
+    sigma_y=0.0_rk
 
     stencil_size = 3
     stencil(1:stencil_size) = (/  1.0_rk/  4.0_rk, &
@@ -202,8 +200,26 @@ subroutine bogey_filter( params, g, Bs, N_df, block_data, xx0, ddx, level)
         case("tanh")
             do i = g,Bs+g+1
                 do j = g,Bs+g+1
-                    sigma_x(i,j) = 1.0_rk - dtanh( r_th/r_x(i,j)/2.0_rk )
-                    sigma_y(i,j) = 1.0_rk - dtanh( r_th/r_y(i,j)/2.0_rk )
+                     sigma_x(i,j) = 1.0_rk - dtanh( r_th/r_x(i,j)/0.7_rk )
+                     sigma_y(i,j) = 1.0_rk - dtanh( r_th/r_y(i,j)/0.7_rk )
+                    
+                     if (sigma_x(i,j)>1.0_rk .or. sigma_x(i,j)<0.0_rk) then
+                        call abort(343674,'something wrong')
+                     endif
+                    ! r_rs(1)     = r_th/(r_x(i,j)-0.5_rk*r_th)
+                    ! r_rs(2)     = r_th/(r_y(i,j)-0.5_rk*r_th)
+                    ! if (r_rs(1)<2.0_rk) then
+                    !     sigma_x(i,j) = 1.0_rk - dtanh( r_rs(1) )
+                    ! else
+                    !     sigma_x(i,j) = 0.0_rk
+                    ! endif
+
+                    ! if (r_rs(1)<2.0_rk) then
+                    !     sigma_y(i,j) = 1.0_rk - dtanh( r_rs(2) )
+                    ! else
+                    !     sigma_y(i,j)=0.0_rk
+                    ! endif
+                    
                 end do
             end do
 
@@ -230,6 +246,13 @@ subroutine bogey_filter( params, g, Bs, N_df, block_data, xx0, ddx, level)
             end do
         end do
     end do
+
+    if (params%save_filter_strength) then
+        ! save filter strength in x direction
+        hvy_WORK(:,:,1,1)=sigma_x(:,:)
+        ! save filter strength in y direction
+        hvy_WORK(:,:,1,2)=sigma_y(:,:)
+    endif
 
 end subroutine bogey_filter
 

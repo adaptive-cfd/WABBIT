@@ -173,6 +173,8 @@ subroutine ini_file_to_params( params, filename )
         call read_param_mpi(FILE, 'Discretization', 'switch', params%sigma_switch, 'tanh' )
         ! bogey shock detection method (p,divU)
         call read_param_mpi(FILE, 'Discretization', 'detector_method', params%detector_method, 'divU' )
+        ! boolean save bogey filter strength
+        call read_param_mpi(FILE, 'Discretization', 'save_filter_strength', params%save_filter_strength, .false. )
     endif
     !***************************************************************************
     ! read statistics parameters

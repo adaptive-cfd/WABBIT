@@ -120,8 +120,8 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
         p_ref     = p_L
       else
         mask      = smoothstep(x_R-x,h)   
-        rho_ref   = transition(x,0.9_rk*domain_size(1),0.05_rk*domain_size(1),rho_R,rho_L)
-        p_ref     = transition(x,0.9_rk*domain_size(1),0.05_rk*domain_size(1),p_R  ,p_L    )
+        rho_ref   = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),rho_R,rho_L)
+        p_ref     = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),p_R  ,p_L    )
       endif  
      
       ! density

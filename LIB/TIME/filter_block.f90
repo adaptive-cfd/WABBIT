@@ -21,26 +21,37 @@
 !
 ! ********************************************************************************************
 
-subroutine filter_block( params, lgt_block, hvy_block , hvy_active, hvy_n)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
+subroutine filter_block( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active,data_is_saved )
+    use module_IO
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
 
+    !> time loop parameters
+    real(kind=rk), intent(in)                       :: time
+    integer(kind=ik), intent(in)                    :: iteration
+
     !> user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in)                  :: params
     !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)                 :: lgt_block(:, :)
     !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
+    !> heavy work data array - block data
+    real(kind=rk), intent(inout)                    :: hvy_work(:, :, :, :, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)                    :: hvy_active(:)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)                 :: lgt_active(:)
+    !> number of active blocks (light/heavy data)
+    integer(kind=ik), intent(inout)                 :: lgt_n, hvy_n
+    ! decide if filter strength is saved
+    logical,intent(in)                              :: data_is_saved
+    ! file name
+    character(len=80)                               :: fname
+
+
 
     ! loop variables
     integer(kind=ik)                    :: k, i, j, l, dF, N_dF, lgt_id
@@ -63,8 +74,6 @@ subroutine filter_block( params, lgt_block, hvy_block , hvy_active, hvy_n)
 
     ! spacing and origin of a block
     real(kind=rk)                       :: xx0(1:3), ddx(1:3)
-
-
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -177,7 +186,7 @@ subroutine filter_block( params, lgt_block, hvy_block , hvy_active, hvy_n)
                 block_old = hvy_block(:, :, :, dF, hvy_active(k) )
 
                 ! 3D or 2D case
-                if ( params%threeD_case ) then
+                if ( size(block_old,3) > 1 ) then
                     ! 3D
                     ! loop over block data
                     do i = g+1, Bs+g
@@ -233,7 +242,7 @@ subroutine filter_block( params, lgt_block, hvy_block , hvy_active, hvy_n)
 
                         ! shock filter
                         if ( dF == 1 ) then
-                            call bogey_filter( params, params%number_ghost_nodes, params%number_block_nodes, params%number_data_fields, hvy_block(:, :, :, 1:N_dF, hvy_active(k) ), xx0, ddx, lgt_block(lgt_id, params%max_treelevel+1) )
+                            call bogey_filter(params, Bs, g, N_dF ,hvy_block(:, :, :, 1:N_dF, hvy_active(k)),xx0,ddx,hvy_work(:, :, :, :, hvy_active(k)) )
                         end if
 
                 end select
@@ -243,6 +252,17 @@ subroutine filter_block( params, lgt_block, hvy_block , hvy_active, hvy_n)
         end do
 
     end do
+
+    if (data_is_saved .and. params%save_filter_strength .and. params%filter_type=='bogey_shock') then
+        ! save filter strength in x direction
+        write( fname,'("sigma_x_", i12.12, ".h5")') nint(time * 1.0e6_rk)
+        call write_field( fname, time, iteration, 1, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
+      ! save filter strength in y direction
+        write( fname,'("sigma_y_", i12.12, ".h5")') nint(time * 1.0e6_rk)
+        call write_field( fname, time, iteration, 2, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
+    endif
+
+
 
     ! clean up
     deallocate(block_old)

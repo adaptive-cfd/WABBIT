@@ -42,7 +42,7 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: init_mask,add_constraints,get_mask
+  PUBLIC :: init_mask,add_constraints,get_mask,area_density,mean_density_on_outlet
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -105,6 +105,7 @@ module module_ns_penalization
       real(kind=rk)       ::inlet_pressure       ! 
       real(kind=rk)       ::outlet_pressure       ! 
       real(kind=rk)       ::pump_speed       ! 
+      real(kind=rk)       ::pump_density      ! 
       
       type(type_funnel_plate), allocatable:: plate(:)
   end type type_funnel

@@ -23,10 +23,11 @@ def do_test2(rootdir, title):
         raise ValueError('no data')
 
     for d in dirsx:
-        err = wabbit_tools.wabbit_error(d )#, norm=np.inf)
-        N, Bs = wabbit_tools.fetch_Nblocks_dir(d, return_Bs=True)
-        Nblocks.append( np.sqrt(N*Bs) )
-        e.append( err )
+        if len(glob.glob(d+'/*.h5')) != 0:
+            err = wabbit_tools.wabbit_error( d )#, norm=np.inf)
+            N, Bs = wabbit_tools.fetch_Nblocks_dir(d, return_Bs=True)
+            Nblocks.append( np.sqrt(N*Bs) )
+            e.append( err )
 
     Nblocks, e = zip(*sorted(zip(Nblocks, e)))
 
@@ -39,7 +40,7 @@ plt.rcParams["font.family"] = 'serif'
 plt.rcParams["font.serif"] = 'Times'
 
 do_test2('A_CONV/dx1','nonequi (4th-4th-4th)')
-#do_test2('A_CONV/dx2','nonequi (2nd-2nd-4th)')
+do_test2('A_CONV/dx2','nonequi (2nd-2nd-4th)')
 do_test2('A_CONV/dx3','equi (4th-4th-4th)')
 do_test2('A_CONV/dx4','equi (2nd-2nd-4th)')
 

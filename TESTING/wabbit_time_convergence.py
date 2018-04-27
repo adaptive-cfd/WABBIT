@@ -16,8 +16,11 @@ def do_test( basedir, name,  blob_width=0.01):
         dt=[]
         err=[]
         for dir in dirs:
-            dt.append( wabbit_tools.fetch_dt_dir(dir) )
-            err.append( wabbit_tools.wabbit_error(dir) )
+            if len(glob.glob(dir+'/*.h5')) != 0:
+                dt.append( wabbit_tools.fetch_dt_dir(dir) )
+                err.append( wabbit_tools.wabbit_error(dir) )
+            else:
+                print('There are no h5 files in '+dir)
 
         print(dirs)
 

@@ -289,7 +289,6 @@ logical::test
 	! it is important to sync the ghosts now in case adaptivity is turned off.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
         com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-        write(*,*) "testing at ", iteration
         test=.false. ! test
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)

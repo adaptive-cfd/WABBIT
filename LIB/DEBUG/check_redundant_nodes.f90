@@ -204,6 +204,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! loop over all synch stages
     do synch_stage = 1, stages
 
+        if (synch_stage==3) data_bounds_type = "exclude_redundant"
+
         ! reset integer send buffer position
         int_pos = 2
         ! reset first in send buffer position

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # note bizarre numbering..
-test3=0 # easy, 4th-4th-3rd, equidistant
+test3=1 # easy, 4th-4th-3rd, equidistant
 test5=1 #
-test3=0
-test2=0
+test3=1
+test2=1
 
 #---------------------------------------------------------------------------------------------------
 

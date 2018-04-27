@@ -211,6 +211,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         int_send_buffer( 2, : ) = -99
 
         ! loop over active heavy data
+        if (data_writing_type=="average") then
         do k = 1, hvy_n
 
             ! reset synch array
@@ -236,6 +237,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
             end if
 
         end do
+        end if
 
         ! loop over active heavy data
         do k = 1, hvy_n
@@ -339,7 +341,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
             end do
         end do
 
-        ! pretent that no communication with myself takes place, in order to skip the
+        ! pretend that no communication with myself takes place, in order to skip the
         ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
         ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
         com_matrix(rank+1) = 0
@@ -471,6 +473,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             l = 2
 
                             ! -99 marks end of data
+                            test2 = .false.
                             do while ( int_receive_buffer(l, neighbor_rank+1) /= -99 )
 
                                 ! proof heavy id and neighborhood id
@@ -494,6 +497,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                                     ! write data
                                     call write_hvy_data( params, data_buffer(1:buffer_size), data_bounds, hvy_block, hvy_active(k) )
                                     ! done, exit the while loop?
+                                    test2=.true.
                                     exit
                                 end if
 
@@ -501,6 +505,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                                 l = l + 5
 
                             end do
+                            if (test2 .eqv. .false.) call abort(777771,"not found")
 
                         end if
 
@@ -541,6 +546,9 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
     !> neighborhood relation, id from dirs
     integer(kind=ik), intent(in)                    :: neighborhood
     !> difference between block levels
+    !! level_diff = ME -  NEIGHBOR from SENDER point of view.
+    !! +1 : I'm finer, my neighbor is coarser
+    !! -1 : My neighbor is finer, I am coarser
     integer(kind=ik), intent(in)                    :: level_diff
 
     ! data_bounds_type
@@ -1820,7 +1828,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     logical, intent(inout)              :: stop_status
 
     ! loop variable
-    integer(kind=ik)                                :: i, j, k, dF, buffer_i
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven
 
     ! error threshold
     real(kind=rk)                                   :: eps
@@ -1842,6 +1850,14 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     ! reset error norm
     error_norm = 0.0_rk
 
+    ! the first index of the redundant points is (g+1, g+1, g+1)
+    ! so if g is even, then we must compare the odd indices i,j,k on the lines
+    ! of the redundant points.
+    ! if g is odd, then we must compare the even ones
+    ! Further note that BS is odd (always), so as odd+even=odd and odd+odd=even
+    ! we can simply study the parity of g
+    oddeven = mod(params%number_ghost_nodes,2)
+
 !---------------------------------------------------------------------------------------------
 ! main body
     ! loop over all data fields
@@ -1850,7 +1866,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         do i = data_bounds(1,1), data_bounds(2,1)
             ! second dimension
             do j = data_bounds(1,2), data_bounds(2,2)
-                ! third dimension, note: for 2D cases kN is allways 1
+                ! third dimension, note: for 2D cases k is always 1
                 do k = data_bounds(1,3), data_bounds(2,3)
 
                     if (level_diff/=-1) then
@@ -1867,8 +1883,16 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
                         !   - old method, non_uniform_mesh_correction=0; in params file -> plenty of errors (okay)
                         !   - old method, sync stage 4 deactivated: finds all occurances of "3finer blocks on corner problem" (okay)
                         !   - new method, averaging, no error found (makes sense: okay)
-                        if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)/=0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0))) then
-                            error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                        if (oddeven==0) then
+                            ! even number of ghost nodes
+                            if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)/=0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0))) then
+                                error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                            endif
+                        else
+                            ! odd number of ghost nodes
+                            if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)==0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)==0))) then
+                                error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                            endif
                         endif
                     endif
                     buffer_i = buffer_i + 1

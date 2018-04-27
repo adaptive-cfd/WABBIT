@@ -49,3 +49,4 @@ $mpi ./wabbit 2D $inifile --memory=0.25GB
 rm -f *times.dat
 
 rm wabbit wabbit-post create_ref_files.sh
+

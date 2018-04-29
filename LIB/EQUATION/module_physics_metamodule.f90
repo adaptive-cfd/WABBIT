@@ -222,13 +222,13 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx,  rhs, stage )
+     call STATISTICS_ACM( time, u, g, x0, dx, stage )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
 
    case ("navier_stokes")
-    !  call STATISTICS_NStokes( time, u, g, x0, dx, rhs, stage )
+      call STATISTICS_NStokes( time, u, g, x0, dx, stage )
 
    case default
      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)

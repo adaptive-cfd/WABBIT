@@ -408,7 +408,7 @@ contains
   ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
   ! on individual blocks. This requires one to use the same staging concept as for the RHS.
   !-----------------------------------------------------------------------------
-  subroutine STATISTICS_ACM( time, u, g, x0, dx, rhs, stage )
+  subroutine STATISTICS_ACM( time, u, g, x0, dx, stage )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -426,9 +426,6 @@ contains
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    ! output. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
 
     ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
     ! terms that depend on global qtys, such as forces etc, which cannot be computed

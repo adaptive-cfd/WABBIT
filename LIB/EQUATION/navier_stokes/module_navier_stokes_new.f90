@@ -41,7 +41,8 @@ module module_navier_stokes_new
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, INICOND_NSTOKES, FIELD_NAMES_NStokes
+  PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
+            CONVERT_STATEVECTOR2D, PACK_STATEVECTOR2D, INICOND_NSTOKES, FIELD_NAMES_NStokes,STATISTICS_NStokes
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -86,7 +87,11 @@ module module_navier_stokes_new
         character(len=80)                           :: geometry="cylinder"
         ! geometric parameters for cylinder (x_0,r)
         real(kind=rk)                               :: x_cntr(1:3), R_cyl
-
+        ! mean variables on domain
+        real(kind=rk)                               :: mean_density
+        real(kind=rk)                               :: mean_pressure
+        ! we need to know which mpirank prints output..
+        integer(kind=ik)                            :: mpirank, mpisize
   end type type_params_ns
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -122,13 +127,22 @@ contains
     character(len=*), intent(in) :: filename
 
     ! inifile structure
-    type(inifile) :: FILE
+    type(inifile)               :: FILE
     integer(kind=ik)            :: dF
-
+     integer(kind=ik)           :: mpicode
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
+      ! we still need to know about mpirank and mpisize, occasionally
+    call MPI_COMM_SIZE (WABBIT_COMM, params_ns%mpisize, mpicode)
+    call MPI_COMM_RANK (WABBIT_COMM, params_ns%mpirank, mpicode)
+
+    if (params_ns%mpirank==0) then
+      write(*,'(80("<"))')
+      write(*,*) "Initializing artificial compressibility module!"
+      write(*,'(80("<"))')
+    endif
 
      ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
@@ -340,9 +354,10 @@ contains
     ! terms that depend on global qtys, such as forces etc, which cannot be computed
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
-    character(len=*), intent(in) :: stage
+    character(len=*), intent(in)       :: stage
     ! Area of mean_density
-    real(kind=rk)                 :: A,tmp
+    real(kind=rk)    ,save             :: integral(4),area
+
 
     ! local variables
     integer(kind=ik) :: Bs
@@ -357,8 +372,8 @@ contains
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
       ! performs initializations in the RHS module, such as resetting integrals
-
-      return
+      integral= 0
+      area    = 0
 
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -372,8 +387,10 @@ contains
       !
       ! called for each block.
       if (params_ns%penalization .and. params_ns%geometry=="funnel") then
-        ! calculate mean_density in blocks close to the pump
-        call area_density(u(:,:,1,1)**2,g,Bs,x0,dx) 
+        rhs=u
+        call convert_statevector2D(rhs(:,:,1,:),'pure_variables')
+        call integrate_over_pump_area(rhs(:,:,1,:),g,Bs,x0,dx,integral,area) 
+        rhs=0.0_rk
       endif
 
 
@@ -384,7 +401,7 @@ contains
       ! this stage is called only once, not for each block.
       if (params_ns%penalization .and. params_ns%geometry=="funnel") then
         ! reduce sum on each block to global sum
-        call mean_density_on_outlet()
+        call mean_quant(integral,area)
         
       endif
 
@@ -417,9 +434,131 @@ contains
   end subroutine RHS_NStokes
 
   !-----------------------------------------------------------------------------
-  ! subroutine statistics_NStokes()
-  !   implicit none
-  ! end subroutine
+  !-----------------------------------------------------------------------------
+  ! main level wrapper to compute statistics (such as mean flow, global energy,
+  ! forces, but potentially also derived stuff such as Integral/Kolmogorov scales)
+  ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
+  ! on individual blocks. This requires one to use the same staging concept as for the RHS.
+  !-----------------------------------------------------------------------------
+  subroutine STATISTICS_NStokes( time, u, g, x0, dx, stage )
+    implicit none
+
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+
+    ! block data, containg the state vector. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+    ! as you are allowed to compute the RHS only in the interior of the field
+    ! you also need to know where 'interior' starts: so we pass the number of ghost points
+    integer, intent(in) :: g
+
+    ! for each block, you'll need to know where it lies in physical space. The first
+    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+
+    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
+    ! terms that depend on global qtys, such as forces etc, which cannot be computed
+    ! from a single block alone, the first stage does that. the second stage can then
+    ! use these integral qtys for the actual RHS evaluation.
+    character(len=*), intent(in) :: stage
+
+    ! local variables
+    integer(kind=ik)            :: Bs, mpierr,ix,iy
+    real(kind=rk),save          :: area
+    real(kind=rk), allocatable  :: mask(:,:)
+    real(kind=rk)               :: eps_inv,tmp(3),y,x,r
+
+    ! compute the size of blocks
+    Bs = size(u,1) - 2*g
+
+    select case(stage)
+    case ("init_stage")
+      !-------------------------------------------------------------------------
+      ! 1st stage: init_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, NOT for each block.
+      ! performs initializations in the RHS module, such as resetting integrals
+      params_ns%mean_density  = 0.0_rk
+      params_ns%mean_pressure = 0.0_rk
+      area                    = 0.0_rk
+    case ("integral_stage")
+      !-------------------------------------------------------------------------
+      ! 2nd stage: integral_stage.
+      !-------------------------------------------------------------------------
+      ! This stage contains all operations which are running on the blocks
+      !
+      ! called for each block.
+
+      if (maxval(abs(u))>1.0e5) then
+        call abort(6661,"ns fail: very very large values in state vector.")
+      endif
+      ! compute force
+      allocate(mask(Bs+2*g, Bs+2*g))
+      call get_mask(mask, x0, dx, Bs, g)
+
+
+      if (size(u,3)==1) then
+        ! compute density and pressure only in physical domain 
+        tmp(1:3) =0.0_rk
+        
+        do iy=g+1, Bs+g
+          y = dble(iy-(g+1)) * dx(2) + x0(2)
+          do ix=g+1, Bs+g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            !if (mask(ix,iy)<1e-10) then
+                  tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
+                  tmp(2) = tmp(2)   + u(ix,iy, 1, pF)
+                  tmp(3) = tmp(3)   + 1.0_rk
+            !endif
+          enddo
+        enddo
+
+        params_ns%mean_density = params_ns%mean_density   + tmp(1)*dx(1)*dx(2)
+        params_ns%mean_pressure= params_ns%mean_pressure  + tmp(2)*dx(1)*dx(2)
+        area                   = area                     + tmp(3)*dx(1)*dx(2)
+      endif ! NOTE: MPI_SUM is perfomed in the post_stage.
+
+    case ("post_stage")
+      !-------------------------------------------------------------------------
+      ! 3rd stage: post_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, NOT for each block.
+
+
+      tmp(1) = params_ns%mean_density
+      call MPI_ALLREDUCE(tmp(1), params_ns%mean_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      tmp(2) = params_ns%mean_pressure
+      call MPI_ALLREDUCE(tmp(2), params_ns%mean_pressure, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      tmp(3) = area
+      call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
+
+     
+    
+       if (params_ns%mpirank == 0) then
+         ! write mean flow to disk...
+         write(*,*) "area=",area/params_ns%Lx/params_ns%Ly,params_ns%mean_density/area ,params_ns%mean_pressure/area
+         open(14,file='meandensity.t',status='unknown',position='append')
+         write (14,'(4(es15.8,1x))') time, params_ns%mean_density
+         close(14)
+
+         ! write forces to disk...
+         open(14,file='meanpressure.t',status='unknown',position='append')
+         write (14,'(4(es15.8,1x))') time, params_ns%mean_pressure
+         close(14)
+       end if
+
+     case default
+       call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")
+     end select
+
+
+  end subroutine STATISTICS_NStokes
+
 
 
   !-----------------------------------------------------------------------------
@@ -590,7 +729,7 @@ contains
         call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
       endif
 
-      ! u(x)=(1-u(x))*u0 to make sure that velocity is zero at mask values
+      ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
       u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
       u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
     case ("pressure_blob")
@@ -614,6 +753,95 @@ contains
     end select
 
   end subroutine INICOND_NStokes
+
+
+subroutine convert_statevector2D(phi,convert2format)
+    implicit none
+    ! convert to type "conservative","pure_variables"
+    character(len=*), intent(in)   :: convert2format
+    !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+    real(kind=rk), intent(inout)      :: phi(1:,1:,1:)
+    ! vector containing the variables in the desired format
+    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
+
+    select case( convert2format )
+    case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
+      ! density 
+      converted_vector(:,:,1)=phi(:,:,rhoF)**2
+      ! rho u 
+      converted_vector(:,:,2)=phi(:,:,UxF)*phi(:,:,rhoF)
+      ! rho v 
+      converted_vector(:,:,3)=phi(:,:,UyF)*phi(:,:,rhoF)
+      ! kinetic energie
+      converted_vector(:,:,4)=phi(:,:,UyF)**2+phi(:,:,UyF)**2
+      converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
+      ! e_tot=e_kin+p/(gamma-1)      
+      converted_vector(:,:,4)=converted_vector(:,:,4)+phi(:,:,pF)/(params_ns%gamma_-1)
+    case ("pure_variables")
+      ! add ambient pressure
+      !rho
+      converted_vector(:,:,1)= phi(:,:,rhoF)**2
+      !u
+      converted_vector(:,:,2)= phi(:,:, UxF)/phi(:,:,rhoF)
+      !v
+      converted_vector(:,:,3)= phi(:,:, UyF)/phi(:,:,rhoF)
+      !p
+      converted_vector(:,:,4)= phi(:,:, pF)    
+    case default
+        call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
+    end select
+
+    phi=converted_vector
+
+end subroutine convert_statevector2D
+
+subroutine pack_statevector2D(phi,format)
+    implicit none
+    ! convert to type "conservative","pure_variables"
+    character(len=*), intent(in)   :: format
+    !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+    real(kind=rk), intent(inout)      :: phi(1:,1:,1:)
+    ! vector containing the variables in the desired format
+    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
+
+    select case( format )
+    case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
+      ! sqrt(rho) 
+      converted_vector(:,:,1)=sqrt(phi(:,:,1))
+      ! sqrt(rho) u 
+      converted_vector(:,:,2)=phi(:,:,2)/converted_vector(:,:,1)
+      ! sqrt(rho) v 
+      converted_vector(:,:,3)=phi(:,:,3)/converted_vector(:,:,1)
+      ! kinetic energie
+      converted_vector(:,:,4)=converted_vector(:,:,2)**2+converted_vector(:,:,3)**2
+      converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
+      ! p=(e_tot-e_kin)(gamma-1)/rho      
+      converted_vector(:,:,4)=(phi(:,:,4)-converted_vector(:,:,4))*(params_ns%gamma_-1)
+    case ("pure_variables") !phi=(rho,u,v,p)
+      ! add ambient pressure
+      ! sqrt(rho) 
+      converted_vector(:,:,1)= sqrt(phi(:,:,1))
+      ! sqrt(rho) u
+      converted_vector(:,:,2)= phi(:,:, 2)*converted_vector(:,:,1)
+      ! sqrt(rho)v
+      converted_vector(:,:,3)= phi(:,:, 3)*converted_vector(:,:,1)
+      !p
+      converted_vector(:,:,4)= phi(:,:, 4)    
+    case default
+        call abort(7771,"the format is unkown: "//trim(adjustl(format)))
+    end select
+
+    phi(:,:,rhoF)=converted_vector(:,:,1)
+
+    phi(:,:,UxF) =converted_vector(:,:,2)
+
+    phi(:,:,UyF) =converted_vector(:,:,3)
+
+    phi(:,:,pF) =converted_vector(:,:,4)
+end subroutine pack_statevector2D
+
+
+
 
 
 

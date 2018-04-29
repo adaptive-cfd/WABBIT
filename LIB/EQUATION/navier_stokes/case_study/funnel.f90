@@ -33,7 +33,7 @@ subroutine init_funnel(FILE)
   funnel%slope                = (dmax - dmin)/((nr_focus_plates-1)*funnel%plates_distance)
   funnel%wall_thickness       = 0.02*domain_size(1)
   funnel%jet_radius           = funnel%jet_radius/2.0_rk
-  funnel%pump_density         =0
+  funnel%pump_density         = 0
   !===========================================================================================================
   ! READ IN Capillary inlet flow
   ! ----------------------------
@@ -74,7 +74,9 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy,n
     ! outlets and inlets 
-    real(kind=rk)                                     :: velocity_pump,rho_pump, rho_capillary,u_capillary,v_capillary,p_capillary,p_2nd_pump_stage,rho_2nd_pump_stage
+    real(kind=rk)                                     :: velocity_pump,rho_pump,pressure_pump, &
+                                                         rho_capillary,u_capillary,v_capillary,p_capillary, &
+                                                         p_2nd_pump_stage,rho_2nd_pump_stage
     ! smooth width of jet
     real(kind=rk)                                     ::jet_smooth_width,pump_smooth_width
 !---------------------------------------------------------------------------------------------
@@ -94,6 +96,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     rho_2nd_pump_stage=funnel%inlet_density/100.0_rk
     p_capillary       =funnel%inlet_pressure
     velocity_pump     =funnel%pump_speed
+    pressure_pump     =funnel%pump_pressure
     p_2nd_pump_stage  =funnel%outlet_pressure
 
     
@@ -177,7 +180,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
               mask(ix,iy,1) = mask(ix,iy,1)+chi
               mask(ix,iy,4) = mask(ix,iy,4)+chi
               Phi_ref(ix,iy,1) = rho_pump                                       
-              Phi_ref(ix,iy,4) = rho*Rs*funnel%temperatur                                              
+              Phi_ref(ix,iy,4) = pressure_pump                                              
             endif                                             
 
 
@@ -222,62 +225,85 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
 
        end do
     end do
-
 end subroutine add_funnel
 
 
-subroutine area_density(rho,g,Bs,x0,dx)
+subroutine integrate_over_pump_area(u,g,Bs,x0,dx,integral,area)
 
+    
     !> grid parameter (g ghostnotes,Bs Bulk)
     integer(kind=ik), intent(in)                     :: Bs, g
-    !> density
-    real(kind=rk), dimension(:,:), intent(in)        :: rho
+    !> density,pressure
+    real(kind=rk), dimension(1:,1:,1:), intent(in)   :: u
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)          :: x0, dx
     !> mean density
-    real(kind=rk)                                     :: density
+    real(kind=rk),intent(out)                      :: integral(4), area
 
-    real(kind=rk)                                    :: h,r,y,x
+    real(kind=rk)                                    :: h,r,y,x,r0,width
+    !temporal data field
+    real(kind=rk),dimension(5)                       :: tmp
 
     integer(kind=ik)                                 :: ix,iy
 
      h  = 1.5_rk*max(dx(1), dx(2))
     ! calculate mean density close to the pump
-    density  =0
-     do iy=1, Bs+2*g
+    width =funnel%wall_thickness*0.5_rk
+    tmp   =  0
+    r0    =(R_domain-funnel%wall_thickness)            
+     do iy=g+1, Bs+g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
-       r = abs(y-domain_size(2)*0.5_rk)
-       do ix=1, Bs+2*g
+       r = abs(y-R_domain)
+       do ix=g+1, Bs+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-
-            if (draw_pumps_volume_flow(x,r,funnel,h)>0) then
-              density =density+rho(ix,iy)
+            if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
+                r>r0 .and. r<r0+width) then
+              tmp(1:4)  = tmp(1:4)+ u(ix,iy,:)
+              tmp(5)    = tmp(5)  + 1.0_rk
             endif
         enddo
       enddo
-      funnel%pump_density=funnel%pump_density+density*dx(1)*dx(2)
+      integral  = integral + tmp(1:4) *dx(1)*dx(2)
+      area      = area     + tmp(5)   *dx(1)*dx(2)
+
+end subroutine integrate_over_pump_area
 
 
-end subroutine area_density
+
+subroutine mean_quant(integral,area)
+    !> area of taking the mean 
+    real(kind=rk),intent(in)    :: area
+    !> integral over the area
+    real(kind=rk),intent(inout) :: integral(1:)
+
+    ! temporary values
+    real(kind=rk),allocatable   :: tmp(:)
+    real(kind=rk)               :: A
+    integer(kind=ik)            :: mpierr,Nq
 
 
+    Nq = size(integral,1)
+    allocate(tmp(Nq))
 
-subroutine mean_density_on_outlet()
+    tmp=integral
 
-    !> mean density
-    real(kind=rk)           :: tmp,A
-
-    integer(kind=ik)        ::mpierr
-
-    tmp = funnel%pump_density
-    call MPI_ALLREDUCE(tmp, funnel%pump_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+    ! integrate over all procs
+    call MPI_ALLREDUCE(tmp  ,integral, Nq , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+    call MPI_ALLREDUCE(area ,A       , 1  , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         
-        !devide by the area of the region
-    A=funnel%pump_diameter*funnel%wall_thickness
-    funnel%pump_density=funnel%pump_density/A
-     funnel%pump_density=funnel%inlet_density*0.1
-    write(*,*)"mean_density", funnel%pump_density
-end subroutine mean_density_on_outlet
+    if (A==0) then
+      call abort(24636,"Error [funnel.f90]: only chuck norris can devide by zero!!")
+    endif
+
+    !devide by the area of the region
+    integral = integral / A
+
+    funnel%pump_density = integral(1)/2  
+    funnel%pump_pressure = integral(4)/2
+
+end subroutine mean_quant
+
+
 ! !==========================================================================
 ! subroutine compute_mask_ref_value(x, y,phi, mask , phi_ref, h  )
 !     implicit none

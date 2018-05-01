@@ -1,3 +1,11 @@
+!----------------------------------------------------------------
+!> Interface between WABBIT and Physics Modules
+!> This module contains all functions which WABBIT provides to 
+!> implement your physics module
+!> \details 
+!> \version 0.5
+!> \author engels
+!----------------------------------------------------------------
 module module_physics_metamodule
 
     use module_precision

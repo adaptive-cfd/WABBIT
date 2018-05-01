@@ -83,8 +83,6 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g)
 
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

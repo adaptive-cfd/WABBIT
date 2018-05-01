@@ -30,9 +30,11 @@ module module_interpolation
 
     implicit none
 
+    PRIVATE
+    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
+  
 !---------------------------------------------------------------------------------------------
 ! main body
 

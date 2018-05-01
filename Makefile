@@ -15,7 +15,7 @@ MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wra
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90\
 	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90\
-	module_physics_metamodule.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 module_bridge.f90
+	module_physics_metamodule.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 module_bridge.f90 module_navier_stokes_params.f90 
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -93,12 +93,17 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_m
 $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_ini_files_parser_mpi.o\
+$(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_precision.o\
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o\
+	initial_conditions.f90 filter_block.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_ini_files_parser_mpi.o\
 	funnel.f90 vortex_street.f90 sod_shock_tube.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
-	$(OBJDIR)/module_operators.o RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 initial_conditions.f90
+$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
+	 RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM-new.o: module_ACM-new.f90 rhs.f90 create_mask_new.f90 iniconds.f90 sponge_new.f90\
@@ -144,8 +149,8 @@ $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
-	filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
-	wavelet_filter.f90 get_block_max_velocity_norm.f90 bogey_filter.f90 statistics_wrapper.f90
+	calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
+	get_block_max_velocity_norm.f90 statistics_wrapper.f90 filter_wrapper.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \

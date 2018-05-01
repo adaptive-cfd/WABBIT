@@ -296,8 +296,8 @@ program main
         ! filter
         if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
             call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-            call filter_block( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active,it_is_time_to_save_data )
-        end if
+            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+         end if
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
@@ -362,7 +362,7 @@ program main
       ! filter before write out
       if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        call filter_block( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active,.true.)
+        call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
       end if
 
       ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.

@@ -93,7 +93,7 @@ module module_params
         character(len=80)                            :: block_distribution
 
         ! debug flag
-        logical                                      :: debug
+        logical                                      :: debug=.false.
 
         ! use non-uniform mesh correction
         logical                                      :: non_uniform_mesh_correction
@@ -181,15 +181,9 @@ module module_params
         ! filter
         ! -------------------------------------------------------------------------------------
         ! type
-        character(len=80)                           :: filter_type
+        character(len=80)                           :: filter_type="no_filter"
         ! frequency
-        integer(kind=ik)                            :: filter_freq
-        ! bogey shock detector threshold,
-        real(kind=rk)                               :: r_th
-        !  detector_method (divU,p),
-        character(len=80)                           :: detector_method 
-        ! switch functio (tanh,abs)
-        character(len=80)                           :: sigma_switch
+        integer(kind=ik)                            :: filter_freq=-1
         ! save filter strength sigma
         logical                                     :: save_filter_strength
 

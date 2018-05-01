@@ -15,6 +15,8 @@ echo "testing filters"
 prefixes=(Ux p rho)
 # list of filters
 filters=(no_filter explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
+#filters=(explicit_5pt )
+
 ## change this list in run_all_filter.sh to!!
 # list of possible times (no need to actually have them)
 times=(000000050000)

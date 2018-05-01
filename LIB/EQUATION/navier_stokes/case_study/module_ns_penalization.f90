@@ -29,7 +29,6 @@ module module_ns_penalization
   use module_precision
   use module_ini_files_parser_mpi
   use mpi
-
   !---------------------------------------------------------------------------------------------
   ! variables
 
@@ -42,7 +41,7 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: init_mask,add_constraints,get_mask,mean_quant,integrate_over_pump_area
+  PUBLIC :: init_penalization,add_constraints,get_mask,mean_quant,integrate_over_pump_area
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -127,14 +126,34 @@ include "sod_shock_tube.f90"
 
 
 !> \brief reads parameters for mask function from file
-subroutine init_mask( filename )
-
-  character(len=*), intent(in) :: filename
-
-    ! inifile structure
-    type(inifile) :: FILE
-    call read_ini_file_mpi(FILE, filename, .true.)
+subroutine init_penalization( params_ns,FILE )
+    use module_navier_stokes_params
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)       :: FILE
+   !> params structure of navier stokes
+    type(type_params_ns),intent(inout)  :: params_ns
     
+     if (params_ns%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: penalization and geometries!"
+      write(*,'(" -----------------------------------")')
+    endif
+    ! =============================================================================
+    ! parameters needed for ns_physics module
+    ! -----------------------------------------------------------------------------
+    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
+    call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
+
+    if (params_ns%penalization) then
+      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk )
+      call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
+    endif
+
+    ! =============================================================================
+    ! parameters needed for penalization only
+    ! -----------------------------------------------------------------------------
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', mask_geometry, "cylinder")
     call read_param_mpi(FILE, 'VPM', 'C_eta', C_eta_inv, 0.01_rk )
@@ -162,7 +181,7 @@ subroutine init_mask( filename )
     
     end select
   
-end subroutine init_mask
+end subroutine init_penalization
 
 
  

@@ -20,17 +20,9 @@ module module_navier_stokes_new
 
   !---------------------------------------------------------------------------------------------
   ! modules
-  use module_precision
-  use module_ns_penalization
-  ! ini file parser module, used to read parameters. note: in principle, you can also
-  ! just use any reader you feel comfortable with, as long as you can read the parameters
-  ! from a file.
-  use module_ini_files_parser_mpi
+  use module_navier_stokes_params
   use module_operators, only : compute_vorticity
-  ! generic initial condition
-  use mpi
-  !---------------------------------------------------------------------------------------------
-  ! variables
+  use module_ns_penalization
 
   implicit none
 
@@ -42,80 +34,25 @@ module module_navier_stokes_new
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
-            CONVERT_STATEVECTOR2D, PACK_STATEVECTOR2D, INICOND_NSTOKES, FIELD_NAMES_NStokes,STATISTICS_NStokes
+            CONVERT_STATEVECTOR2D, PACK_STATEVECTOR2D, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
+            STATISTICS_NStokes,FILTER_NSTOKES
   !**********************************************************************************************
-
-  ! user defined data structure for time independent parameters, settings, constants
-  ! and the like. only visible here.
-  type :: type_params_ns
-        ! Courant-Friedrichs-Lewy
-        real(kind=rk)                               :: CFL, T_end
-        ! spatial domain
-        real(kind=rk)                               :: Lx, Ly, Lz
-        ! number data fields
-        integer(kind=ik)                            :: number_data_fields
-        ! dimension
-        integer(kind=ik)                            :: dim, N_fields_saved
-        ! adiabatic coefficient
-        real(kind=rk)                               :: gamma_
-        ! specific gas constant
-        real(kind=rk)                               :: Rs
-        ! isochoric heat capacity
-        real(kind=rk)                               :: Cv
-        ! isobaric heat capacity
-        real(kind=rk)                               :: Cp
-        ! prandtl number
-        real(kind=rk)                               :: Pr
-        ! dynamic viscosity
-        real(kind=rk)                               :: mu0
-        ! width of initialcond
-        real(kind=rk)                               :: inicond_width
-        ! dissipation switch
-        logical                                     :: dissipation
-        ! variable names
-        character(len=80), allocatable              :: names(:)
-        ! înitial condition
-        character(len=80)                           :: inicond
-        ! discretization
-        character(len=80)                           :: discretization
-        ! ------------------------------------------------------------------------------------------
-        ! penalization
-        logical                                     :: penalization,smooth_mask=.True., sponge_layer
-        ! penalization parameter and sponge parameter
-        real(kind=rk)                               :: C_eta,C_sp
-        ! geometry to display
-        character(len=80)                           :: geometry="cylinder"
-        ! geometric parameters for cylinder (x_0,r)
-        real(kind=rk)                               :: x_cntr(1:3), R_cyl
-        ! mean variables on domain
-        real(kind=rk)                               :: mean_density
-        real(kind=rk)                               :: mean_pressure
-        ! we need to know which mpirank prints output..
-        integer(kind=ik)                            :: mpirank, mpisize
-  end type type_params_ns
-
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params_ns),save :: params_ns
-  ! statevector index
-  integer(kind=ik)    ,save :: rhoF,UxF,UyF,UzF,pF
+
 
   ! real(kind=rk)   ,parameter :: rho_init=1.645_rk,p_init=101330.0_rk,u_init=36.4_rk,v0_=0.0_rk,T_init=200!273.15_rk
   real(kind=rk)       ,save :: rho_init=1_rk,p_init=1.0_rk,T_init=1!273.15_rk
   real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,0.0_rk/)
 
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
-
+ 
 contains
+
 
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
-  include "initial_conditions.f90"
-  !-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
   !> Main level wrapper routine to read parameters in the physics module. It reads
@@ -129,44 +66,48 @@ contains
     ! inifile structure
     type(inifile)               :: FILE
     integer(kind=ik)            :: dF
-     integer(kind=ik)           :: mpicode
-    ! read the file, only process 0 should create output on screen
-    call set_lattice_spacing_mpi(1.0d0)
-    call read_ini_file_mpi(FILE, filename, .true.)
+    integer(kind=ik)           :: mpicode
+   
 
-      ! we still need to know about mpirank and mpisize, occasionally
+
+    ! ==================================================================
+    ! initialize MPI parameter
+    ! ------------------------------------------------------------------
+    ! we still need to know about mpirank and mpisize, occasionally
     call MPI_COMM_SIZE (WABBIT_COMM, params_ns%mpisize, mpicode)
     call MPI_COMM_RANK (WABBIT_COMM, params_ns%mpirank, mpicode)
 
     if (params_ns%mpirank==0) then
+      write(*,*)
+      write(*,*)
       write(*,'(80("<"))')
-      write(*,*) "Initializing artificial compressibility module!"
+      write(*,*) "Initializing Navier Stokes module!"
       write(*,'(80("<"))')
+      write(*,*)
+      write(*,*)
     endif
 
-     ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
-    ! dimension
-    call read_param_mpi(FILE, 'Dimensionality', 'dim', params_ns%dim, 2 )
-    ! spatial domain size
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', params_ns%Lx, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', params_ns%Ly, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Lz', params_ns%Lz, 0.0_rk )
-    ! read adiabatic coefficient
-    call read_param_mpi(FILE, 'Navier_Stokes', 'gamma_', params_ns%gamma_, 0.0_rk )
-    ! read specific gas constant
-    call read_param_mpi(FILE, 'Navier_Stokes', 'Rs', params_ns%Rs, 0.0_rk )
-    ! calculate isochoric heat capacity
-    params_ns%Cv = params_ns%Rs/(params_ns%gamma_-1.0_rk)
-    ! calculate isobaric heat capacity
-    params_ns%Cp = params_ns%Cv*params_ns%gamma_
-    ! read prandtl number
-    call read_param_mpi(FILE, 'Navier_Stokes', 'Pr', params_ns%Pr, 0.0_rk )
-    ! read dynamic viscosity
-    call read_param_mpi(FILE, 'Navier_Stokes', 'mu0', params_ns%mu0, 0.0_rk )
-    ! read switch to turn on|off dissipation
-    call read_param_mpi(FILE, 'Navier_Stokes', 'dissipation', params_ns%dissipation, .true. )
-    ! read initial conditions
+
+    ! read the file, only process 0 should create output on screen
+    call set_lattice_spacing_mpi(1.0d0)
+    ! open file
+    call read_ini_file_mpi(FILE, filename, .true.)
+    ! init all parameters used in ns_equations
+    call init_navier_stokes_eq(params_ns, FILE)
+    ! init all parameters used for penalization
+    call init_penalization(    params_ns, FILE)
+    ! init all parameters used for the filter
+    call init_filter(   params_ns%filter, FILE)
+    ! init all params for organisation 
+    call init_other_params(params_ns,     FILE )
+
+    ! read in initial conditions
+    if (params_ns%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: initial conditions"
+      write(*,'(" ---------------------------")')
+    endif
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
     call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, params_ns%Lx*0.1_rk )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
@@ -174,28 +115,6 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
 
-    ! penalization:
-    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
-    call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
-
-    if (params_ns%penalization) then
-      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk )
-      call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
-      call init_mask(filename)
-    endif
-  ! read variable names
-    ! allocate names list
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_ns%N_fields_saved, 1 )
-    allocate( params_ns%names( params_ns%N_fields_saved ) )
-    params_ns%names = "---"
-    ! read file
-    call read_param_mpi(FILE, 'Saving', 'field_names', params_ns%names, params_ns%names )
-
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
-    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
-
-    call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
-    call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk   )
     ! set global parameters pF,rohF, UxF etc
     UzF=-1
     do dF = 1, params_ns%number_data_fields
@@ -206,9 +125,13 @@ contains
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
 
-
     call clean_ini_file_mpi( FILE )
+
   end subroutine READ_PARAMETERS_NStokes
+
+ 
+
+
 
 
   !-----------------------------------------------------------------------------
@@ -755,7 +678,56 @@ contains
   end subroutine INICOND_NStokes
 
 
+
+
+
+ !-----------------------------------------------------------------------------
+  ! main level wrapper to set the right hand side on a block. Note this is completely
+  ! independent of the grid any an MPI formalism, neighboring relations and the like.
+  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
+  ! from that. Ghost nodes are assumed to be sync'ed.
+  !-----------------------------------------------------------------------------
+  subroutine filter_NStokes( time, u, g, x0, dx, work_array )
+    implicit none
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+
+    ! block data, containg the state vector. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+    ! as you are allowed to compute the work_array only in the interior of the field
+    ! you also need to know where 'interior' starts: so we pass the number of ghost points
+    integer, intent(in) :: g
+
+    ! for each block, you'll need to know where it lies in physical space. The first
+    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+    ! output. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
+
+
+    ! local variables
+    integer(kind=ik) :: Bs
+
+    ! compute the size of blocks
+    Bs = size(u,1) - 2*g
+
+   
+    call filter_block(params_ns%filter, time, u, Bs, g, x0, dx, work_array)
+   
+
+  end subroutine filter_NStokes
+
+
+
+
+!> \brief convert the statevector \f$(\sqrt(rho),\sqrt(rho)u,\sqrt(rho)v,p )\f$
+!! to the desired format.
 subroutine convert_statevector2D(phi,convert2format)
+
     implicit none
     ! convert to type "conservative","pure_variables"
     character(len=*), intent(in)   :: convert2format
@@ -795,6 +767,8 @@ subroutine convert_statevector2D(phi,convert2format)
 
 end subroutine convert_statevector2D
 
+
+
 subroutine pack_statevector2D(phi,format)
     implicit none
     ! convert to type "conservative","pure_variables"
@@ -831,13 +805,10 @@ subroutine pack_statevector2D(phi,format)
         call abort(7771,"the format is unkown: "//trim(adjustl(format)))
     end select
 
-    phi(:,:,rhoF)=converted_vector(:,:,1)
-
-    phi(:,:,UxF) =converted_vector(:,:,2)
-
-    phi(:,:,UyF) =converted_vector(:,:,3)
-
-    phi(:,:,pF) =converted_vector(:,:,4)
+    phi(:,:,rhoF) =converted_vector(:,:,1)
+    phi(:,:,UxF)  =converted_vector(:,:,2)
+    phi(:,:,UyF)  =converted_vector(:,:,3)
+    phi(:,:,pF)   =converted_vector(:,:,4)
 end subroutine pack_statevector2D
 
 

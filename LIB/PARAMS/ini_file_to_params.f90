@@ -162,20 +162,12 @@ subroutine ini_file_to_params( params, filename )
     ! boundary condition
     call read_param_mpi(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
-    ! filter type
-    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no-filter" )
     ! filter frequency
-    call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
-    if (params%filter_type=="bogey_shock") then
-        ! bogey shock detector threshold
-        call read_param_mpi(FILE, 'Discretization', 'r_th', params%r_th, 1e-3_rk )
-        ! bogey shock switch tanh
-        call read_param_mpi(FILE, 'Discretization', 'switch', params%sigma_switch, 'tanh' )
-        ! bogey shock detection method (p,divU)
-        call read_param_mpi(FILE, 'Discretization', 'detector_method', params%detector_method, 'divU' )
-        ! boolean save bogey filter strength
-        call read_param_mpi(FILE, 'Discretization', 'save_filter_strength', params%save_filter_strength, .false. )
+    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
+    if (params%filter_type.ne."no_filter") then
+           call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
     endif
+
     !***************************************************************************
     ! read statistics parameters
     !

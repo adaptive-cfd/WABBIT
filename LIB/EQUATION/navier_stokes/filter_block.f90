@@ -192,6 +192,14 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
 
     stencil_size            =filter%stencil_size
     N_dF                    =filter%number_data_fields
+    
+    if (size(u,3)==1) then
+        !2D
+        call convert_statevector2D(u(:,:,1,:),'conservative')
+    else
+        !3D
+        call abort(5326,"ERROR [filter_block]: 3D case not implemented yet")
+    endif
     work_array(:,:,:,1:N_dF)= u
 
     ! loop over all datafields
@@ -243,21 +251,17 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
                 case('bogey_shock')
                     ! shock filter
                     if ( dF == 1 ) then
-                        call bogey_filter(filter, Bs, g, N_dF ,u,x0,dx)
+                        call bogey_filter(filter, Bs, g, N_dF ,u,x0,dx,work_array)
                     end if
             end select
         end if
     end do
 
-        !if (data_is_saved .and. params%save_filter_strength .and. params%filter_type=='bogey_shock') then
-        !     ! save filter strength in x direction
-        !     write( fname,'("sigma_x_", i12.12, ".h5")') nint(time * 1.0e6_rk)
-        !     call write_field( fname, time, iteration, 1, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
-        !   ! save filter strength in y direction
-        !     write( fname,'("sigma_y_", i12.12, ".h5")') nint(time * 1.0e6_rk)
-        !     call write_field( fname, time, iteration, 2, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
-        ! endif
-
+    if (size(u,3)==1) then
+            call pack_statevector2D(u(:,:,1,:),'conservative')
+    else
+            call abort(9820,"3D not implemented yet")
+    endif
 
 end subroutine filter_block
 
@@ -501,9 +505,8 @@ end subroutine wavelet_filter
 !! \date 21/09/17 - create
 !! \date 29/04/18 - update for new physics branch (pKrah)
 
-subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx)!,hvy_WORK)
+subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
 
-!use module_navier_stokes_new
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -513,7 +516,7 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx)!,hvy_WORK)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
     !> heavy work    
-   ! real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
     ! spacing and origin of a block
     real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3)
 
@@ -589,13 +592,17 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx)!,hvy_WORK)
  !   call set_boundary( Bs, g, block_data(:, :, 1, 1), block_data(:, :, 1, 2), block_data(:, :, 1, 3), block_data(:, :, 1, 4), xx0, ddx, params%Lx, params%Ly )
     !> \todo make filter interface for different physics modules
     if (.true.) then
-        !call abort(4345," bogey implement!" )
-        ! call convert2format2D(block_data,'conservative','pure_variables')
-        rho = block_data(:, :, 1, 1)**2.0_rk
-        u   = block_data(:, :, 1, 2)/block_data(:, :, 1, 1)
-        v   = block_data(:, :, 1, 3)/block_data(:, :, 1, 1)
-        p   = block_data(:, :, 1, 4)
-        gamma_=1.4
+        !! CAUTION !!
+        ! conservative variables are asumed here (rho,rho u, rho v, e)
+        call convert2format(block_data(:,:,1,:)    ,'conservative',&
+                            hvy_WORK(:,:,1,1:N_dF) ,'pure_variables')
+
+        rho = hvy_WORK(:, :, 1, 1)
+        u   = hvy_work(:, :, 1, 2)
+        v   = hvy_work(:, :, 1, 3)
+        p   = hvy_work(:, :, 1, 4)
+        gamma_=params_ns%gamma_
+
     else
         call abort(13463,'Error [bogey_filter]: only ns supported: everything else not implemented yet!')
     endif
@@ -724,12 +731,12 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx)!,hvy_WORK)
         end do
     end do
 
-    ! if (filter%save_filter_strength) then
-    !     ! save filter strength in x direction
-    !     hvy_WORK(:,:,1,1)=sigma_x(:,:)
-    !     ! save filter strength in y direction
-    !     hvy_WORK(:,:,1,2)=sigma_y(:,:)
-    ! endif
+    if (filter%save_filter_strength) then
+        ! save filter strength in x direction
+        hvy_WORK(:,:,1,1)=sigma_x(:,:)
+        ! save filter strength in y direction
+        hvy_WORK(:,:,1,2)=sigma_y(:,:)
+    endif
 
 end subroutine bogey_filter
 

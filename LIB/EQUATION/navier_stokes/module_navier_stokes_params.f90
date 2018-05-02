@@ -118,7 +118,6 @@ module module_navier_stokes_params
 contains
 
   include "initial_conditions.f90"
-  include "filter_block.f90"
   
 
   subroutine init_navier_stokes_eq(params_ns, FILE )

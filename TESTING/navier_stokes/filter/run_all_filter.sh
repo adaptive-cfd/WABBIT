@@ -8,14 +8,13 @@
 test_dir="./TESTING/"
 dir="./TESTING/navier_stokes/filter/"
 params=$1
+# write time
+times=$2
 # list of prefixes the test generates
 prefixes=(Ux p rho)
 # list of filters
-filters=(no_filter explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
+filters=(explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
 #filters=(explicit_5pt )
-
-# list of possible times (no need to actually have them)
-times=(000000050000)
 
 
 for filter in ${filters[@]}
@@ -41,15 +40,12 @@ for filter in ${filters[@]}
 	# loop over all HDF5 files and generate keyvalues using wabbit
 	for p in ${prefixes[@]}
 	do
-	  for t in ${times[@]}
-	  do
 	    #current configname
-	    configname=${p}"_"${t}
+	    configname=${p}"_"${times}
 	    #change configname for current filter
 	    cp ${configname}".h5" ${filter}_${configname}".h5"
 	    #
 	    echo "changed: " ${configname}".h5 to" ${filter}_${configname}".h5"
-	  done
 	done
 	echo " "
 	echo " "

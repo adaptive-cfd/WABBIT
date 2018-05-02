@@ -14,17 +14,17 @@ echo "testing filters"
 # list of prefixes the test generates
 prefixes=(Ux p rho)
 # list of filters
-filters=(no_filter explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
+filters=(explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
 #filters=(explicit_5pt )
 
 ## change this list in run_all_filter.sh to!!
 # list of possible times (no need to actually have them)
-times=(000000050000)
+times=000000050000
 
 
 
 
-${dir}/run_all_filter.sh ${params}
+${dir}/run_all_filter.sh ${params} ${times}
 
 
 	echo "============================"
@@ -36,11 +36,9 @@ do
 	# loop over all HDF5 files and generate keyvalues using wabbit
 	for p in ${prefixes[@]}
 	do
-	  for t in ${times[@]}
-	  do
 	    echo "--------------------------------------------------------------------"
 	    #configname
-	    configname=${filter}_${p}"_"${t}
+	    configname=${filter}_${p}"_"${times}
 	    # *.h5 file coming out of the code
 	   	file=${configname}".h5"
 	    # will be transformed into this *.key file
@@ -72,7 +70,6 @@ do
 	    echo " "
 	    echo " "
 
-	  done
 	done
 done
 

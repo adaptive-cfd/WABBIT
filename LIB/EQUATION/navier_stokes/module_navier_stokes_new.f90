@@ -16,6 +16,8 @@
 !> \author P.Krah
 !-----------------------------------------------------------------
 
+!> \brief Implementation of Navier Stokes Physiscs Interface for 
+!! WABBIT
 module module_navier_stokes_new
 
   !---------------------------------------------------------------------------------------------
@@ -35,7 +37,7 @@ module module_navier_stokes_new
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
             CONVERT_STATEVECTOR2D, PACK_STATEVECTOR2D, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
-            STATISTICS_NStokes,FILTER_NSTOKES
+            STATISTICS_NStokes,FILTER_NSTOKES,convert2format
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
@@ -52,6 +54,8 @@ contains
 
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
+  include "filter_block.f90"
+
 !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -167,7 +171,7 @@ contains
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! output in work array.
-    real(kind=rk), allocatable :: vort(:,:,:,:)
+    real(kind=rk), allocatable :: tmp_u(:,:,:,:)
 
     ! local variables
     integer(kind=ik) ::  Bs
@@ -178,7 +182,7 @@ contains
 
     !
     ! compute vorticity
-    allocate(vort(size(u,1),size(u,2),size(u,3),3))
+    allocate(tmp_u(size(u,1),size(u,2),size(u,3),3))
 
     if (size(u,3)==1) then
           ! ---------------------------------
@@ -194,9 +198,9 @@ contains
                                  u(:,:,:,UyF)/u(:,:,:,rhoF), &
                                  0*u(:,:,:,rhoF), &
                                  dx, Bs, g, params_ns%discretization, &
-                                 vort)
+                                 tmp_u)
 
-        work(:,:,:,5)=vort(:,:,:,1)
+        work(:,:,:,5)=tmp_u(:,:,:,1)
 
         !write out mask
         if (params_ns%penalization) then
@@ -205,6 +209,10 @@ contains
           work(:,:,1,6)=0.0_rk
         endif
 
+        if (params_ns%filter%name=="bogey_shock" .and. params_ns%filter%save_filter_strength) then
+            tmp_u=u
+            call filter_block(params_ns%filter, time, tmp_u, Bs, g, x0, dx, work(:,:,:,7:(7+params_ns%number_data_fields)))
+        endif
     else
       call abort(564567,"Error: [module_navier_stokes.f90] 3D case not implemented")
         ! wx,wy,wz (3D - case)
@@ -212,10 +220,10 @@ contains
    !                               u(:,:,:,UyF)/u(:,:,:,rhoF), &
    !                               u(:,:,:,UzF)/u(:,:,:,rhoF), &
    !                               dx, Bs, g, params_ns%discretization, &
-   !                               vort)
-   ! !     work(:,:,:,=vort(:,:,:,1:3)
+   !                               tmp_u)
+   ! !     work(:,:,:,=tmp_u(:,:,:,1:3)
     endif
-    deallocate(vort)
+    deallocate(tmp_u)
 
     ! mask
 
@@ -517,6 +525,10 @@ contains
 
     dt = 9.9e9_rk
 
+
+    if (maxval(abs(u))>1.0e7) then
+        call abort(65761,"ERROR [module_navier_stokes_new.f90]: very large values in statevector")
+    endif
     ! get smallest spatial seperation
     if(size(u,3)==1) then
         deltax=minval(dx(1:2))
@@ -715,7 +727,6 @@ contains
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
-   
     call filter_block(params_ns%filter, time, u, Bs, g, x0, dx, work_array)
    
 
@@ -724,7 +735,7 @@ contains
 
 
 
-!> \brief convert the statevector \f$(\sqrt(rho),\sqrt(rho)u,\sqrt(rho)v,p )\f$
+!> \brief convert the statevector \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
 !! to the desired format.
 subroutine convert_statevector2D(phi,convert2format)
 
@@ -745,7 +756,7 @@ subroutine convert_statevector2D(phi,convert2format)
       ! rho v 
       converted_vector(:,:,3)=phi(:,:,UyF)*phi(:,:,rhoF)
       ! kinetic energie
-      converted_vector(:,:,4)=phi(:,:,UyF)**2+phi(:,:,UyF)**2
+      converted_vector(:,:,4)=phi(:,:,UxF)**2+phi(:,:,UyF)**2
       converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
       ! e_tot=e_kin+p/(gamma-1)      
       converted_vector(:,:,4)=converted_vector(:,:,4)+phi(:,:,pF)/(params_ns%gamma_-1)
@@ -768,7 +779,8 @@ subroutine convert_statevector2D(phi,convert2format)
 end subroutine convert_statevector2D
 
 
-
+!> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from 
+!>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$
 subroutine pack_statevector2D(phi,format)
     implicit none
     ! convert to type "conservative","pure_variables"
@@ -811,6 +823,32 @@ subroutine pack_statevector2D(phi,format)
     phi(:,:,pF)   =converted_vector(:,:,4)
 end subroutine pack_statevector2D
 
+
+
+subroutine convert2format(phi_in,format_in,phi_out,format_out)
+    implicit none
+    ! convert to type "conservative","pure_variables"
+    character(len=*), intent(in)   ::  format_in, format_out
+    !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+    real(kind=rk), intent(in)      :: phi_in(1:,1:,1:)
+    ! vector containing the variables in the desired format
+    real(kind=rk), intent(inout)   :: phi_out(:,:,:)
+
+    ! convert phi_in to skewsymetric variables  \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
+    if (format_in=="skew") then
+      phi_out  =  phi_in
+    else
+      phi_out  =  phi_in
+      call pack_statevector2D(phi_out,format_in)
+    endif
+
+    ! form skewsymetric variables convert to any other scheme
+    if (format_out=="skew") then
+      !do nothing because format is skew already
+    else
+      call convert_statevector2D(phi_out,format_out)
+    endif    
+end subroutine convert2format
 
 
 

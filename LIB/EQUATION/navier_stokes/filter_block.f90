@@ -258,9 +258,9 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
     end do
 
     if (size(u,3)==1) then
-            call pack_statevector2D(u(:,:,1,:),'conservative')
+        call pack_statevector2D(u(:,:,1,:),'conservative')
     else
-            call abort(9820,"3D not implemented yet")
+        call abort(9820,"3D not implemented yet")
     endif
 
 end subroutine filter_block
@@ -596,7 +596,7 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
         ! conservative variables are asumed here (rho,rho u, rho v, e)
         call convert2format(block_data(:,:,1,:)    ,'conservative',&
                             hvy_WORK(:,:,1,1:N_dF) ,'pure_variables')
-
+        
         rho = hvy_WORK(:, :, 1, 1)
         u   = hvy_work(:, :, 1, 2)
         v   = hvy_work(:, :, 1, 3)

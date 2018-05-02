@@ -1,17 +1,19 @@
 !-------------------------------------------------------------------------------
-! FORTRAN ini files parser module
+!> \brief FORTRAN ini files parser module
 !-------------------------------------------------------------------------------
-! This module reads values from standard ini-files.
-! The first step is to read in the entire file into a derived datatype. this datatype
-! is provided here. After reading the file, you can call the generic routine
-! "read_param" to extract a value, e.g. parameter=10.0;
-! note we expect lines to end on a colon (;)
-! commented lines beginning with # ; ! are ignored.
-! The ini files are organized in sections and values:
-! [Section]
-! parameter=10;
+!> \details
+!! This module reads values from standard ini-files.\n
+!! The first step is to read in the entire file into a derived datatype. this datatype
+!! is provided here. After reading the file, you can call the generic routine
+!! "read_param" to extract a value, e.g. parameter=10.0;\n
+!! note we expect lines to end on a colon (;)
+!! commented lines beginning with # ; ! are ignored.\n
+!! The ini files are organized in sections and values:\n
+!!              
+!!        [Section]
+!!        parameter=10;
 !-------------------------------------------------------------------------------
-! This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this
+!! \details This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this
 !-------------------------------------------------------------------------------
 module module_ini_files_parser
   use module_precision
@@ -31,6 +33,8 @@ module module_ini_files_parser
   ! the flag is set with the read_ini_file routine
   logical, private, save :: verbosity = .true.
 
+  ! format of read output
+  character(len=100), private,save ::FORMAT1='("read [", A,"]",T30,A,T60,"=",TR2,A)'
   ! type definition of an inifile type. it contains an allocatable string array
   ! of maxcolumns length. we will allocate the array, then fill it with what we
   ! read from the file.
@@ -278,7 +282,8 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+      !write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_dbl
 
@@ -330,7 +335,7 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_sgl
 
@@ -367,7 +372,7 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1)trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_str
 
@@ -433,20 +438,22 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_vct
 
   !-------------------------------------------------------------------------------
-  ! Fetches a STRING VALUED vector parameter from the PARAMS.ini file.
-  ! Displays what it does on stdout (so you can see whats going on)
-  ! Input:
-  !       PARAMS: the complete *.ini file
-  !       section: the section we're looking for
-  !       keyword: the keyword we're looking for
-  !       defaultvalue: if the we can't find the parameter, we return this and warn
-  ! Output:
-  !       params_string: this is the parameter you were looking for
+  !! \brief
+  !! Fetches a STRING VALUED vector parameter from the PARAMS.ini file.
+  !! Displays what it does on stdout (so you can see whats going on)
+  !! \details
+  !! Input:
+  !!       PARAMS: the complete *.ini file
+  !!       section: the section we're looking for
+  !!       keyword: the keyword we're looking for
+  !!       defaultvalue: if the we can't find the parameter, we return this and warn
+  !! Output:
+  !!       params_string: this is the parameter you were looking for
   !-------------------------------------------------------------------------------
   subroutine param_vct_str (PARAMS, section, keyword, params_vector, defaultvalue)
     implicit none
@@ -469,7 +476,7 @@ contains
       write(*,*) "error: vector and default value are not of the same length"
     endif
 
-    write(formatstring,'("(",i2.2,"(g17.3,1x))")') n
+    write(formatstring,'("(",i2.2,"(g8.3,1x))")') n
 
     call GetValue(PARAMS, section, keyword, value)
 
@@ -486,7 +493,7 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_vct_str
 
@@ -524,7 +531,7 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_int
 
@@ -568,7 +575,7 @@ contains
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,*) "read "//trim(section)//"::"//trim(keyword)//" = "//adjustl(trim(value))
+      write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_bool
 
@@ -703,7 +710,7 @@ contains
 
   ! in verbose mode, inform about what we did
   if (verbosity) then
-         write(*,'(" read ",A,"::",A," as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
+         write(*,'(" read [",A,"]",T30,A,T60,"as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
   end if
 
 end subroutine param_matrix

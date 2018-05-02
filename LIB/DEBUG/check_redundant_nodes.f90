@@ -192,7 +192,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     if ( data_writing_type == 'staging' ) then
         ! all four stages
         ! NOTE: WE CAN ACTUALLY SKIP STAGE 4
-        stages = 3
+        stages = 4
     else
         ! only one stage
         stages = 1
@@ -204,7 +204,12 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! loop over all synch stages
     do synch_stage = 1, stages
 
-        if (synch_stage==3) data_bounds_type = "exclude_redundant"
+        if (synch_stage==3)  then
+            data_bounds_type = "exclude_redundant"
+        else
+            data_bounds_type = "include_redundant"
+        endif
+
 
         ! reset integer send buffer position
         int_pos = 2

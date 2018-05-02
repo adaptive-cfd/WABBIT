@@ -98,9 +98,9 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'DomainSize', 'Lz', params%Lz, 1.0_rk )
 
     ! saving options.
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
-    allocate( params%field_names(1:params%N_fields_saved) )
-    call read_param_mpi(FILE, 'Saving', 'field_names', params%field_names, (/"ux","uy","p "/) )
+     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
+ !   allocate( params%field_names(1:params%N_fields_saved) )
+!    call read_param_mpi(FILE, 'Saving', 'field_names', params%field_names, (/"ux","uy","p "/) )
 
 
     !***************************************************************************

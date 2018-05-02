@@ -27,11 +27,11 @@ subroutine init_funnel(FILE)
   call read_param_mpi(FILE, 'funnel', 'pump_x_center'         , funnel%pump_x_center, domain_size(1)*0.5_rk)     
   funnel%max_inner_diameter   = dmax
   funnel%min_inner_diameter   = dmin
-  funnel%length               = domain_size(1)*0.85_rk
+  funnel%wall_thickness       = 0.05*domain_size(1)
+  funnel%length               = domain_size(1)*0.9_rk-funnel%wall_thickness*2.0_rk
   funnel%plates_thickness     = funnel%length/(2.0_rk*funnel%nr_plates)
   funnel%plates_distance      = (funnel%length-funnel%plates_thickness)/(funnel%nr_plates-1)
   funnel%slope                = (dmax - dmin)/((nr_focus_plates-1)*funnel%plates_distance)
-  funnel%wall_thickness       = 0.02*domain_size(1)
   funnel%jet_radius           = funnel%jet_radius/2.0_rk
   funnel%pump_density         = 0
   !===========================================================================================================
@@ -44,7 +44,10 @@ subroutine init_funnel(FILE)
   call read_param_mpi(FILE, 'funnel', 'pump_speed'      , funnel%pump_speed, 30.0_rk )
   call read_param_mpi(FILE, 'funnel', 'outlet_pressure' , funnel%outlet_pressure, 1.0_rk)     
   
-
+  if (funnel%length         >domain_size(1)-2.0_rk*funnel%wall_thickness .or. &
+      funnel%outer_diameter >domain_size(2)-2.0_rk*funnel%wall_thickness) then
+    call abort(5032,"ERROR [funnel.f90]:funnel is larger then simulation domain!")
+  endif
 
   !initialice geometry of ion funnel plates 
   call init_plates(funnel)
@@ -304,101 +307,6 @@ subroutine mean_quant(integral,area)
 end subroutine mean_quant
 
 
-! !==========================================================================
-! subroutine compute_mask_ref_value(x, y,phi, mask , phi_ref, h  )
-!     implicit none
-!     ! grid
-!     integer(kind=ik), intent(in)                              :: Bs, g
-!     !> mask term for every grid point of this block
-!     real(kind=rk), dimension(4), intent(out)                  :: mask,phi_ref
-!     !> spacing and origin of block
-!     real(kind=rk), dimension(2), intent(in)                   :: x,y,phi
-
-!     ! auxiliary variables
-!     real(kind=rk)                                             :: x, y, r, h
-!     ! loop variables
-!     integer(kind=ik)                                          :: ix, iy
-! !-------------------------------------------------------------------------
-! ! variables initialization
-!     ! Funnel
-!             ! ------
-!             ! 1. compute mask term:
-!             chi = draw_funnel_plates(x,y,funnel,h)
-!             ! 2. set quantities to desired values:
-!             if (chi>0) then
-!               mask(2:4) = mask(2:4) + chi
-!               Phi_ref(2) = 0.0_rk                     ! no velocity in x
-!               Phi_ref(3) = 0.0_rk                     ! no velocity in y
-!               Phi_ref(4) = rho*Rs*funnel%temperatur   ! pressure set according to
-!             endif                                           ! the temperature of the funnel   
-
-!             ! Walls
-!             ! -----
-!             ! draw the walls arround the funnel
-!             chi = draw_walls(x,y,funnel,h)
-!             ! set reference values at these region
-!             if (chi>0) then                       ! default values on the walls
-!               mask(2:4) = mask(2:4) + chi
-!               Phi_ref(2) = 0.0_rk                     ! no velocity in x
-!               Phi_ref(3) = 0.0_rk                     ! no velocity in y
-!               Phi_ref(4) = rho*Rs*funnel%temperatur   ! pressure set according to
-!             endif                                           ! the temperature of the funnel   
-
-!             ! Outlet flow: PUMPS
-!             ! ------------------
-!             ! pump volume flow
-!             chi=  draw_pumps_volume_flow(x,y,funnel,h)
-!             if (chi>0) then                                 
-!               mask(2:3) = mask(2:3)+chi
-!               if (y>R_domain) then
-!                 Phi_ref(3) = rho*velocity_pump                                       
-!               else
-!                 Phi_ref(3) = -rho*velocity_pump                                          
-!               endif                   
-!             endif 
-
-!             ! mass and energy sink
-!             chi=  draw_pumps_sink(x,y,funnel,h)
-!             if (chi>0) then                                 
-!               mask(1) = mask(1)+chi
-!               mask(4) = mask(4)+chi
-!               Phi_ref(1) = rho_pump                                       
-!               Phi_ref(4) = rho_pump*Rs*funnel%temperatur                                              
-!             endif                                             
-
-
-
-!             ! Inlet flow: Capillary
-!             ! ---------------------
-!             chi=  draw_jet(x,y,funnel,h)
-!             if (chi>0) then                                 
-!               mask(1:4) = mask(1:4)+chi
-!               Phi_ref(1) = rho_capillary                       
-!               Phi_ref(2) = rho_capillary*u_capillary  
-!               Phi_ref(3) = rho_capillary*v_capillary                              
-!               Phi_ref(4) = p_capillary   
-!             endif                                              
-
-
-!             ! ! Outlet flow: Transition to 2pump
-!             ! ! ---------------------
-!             ! chi=  draw_outlet(x,y,funnel,h)
-!                chi=  draw_sink(x,y,funnel,h)
-              
-!               if (chi>0) then                                 
-!                 mask(1) = mask(1)+chi
-!                 mask(4) = mask(4)+chi
-!                 Phi_ref(1) = rho_capillary                       
-!                 !Phi_ref(2) = 0
-!                 Phi_ref(3) = 0                                      
-!                 Phi_ref(4) = p_2nd_pump_stage
-!               endif    
-          
-! end subroutine draw_funnel
-! !==========================================================================
-
-
-
 
 
 
@@ -486,6 +394,9 @@ function draw_walls(x,r,funnel,h)
   if (abs(x-funnel%pump_x_center)> funnel%pump_diameter*0.5_rk) then
     ! mask for r>R_domain-wall_thickness   (outer wall)  
          mask=mask+smoothstep(R_domain-funnel%wall_thickness-r,h)
+  else
+
+         mask=mask+smoothstep(R_domain-0.333_rk*funnel%wall_thickness-r,h)
   endif
 
   ! wall in EAST
@@ -518,7 +429,7 @@ function draw_pumps_volume_flow(x,r,funnel,h)
   real(kind=rk)                         ::  mask, draw_pumps_volume_flow,r0,width
 
   mask  =0
-  width =funnel%wall_thickness*0.5_rk
+  width =funnel%wall_thickness*0.333_rk
   r0    =(R_domain-funnel%wall_thickness) 
   if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk) then
          !for r0<r<r0+width apply penalization
@@ -534,12 +445,14 @@ function draw_pumps_sink(x,r,funnel,h)
   real(kind=rk),    intent(in)          :: x, r, h
   type(type_funnel),intent(in)          ::funnel
 
-  real(kind=rk)                         ::r0,  mask, draw_pumps_sink
+  real(kind=rk)                         ::r0,  mask, draw_pumps_sink,width
 
   mask  = 0.0_rk
-  r0    =(R_domain-funnel%wall_thickness*0.5_rk)
+  r0    =(R_domain-funnel%wall_thickness*0.6666_rk)
+  width =funnel%wall_thickness*0.333_rk
   if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter/2) then
-         mask=mask+smoothstep(r0-r,h)
+         !mask=soft_bump2(r,r0,width,h)
+         mask=smoothstep(r0-r,h)
   endif
 
 

@@ -78,6 +78,7 @@ subroutine sparse_to_dense(help, params)
         write(*,'(A20,1x,A80)') "Reading file:", file_in
         write(*,'(A20,1x,A80)') "Writing to file:", file_out
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
+        write(*,'(A20,1x,i3)') "Target level:", level
         write(*,'(80("-"))')
     endif
 
@@ -85,11 +86,23 @@ subroutine sparse_to_dense(help, params)
     call open_file_hdf5( trim(adjustl(file_in)), file_id, .false.)
     if ( params%threeD_case ) then
         call get_size_datafield(4, file_id, "blocks", size_field)
+        params%number_blocks = int(size_field(4),kind=ik)
     else
         call get_size_datafield(3, file_id, "blocks", size_field(1:3))
+        params%number_blocks = int(size_field(3),kind=ik)
+        size_field(4) = 0
     end if
+    params%number_block_nodes = int(size_field(1),kind=ik)
     call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
     call close_file_hdf5(file_id)
+
+
+    if (params%rank==0) then
+        write(*,'("Size of blocks-array in file: ",4(i6,1x))') size_field
+        write(*,'("So the file contains Nb=",i6," blocks of size Bs=",i4)') params%number_blocks, params%number_block_nodes
+    endif
+
+
     call get_attributes(file_in, lgt_n, time, iteration, domain)
     ! set max_treelevel for allocation of hvy_block
     if (dims_treecode(1)<=level) then
@@ -110,7 +123,7 @@ subroutine sparse_to_dense(help, params)
             + mod(4_ik**params%max_treelevel,params%number_procs)
         max_neighbors = 12
     end if
-    params%number_block_nodes = int(size_field(1),kind=ik)
+
     params%number_data_fields  = 1
     params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
     ! allocate data

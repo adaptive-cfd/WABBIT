@@ -242,6 +242,9 @@ program main
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+    else
+        ! next write time for reloaded data
+        if (params%write_method .eq. 'fixed_time') params%next_write_time = time + params%next_write_time
     end if
 
     ! max neighbor num

@@ -60,18 +60,15 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
 
   blockbuffer(:,Bs_f+1,:) = blockbuffer(:,1,:)
   blockbuffer(:,:,Bs_f+1) = blockbuffer(:,:,1)
-  if (params%threeD_case) then
-      blockbuffer(Bs_f+1,:,:) = blockbuffer(1,:,:)
-  end if
-  
+  if (params%threeD_case) blockbuffer(Bs_f+1,:,:) = blockbuffer(1,:,:)
 
   do k=1, hvy_n
       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-      start_x = floor(x0(1)/dx(1)) + 1
-      start_y = floor(x0(2)/dx(2)) + 1
+      start_x = nint(x0(1)/dx(1)) + 1
+      start_y = nint(x0(2)/dx(2)) + 1
       if (params%threeD_case) then
-          start_z = floor(x0(3)/dx(3)) + 1
+          start_z = nint(x0(3)/dx(3)) + 1
           hvy_block(1:Bs, 1:Bs, 1:Bs, 1, hvy_active(k)) = blockbuffer(start_x:start_x+Bs-1,&
               start_y:start_y+Bs-1,start_z:start_z+Bs-1)
       else 

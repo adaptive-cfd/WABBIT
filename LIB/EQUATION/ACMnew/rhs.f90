@@ -45,7 +45,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     !>
     real(kind=rk)       :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk)       :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                           v_dydy, p_dx, p_dy, penalx, penaly
+                           v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2
     ! loop variables
     integer(kind=rk)    :: ix, iy, idir
     ! coefficients for Tam&Webb
@@ -109,8 +109,8 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do ix = g+1, Bs+g
-            do iy = g+1, Bs+g
+        do iy = g+1, Bs+g
+            do ix = g+1, Bs+g
 
                 u_dx = (u(ix+1,iy)-u(ix-1,iy))*dx_inv*0.5_rk
                 u_dy = (u(ix,iy+1)-u(ix,iy-1))*dy_inv*0.5_rk
@@ -142,8 +142,8 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
         !-----------------------------------------------------------------------
         ! 4th order
         !-----------------------------------------------------------------------
-        do ix = g+1, Bs+g
-          do iy = g+1, Bs+g
+        do iy = g+1, Bs+g
+          do ix = g+1, Bs+g
             ! first derivatives of u, v, p
             u_dx = (a(-3)*u(ix-3,iy) + a(-2)*u(ix-2,iy) + a(-1)*u(ix-1,iy) &
                 + a(0)*u(ix,iy) + a(+1)*u(ix+1,iy) + a(+2)*u(ix+2,iy) + a(+3)*u(ix+3,iy))*dx_inv
@@ -195,24 +195,37 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
         case('accelerate')
           forcing(idir) = max(0.0_rk, params_acm%u_mean_set(idir)-params_acm%mean_flow(idir)) &
                         * startup_conditioner(time, 0.0_rk, 0.5_rk)
+          ! add forcing to right hand side
+          rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
         case('fixed')
           ! note fixed forcing directly modifies the state vetor and is not a
           ! forcing term in the conventional sense.
           forcing(idir) = 0.0_rk
           phi(:,:,idir) = phi(:,:,idir) - params_acm%mean_flow(idir) + params_acm%u_mean_set(idir)
-
+          ! add forcing to right hand side
+          rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
         case('none')
           ! do nothing in this direction.
-          forcing(idir) = 0.0_rk
-
+!          forcing(idir) = 0.0_rk
+        case('taylor_green')
+            if (idir==1) then  
+                do iy = g+1,Bs+g
+                    do ix = g+1,Bs+g
+                        x = x0(1) + dble(ix-g-1) * dx(1)
+                        y = x0(2) + dble(iy-g-1) * dx(2)
+                        term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
+                        forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) *&
+                            dcos(y - params_acm%u_mean_set(2)*time) *term_2
+                        forcing(2) = -dcos(x - params_acm%u_mean_set(1)*time) *&
+                            dsin(y - params_acm%u_mean_set(2) * time) *term_2
+                        rhs(ix,iy,1:2) = rhs(ix,iy,1:2) + forcing(1:2)
+                    end do
+                end do
+            end if
         case default
-          call abort(7710, "ACM::rhs.90::meanflow forcing type unkown")
+          call abort(7710, "ACM::rhs.f90::meanflow forcing type unkown")
         end select
-
-        ! add forcing to right hand side
-        rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
-      end do
-
+    end do
     end if
 
 
@@ -357,9 +370,9 @@ end subroutine RHS_2D_acm_new
 !         !-----------------------------------------------------------------------
 !         ! 2nd order
 !         !-----------------------------------------------------------------------
-!         do ix = g+1, Bs+g
+!         do iz = g+1, Bs+g
 !             do iy = g+1, Bs+g
-!                 do iz = g+1, Bs+g
+!                 do ix = g+1, Bs+g
 !
 !                     ! first and second derivatives of u,v,w
 !                     u_dx = (u(ix+1,iy,iz)-u(ix-1,iy,iz))*dx_inv*0.5_rk
@@ -412,9 +425,9 @@ end subroutine RHS_2D_acm_new
 !         !-----------------------------------------------------------------------
 !         ! 4th order
 !         !-----------------------------------------------------------------------
-!         do ix = g+1, Bs+g
+!         do iz = g+1, Bs+g
 !             do iy = g+1, Bs+g
-!                 do iz = g+1, Bs+g
+!                 do ix = g+1, Bs+g
 !                     ! first derivatives of u, v, p
 !                     u_dx = (a(-3)*u(ix-3,iy,iz) + a(-2)*u(ix-2,iy,iz) + a(-1)*u(ix-1,iy,iz) + a(0)*u(ix,iy,iz)&
 !                      +  a(+1)*u(ix+1,iy,iz) + a(+2)*u(ix+2,iy,iz) + a(+3)*u(ix+3,iy,iz))*dx_inv

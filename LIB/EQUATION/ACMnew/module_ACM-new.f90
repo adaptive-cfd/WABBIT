@@ -24,7 +24,7 @@ module module_acm_new
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
   use module_ini_files_parser_mpi
-  use module_operators, only : compute_vorticity
+  use module_operators, only : compute_vorticity, divergence
   use mpi
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -61,6 +61,8 @@ module module_acm_new
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3)
+    ! the error compared to an analytical solution (e.g. taylor-green)
+    real(kind=rk) :: error(1:6)
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
   end type type_params
@@ -186,7 +188,8 @@ contains
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik) :: neqn, nwork, Bs
+    integer(kind=ik)  :: neqn, nwork, Bs, k
+    character(len=80) :: name
 
     ! number of state variables
     neqn = size(u,4)
@@ -198,13 +201,22 @@ contains
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
 
-    ! vorticity
-    call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization,&
-    work(:,:,:,4:6))
-
-    ! mask
-    call create_mask_2D_NEW(work(:,:,1,5), x0, dx, Bs, g )
-
+    do k=neqn,size(params_acm%names,1)
+        name = params_acm%names(k)
+        select case(name(1:3))
+            case('vor')
+                ! vorticity
+                call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+                    dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+            case('div')
+                ! div(u)
+                call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, &
+                    g, params_acm%discretization,work(:,:,:,k))
+            case('mas')
+                ! mask
+                call create_mask_2D_NEW(work(:,:,1,k), x0, dx, Bs, g )
+        end select
+    end do
   end subroutine
 
 
@@ -387,8 +399,9 @@ contains
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: Bs, mpierr
-    real(kind=rk) :: tmp(1:3)
+    integer(kind=ik) :: Bs, mpierr, ix, iy
+    real(kind=rk) :: tmp(1:6)
+    real(kind=rk) :: x, y
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -401,6 +414,7 @@ contains
       ! this stage is called only once, not for each block.
       ! performs initializations in the RHS module, such as resetting integrals
       params_acm%mean_flow = 0.0_rk
+      if (params_acm%forcing_type(1) .eq. "taylor_green") params_acm%error = 0.0_rk
 
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -423,14 +437,32 @@ contains
         params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
       endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
+      if (params_acm%forcing_type(1) .eq. "taylor_green") then
+        do iy = g+1,Bs+g
+          do ix = g+1, Bs+g
+              x = x0(1) + dble(ix-g-1)*dx(1)
+              y = x0(2) + dble(iy-g-1)*dx(2)
+              tmp(1) = params_acm%u_mean_set(1)+dsin(x-params_acm%u_mean_set(1)*time)*&
+                  dcos(y-params_acm%u_mean_set(2)*time)*dcos(time)
+              tmp(2) = params_acm%u_mean_set(2)-dcos(x-params_acm%u_mean_set(1)*time)*&
+                  dsin(y-params_acm%u_mean_set(2)*time)*dcos(time)
+              tmp(3) = 0.25_rk*(dcos(2.0_rk*(x-params_acm%u_mean_set(1)*time)) +&
+                  dcos(2.0_rk*(y-params_acm%u_mean_set(2)*time)))*dcos(time)**2
+              params_acm%error(1:3) = params_acm%error(1:3) + abs(u(ix,iy,1,:)-&
+                  tmp(1:3))
+              params_acm%error(4:6) = params_acm%error(4:6) + sqrt(tmp(1:3)**2)
+          end do
+        end do
+	params_acm%error = params_acm%error*dx(1)*dx(2)
+      end if
     case ("post_stage")
       !-------------------------------------------------------------------------
       ! 3rd stage: post_stage.
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
 
-      tmp = params_acm%mean_flow
-      call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      tmp(1:3) = params_acm%mean_flow
+      call MPI_ALLREDUCE(tmp(1:3), params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
       if (params_acm%dim == 2) then
         params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
       else
@@ -444,6 +476,18 @@ contains
         close(14)
       end if
 
+      if (params_acm%forcing_type(1) .eq. "taylor_green") then
+        tmp = params_acm%error
+        call MPI_REDUCE(tmp, params_acm%error, 6, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD,mpierr)
+        !params_acm%error(1:3) = params_acm%error(1:3)/params_acm%error(4:6)
+        params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%Lx*params_acm%Ly)
+        if (params_acm%mpirank == 0) then
+          ! write error to disk...
+          open(15,file='error_taylor_green.t',status='unknown',position='append')
+          write (15,'(4(es15.8,1x))') time, params_acm%error(1:3)
+          close(15)
+        end if
+      end if
     case default
       call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")
     end select
@@ -508,11 +552,26 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
+    real(kind=rk)    :: x,y
+    integer(kind=ik) :: Bs, ix, iy
+    
+    ! compute the size of blocks
+    Bs = size(u,1) - 2*g
 
     select case (params_acm%inicond)
     case("meanflow")
       u = 0.0_rk
       u(:,:,:,1) = 1.0_rk
+    case("taylor_green")
+      do iy= g+1,Bs+g
+        do ix= g+1, Bs+g
+          x = x0(1) + dble(ix-g-1)*dx(1)
+          y = x0(2) + dble(iy-g-1)*dx(2)
+          u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
+          u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)
+          u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))
+        end do
+      end do
     case default
       write(*,*) "errorrroororor"
     end select

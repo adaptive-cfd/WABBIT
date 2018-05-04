@@ -66,7 +66,7 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
 ! main body
 
     ! read time, iteration, domain size and total number of blocks from first input file
-    call get_attributes(params%input_files(1), lgt_n, time, iteration, domain)
+    call read_attributes(params%input_files(1), lgt_n, time, iteration, domain)
     if (.not. params%threeD_case) domain(3) = 0.0_rk
     ! print time, iteration and domain on screen
     if (params%rank==0) then

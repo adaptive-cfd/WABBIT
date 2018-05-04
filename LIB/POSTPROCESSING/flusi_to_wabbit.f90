@@ -8,7 +8,7 @@
 !! from a .h5 file where all data is stored in one block
 !
 ! = log ======================================================================================
-!> \date  07/03/18 - create hashcode: commit 
+!> \date  07/03/18 - create hashcode: commit 8f4858f429c6c3f537190f48a8e8a931154a01d5
 !-----------------------------------------------------------------------------------------------------
 !
 subroutine flusi_to_wabbit(help, params)
@@ -37,20 +37,19 @@ subroutine flusi_to_wabbit(help, params)
     integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:)
     integer(kind=ik), allocatable     :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable        :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    integer(kind=ik)                  :: hvy_n, lgt_n,level, Bs_tmp, Bs, max_level
+    integer(kind=ik)                  :: hvy_n, lgt_n,level, Bs
     real(kind=rk), dimension(3)       :: domain
-    character(len=3)                  :: Bs_read, level_read
+    character(len=3)                  :: Bs_read
     integer(kind=ik), dimension(3)    :: nxyz
+    real(kind=rk)                     :: level_tmp
 
 !-----------------------------------------------------------------------------------------------------
-    level = 0
     params%number_data_fields  = 1
-    Bs_tmp = 0
 !----------------------------------------------
     if (help .eqv. .true.) then
         if (params%rank==0) then
             write(*,*) "postprocessing subroutine to read a file from flusi and convert it to wabbit format. command line:"
-            write(*,*) "mpi_command -n 1 ./wabbit-post 2D --flusi-to-wabbit source.h5 target.h5 target_blocksize max_level"
+            write(*,*) "mpi_command -n 1 ./wabbit-post 2D --flusi-to-wabbit source.h5 target.h5 target_blocksize"
         end if
     else
         ! get values from command line (filename and desired blocksize)
@@ -60,26 +59,20 @@ subroutine flusi_to_wabbit(help, params)
         call get_command_argument(5, Bs_read)
         read(Bs_read,*) Bs
         if (mod(Bs,2)==0) call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
-        call get_command_argument(6, level_read)
-        read(level_read,*) max_level
 
         ! read attributes such as number of discretisation points, time, domain size
         call get_attributes_flusi(file_in, nxyz, time, domain)
         if (.not. params%threeD_case .and. nxyz(1)/=1) &
             call abort(8714, "ERROR: saved datafield is 3D, WABBIT expects 2D")
 
+        level_tmp = log(dble(nxyz(2))/dble(Bs-1)) / log(2.0_rk)
+        level = int(level_tmp)
+
+        ! check the input
         if (nxyz(2)/=nxyz(3)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
-
         if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
-
-        Bs_tmp = nxyz(2)/2
-        do while (level<max_level)
-            level = level + 1
-            if ((Bs_tmp+1)==Bs) exit
-            Bs_tmp = Bs_tmp/2
-        end do
-
-        if ((Bs_tmp+1)/=Bs) call abort(2948, "ERROR: I'm afraid your saved blocksize does not match for WABBIT or your input max_level is too small")
+        if (mod(nxyz(2),(Bs-1))/=0 .or. abs(level-level_tmp)>1.e-14)&
+            call abort(2948, "ERROR: I'm afraid your saved blocksize does not match for WABBIT")
 
         params%max_treelevel=level
         params%Lx = domain(2)
@@ -92,15 +85,11 @@ subroutine flusi_to_wabbit(help, params)
         else
             lgt_n = 4_ik**params%max_treelevel
         end if
-        params%number_blocks = lgt_n/params%number_procs +&
-            mod(lgt_n,params%number_procs)
+        hvy_n = lgt_n
+        params%number_blocks = lgt_n
         call allocate_grid( params, lgt_block, hvy_block, hvy_neighbor,&
             lgt_active, hvy_active, lgt_sortednumlist,.false., hvy_work, int_send_buffer, &
             int_receive_buffer, real_send_buffer, real_receive_buffer )
-
-        ! create lists of active blocks (light and heavy data) after load balancing (have changed)
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n,&
-            hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
         call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor,&
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &

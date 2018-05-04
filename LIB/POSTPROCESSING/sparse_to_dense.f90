@@ -79,7 +79,7 @@ subroutine sparse_to_dense(help, params)
         end if
         call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
         call close_file_hdf5(file_id)
-        call get_attributes(file_in, lgt_n, time, iteration, domain)
+        call read_attributes(file_in, lgt_n, time, iteration, domain)
         ! set max_treelevel for allocation of hvy_block
         if (dims_treecode(1)<=level) then
             params%max_treelevel = level

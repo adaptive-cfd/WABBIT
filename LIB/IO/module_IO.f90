@@ -65,7 +65,7 @@ contains
     ! check if input file exists
     include "check_file_exists.f90"
 
-    include "get_attributes.f90"
+    include "read_attributes.f90"
 
     include "read_file_flusi.f90"
 

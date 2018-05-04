@@ -3,7 +3,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name get_attributes.f90
+!> \name read_attributes.f90
 !> \version 0.5
 !> \author sm
 !
@@ -13,7 +13,7 @@
 !> \date 02/02/18 - create
 !
 
-subroutine get_attributes(fname, lgt_n, time, iteration, domain)
+subroutine read_attributes(fname, lgt_n, time, iteration, domain)
 
     implicit none
     !> file name
@@ -44,4 +44,4 @@ subroutine get_attributes(fname, lgt_n, time, iteration, domain)
     lgt_n = number_blocks(1)
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
-end subroutine get_attributes
+end subroutine read_attributes

@@ -168,11 +168,11 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
 	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
-	read_mesh.f90 check_file_exists.f90 get_attributes.f90 read_file_flusi.f90
+	read_mesh.f90 check_file_exists.f90 read_attributes.f90 read_file_flusi.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	volume_integral.f90 compute_vorticity.f90
+	volume_integral.f90 compute_vorticity.f90 divergence.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

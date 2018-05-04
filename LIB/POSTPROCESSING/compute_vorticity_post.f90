@@ -92,9 +92,9 @@ subroutine compute_vorticity_post(help, params)
         call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
         params%max_treelevel = int(dims_treecode(1), kind=ik)
         call close_file_hdf5(file_id)
-        call get_attributes(file_ux, lgt_n, time, iteration, domain)
+        call read_attributes(file_ux, lgt_n, time, iteration, domain)
         ! only lgt_n/number_procs blocks necessary (since we do not want to refine)
-        params%number_blocks = lgt_n/params%number_procs
+        params%number_blocks = lgt_n/params%number_procs + mod(lgt_n, params%number_procs)
         if (params%rank==0) params%number_blocks = params%number_blocks + &
             mod(lgt_n, params%number_procs)
         params%Lx = domain(1)

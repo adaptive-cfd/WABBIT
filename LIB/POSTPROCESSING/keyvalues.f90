@@ -8,6 +8,7 @@
 !! min / max / mean / L2 norm of the field data. This is used for testing
 !! so that we don't need to store entire fields but rather the *.key only
 !! \version 10/1/18 - create commit b2719e1aa2339f4f1f83fb29bd2e4e5e81d05a2a
+!! \version 4/4/18 - add space filling curve test commit 47b4c1e24eabd112c950928e77e134046fc05d9a
 !*********************************************************************************************
 
 subroutine keyvalues(fname, params, help)
@@ -42,8 +43,8 @@ subroutine keyvalues(fname, params, help)
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
 
-    integer(kind=ik) :: sum_curve(3)
-    character(len=12) :: curves(3)
+    integer(kind=ik)  :: sum_curve(2)
+    character(len=12) :: curves(2)
     real(kind=rk)    :: x,y,z
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
@@ -52,7 +53,6 @@ subroutine keyvalues(fname, params, help)
     rank = params%rank
     curves(1) = 'sfc_hilbert'
     curves(2) = 'sfc_z'
-    curves(3) = 'equal'
 !-----------------------------------------------------------------------------------------------------
     if (help) then
         if (rank==0) then
@@ -77,11 +77,12 @@ subroutine keyvalues(fname, params, help)
         params%number_block_nodes = int(size_field(1),kind=ik)
         params%number_data_fields = 1
         params%number_ghost_nodes = 0
-        call get_attributes(fname, lgt_n, time, iteration, domain)
+        call read_attributes(fname, lgt_n, time, iteration, domain)
         params%Lx = domain(1)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
-        params%number_blocks = lgt_n/params%number_procs + params%number_procs
+        ! make sure there is enough memory allocated
+        params%number_blocks = 2_ik*(lgt_n/params%number_procs)
         call allocate_grid( params, lgt_block, hvy_block,hvy_neighbor, lgt_active,&
             hvy_active, lgt_sortednumlist, .false., hvy_work,&
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -165,13 +166,13 @@ subroutine keyvalues(fname, params, help)
         if (rank == 0) then
             open  (59, file=fname(1:index(fname,'.'))//'key', &
                 status = 'replace', action='write', iostat=ioerr)
-            write (59,'(6(es15.8,1x), 3(i10,1x))') time, maxi, mini, meani, squari, qi , &
-                sum_curve(1), sum_curve(2), sum_curve(3) 
+            write (59,'(6(es15.8,1x), 2(i10,1x))') time, maxi, mini, meani, squari, qi , &
+                sum_curve(1), sum_curve(2)
             write (*,'(A)') "Result:"
-            write (* ,'(6(A15,1x),3(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
-                "Q-integral", curves(1), curves(2), curves(3)
-            write (* ,'(6(es15.8,1x),3(i12,1x))') time, maxi, mini, meani, squari, qi, &
-                sum_curve(1), sum_curve(2), sum_curve(3)
+            write (* ,'(6(A15,1x),2(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
+                "Q-integral", curves(1), curves(2)
+            write (* ,'(6(es15.8,1x),2(i12,1x))') time, maxi, mini, meani, squari, qi, &
+                sum_curve(1), sum_curve(2)
             write (*,'(A)') "These values can be used to compare two HDF5 files"
             close (59)
         endif

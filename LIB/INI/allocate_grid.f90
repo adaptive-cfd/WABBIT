@@ -37,29 +37,31 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     implicit none
 
     !> user defined parameter structure
-    type (type_params), intent(inout)               :: params
+    type (type_params), intent(inout)                 :: params
     !> light data array
-    integer(kind=ik), allocatable, intent(out)      :: lgt_block(:, :)
+    integer(kind=ik), allocatable, intent(out)        :: lgt_block(:, :)
     !> heavy data array - block data
-    real(kind=rk), allocatable, intent(out)         :: hvy_block(:, :, :, :, :)
+    real(kind=rk), allocatable, intent(out)           :: hvy_block(:, :, :, :, :)
     !> heavy work array  )
-    real(kind=rk), allocatable, intent(out)         :: hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable, optional, intent(out) :: hvy_work(:, :, :, :, :)
     !> neighbor array (heavy data)
-    integer(kind=ik), allocatable, intent(out)      :: hvy_neighbor(:,:)
+    integer(kind=ik), allocatable, intent(out)        :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)      :: lgt_active(:)
+    integer(kind=ik), allocatable, intent(out)        :: lgt_active(:)
     !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
+    integer(kind=ik), allocatable, intent(out)        :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), allocatable, intent(out)     :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs, buffer_N, buffer_N_int
+    integer(kind=ik)                                  :: Bs, g, N_dF, number_blocks,&
+                                                      rank, number_procs, buffer_N, buffer_N_int
 
-    ! send/receive buffer, integer and real
-    integer(kind=ik), allocatable, intent(out)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable, intent(out)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    logical, intent(in)                             :: simulation
-    integer(kind=ik)                                :: rk_steps
+    !> send/receive buffer, integer and real
+    integer(kind=ik), allocatable, optional, intent(out) :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), allocatable, optional, intent(out)    :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    !> do we have to allocate everything? 
+    logical, intent(in)                                  :: simulation
+    integer(kind=ik)                                     :: rk_steps
 
 !---------------------------------------------------------------------------------------------
 ! interfaces

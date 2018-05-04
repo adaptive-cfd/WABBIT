@@ -128,14 +128,14 @@ module module_params
         integer(kind=ik)                            :: number_procs
         ! WABBIT communicator
         integer(kind=ik)                            :: WABBIT_COMM
-        
+
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
         ! bridge for connecting WABBIT to outdoor MPI_WORLD
         type(bridgeMPI)                             :: bridge
-        ! 
-        logical                                     :: bridge_exists
+        !
+        logical                                     :: bridge_exists = .false.
         !--------------------------------------------------------------------------------------
                !! particle connection
         !--------------------------------------------------------------------------------------
@@ -153,7 +153,7 @@ module module_params
         logical                          :: bridgeCommonMPI
         !! - Consideration of the particle side as master in case of several myWorld_comms
         logical                          :: bridgeFluidMaster
-  
+
 
 
         ! -------------------------------------------------------------------------------------
@@ -191,7 +191,7 @@ module module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-      
+
 
 !---------------------------------------------------------------------------------------------
 ! main body

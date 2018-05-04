@@ -28,7 +28,7 @@ subroutine init_funnel(FILE)
   funnel%max_inner_diameter   = dmax
   funnel%min_inner_diameter   = dmin
   funnel%wall_thickness       = 0.05*domain_size(1)
-  funnel%length               = domain_size(1)*0.9_rk-funnel%wall_thickness*2.0_rk
+  funnel%length               = domain_size(1)*0.98_rk-funnel%wall_thickness*2.0_rk
   funnel%plates_thickness     = funnel%length/(2.0_rk*funnel%nr_plates)
   funnel%plates_distance      = (funnel%length-funnel%plates_thickness)/(funnel%nr_plates-1)
   funnel%slope                = (dmax - dmin)/((nr_focus_plates-1)*funnel%plates_distance)

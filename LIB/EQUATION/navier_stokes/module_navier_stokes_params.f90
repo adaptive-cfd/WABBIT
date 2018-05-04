@@ -69,6 +69,10 @@ module module_navier_stokes_params
         real(kind=rk)                               :: Lx, Ly, Lz
         ! number data fields
         integer(kind=ik)                            :: number_data_fields
+        ! number of block nodes
+        integer(kind=ik)                            :: Bs
+        ! maximal tree level
+        integer(kind=ik)                            :: Jmax
         ! dimension
         integer(kind=ik)                            :: dim, N_fields_saved
         ! adiabatic coefficient
@@ -187,6 +191,9 @@ subroutine init_other_params(params_ns, FILE )
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk   )
    
+    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_ns%Bs, 1   )
+
     
   end subroutine init_other_params
 

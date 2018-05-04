@@ -55,7 +55,7 @@ contains
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
   include "filter_block.f90"
-
+  include "inicond_shear_layer.f90"
 !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -70,8 +70,8 @@ contains
     ! inifile structure
     type(inifile)               :: FILE
     integer(kind=ik)            :: dF
-    integer(kind=ik)           :: mpicode
-   
+    integer(kind=ik)            :: mpicode,nx_max
+    real(kind=rk)               :: dx_min
 
 
     ! ==================================================================
@@ -118,6 +118,20 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
+
+
+    !
+
+    if (params_ns%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "Additional Information"
+      write(*,'(" -----------------------")')
+      dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
+      nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
+      write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
+      write(*,'("maximal resolution: ",T40,i5,x,"x",i5)') nx_max/2, nx_max/2
+    endif
 
     ! set global parameters pF,rohF, UxF etc
     UzF=-1
@@ -605,6 +619,13 @@ contains
     case ("sinus_2d","sinus2d","sin2d")
       !> \todo implement sinus_2d inicondition
       call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
+    case("shear_layer")
+      if (params_ns%dim==2) then
+        call inicond_shear_layer(  u, x0, dx ,Bs, g)
+      else
+        call abort(4832,"ERROR [navier_stokes_new.f90]: no 3d shear layer implemented")
+      endif
+    
     case ("zeros")
       ! add ambient pressure
       u( :, :, :, pF) = p_init

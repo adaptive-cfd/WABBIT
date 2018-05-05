@@ -95,9 +95,12 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
-    allocate( data_predict_fine(2*Bs-1, 2*Bs-1, 2*Bs-1)  )
-    allocate( data_predict_coarse(Bs, Bs, Bs)  )
+    !allocate( data_predict_fine(2*Bs-1, 2*Bs-1, 2*Bs-1)  )
+    allocate( data_predict_fine(2*(Bs+2*g)-1, 2*(Bs+2*g)-1, 2*(Bs+2*g)-1) )
+    !allocate( data_predict_coarse(Bs, Bs, Bs)  )
+    allocate( data_predict_coarse(Bs+2*g, Bs+2*g, Bs+2*g) )
     allocate( new_data(2*Bs-1, 2*Bs-1, 2*Bs-1, params%number_data_fields)  )
+
     ! set light data list for working, only light data coresponding to proc are not zero
     my_lgt_block = 0
     my_lgt_block( my_light_start+1: my_light_start+N, :) = lgt_block( my_light_start+1: my_light_start+N, :)
@@ -123,12 +126,14 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! loop over all data fields
             do dF = 1, params%number_data_fields
                 ! reset data
-                data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
+                !data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
+                data_predict_coarse = hvy_block(:, :, :, dF, hvy_active(k) )
                 !data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_3D(data_predict_coarse, data_predict_fine, params%order_predictor)
                 ! save new data
-                new_data(:,:,:,dF) = data_predict_fine
+                !new_data(:,:,:,dF) = data_predict_fine
+                new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*g+1+2*Bs-2, 2*g+1:2*g+1+2*Bs-2, 2*g+1:2*g+1+2*Bs-2)
             end do
 
             ! ------------------------------------------------------------------------------------------------------

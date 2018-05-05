@@ -1,5 +1,5 @@
 # WABBIT
-## (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nsects in (T)urbulence
+## (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nteractions in (T)urbulence
 
 ## Getting Started
 

@@ -395,12 +395,15 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
 
         ! fill receive buffer for internal neighbors for averaging writing type
+        ! note: only work if send buffer has data
         if ( (data_writing_type == 'average') .or. (data_writing_type == 'compare') .or. (data_writing_type == 'staging') ) then
-            ! fill receive buffer
-            int_receive_buffer( 1:int_pos(rank+1)  , rank+1 ) = int_send_buffer( 1:int_pos(rank+1)  , rank+1 )
-            real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 )
-            ! change com matrix, need to sort in buffers in next step
-            com_matrix(rank+1) = 1
+            if ( int_send_buffer(1 , rank+1 ) > 0 ) then
+                ! fill receive buffer
+                int_receive_buffer( 1:int_pos(rank+1)  , rank+1 ) = int_send_buffer( 1:int_pos(rank+1)  , rank+1 )
+                real_receive_buffer( 1:int_receive_buffer(1,rank+1), rank+1 ) = real_send_buffer( 1:int_receive_buffer(1,rank+1), rank+1 )
+                ! change com matrix, need to sort in buffers in next step
+                com_matrix(rank+1) = 1
+            end if
         end if
 
         ! Daten einsortieren

@@ -84,4 +84,7 @@ contains
     ! routine to reset ghost nodes to uniform number (for debuging)
     include "reset_ghost_nodes.f90"
 
+    ! synchronize light data array
+    include "synchronize_lgt_data.f90"
+
 end module module_MPI

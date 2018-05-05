@@ -90,8 +90,7 @@ contains
     include "merge_blocks.f90"
 
     ! balance the load
-    include "balance_load_2D.f90"
-    include "balance_load_3D.f90"
+    include "balance_load.f90"
 
     ! create list with number of blocks per rank
     include "set_desired_num_blocks_per_rank.f90"

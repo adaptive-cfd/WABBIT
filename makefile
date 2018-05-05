@@ -125,7 +125,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	synchronize_ghosts.f90 copy_ghost_nodes_2D.f90 create_send_buffer_2D.f90 write_receive_buffer_2D.f90 create_external_com_list.f90 \
 	max_com_num.f90 fill_send_buffer.f90 fill_receive_buffer.f90 RMA_lock_unlock_get_data.f90 RMA_lock_unlock_put_data.f90 \
 	isend_irecv_data.f90 copy_ghost_nodes_3D.f90 create_send_buffer_3D.f90 write_receive_buffer_3D.f90 blocks_per_mpirank.f90 \
-	reset_ghost_nodes.f90 copy_redundant_nodes_2D.f90
+	reset_ghost_nodes.f90 copy_redundant_nodes_2D.f90 synchronize_lgt_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o\
@@ -141,10 +141,10 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(OBJDIR)/module_MPI.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o \
 	update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
-	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load_2D.f90 set_desired_num_blocks_per_rank.f90 \
+	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
     treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
-    refinement_execute_3D.f90 balance_load_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
+    refinement_execute_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
 	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90 \
 	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

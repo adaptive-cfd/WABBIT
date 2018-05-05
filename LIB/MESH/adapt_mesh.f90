@@ -164,11 +164,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
-    if ( params%threeD_case ) then
-        call balance_load_3D( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-    else
-        call balance_load_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-    end if
+    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
 
 
     !> load balancing destroys the lists again, so we have to create them one last time to

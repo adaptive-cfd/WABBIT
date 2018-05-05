@@ -118,7 +118,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         ! 'exclude_redundant', 'include_redundant', 'only_redundant'
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging', 'compare'
-        data_writing_type = 'average'
+        data_writing_type = 'staging'
 
     else
         ! nodes test
@@ -148,7 +148,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     neighbor_num = size(hvy_neighbor, 2)
 
     ! 2D only!
-    allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
+    allocate( data_buffer( (Bs+2*g)*(Bs+2*g)*(Bs+2*g)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
     com_matrix(number_procs), int_pos(number_procs), dummy_matrix(number_procs, number_procs) )
 
     ! reset ghost nodes for all blocks - for debugging
@@ -191,7 +191,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! set number of synch stages
     if ( data_writing_type == 'staging' ) then
         ! all four stages
-        stages = 3!4
+        stages = 4
     else
         ! only one stage
         stages = 1
@@ -205,6 +205,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
         if (synch_stage==3) then
             data_bounds_type = 'exclude_redundant'
+        end if
+        if (synch_stage==4) then
+            data_bounds_type = 'include_redundant'
         end if
 
         ! reset integer send buffer position
@@ -332,7 +335,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                             case('staging')
                                 ! set synch status
-                                call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                                call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
 
                                 ! data has to synchronize in current stage
                                 if (synch) then
@@ -353,7 +356,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         ! synch status for staging method
                         if (data_writing_type == 'staging') then
                             ! set synch status
-                            call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                            call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
                         else
                             ! synch status is allways true
                             synch = .true.
@@ -498,7 +501,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
 
                         ! set synch status
-                        call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                        call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
                         ! synch == .true. bedeutet, dass der aktive block seinem nachbarn daten gibt
                         ! hier sind wir aber auf der seite des empfängers, das bedeutet, neighbor_synch muss ausgewertet werden
 
@@ -621,6 +624,1179 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
 
             if ( params%threeD_case ) then
                 ! 3D
+                select case(neighborhood)
+                    ! '__1/___'
+                    case(1)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = Bs-sh_end
+                        data_bounds(2,3) = Bs+g-sh_start
+
+                    ! '__2/___'
+                    case(2)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1+sh_start
+                        data_bounds(2,2) = g+1+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__3/___'
+                    case(3)
+                        ! first dimension
+                        data_bounds(1,1) = Bs-sh_end
+                        data_bounds(2,1) = Bs+g-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__4/___'
+                    case(4)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = Bs-sh_end
+                        data_bounds(2,2) = Bs+g-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__5/___'
+                    case(5)
+                        ! first dimension
+                        data_bounds(1,1) = g+1+sh_start
+                        data_bounds(2,1) = g+1+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__6/___'
+                    case(6)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1+sh_start
+                        data_bounds(2,3) = g+1+g+sh_end
+
+                    ! '_12/___'
+                    case(7)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1+sh_start
+                        data_bounds(2,2) = g+1+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = Bs-sh_end
+                        data_bounds(2,3) = Bs+g-sh_start
+
+                    ! '_13/___'
+                    case(8)
+                        ! first dimension
+                        data_bounds(1,1) = Bs-sh_end
+                        data_bounds(2,1) = Bs+g-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = Bs-sh_end
+                        data_bounds(2,3) = Bs+g-sh_start
+
+                    ! '_14/___'
+                    case(9)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = Bs-sh_end
+                        data_bounds(2,2) = Bs+g-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = Bs-sh_end
+                        data_bounds(2,3) = Bs+g-sh_start
+
+                    ! '_15/___'
+                    case(10)
+                        ! first dimension
+                        data_bounds(1,1) = g+1+sh_start
+                        data_bounds(2,1) = g+1+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = Bs-sh_end
+                        data_bounds(2,3) = Bs+g-sh_start
+
+                      ! '_62/___'
+                    case(11)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1+sh_start
+                        data_bounds(2,2) = g+1+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1+sh_start
+                        data_bounds(2,3) = g+1+g+sh_end
+
+                    ! '_63/___'
+                    case(12)
+                        ! first dimension
+                        data_bounds(1,1) = Bs-sh_end
+                        data_bounds(2,1) = Bs+g-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1+sh_start
+                        data_bounds(2,3) = g+1+g+sh_end
+
+                    ! '_64/___'
+                    case(13)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = Bs-sh_end
+                        data_bounds(2,2) = Bs+g-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1+sh_start
+                        data_bounds(2,3) = g+1+g+sh_end
+
+                    ! '_65/___'
+                    case(14)
+                        ! first dimension
+                        data_bounds(1,1) = g+1+sh_start
+                        data_bounds(2,1) = g+1+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1+sh_start
+                        data_bounds(2,3) = g+1+g+sh_end
+
+                    ! '_23/___'
+                    case(15)
+                        ! first dimension
+                        data_bounds(1,1) = Bs-sh_end
+                        data_bounds(2,1) = Bs+g-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1+sh_start
+                        data_bounds(2,2) = g+1+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '_25/___'
+                    case(16)
+                        ! first dimension
+                        data_bounds(1,1) = g+1+sh_start
+                        data_bounds(2,1) = Bs+1+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1+sh_start
+                        data_bounds(2,2) = g+1+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '_43/___'
+                    case(17)
+                        ! first dimension
+                        data_bounds(1,1) = Bs-sh_end
+                        data_bounds(2,1) = Bs+g-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = Bs-sh_end
+                        data_bounds(2,2) = Bs+g-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '_45/___'
+                    case(18)
+                        ! first dimension
+                        data_bounds(1,1) = g+1+sh_start
+                        data_bounds(2,1) = Bs+1+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = Bs-sh_end
+                        data_bounds(2,2) = Bs+g-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    case(19,20,21,22)
+                        if ( level_diff == 0 ) then
+                            ! third dimension
+                            data_bounds(1,3) = Bs-sh_end
+                            data_bounds(2,3) = Bs+g-sh_start
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(19) ! '123/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-sh_end
+                                    data_bounds(2,1) = Bs+g-sh_start
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start
+                                    data_bounds(2,2) = g+1+g+sh_end
+
+                                case(20) ! '134/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-sh_end
+                                    data_bounds(2,1) = Bs+g-sh_start
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-sh_end
+                                    data_bounds(2,2) = Bs+g-sh_start
+
+                                case(21) ! '145/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start
+                                    data_bounds(2,1) = g+1+g+sh_end
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-sh_end
+                                    data_bounds(2,2) = Bs+g-sh_start
+
+                                case(22) ! '152/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start
+                                    data_bounds(2,1) = g+1+g+sh_end
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start
+                                    data_bounds(2,2) = g+1+g+sh_end
+
+                            end select
+
+                        elseif ( level_diff == -1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = Bs+1
+                            data_bounds(2,3) = Bs+g
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(19) ! '123/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs+1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+g
+
+                                case(20) ! '134/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs+1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs+1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(21) ! '145/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs+1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(22) ! '152/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = Bs-g-sh_end*2
+                            data_bounds(2,3) = Bs+g-sh_start*2
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(19) ! '123/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-g-sh_end*2
+                                    data_bounds(2,1) = Bs+g-sh_start*2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start*2
+                                    data_bounds(2,2) = g+1+g+g+sh_end*2
+
+                                case(20) ! '134/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-g-sh_end*2
+                                    data_bounds(2,1) = Bs+g-sh_start*2
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-g-sh_end*2
+                                    data_bounds(2,2) = Bs+g-sh_start*2
+
+                                case(21) ! '145/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start*2
+                                    data_bounds(2,1) = g+1+g+g+sh_end*2
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-g-sh_end*2
+                                    data_bounds(2,2) = Bs+g-sh_start*2
+
+                                case(22) ! '152/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start*2
+                                    data_bounds(2,1) = g+1+g+g+sh_end*2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start*2
+                                    data_bounds(2,2) = g+1+g+g+sh_end*2
+
+                            end select
+                        end if
+
+                    case(23,24,25,26)
+                        if ( level_diff == 0 ) then
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start
+                            data_bounds(2,3) = g+1+g+sh_end
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(23) ! '623/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-sh_end
+                                    data_bounds(2,1) = Bs+g-sh_start
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start
+                                    data_bounds(2,2) = g+1+g+sh_end
+
+                                case(24) ! '634/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-sh_end
+                                    data_bounds(2,1) = Bs+g-sh_start
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-sh_end
+                                    data_bounds(2,2) = Bs+g-sh_start
+
+                                case(25) ! '645/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start
+                                    data_bounds(2,1) = g+1+g+sh_end
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-sh_end
+                                    data_bounds(2,2) = Bs+g-sh_start
+
+                                case(26) ! '652/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start
+                                    data_bounds(2,1) = g+1+g+sh_end
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start
+                                    data_bounds(2,2) = g+1+g+sh_end
+
+                            end select
+
+                        elseif ( level_diff == -1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = g+g
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(23) ! '623/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs+1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+g
+
+                                case(24) ! '634/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs+1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs+1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(25) ! '645/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs+1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(26) ! '652/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start*2
+                            data_bounds(2,3) = g+1+g+g+sh_end*2
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(23) ! '623/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-g-sh_end*2
+                                    data_bounds(2,1) = Bs+g-sh_start*2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start*2
+                                    data_bounds(2,2) = g+1+g+g+sh_end*2
+
+                                case(24) ! '634/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = Bs-g-sh_end*2
+                                    data_bounds(2,1) = Bs+g-sh_start*2
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-g-sh_end*2
+                                    data_bounds(2,2) = Bs+g-sh_start*2
+
+                                case(25) ! '645/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start*2
+                                    data_bounds(2,1) = g+1+g+g+sh_end*2
+                                    ! second dimension
+                                    data_bounds(1,2) = Bs-g-sh_end*2
+                                    data_bounds(2,2) = Bs+g-sh_start*2
+
+                                case(26) ! '652/___'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1+sh_start*2
+                                    data_bounds(2,1) = g+1+g+g+sh_end*2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1+sh_start*2
+                                    data_bounds(2,2) = g+1+g+g+sh_end*2
+
+                            end select
+                        end if
+
+                    case(27,28,29,30)
+                        if ( level_diff == -1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = (Bs+1)/2
+                            data_bounds(2,3) = Bs+g
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(27) ! '__1/123'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+
+                                case(28) ! '__1/134'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(29) ! '__1/145'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(30) ! '__1/152'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = Bs-g-sh_end*2
+                            data_bounds(2,3) = Bs+g-sh_start*2
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+
+                        end if
+
+                    case(31,32,33,34)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            ! first, third dimension
+                            select case(neighborhood)
+                                case(32) ! '__2/623'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                                case(31) ! '__2/123'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(33) ! '__2/152'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(34) ! '__2/652'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = g+1+sh_start*2
+                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                    case(35,36,37,38)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(2,1) = Bs+g
+                            ! second, third dimension
+                            select case(neighborhood)
+                                case(35) ! '__3/123'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(37) ! '__3/134'
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(38) ! '__3/634'
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                                case(36) ! '__3/623'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs-g-sh_end*2
+                            data_bounds(2,1) = Bs+g-sh_start*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                    case(39,40,41,42)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(2,2) = Bs+g
+                            ! first, third dimension
+                            select case(neighborhood)
+                                case(40) ! '__4/634'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                                case(39) ! '__4/134'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(41) ! '__4/145'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(42) ! '__4/645'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs-g-sh_end*2
+                            data_bounds(2,2) = Bs+g-sh_start*2
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                    case(43,44,45,46)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            ! second, third dimension
+                            select case(neighborhood)
+                                case(45) ! '__5/152'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(43) ! '__5/145'
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(44) ! '__5/645'
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                                case(46) ! '__5/652'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1+sh_start*2
+                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                    case(47,48,49,50)
+                        if ( level_diff == -1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = (Bs+1)/2+g+g
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(47) ! '__6/623'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+
+                                case(48) ! '__6/634'
+                                    ! first dimension
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(49) ! '__6/645'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(50) ! '__6/652'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start*2
+                            data_bounds(2,3) = g+1+g+g+sh_end*2
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+
+                        end if
+
+                    case(51,52)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            ! third dimension
+                            data_bounds(1,3) = (Bs+1)/2
+                            data_bounds(2,3) = Bs+g
+                            ! first dimension
+                            select case(neighborhood)
+                                case(51) ! '_12/123'
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(52) ! '_12/152'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = g+1+sh_start*2
+                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            ! third dimension
+                            data_bounds(1,3) = Bs-g-sh_end*2
+                            data_bounds(2,3) = Bs+g-sh_start*2
+
+                        end if
+
+                    case(53,54)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(2,1) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = (Bs+1)/2
+                            data_bounds(2,3) = Bs+g
+                            ! second dimension
+                            select case(neighborhood)
+                                case(54) ! '_13/134'
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(53) ! '_13/123'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs-g-sh_end*2
+                            data_bounds(2,1) = Bs+g-sh_start*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = Bs-g-sh_end*2
+                            data_bounds(2,3) = Bs+g-sh_start*2
+
+                        end if
+
+                    case(55,56)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = (Bs+1)/2
+                            data_bounds(2,3) = Bs+g
+                            ! first dimension
+                            select case(neighborhood)
+                                case(55) ! '_14/134'
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(56) ! '_14/145'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = Bs-g-sh_end*2
+                            data_bounds(2,2) = Bs+g-sh_start*2
+                            ! third dimension
+                            data_bounds(1,3) = Bs-g-sh_end*2
+                            data_bounds(2,3) = Bs+g-sh_start*2
+
+                        end if
+
+                    case(57,58)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            ! third dimension
+                            data_bounds(1,3) = (Bs+1)/2
+                            data_bounds(2,3) = Bs+g
+                            ! second dimension
+                            select case(neighborhood)
+                                case(57) ! '_15/145'
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(58) ! '_15/152''
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1+sh_start*2
+                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = Bs-g-sh_end*2
+                            data_bounds(2,3) = Bs+g-sh_start*2
+
+                        end if
+
+                    case(59,60)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = (Bs+1)/2+g+g
+                            ! first dimension
+                            select case(neighborhood)
+                                case(59) ! '_62/623'
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(60) ! '_62/652'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = g+1+sh_start*2
+                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start*2
+                            data_bounds(2,3) = g+1+g+g+sh_end*2
+
+                        end if
+
+                     case(61,62)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(2,1) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = (Bs+1)/2+g+g
+                            ! second dimension
+                            select case(neighborhood)
+                                case(62) ! '_63/634'
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(61) ! '_63/623'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs-g-sh_end*2
+                            data_bounds(2,1) = Bs+g-sh_start*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start*2
+                            data_bounds(2,3) = g+1+g+g+sh_end*2
+
+                        end if
+
+                    case(63,64)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = (Bs+1)/2+g+g
+                            ! first dimension
+                            select case(neighborhood)
+                                case(63) ! '_64/634'
+                                    data_bounds(1,1) = (Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(64) ! '_64/645'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = Bs-g-sh_end*2
+                            data_bounds(2,2) = Bs+g-sh_start*2
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start*2
+                            data_bounds(2,3) = g+1+g+g+sh_end*2
+
+                        end if
+
+                    case(65,66)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = (Bs+1)/2+g+g
+                            ! second dimension
+                            select case(neighborhood)
+                                case(65) ! '_65/645'
+                                    data_bounds(1,2) = (Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(66) ! '_65/652'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = (Bs+1)/2+g+g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1+sh_start*2
+                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            data_bounds(1,3) = g+1+sh_start*2
+                            data_bounds(2,3) = g+1+g+g+sh_end*2
+
+                        end if
+
+                     case(67,68)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            ! third dimension
+                            select case(neighborhood)
+                                case(67) ! '_23/123'
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(68) ! '_23/236''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs-g-sh_end*2
+                            data_bounds(2,1) = Bs+g-sh_start*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1+sh_start*2
+                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                     case(69,70)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            ! second dimension
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = (Bs+1)/2+g+g
+                            ! third dimension
+                            select case(neighborhood)
+                                case(69) ! '_25/152'
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(70) ! '_25/652''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1+sh_start*2
+                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            ! second dimension
+                            data_bounds(1,2) = g+1+sh_start*2
+                            data_bounds(2,2) = g+1+g+g+sh_end*2
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                     case(71,72)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = (Bs+1)/2
+                            data_bounds(2,1) = Bs+g
+                            ! second dimension
+                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            select case(neighborhood)
+                                case(71) ! '_43/134'
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(72) ! '_43/634''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs-g-sh_end*2
+                            data_bounds(2,1) = Bs+g-sh_start*2
+                            ! second dimension
+                            data_bounds(1,2) = Bs-g-sh_end*2
+                            data_bounds(2,2) = Bs+g-sh_start*2
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                     case(73,74)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = (Bs+1)/2+g+g
+                            ! second dimension
+                            data_bounds(1,2) = (Bs+1)/2
+                            data_bounds(2,2) = Bs+g
+                            ! third dimension
+                            select case(neighborhood)
+                                case(73) ! '_45/145'
+                                    data_bounds(1,3) = (Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(74) ! '_45/645'
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = (Bs+1)/2+g+g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = g+1+sh_start*2
+                            data_bounds(2,1) = g+1+g+g+sh_end*2
+                            ! second dimension
+                            data_bounds(1,2) = Bs-g-sh_end*2
+                            data_bounds(2,2) = Bs+g-sh_start*2
+                            ! third dimension
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+g
+
+                        end if
+
+                end select
 
             else
                 ! 2D
@@ -940,6 +2116,1276 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
 
             if ( params%threeD_case ) then
                 ! 3D
+                select case(neighborhood)
+                    ! '__1/___'
+                    case(1)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = 1-sh_end
+                        data_bounds(2,3) = g+1-sh_start
+
+                    ! '__2/___'
+                    case(2)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__3/___'
+                    case(3)
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__4/___'
+                    case(4)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__5/___'
+                    case(5)
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '__6/___'
+                    case(6)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = Bs+g+sh_start
+                        data_bounds(2,3) = Bs+g+g+sh_end
+
+                    ! '_12/___'
+                    case(7)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = 1-sh_end
+                        data_bounds(2,3) = g+1-sh_start
+
+                    ! '_13/___'
+                    case(8)
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = 1-sh_end
+                        data_bounds(2,3) = g+1-sh_start
+
+                    ! '_14/___'
+                    case(9)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = 1-sh_end
+                        data_bounds(2,3) = g+1-sh_start
+
+                    ! '_15/___'
+                    case(10)
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = 1-sh_end 
+                        data_bounds(2,3) = g+1-sh_start
+
+                      ! '_62/___'
+                    case(11)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = Bs+g+sh_start
+                        data_bounds(2,3) = Bs+g+g+sh_end
+
+                    ! '_63/___'
+                    case(12)
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = Bs+g+sh_start
+                        data_bounds(2,3) = Bs+g+g+sh_end
+
+                    ! '_64/___'
+                    case(13)
+                        ! first dimension
+                        data_bounds(1,1) = g+1
+                        data_bounds(2,1) = Bs+g
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = Bs+g+sh_start
+                        data_bounds(2,3) = Bs+g+g+sh_end
+
+                    ! '_65/___'
+                    case(14)
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = g+1
+                        data_bounds(2,2) = Bs+g
+                        ! third dimension
+                        data_bounds(1,3) = Bs+g+sh_start
+                        data_bounds(2,3) = Bs+g+g+sh_end
+
+                    ! '_23/___'
+                    case(15)
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '_25/___'
+                    case(16)
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = Bs+g+sh_start
+                        data_bounds(2,2) = Bs+g+g+sh_end
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '_43/___'
+                    case(17)
+                        ! first dimension
+                        data_bounds(1,1) = 1-sh_end
+                        data_bounds(2,1) = g+1-sh_start
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    ! '_45/___'
+                    case(18)
+                        ! first dimension
+                        data_bounds(1,1) = Bs+g+sh_start
+                        data_bounds(2,1) = Bs+g+g+sh_end
+                        ! second dimension
+                        data_bounds(1,2) = 1-sh_end
+                        data_bounds(2,2) = g+1-sh_start
+                        ! third dimension
+                        data_bounds(1,3) = g+1
+                        data_bounds(2,3) = Bs+g
+
+                    case(19,20,21,22)
+                        ! third dimension
+                        data_bounds(1,3) = 1-sh_end
+                        data_bounds(2,3) = g+1-sh_start
+                        ! first, second dimension
+                        select case(neighborhood)
+                            case(19) ! '123/___'
+                                ! first dimension
+                                data_bounds(1,1) = 1-sh_end
+                                data_bounds(2,1) = g+1-sh_start
+                                ! second dimension
+                                data_bounds(1,2) = Bs+g+sh_start
+                                data_bounds(2,2) = Bs+g+g+sh_end
+
+                            case(20) ! '134/___'
+                                ! first dimension
+                                data_bounds(1,1) = 1-sh_end
+                                data_bounds(2,1) = g+1-sh_start
+                                ! second dimension
+                                data_bounds(1,2) = 1-sh_end
+                                data_bounds(2,2) = g+1-sh_start
+
+                            case(21) ! '145/___'
+                                ! first dimension
+                                data_bounds(1,1) = Bs+g+sh_start
+                                data_bounds(2,1) = Bs+g+g+sh_end
+                                ! second dimension
+                                data_bounds(1,2) = 1-sh_end
+                                data_bounds(2,2) = g+1-sh_start
+
+                            case(22) ! '152/___'
+                                ! first dimension
+                                data_bounds(1,1) = Bs+g+sh_start
+                                data_bounds(2,1) = Bs+g+g+sh_end
+                                ! second dimension
+                                data_bounds(1,2) = Bs+g+sh_start
+                                data_bounds(2,2) = Bs+g+g+sh_end
+
+                        end select
+
+                    case(23,24,25,26)
+                        ! third dimension
+                        data_bounds(1,3) = Bs+g+sh_start
+                        data_bounds(2,3) = Bs+g+g+sh_end
+                        ! first, second dimension
+                        select case(neighborhood)
+                            case(23) ! '623/___'
+                                ! first dimension
+                                data_bounds(1,1) = 1-sh_end
+                                data_bounds(2,1) = g+1-sh_start
+                                ! second dimension
+                                data_bounds(1,2) = Bs+g+sh_start
+                                data_bounds(2,2) = Bs+g+g+sh_end
+
+                            case(24) ! '634/___'
+                                ! first dimension
+                                data_bounds(1,1) = 1-sh_end
+                                data_bounds(2,1) = g+1-sh_start
+                                ! second dimension
+                                data_bounds(1,2) = 1-sh_end
+                                data_bounds(2,2) = g+1-sh_start
+
+                            case(25) ! '645/___'
+                                ! first dimension
+                                data_bounds(1,1) = Bs+g+sh_start
+                                data_bounds(2,1) = Bs+g+g+sh_end
+                                ! second dimension
+                                data_bounds(1,2) = 1-sh_end
+                                data_bounds(2,2) = g+1-sh_start
+
+                            case(26) ! '652/___'
+                                ! first dimension
+                                data_bounds(1,1) = Bs+g+sh_start
+                                data_bounds(2,1) = Bs+g+g+sh_end
+                                ! second dimension
+                                data_bounds(1,2) = Bs+g+sh_start
+                                data_bounds(2,2) = Bs+g+g+sh_end
+
+                        end select
+
+                    case(27,28,29,30)
+                        if ( level_diff == -1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(27) ! '__1/123'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+
+                                case(28) ! '__1/134'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(29) ! '__1/145'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(30) ! '__1/152'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(27) ! '__1/123'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+
+                                case(28) ! '__1/134'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(29) ! '__1/145'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(30) ! '__1/152'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                    case(31,32,33,34)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! first, third dimension
+                            select case(neighborhood)
+                                case(31) ! '__2/123'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(32) ! '__2/623'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                                case(33) ! '__2/152'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(34) ! '__2/652'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! first, third dimension
+                            select case(neighborhood)
+                                case(31) ! '__2/123'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(32) ! '__2/623'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                                case(33) ! '__2/152'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(34) ! '__2/652'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(35,36,37,38)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! second, third dimension
+                            select case(neighborhood)
+                                case(35) ! '__3/123'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(37) ! '__3/134'
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(38) ! '__3/634'
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                                case(36) ! '__3/623'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! second, third dimension
+                            select case(neighborhood)
+                                case(35) ! '__3/123'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(37) ! '__3/134'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(38) ! '__3/634'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                                case(36) ! '__3/623'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(39,40,41,42)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! first, third dimension
+                            select case(neighborhood)
+                                case(40) ! '__4/634'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                                case(39) ! '__4/134'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(41) ! '__4/145'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(42) ! '__4/645'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! first, third dimension
+                            select case(neighborhood)
+                                case(40) ! '__4/634'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                                case(39) ! '__4/134'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(41) ! '__4/145'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(42) ! '__4/645'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(43,44,45,46)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! second, third dimension
+                            select case(neighborhood)
+                                case(45) ! '__5/152'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(43) ! '__5/145'
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(44) ! '__5/645'
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                                case(46) ! '__5/652'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! second, third dimension
+                            select case(neighborhood)
+                                case(45) ! '__5/152'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(43) ! '__5/145'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(44) ! '__5/645'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                                case(46) ! '__5/652'
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                                    ! third dimension
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(47,48,49,50)
+                        if ( level_diff == -1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(47) ! '__6/623'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+
+                                case(48) ! '__6/634'
+                                    ! first dimension
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(49) ! '__6/645'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! second dimension
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(50) ! '__6/652'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! first, second dimension
+                            select case(neighborhood)
+                                case(47) ! '__6/623'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+
+                                case(48) ! '__6/634'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(49) ! '__6/645'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(50) ! '__6/652'
+                                    ! first dimension
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                                    ! second dimension
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(51,52)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! first dimension
+                            select case(neighborhood)
+                                case(51) ! '_12/123'
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+
+                                case(52) ! '_12/152'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! first dimension
+                            select case(neighborhood)
+                                case(51) ! '_12/123'
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(52) ! '_12/152'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                    case(53,54)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! second dimension
+                            select case(neighborhood)
+                                case(54) ! '_13/134'
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(53) ! '_13/123'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! second dimension
+                            select case(neighborhood)
+                                case(54) ! '_13/134'
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(53) ! '_13/123'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                    case(55,56)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! first dimension
+                            select case(neighborhood)
+                                case(55) ! '_14/134'
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+
+                                case(56) ! '_14/145'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! first dimension
+                            select case(neighborhood)
+                                case(55) ! '_14/134'
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(56) ! '_14/145'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(57,58)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! second dimension
+                            select case(neighborhood)
+                                case(57) ! '_15/145'
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(58) ! '_15/152''
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = 1-sh_end
+                            data_bounds(2,3) = g+1-sh_start
+                            ! second dimension
+                            select case(neighborhood)
+                                case(57) ! '_15/145'
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(58) ! '_15/152''
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(59,60)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! first dimension
+                            select case(neighborhood)
+                                case(59) ! '_62/623'
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+
+                                case(60) ! '_62/652'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! first dimension
+                            select case(neighborhood)
+                                case(59) ! '_62/623'
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(60) ! '_62/652'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                     case(61,62)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! second dimension
+                            select case(neighborhood)
+                                case(62) ! '_63/634'
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(61) ! '_63/623'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! second dimension
+                            select case(neighborhood)
+                                case(62) ! '_63/634'
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(61) ! '_63/623'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                      case(63,64)
+                        if ( level_diff == -1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! first dimension
+                            select case(neighborhood)
+                                case(63) ! '_64/634'
+                                    data_bounds(1,1) = 1
+                                    data_bounds(2,1) = Bs+g
+
+                                case(64) ! '_64/645'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! first dimension
+                            select case(neighborhood)
+                                case(63) ! '_64/634'
+                                    data_bounds(1,1) = g+(Bs+1)/2
+                                    data_bounds(2,1) = Bs+g
+
+                                case(64) ! '_64/645'
+                                    data_bounds(1,1) = g+1
+                                    data_bounds(2,1) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                    case(65,66)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! second dimension
+                            select case(neighborhood)
+                                case(65) ! '_65/645'
+                                    data_bounds(1,2) = 1
+                                    data_bounds(2,2) = Bs+g
+
+                                case(66) ! '_65/652'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = Bs+2*g
+
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! third dimension
+                            data_bounds(1,3) = Bs+g+sh_start
+                            data_bounds(2,3) = Bs+g+g+sh_end
+                            ! second dimension
+                            select case(neighborhood)
+                                case(65) ! '_65/645'
+                                    data_bounds(1,2) = g+(Bs+1)/2
+                                    data_bounds(2,2) = Bs+g
+
+                                case(66) ! '_65/652'
+                                    data_bounds(1,2) = g+1
+                                    data_bounds(2,2) = g+(Bs+1)/2
+
+                            end select
+
+                        end if
+
+                     case(67,68)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            select case(neighborhood)
+                                case(67) ! '_23/123'
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(68) ! '_23/236''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            select case(neighborhood)
+                                case(67) ! '_23/123'
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(68) ! '_23/236''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                     case(69,70)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            select case(neighborhood)
+                                case(69) ! '_25/152'
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(70) ! '_25/652''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! second dimension
+                            data_bounds(1,2) = Bs+g+sh_start
+                            data_bounds(2,2) = Bs+g+g+sh_end
+                            ! third dimension
+                            select case(neighborhood)
+                                case(69) ! '_25/152'
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(70) ! '_25/652''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                     case(71,72)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            select case(neighborhood)
+                                case(71) ! '_43/134'
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(72) ! '_43/634''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = 1-sh_end
+                            data_bounds(2,1) = g+1-sh_start
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            select case(neighborhood)
+                                case(71) ! '_43/134'
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(72) ! '_43/634''
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                     case(73,74)
+                        if ( level_diff == -1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            select case(neighborhood)
+                                case(73) ! '_45/145'
+                                    data_bounds(1,3) = 1
+                                    data_bounds(2,3) = Bs+g
+
+                                case(74) ! '_45/645'
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = Bs+2*g
+                            end select
+
+                        elseif ( level_diff == 1 ) then
+                            ! first dimension
+                            data_bounds(1,1) = Bs+g+sh_start
+                            data_bounds(2,1) = Bs+g+g+sh_end
+                            ! second dimension
+                            data_bounds(1,2) = 1-sh_end
+                            data_bounds(2,2) = g+1-sh_start
+                            ! third dimension
+                            select case(neighborhood)
+                                case(73) ! '_45/145'
+                                    data_bounds(1,3) = g+(Bs+1)/2
+                                    data_bounds(2,3) = Bs+g
+
+                                case(74) ! '_45/645'
+                                    data_bounds(1,3) = g+1
+                                    data_bounds(2,3) = g+(Bs+1)/2
+                            end select
+
+                        end if
+
+                end select
 
             else
                 ! 2D
@@ -1218,13 +3664,16 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
     ! grid parameter
     integer(kind=ik)                                :: Bs, g
 
+    ! start and edn shift values
+    integer(kind=ik)                                :: sh_start, sh_end
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! grid parameter
+    ! grid piarameter
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
 
@@ -1233,11 +3682,677 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
     jN = data_bounds(2,2) - data_bounds(1,2) + 1
     kN = data_bounds(2,3) - data_bounds(1,3) + 1
 
+    sh_start = 0
+    sh_end   = 0
+
+    if ( data_bounds_type == 'exclude_redundant' ) then
+        sh_start = 1
+    end if
+    if ( data_bounds_type == 'only_redundant' ) then
+        sh_end = -g
+    end if
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
     if ( params%threeD_case ) then
         ! 3D
+        select case(neighborhood)
+            ! nothing to do
+            ! '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
+            ! '_12/___', '_13/___', '_14/___', '_15/___'
+            ! '_62/___', '_63/___', '_64/___', '_65/___'
+            ! '_23/___', '_25/___', '_43/___', '_45/___'
+            case(1:18)
+
+            ! '123/___', '134/___', '145/___', '152/___'
+            ! '623/___', '634/___', '645/___', '652/___'
+            ! '__1/123', '__1/134', '__1/145', '__1/152',
+            ! '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
+            ! '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
+            ! '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
+            ! '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
+            ! '_43/134', '_43/634', '_45/145', '_45/645'
+            case(19:74)
+                if ( level_diff == -1 ) then
+                    ! loop over all data fields
+                    do dF = 1, params%number_data_fields
+                        ! interpolate data
+                        call prediction_3D( hvy_block( data_bounds(1,1):data_bounds(2,1), &
+                                                       data_bounds(1,2):data_bounds(2,2), &
+                                                       data_bounds(1,3):data_bounds(2,3), dF, hvy_id ), &
+                        res_pre_data( 1:iN*2-1, 1:jN*2-1, 1:kN*2-1, dF), params%order_predictor)
+                    end do
+                    ! reset data bounds
+                    select case(neighborhood)
+                        case(19) ! '123/___'
+                            data_bounds(1,1) = g-1-sh_end
+                            data_bounds(2,1) = 2*g-1-sh_start
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = g-1-sh_end
+                            data_bounds(2,3) = 2*g-1-sh_start
+
+                        case(20) ! '134/___'
+                            data_bounds(1,1) = g-1-sh_end
+                            data_bounds(2,1) = 2*g-1-sh_start
+                            data_bounds(1,2) = g-1-sh_end
+                            data_bounds(2,2) = 2*g-1-sh_start
+                            data_bounds(1,3) = g-1-sh_end
+                            data_bounds(2,3) = 2*g-1-sh_start
+
+                        case(21) ! '145/___'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = g-1-sh_end
+                            data_bounds(2,2) = 2*g-1-sh_start
+                            data_bounds(1,3) = g-1-sh_end
+                            data_bounds(2,3) = 2*g-1-sh_start
+
+                        case(22) ! '152/___'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = g-1-sh_end
+                            data_bounds(2,3) = 2*g-1-sh_start
+
+                        case(23) ! '623/___'
+                            data_bounds(1,1) = g-1-sh_end
+                            data_bounds(2,1) = 2*g-1-sh_start
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(24) ! '634/___'
+                            data_bounds(1,1) = g-1-sh_end
+                            data_bounds(2,1) = 2*g-1-sh_start
+                            data_bounds(1,2) = g-1-sh_end
+                            data_bounds(2,2) = 2*g-1-sh_start
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(25) ! '645/___'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = g-1-sh_end
+                            data_bounds(2,2) = 2*g-1-sh_start
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(26) ! '652/___'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(27) ! '__1/123'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(28) ! '__1/134'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(29) ! '__1/145'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(30) ! '__1/152'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(31) ! '__2/123'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(32) ! '___2/623'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(33) ! '__2/152'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(34) ! '__2/652'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(35) ! '__3/123'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(37) ! '__3/134'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(38) ! '__3/634'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(36) ! '__3/623'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(40) ! '__4/634'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(39) ! '__4/134'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(41) ! '__4/145'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(42) ! '__4/645'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(45) ! '__5/152'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(43) ! '__5/145'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(44) ! '__5/645'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(46) ! '__5/652'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(47) ! '__6/623'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(48) ! '__6/634'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(49) ! '__6/645'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(50) ! '__6/652'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(51) ! '_12/123'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(52) ! '_12/152'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(54) ! '_13/134'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(53) ! '_13/123'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(55) ! '_14/134'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(56) ! '_14/145'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(57) ! '_15/145'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(58) ! '_15/152'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = Bs+g-sh_end
+                            data_bounds(2,3) = Bs+2*g-sh_start
+
+                        case(59) ! '_62/623'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(60) ! '_62/652'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(62) ! '_63/634'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(61) ! '_63/623'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(63) ! '_64/634'
+                            data_bounds(1,1) = g+1
+                            data_bounds(2,1) = Bs+2*g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(64) ! '_64/645'
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = Bs+g
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(65) ! '_65/645'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = g+1
+                            data_bounds(2,2) = Bs+2*g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(66) ! '_65/652'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = Bs+g
+                            data_bounds(1,3) = 1+sh_start
+                            data_bounds(2,3) = g+1+sh_end
+
+                        case(67) ! '_23/123'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(68) ! '_23/236''
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(69) ! '_25/152'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(70) ! '_25/652'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = 1+sh_start
+                            data_bounds(2,2) = g+1+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(71) ! '_43/134'
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(72) ! '_43/634''
+                            data_bounds(1,1) = Bs+g-sh_end
+                            data_bounds(2,1) = Bs+2*g-sh_start
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                        case(73) ! '_45/145'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = g+1
+                            data_bounds(2,3) = Bs+2*g
+
+                        case(74) ! '_45/645'
+                            data_bounds(1,1) = 1+sh_start
+                            data_bounds(2,1) = g+1+sh_end
+                            data_bounds(1,2) = Bs+g-sh_end
+                            data_bounds(2,2) = Bs+2*g-sh_start
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = Bs+g
+
+                    end select
+                    
+                elseif ( level_diff == 1) then
+                    ! loop over all data fields
+                    do dF = 1, params%number_data_fields
+                        ! first dimension
+                        do i = data_bounds(1,1), data_bounds(2,1), 2
+                            ! second dimension
+                            do j = data_bounds(1,2), data_bounds(2,2), 2
+                                ! third dimension
+                                do k = data_bounds(1,3), data_bounds(2,3), 2
+
+                                    ! write restricted data
+                                    res_pre_data( (i-data_bounds(1,1))/2+1, (j-data_bounds(1,2))/2+1, (k-data_bounds(1,3))/2+1, dF) &
+                                    = hvy_block( i, j, k, dF, hvy_id )
+
+                                end do
+                            end do
+                        end do
+                    end do
+
+                    select case(neighborhood)
+
+                        case(19:26)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(27:30)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(31:34)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = (Bs+1)/2
+
+                        case(35:38)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = (Bs+1)/2
+
+                        case(39:42)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = (Bs+1)/2
+
+                        case(43:46)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = (Bs+1)/2
+
+                        case(47:50)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(51:52)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(53:54)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(55:56)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(57:58)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(59:60)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(61:62)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(63:64)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = (Bs+1)/2
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(65:66)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = (Bs+1)/2
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = g+1-sh_start+sh_end
+
+                        case(67:68)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = (Bs+1)/2
+
+                        case(69:74)
+                            ! reset data bounds
+                            data_bounds(1,1) = 1
+                            data_bounds(2,1) = g+1-sh_start+sh_end
+                            data_bounds(1,2) = 1
+                            data_bounds(2,2) = g+1-sh_start+sh_end
+                            data_bounds(1,3) = 1
+                            data_bounds(2,3) = (Bs+1)/2
+
+                    end select   
+
+                end if
+        end select
 
     else
         ! 2D
@@ -2079,7 +5194,7 @@ end subroutine isend_irecv_data_2
 
 !############################################################################################################
 
-subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_id, neighborhood )
+subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_id, neighborhood )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -2088,6 +5203,9 @@ subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy
 ! variables
 
     implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)                  :: params
 
     ! synch stage
     integer(kind=ik), intent(in)        :: synch_stage
@@ -2150,36 +5268,44 @@ subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy
         neighbor_synch = .true.
     end if
 
-    ! stage 4
-    if ( (synch_stage == 4) .and. (level_diff == 0) ) then
-        ! neighborhood NE
-        if ( neighborhood == 5 ) then
-            if ( (hvy_neighbor( hvy_id, 9) /= -1) .or. (hvy_neighbor( hvy_id, 13) /= -1) ) then
-                synch = .true.
-                neighbor_synch = .true.
+    ! check dimension
+    if ( params%threeD_case ) then
+        ! 3D
+
+    else
+        ! 2D
+        ! stage 4
+        if ( (synch_stage == 4) .and. (level_diff == 0) ) then
+            ! neighborhood NE
+            if ( neighborhood == 5 ) then
+                if ( (hvy_neighbor( hvy_id, 9) /= -1) .or. (hvy_neighbor( hvy_id, 13) /= -1) ) then
+                    synch = .true.
+                    neighbor_synch = .true.
+                end if
+            end if
+            ! neighborhood NW
+            if ( neighborhood == 6 ) then
+                if ( (hvy_neighbor( hvy_id, 10) /= -1) .or. (hvy_neighbor( hvy_id, 15) /= -1) ) then
+                    synch = .true.
+                    neighbor_synch = .true.
+                end if
+            end if
+            ! neighborhood SE
+            if ( neighborhood == 7 ) then
+                if ( (hvy_neighbor( hvy_id, 11) /= -1) .or. (hvy_neighbor( hvy_id, 14) /= -1) ) then
+                    synch = .true.
+                    neighbor_synch = .true.
+                end if
+            end if
+            ! neighborhood SW
+            if ( neighborhood == 8 ) then
+                if ( (hvy_neighbor( hvy_id, 12) /= -1) .or. (hvy_neighbor( hvy_id, 16) /= -1) ) then
+                    synch = .true.
+                    neighbor_synch = .true.
+                end if
             end if
         end if
-        ! neighborhood NW
-        if ( neighborhood == 6 ) then
-            if ( (hvy_neighbor( hvy_id, 10) /= -1) .or. (hvy_neighbor( hvy_id, 15) /= -1) ) then
-                synch = .true.
-                neighbor_synch = .true.
-            end if
-        end if
-        ! neighborhood SE
-        if ( neighborhood == 7 ) then
-            if ( (hvy_neighbor( hvy_id, 11) /= -1) .or. (hvy_neighbor( hvy_id, 14) /= -1) ) then
-                synch = .true.
-                neighbor_synch = .true.
-            end if
-        end if
-        ! neighborhood SW
-        if ( neighborhood == 8 ) then
-            if ( (hvy_neighbor( hvy_id, 12) /= -1) .or. (hvy_neighbor( hvy_id, 16) /= -1) ) then
-                synch = .true.
-                neighbor_synch = .true.
-            end if
-        end if
+
     end if
 
 end subroutine set_synch_status

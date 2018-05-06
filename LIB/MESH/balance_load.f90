@@ -362,7 +362,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                 ! does this block lie on the right mpirank, i.e., the current part of the
                 ! SFC? if so, nothing needs to be done. otherwise, the following if is active
-                if ( proc_dist_id /= proc_data_id ) then
+                ! note: also check if the current proc can store more blocks, means: opt_dist_list > 0
+                if ( (proc_dist_id /= proc_data_id) .and. (opt_dist_list(proc_dist_id+1) > 0) ) then
                     ! as this block is one the wrong rank, it will be sent away from its
                     ! current owner (proc_data_id) to the owner of this part of the
                     ! SFC (proc_dist_id)

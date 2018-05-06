@@ -357,13 +357,17 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
             ! loop over sfc_list
             do k = 1, lgt_n
+                ! check if current proc can store more blocks, otherwise switch to next proc
+                do while ( opt_dist_list(proc_dist_id+1) == 0 )
+                    proc_dist_id = proc_dist_id + 1
+                end do
+
                 ! find out on which mpirank lies the block that we're looking at
                 call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 
                 ! does this block lie on the right mpirank, i.e., the current part of the
                 ! SFC? if so, nothing needs to be done. otherwise, the following if is active
-                ! note: also check if the current proc can store more blocks, means: opt_dist_list > 0
-                if ( (proc_dist_id /= proc_data_id) .and. (opt_dist_list(proc_dist_id+1) > 0) ) then
+                if ( proc_dist_id /= proc_data_id ) then
                     ! as this block is one the wrong rank, it will be sent away from its
                     ! current owner (proc_data_id) to the owner of this part of the
                     ! SFC (proc_dist_id)

@@ -86,25 +86,22 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
     logical :: sync
     character(len=80) :: method
+    integer(kind=ik)  :: count
 
-    call get_command_argument(4, method)
+    count = command_argument_count()
+    call get_command_argument(count, method)
 
-    if (method=="--old" .or. method=="") then
-        ! OLD routine
-        call synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-        com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
-        real_receive_buffer )
-
-    elseif (method=="--new") then
+    if (method=="--new") then
         ! new routine
         sync = .true.
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync )
 
     else
-        write(*,*) "Call: ./wabbit 2D PARAMS.ini --memory=2.0GB [--old,--new]"
-        write(*,*) " default is --old!"
-        call abort(44, "unknown sync arg")
+        ! OLD routine
+        call synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
+        com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
+        real_receive_buffer )
     endif
 
 ! sync=.false. ! test

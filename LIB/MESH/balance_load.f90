@@ -356,10 +356,18 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
             ! loop over sfc_list
             do k = 1, lgt_n
-                ! check if current proc can store more blocks, otherwise switch to next proc
+                ! if the current owner of the SFC is supposed to have zero blocks
+                ! then it does not really own this part of the SFC. So we look for the
+                ! first rank which is supposed to hold at least one block, and declare it as owner
+                ! of this part. NOTE: as we try to minimize communication during send/recv in
+                ! load balancing, it may well be that the list of active mpiranks (ie those
+                ! which have nonzero number of blocks) is non contiguous, i.e.
+                ! opt_dist_list = 1 1 1 0 0 0 0 1 0 1
+                ! can happen.
                 do while ( opt_dist_list(proc_dist_id+1) == 0 )
                     proc_dist_id = proc_dist_id + 1
                 end do
+
                 ! find out on which mpirank lies the block that we're looking at
                 call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 

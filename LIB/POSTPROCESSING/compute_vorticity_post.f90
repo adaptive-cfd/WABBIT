@@ -122,10 +122,9 @@ subroutine compute_vorticity_post(help, params)
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-            hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, &
-            real_send_buffer, real_receive_buffer )
+
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
         ! calculate vorticity from velocities
         do k=1,hvy_n

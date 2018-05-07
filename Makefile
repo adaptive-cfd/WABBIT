@@ -43,7 +43,7 @@ PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
 FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb
-FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=99999
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib

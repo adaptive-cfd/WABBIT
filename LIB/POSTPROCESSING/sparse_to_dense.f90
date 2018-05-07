@@ -72,6 +72,12 @@ subroutine sparse_to_dense(help, params)
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
 
+    ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
+    ! most variables are unfortunately not automatically set to reasonable values. In simulations,
+    ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
+    ! we do not read an ini file, so defaults may not be set.
+    params%non_uniform_mesh_correction = 1 ! This is an important switch for the OLD ghost nodes.
+
     if (params%rank==0) then
         write(*,'(80("-"))')
         write(*,*) "Wabbit sparse-to-dense. Will read a wabbit field and return a"
@@ -150,6 +156,8 @@ subroutine sparse_to_dense(help, params)
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active,&
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+    write(*,*) shape(lgt_block), "hvy:", shape(hvy_block)
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
     com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 

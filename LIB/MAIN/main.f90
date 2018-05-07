@@ -252,7 +252,7 @@ program main
     ! it is to test the test redundant nodes routine.
     test=.false.
     if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
-    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+    if (params%debug) call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
          hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
     if (rank==0) write(*,*) "Done testing redundant nodes."
 
@@ -298,8 +298,8 @@ program main
         com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
         test=.false. ! test
 
-      !  call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-      !  hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
+        if (params%debug) call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
 
         if (test) then
             iteration = 99

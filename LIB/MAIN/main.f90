@@ -419,20 +419,19 @@ program main
 
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then
+        ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
-      ! filter before write out
-      if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
-      end if
+        ! filter before write out
+        if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
+            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+        end if
 
-      ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-      com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-      ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-      ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
-      ! slots. the state vector (hvy_block) is copied if desired.
-      call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+        ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+        ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+        ! slots. the state vector (hvy_block) is copied if desired.
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements

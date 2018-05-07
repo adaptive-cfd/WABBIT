@@ -29,7 +29,7 @@ for filter in ${filters[@]}
 	echo " "
 	echo " "
 
-	./${test_dir}/replace_ini_value.sh  ${params} filter_type ${filter}
+	./${test_dir}/replace_ini_value.sh  ${params} Discretization filter_type ${filter}
 	# run actual test
 	${mpi_command} ./wabbit 2D ${params} --memory=2GB
 

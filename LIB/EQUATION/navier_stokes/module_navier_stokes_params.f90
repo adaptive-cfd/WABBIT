@@ -23,11 +23,11 @@ module module_navier_stokes_params
   !               FILTER PARAMETER
   !---------------------------------------------------------
   ! filter structure
-  type :: type_params_filter 
+  type :: type_params_filter
       ! name of filter
-      character(len=80)                  :: name 
+      character(len=80)                  :: name
       ! number or data fields to filter
-      integer(kind=ik)                   :: number_data_fields 
+      integer(kind=ik)                   :: number_data_fields
 
       ! explicit filters
       ! ----------------
@@ -39,22 +39,22 @@ module module_navier_stokes_params
       !wavelet filter
       !---------------
       ! fine/coarse predictor of wavelets
-      character(len=80)                  ::order_predictor 
+      character(len=80)                  ::order_predictor
        ! threshold value for wavelets
-      real(kind=rk)                     ::eps 
+      real(kind=rk)                     ::eps
 
       ! bogey shcok filter
       !---------------
       ! bogey shock detector threshold,
       real(kind=rk)                               :: r_th
       !  detector_method (divU,p),
-      character(len=80)                           :: detector_method 
+      character(len=80)                           :: detector_method
       ! switch functio (tanh,abs)
       character(len=80)                           :: sigma_switch
       ! save filter strength sigma
       logical                                     :: save_filter_strength
 
-  end type type_params_filter   
+  end type type_params_filter
   !=========================================================
 
 
@@ -76,7 +76,7 @@ module module_navier_stokes_params
         ! dimension
         integer(kind=ik)                            :: dim, N_fields_saved
         ! adiabatic coefficient
-        real(kind=rk)                               :: gamma_
+        real(kind=rk)                               :: gamma_=0
         ! specific gas constant
         real(kind=rk)                               :: Rs
         ! isochoric heat capacity
@@ -122,7 +122,7 @@ module module_navier_stokes_params
 contains
 
   include "initial_conditions.f90"
-  
+
 
   subroutine init_navier_stokes_eq(params_ns, FILE )
     implicit none
@@ -130,7 +130,7 @@ contains
     type(inifile) ,intent(inout)     :: FILE
     !> params structure of navier stokes
     type(type_params_ns),intent(inout)  :: params_ns
-    
+
     if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
@@ -162,7 +162,7 @@ contains
 
   end subroutine init_navier_stokes_eq
 
-  
+
 
 
 subroutine init_other_params(params_ns, FILE )
@@ -171,7 +171,7 @@ subroutine init_other_params(params_ns, FILE )
     type(inifile) ,intent(inout)        :: FILE
     !> params structure of navier stokes
     type(type_params_ns),intent(inout)  :: params_ns
-    
+
     if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
@@ -190,11 +190,11 @@ subroutine init_other_params(params_ns, FILE )
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk   )
-   
+
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_ns%Bs, 1   )
 
-    
+
   end subroutine init_other_params
 
 

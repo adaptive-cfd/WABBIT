@@ -1,11 +1,11 @@
 !---------------------------------------------------!!!!
-!> \file This file includes all filter routines          
+!> \file This file includes all filter routines
 !---------------------------------------------------!!!!
 
 
-    
+
     ! old (not-filterd) statevector
-    ! ----------------------------- 
+    ! -----------------------------
     ! + filter values are added to the original statevector
     ! + is initialiced in init_filter
     ! real(kind=rk), allocatable          :: block_old(:, :, :)
@@ -19,7 +19,7 @@ subroutine init_filter(filter, FILE )
     type(inifile)           ,intent(inout)  :: FILE
     !> params structure of navier stokes
     type(type_params_filter),intent(inout)  :: filter
-    
+
     ! stencil array, note: size is fixed
     real(kind=rk)                      :: stencil(19)
     ! filter position (array postion of value to filter)
@@ -39,7 +39,7 @@ subroutine init_filter(filter, FILE )
     call read_param_mpi(FILE, 'Discretization', 'filter_type', filter%name, "no-filter" )
     ! reset stencil_size
     stencil_size = 0
-      
+
         ! set filter pos
         select case(filter%name)
             case('explicit_5pt')
@@ -85,7 +85,7 @@ subroutine init_filter(filter, FILE )
                                              45.0_rk/1024.0_rk, &
                                              -5.0_rk/ 512.0_rk, &
                                               1.0_rk/1024.0_rk/)
-                
+
             case('no_filter')
                 ! do nothing..
 
@@ -94,7 +94,7 @@ subroutine init_filter(filter, FILE )
                 call read_param_mpi(FILE, 'Discretization', 'order_predictor', filter%order_predictor, "---" )
                 ! read threshold value
                 call read_param_mpi(FILE, 'Blocks', 'eps', filter%eps, 1e-3_rk )
-                
+
             case('bogey_shock')
                 ! bogey shock detector threshold
                 call read_param_mpi(FILE, 'Discretization', 'r_th', filter%r_th, 1e-3_rk )
@@ -104,7 +104,7 @@ subroutine init_filter(filter, FILE )
                 call read_param_mpi(FILE, 'Discretization', 'detector_method', filter%detector_method, 'divU' )
                 ! boolean save bogey filter strength
                 call read_param_mpi(FILE, 'Discretization', 'save_filter_strength', filter%save_filter_strength, .false. )
-    
+
             case default
                 call abort(4564,"ERROR [filter_block.f90]: filter type is not known!")
         end select
@@ -192,7 +192,7 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
 
     stencil_size            =filter%stencil_size
     N_dF                    =filter%number_data_fields
-    
+
     if (size(u,3)==1) then
         !2D
         call convert_statevector2D(u(:,:,1,:),'conservative')
@@ -505,7 +505,7 @@ end subroutine wavelet_filter
 !! \date 21/09/17 - create
 !! \date 29/04/18 - update for new physics branch (pKrah)
 
-subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
+subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -513,9 +513,11 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
     implicit none
     !> params structure of navier stokes
     type(type_params_filter),intent(in) :: filter
+    !> grid parameter
+    integer(kind=ik), intent(in)        :: g, Bs, N_dF
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    !> heavy work    
+    !> heavy work
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
     ! spacing and origin of a block
     real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3)
@@ -523,8 +525,6 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
 
     ! loop parameter
     integer(kind=ik)                    :: i, j, l, dF
-!    ! grid parameter
-!    integer(kind=ik)                    :: Bs, g, N_dF
 
     ! filtered values and array for old block data
     real(kind=rk)                       :: phi_tilde(3), r_xyz(3), r_th, eps, c1, c2, c_stencil(4)
@@ -542,8 +542,6 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
 
     ! /todo: move to ini file
     character(len=80)                   :: detector_method, sigma_method
-    !> grid parameter
-    integer(kind=ik)                    :: g, Bs,N_dF
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -596,7 +594,7 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
         ! conservative variables are asumed here (rho,rho u, rho v, e)
         call convert2format(block_data(:,:,1,:)    ,'conservative',&
                             hvy_WORK(:,:,1,1:N_dF) ,'pure_variables')
-        
+
         rho = hvy_WORK(:, :, 1, 1)
         u   = hvy_work(:, :, 1, 2)
         v   = hvy_work(:, :, 1, 3)
@@ -606,7 +604,7 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
     else
         call abort(13463,'Error [bogey_filter]: only ns supported: everything else not implemented yet!')
     endif
-    
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -703,7 +701,7 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
                     ! else
                     !     sigma_y(i,j)=0.0_rk
                     ! endif
-                    
+
                 end do
             end do
 

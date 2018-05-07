@@ -16,7 +16,7 @@
 !> \author P.Krah
 !-----------------------------------------------------------------
 
-!> \brief Implementation of Navier Stokes Physiscs Interface for 
+!> \brief Implementation of Navier Stokes Physiscs Interface for
 !! WABBIT
 module module_navier_stokes_new
 
@@ -48,7 +48,7 @@ module module_navier_stokes_new
   real(kind=rk)       ,save :: rho_init=1_rk,p_init=1.0_rk,T_init=1!273.15_rk
   real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,0.0_rk/)
 
- 
+
 contains
 
 
@@ -102,7 +102,7 @@ contains
     call init_penalization(    params_ns, FILE)
     ! init all parameters used for the filter
     call init_filter(   params_ns%filter, FILE)
-    ! init all params for organisation 
+    ! init all params for organisation
     call init_other_params(params_ns,     FILE )
 
     ! read in initial conditions
@@ -147,7 +147,7 @@ contains
 
   end subroutine READ_PARAMETERS_NStokes
 
- 
+
 
 
 
@@ -206,7 +206,7 @@ contains
           work(:,:,:,UyF)  = u(:,:,:,3)/u(:,:,:,1)
           work(:,:,:,pF)   = u(:,:,:,4)
           ! ---------------------------------
-          
+
         ! only wx,wy (2D - case)
         call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
                                  u(:,:,:,UyF)/u(:,:,:,rhoF), &
@@ -334,7 +334,7 @@ contains
       if (params_ns%penalization .and. params_ns%geometry=="funnel") then
         rhs=u
         call convert_statevector2D(rhs(:,:,1,:),'pure_variables')
-        call integrate_over_pump_area(rhs(:,:,1,:),g,Bs,x0,dx,integral,area) 
+        call integrate_over_pump_area(rhs(:,:,1,:),g,Bs,x0,dx,integral,area)
         rhs=0.0_rk
       endif
 
@@ -347,7 +347,7 @@ contains
       if (params_ns%penalization .and. params_ns%geometry=="funnel") then
         ! reduce sum on each block to global sum
         call mean_quant(integral,area)
-        
+
       endif
 
     case ("local_stage")
@@ -361,9 +361,9 @@ contains
       ! called for each block.
       if (size(u,3)==1) then
         call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-        
+
         if (params_ns%penalization) then
-        ! add volume penalization 
+        ! add volume penalization
           call add_constraints(rhs(:,:,1,:),Bs, g, x0,(/dx(1),dx(2)/),u(:,:,1,:))
         endif
 
@@ -447,9 +447,9 @@ contains
 
 
       if (size(u,3)==1) then
-        ! compute density and pressure only in physical domain 
+        ! compute density and pressure only in physical domain
         tmp(1:3) =0.0_rk
-        
+
         do iy=g+1, Bs+g
           y = dble(iy-(g+1)) * dx(2) + x0(2)
           do ix=g+1, Bs+g
@@ -482,8 +482,8 @@ contains
       call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
 
-     
-    
+
+
        if (params_ns%mpirank == 0) then
          ! write mean flow to disk...
          write(*,*) "area=",area/params_ns%Lx/params_ns%Ly,params_ns%mean_density/area ,params_ns%mean_pressure/area
@@ -612,7 +612,7 @@ contains
     if (p_init<=0.0_rk .or. rho_init <=0.0) then
       call abort(6032, "Error [module_navier_stokes_new.f90]: initial pressure and density must be larger then 0")
     endif
-    
+
 
 
     select case( params_ns%inicond )
@@ -625,7 +625,7 @@ contains
       else
         call abort(4832,"ERROR [navier_stokes_new.f90]: no 3d shear layer implemented")
       endif
-    
+
     case ("zeros")
       ! add ambient pressure
       u( :, :, :, pF) = p_init
@@ -646,12 +646,12 @@ contains
       !
       ! Test case for shock capturing filter
       ! The initial condition is devided into
-      ! Left part x<= Lx/2 
+      ! Left part x<= Lx/2
       !
       ! rho=1
       ! p  =1
       ! u  =0
-      ! 
+      !
       ! Rigth part x> Lx/2
       !
       ! rho=0.125
@@ -749,7 +749,7 @@ contains
     Bs = size(u,1) - 2*g
 
     call filter_block(params_ns%filter, time, u, Bs, g, x0, dx, work_array)
-   
+
 
   end subroutine filter_NStokes
 
@@ -770,16 +770,16 @@ subroutine convert_statevector2D(phi,convert2format)
 
     select case( convert2format )
     case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
-      ! density 
+      ! density
       converted_vector(:,:,1)=phi(:,:,rhoF)**2
-      ! rho u 
+      ! rho u
       converted_vector(:,:,2)=phi(:,:,UxF)*phi(:,:,rhoF)
-      ! rho v 
+      ! rho v
       converted_vector(:,:,3)=phi(:,:,UyF)*phi(:,:,rhoF)
       ! kinetic energie
       converted_vector(:,:,4)=phi(:,:,UxF)**2+phi(:,:,UyF)**2
       converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
-      ! e_tot=e_kin+p/(gamma-1)      
+      ! e_tot=e_kin+p/(gamma-1)
       converted_vector(:,:,4)=converted_vector(:,:,4)+phi(:,:,pF)/(params_ns%gamma_-1)
     case ("pure_variables")
       ! add ambient pressure
@@ -790,7 +790,7 @@ subroutine convert_statevector2D(phi,convert2format)
       !v
       converted_vector(:,:,3)= phi(:,:, UyF)/phi(:,:,rhoF)
       !p
-      converted_vector(:,:,4)= phi(:,:, pF)    
+      converted_vector(:,:,4)= phi(:,:, pF)
     case default
         call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
     end select
@@ -800,7 +800,7 @@ subroutine convert_statevector2D(phi,convert2format)
 end subroutine convert_statevector2D
 
 
-!> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from 
+!> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from
 !>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$
 subroutine pack_statevector2D(phi,format)
     implicit none
@@ -813,27 +813,27 @@ subroutine pack_statevector2D(phi,format)
 
     select case( format )
     case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
-      ! sqrt(rho) 
+      ! sqrt(rho)
       converted_vector(:,:,1)=sqrt(phi(:,:,1))
-      ! sqrt(rho) u 
+      ! sqrt(rho) u
       converted_vector(:,:,2)=phi(:,:,2)/converted_vector(:,:,1)
-      ! sqrt(rho) v 
+      ! sqrt(rho) v
       converted_vector(:,:,3)=phi(:,:,3)/converted_vector(:,:,1)
       ! kinetic energie
       converted_vector(:,:,4)=converted_vector(:,:,2)**2+converted_vector(:,:,3)**2
       converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
-      ! p=(e_tot-e_kin)(gamma-1)/rho      
+      ! p=(e_tot-e_kin)(gamma-1)/rho
       converted_vector(:,:,4)=(phi(:,:,4)-converted_vector(:,:,4))*(params_ns%gamma_-1)
     case ("pure_variables") !phi=(rho,u,v,p)
       ! add ambient pressure
-      ! sqrt(rho) 
+      ! sqrt(rho)
       converted_vector(:,:,1)= sqrt(phi(:,:,1))
       ! sqrt(rho) u
       converted_vector(:,:,2)= phi(:,:, 2)*converted_vector(:,:,1)
       ! sqrt(rho)v
       converted_vector(:,:,3)= phi(:,:, 3)*converted_vector(:,:,1)
       !p
-      converted_vector(:,:,4)= phi(:,:, 4)    
+      converted_vector(:,:,4)= phi(:,:, 4)
     case default
         call abort(7771,"the format is unkown: "//trim(adjustl(format)))
     end select
@@ -868,7 +868,7 @@ subroutine convert2format(phi_in,format_in,phi_out,format_out)
       !do nothing because format is skew already
     else
       call convert_statevector2D(phi_out,format_out)
-    endif    
+    endif
 end subroutine convert2format
 
 

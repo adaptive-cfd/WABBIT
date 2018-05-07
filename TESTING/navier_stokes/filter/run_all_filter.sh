@@ -1,6 +1,6 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
-# This routine runs all filters on sods shock tube in the list of available filters 
+# This routine runs all filters on sods shock tube in the list of available filters
 # and produces data (statevector) at time t=0.05 for comparing the filters
 # author: P.Krah date: 20.04.2018
 #-------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ times=$2
 prefixes=(Ux p rho)
 # list of filters
 filters=(explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
-#filters=(explicit_5pt )
+#filters=(explicit_5pt bogey_shock)
 
 
 for filter in ${filters[@]}
@@ -23,7 +23,7 @@ for filter in ${filters[@]}
 	echo " "
 	echo " "
 	echo "===================================================================="
-	echo -e "running filter:" ${filter} 
+	echo -e "running filter:" ${filter}
 	echo "===================================================================="
 	echo " "
 	echo " "

@@ -2,14 +2,14 @@
 !> Module for all debug subroutines
 !-------------------------------------------------------------------------!!!!
 !> \details
-!> 
+!>
 !> \version 0.4
 !> \author msr
 !!
 !!
 !> \date 29.11.16 - create
 !! \date 30.04.19 - check if debug arrays are allocated
-!!                
+!!
 !!
 !! \todo  union with debug data structure
 ! *****************************************************************************
@@ -21,9 +21,7 @@ module module_debug
     use mpi
     ! global parameters
     use module_params
-    ! interpolation routines
     use module_interpolation
-
 !---------------------------------------------------------------------------------------------
 ! variables
     implicit none
@@ -99,15 +97,15 @@ contains
       integer, optional, intent(in) :: call_counter
 
       integer :: k
-     
+
       ! write time
       if ( params%debug ) then
-        
+
         ! check if allocate_init_debbuging was called before
         if (.not. allocated(debug%name_comp_time)) then
           call abort(5946,'ERROR [module_debug]: debug arrays are not allocated yet')
         endif
-       
+
         ! find free or corresponding line
         k = 1
         do while ( debug%name_comp_time(k) /= "---" )

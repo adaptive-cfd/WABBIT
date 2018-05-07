@@ -115,7 +115,7 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o \
+$(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_interpolation.o \
 	check_lgt_block_synchronization.f90 write_future_mesh_lvl.f90 write_debug_times.f90 write_block_distribution.f90 write_com_list.f90 \
 	write_com_matrix.f90 write_com_matrix_pos.f90 allocate_init_debugging.f90 check_redundant_nodes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

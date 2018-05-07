@@ -42,7 +42,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv,nu
     real(kind=rk) :: u_dx, u_dy, u_dxdx, u_dydy
     real(kind=rk) :: u_dz, u_dzdz
-    real(kind=rk) :: xcb, ycb, beta, x,y
+    real(kind=rk) :: xcb, ycb, beta, x,y, sech
     ! loop variables
     integer(kind=ik) :: ix, iy, iz, i, N, ia1, ia2, ib1, ib2, ia, ib
     ! coefficients for Tam&Webb
@@ -150,10 +150,24 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
                     end do
                 endif
 
+
             case default
                 call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
             end select
 
+
+            if (params_convdiff%velocity(i)=="cyclogenesis") then
+                do ix = g+1, Bs+g
+                    do iy = g+1, Bs+g
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i)
+                        y = y / params_convdiff%blob_width(i)
+                        ! sech(x) = 1.0 / cosh(x)
+                        sech = 1.0_rk / cosh(y)
+                        ! source term
+                        rhs(ix,iy,1,i) = rhs(ix,iy,1,i) - u0(ix,iy,1,2)*(-sech**2 / params_convdiff%blob_width(i) )
+                    end do
+                end do
+            endif
             !!!!!!!!!!!!!
             ! 3D
             !!!!!!!!!!!!!
@@ -225,17 +239,34 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
     real(kind=rk) :: u_this
 
     integer :: ix,iy, N
-    real(kind=rk) :: x,y,c0x,c0y, T, c0,c1,c2,c3
+    real(kind=rk) :: x,y,c0x,c0y, T, c0,c1,c2,c3, phi, r, ut
 
     u0 = 0.0_rk
 
 
     c0x = 0.5_rk*params_convdiff%Lx
     c0y = 0.5_rk*params_convdiff%Ly
-    T = params_convdiff%T_end
+    T = params_convdiff%T_swirl
 
 
     select case(params_convdiff%velocity(i))
+    case ("cyclogenesis")
+        do iy = 1, Bs + 2*g
+            do ix = 1, Bs + 2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                ! radius
+                r = dsqrt( (x-params_convdiff%x0(i))**2 + (y-params_convdiff%y0(i))**2 )
+                ! tangential velocity
+                ut = 1.0d0 * (1.d0 / (cosh(r))) * (tanh(r))
+                ! angle phi
+                phi = atan2(y-params_convdiff%y0(i),x-params_convdiff%x0(i))
+
+                u0(ix,iy,1) = -sin(phi) * ut
+                u0(ix,iy,2) =  cos(phi) * ut
+            enddo
+        enddo
+
     case ("swirl")
 
         do iy = 1, Bs + 2*g

@@ -40,6 +40,7 @@ subroutine post_mean(params, help)
   real(kind=rk), dimension(3)             :: domain
   real(kind=rk)                           :: time
   integer(hsize_t), dimension(2)          :: dims_treecode
+  integer(kind=1), allocatable          :: hvy_synch(:, :, :, :)
   integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
 
 
@@ -93,7 +94,7 @@ write(*,*) " here it comes"
   params%Lz = domain(3)
   params%number_blocks = lgt_n!/params%number_procs + mod(lgt_n,params%number_procs)
 
-  call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
+  call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_synch,&
   hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
   int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 

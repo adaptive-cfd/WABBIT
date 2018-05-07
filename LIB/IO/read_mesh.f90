@@ -55,9 +55,9 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! treecode array
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
     integer(kind=ik), dimension(:,:), allocatable :: my_lgt_block
-    integer(kind=ik)                   :: blocks_per_rank_list(0:params%number_procs-1) 
+    integer(kind=ik)                   :: blocks_per_rank_list(0:params%number_procs-1)
     ! loop variables
-    integer(kind=rk)                              :: lgt_id, k
+    integer(kind=ik)                              :: lgt_id, k
     ! error variable
     integer(kind=ik)                              :: ierr
     integer(kind=ik)                              :: treecode_size
@@ -73,7 +73,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! grid parameter
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
-    
+
     lgt_id = 0
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -136,8 +136,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + hvy_n - 1/)
     call read_dset_mpi_hdf5_2D(file_id, "block_treecode", &
         lbounds, ubounds, block_treecode)
-    
-        
+
+
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
      do k=1, hvy_n
@@ -146,7 +146,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         my_lgt_block(lgt_id,1:dims_treecode(1)) = block_treecode(1:dims_treecode(1),k)
         ! set mesh level
         my_lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k),dims_treecode(1))
-        ! set refinement status 
+        ! set refinement status
         my_lgt_block(lgt_id, params%max_treelevel+2) = 0
     end do
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.

@@ -1,0 +1,11 @@
+TESTING/A_CONV/adapt*
+TESTING/A_CONV/dt*
+TESTING/A_CONV/dx*
+TESTING/B_SWIRL/dt*
+TESTING/B_SWIRL/fixeps*
+TESTING/B_SWIRL/adapt_*
+TESTING/B_SWIRL/adaptiv*_swirl-*
+*times.dat
+*.log
+*.t
+*.h5

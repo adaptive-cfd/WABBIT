@@ -21,6 +21,8 @@ module module_debug
     use mpi
     ! global parameters
     use module_params
+    ! interpolation routines
+    use module_interpolation
 
 !---------------------------------------------------------------------------------------------
 ! variables

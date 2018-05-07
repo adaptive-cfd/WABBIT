@@ -32,6 +32,7 @@ subroutine sparse_to_dense(help, params)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
+    integer(kind=1), allocatable            :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -127,9 +128,10 @@ subroutine sparse_to_dense(help, params)
     params%number_data_fields  = 1
     params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
     ! allocate data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_work, &
-        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, &
-        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, &
+    lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, &
+    real_send_buffer, real_receive_buffer )
+
     ! allocate communication arrays
     call allocate_com_arrays(params, com_lists, com_matrix)
     ! read field

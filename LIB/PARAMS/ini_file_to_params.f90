@@ -98,9 +98,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'DomainSize', 'Lz', params%Lz, 1.0_rk )
 
     ! saving options.
-     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
- !   allocate( params%field_names(1:params%N_fields_saved) )
-!    call read_param_mpi(FILE, 'Saving', 'field_names', params%field_names, (/"ux","uy","p "/) )
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
 
     !***************************************************************************
@@ -164,8 +162,8 @@ subroutine ini_file_to_params( params, filename )
 
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
-    if (params%filter_type.ne."no_filter") then
-           call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
+    if (params%filter_type /= "no_filter") then
+        call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
     endif
 
     !***************************************************************************
@@ -261,5 +259,6 @@ subroutine ini_file_to_params( params, filename )
     close(15)
     open (15, file='timesteps_info.t', status='replace')
     close(15)
-
+    open (15, file='blocks_per_mpirank.t', status='replace')
+    close(15)
 end subroutine ini_file_to_params

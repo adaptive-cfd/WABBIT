@@ -13,9 +13,10 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 # Files that create modules:
 MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
-	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90\
-	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90\
-	module_physics_metamodule.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 module_bridge.f90 module_navier_stokes_params.f90 
+	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
+	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90 \
+	module_physics_metamodule.f90 module_ACM-new.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
+	module_bridge.f90 module_navier_stokes_params.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -41,8 +42,8 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
-FFLAGS += -Wuninitialized -O -fimplicit-none -fbounds-check -g -ggdb
-FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -fbounds-check -ffpe-trap=zero,invalid -g -ggdb -fimplicit-none -finit-real=nan
+FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib

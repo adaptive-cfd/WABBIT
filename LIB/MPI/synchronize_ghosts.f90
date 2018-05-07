@@ -57,7 +57,67 @@
 !
 ! ********************************************************************************************
 
-subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
+    com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
+    real_receive_buffer, hvy_synch )
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
+    ! grid stay fixed between two synch calls, so use old com_lists and com_matrix
+    logical, intent(in)                 :: grid_changed
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    logical :: sync
+    character(len=80) :: method
+
+    call get_command_argument(4, method)
+
+    if (method=="--old" .or. method=="") then
+        ! OLD routine
+        call synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
+        com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
+        real_receive_buffer )
+
+    elseif (method=="--new") then
+        ! new routine
+        sync = .true.
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync )
+
+    else
+        write(*,*) "Call: ./wabbit 2D PARAMS.ini --memory=2.0GB [--old,--new]"
+        write(*,*) " default is --old!"
+        call abort(44, "unknown sync arg")
+    endif
+
+! sync=.false. ! test
+!         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+!         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync)
+
+end subroutine sync_ghosts
+
+
+
+subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
+    com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
+    real_receive_buffer )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -75,14 +135,19 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-
     ! grid stay fixed between two synch calls, so use old com_lists and com_matrix
     logical, intent(in)                 :: grid_changed
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: k, N, i, j, neighbor_num, synch_stage, hvy_id, lgt_id, neighbor_light_id, neighborhood, com_number
@@ -101,21 +166,14 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! number of processes
     integer(kind=ik)                    :: number_procs
 
-    ! communication lists:
-    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
-    ! communications matrix:
-    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
 
     ! communications position: position in send buffer
     integer(kind=ik), allocatable       :: com_pos(:)
 
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! number of communications, number of neighboring procs
     integer(kind=ik)                     :: my_n_com, n_procs

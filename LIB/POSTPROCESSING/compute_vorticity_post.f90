@@ -6,7 +6,7 @@
 !
 !> \brief postprocessing routine for subsequent vorticity calculation from datafields ux, uy (, uz) saved in .h5 files
 ! = log ======================================================================================
-! 
+!
 !> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 !-----------------------------------------------------------------------------------------------------
 
@@ -33,6 +33,7 @@ subroutine compute_vorticity_post(help, params)
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
+    integer(kind=1), allocatable          :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
     integer(kind=ik), allocatable      :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -104,7 +105,7 @@ subroutine compute_vorticity_post(help, params)
         params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
 
         ! allocate data
-        call allocate_grid( params, lgt_block, hvy_block, hvy_work,&
+        call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_synch, &
             hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist,&
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         ! allocate communication arrays

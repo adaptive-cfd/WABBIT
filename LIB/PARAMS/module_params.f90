@@ -43,8 +43,6 @@ module module_params
         real(kind=rk)                                :: dt_fixed, dt_max
         ! number of allowed time steps
         integer(kind=ik)                             :: nt, inicond_refinements
-        ! time step calculator
-        character(len=80)                            :: time_step_calc
         ! data writing frequency
         integer(kind=ik)                             :: write_freq
         ! data writing frequency
@@ -128,7 +126,7 @@ module module_params
         integer(kind=ik)                            :: number_procs
         ! WABBIT communicator
         integer(kind=ik)                            :: WABBIT_COMM
-
+        
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
@@ -153,7 +151,7 @@ module module_params
         logical                          :: bridgeCommonMPI
         !! - Consideration of the particle side as master in case of several myWorld_comms
         logical                          :: bridgeFluidMaster
-
+  
 
 
         ! -------------------------------------------------------------------------------------
@@ -191,7 +189,6 @@ module module_params
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
 
 !---------------------------------------------------------------------------------------------
 ! main body

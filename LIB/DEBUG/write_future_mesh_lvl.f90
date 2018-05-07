@@ -56,7 +56,8 @@ subroutine write_future_mesh_lvl( params, lgt_block, hvy_neighbor, lgt_active, l
 
     ! loop variables
     integer(kind=ik)                    :: k, l, lgt_start, lgt_id, proc_id, hvy_id, ref_status
-
+    ! communicator
+    integer(kind=ik)                    :: WABBIT_COMM
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -64,8 +65,8 @@ subroutine write_future_mesh_lvl( params, lgt_block, hvy_neighbor, lgt_active, l
 ! variables initialization
 
     ! determine process rank
-    rank = params%rank
-
+    rank        = params%rank
+    WABBIT_COMM = params%WABBIT_COMM
     ! light data start id
     call proc_to_lgt_data_start_id( lgt_start, rank, params%number_blocks )
 
@@ -120,7 +121,7 @@ subroutine write_future_mesh_lvl( params, lgt_block, hvy_neighbor, lgt_active, l
     end do
 
     ! gather data
-    call MPI_Allreduce(my_fut_mesh_lvl, my_fut_mesh_lvl_0, size(my_fut_mesh_lvl,1)*size(my_fut_mesh_lvl,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(my_fut_mesh_lvl, my_fut_mesh_lvl_0, size(my_fut_mesh_lvl,1)*size(my_fut_mesh_lvl,2), MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! write file
     if (rank == 0) then

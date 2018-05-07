@@ -2,7 +2,7 @@
 ! WABBIT
 !> \name keyvalues.f90
 !> \version 0.5
-!> \author sm, engels 
+!> \author sm, engels
 !
 !> \brief loads the specified *.h5 file and creates a *.key file that contains
 !! min / max / mean / L2 norm of the field data. This is used for testing
@@ -28,13 +28,11 @@ subroutine keyvalues(fname, params, help)
     !> help flag
     logical, intent(in)                     :: help
     integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable              :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    integer(hsize_t), dimension(4)          :: size_field    
+    integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
     integer(kind=ik)                        :: lgt_id, k, Bs, nz, iteration, lgt_n, hvy_n
     real(kind=rk), dimension(3)             :: x0, dx
@@ -82,10 +80,10 @@ subroutine keyvalues(fname, params, help)
         params%Ly = domain(2)
         if (params%threeD_case) params%Lz = domain(3)
         ! make sure there is enough memory allocated
-        params%number_blocks = 2_ik*(lgt_n/params%number_procs)
-        call allocate_grid( params, lgt_block, hvy_block,hvy_neighbor, lgt_active,&
-            hvy_active, lgt_sortednumlist, .false., hvy_work,&
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        !> \todo change for three D
+        params%number_blocks = 4_ik*(lgt_n/params%number_procs)
+        call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            hvy_active, lgt_sortednumlist, .false.)
         call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         call read_field(fname, 1, params, hvy_block, hvy_n )
         call create_active_and_sorted_lists( params, lgt_block, &
@@ -95,7 +93,7 @@ subroutine keyvalues(fname, params, help)
         ! compute an additional quantity that depends also on the position
         ! (the others are translation invariant)
         Bs = params%number_block_nodes
-        if (params%threeD_case) then 
+        if (params%threeD_case) then
             nz = Bs
         else
             nz = 1
@@ -116,13 +114,13 @@ subroutine keyvalues(fname, params, help)
             call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
                 lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
             call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &
-                MPI_COMM_WORLD,mpicode)
+                WABBIT_COMM,mpicode)
             do k=1,hvy_n
                 call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                 tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
             end do
             call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
-                MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+                MPI_SUM,0,WABBIT_COMM,mpicode)
             sum_curve(i) = sum(sum_tree)
         end do
 
@@ -150,14 +148,14 @@ subroutine keyvalues(fname, params, help)
             maxl = max(maxl,maxval(hvy_block(:,:,:,:,hvy_active(k))))
             minl = min(minl,minval(hvy_block(:,:,:,:,hvy_active(k))))
             squarl = squarl + sum(hvy_block(:,:,:,:,hvy_active(k))**2)
-            meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_active(k))) 
+            meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_active(k)))
         end do
 
-        call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
-        call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,mpicode)
+        call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
+        call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
 
         qi = qi / lgt_n
         squari = squari / lgt_n
@@ -166,13 +164,13 @@ subroutine keyvalues(fname, params, help)
         if (rank == 0) then
             open  (59, file=fname(1:index(fname,'.'))//'key', &
                 status = 'replace', action='write', iostat=ioerr)
-            write (59,'(6(es15.8,1x), 2(i10,1x))') time, maxi, mini, meani, squari, qi , &
-                sum_curve(1), sum_curve(2)
+            write (59,'(6(es15.8,1x), 3(i10,1x))') time, maxi, mini, meani, squari, qi , &
+                sum_curve(1), sum_curve(2), sum_curve(2)
             write (*,'(A)') "Result:"
-            write (* ,'(6(A15,1x),2(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
-                "Q-integral", curves(1), curves(2)
-            write (* ,'(6(es15.8,1x),2(i12,1x))') time, maxi, mini, meani, squari, qi, &
-                sum_curve(1), sum_curve(2)
+            write (* ,'(6(A15,1x),3(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
+                "Q-integral", curves(1), curves(2), curves(2)
+            write (* ,'(6(es15.8,1x),3(i12,1x))') time, maxi, mini, meani, squari, qi, &
+                sum_curve(1), sum_curve(2), sum_curve(2)
             write (*,'(A)') "These values can be used to compare two HDF5 files"
             close (59)
         endif

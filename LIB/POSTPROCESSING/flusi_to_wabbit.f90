@@ -31,12 +31,10 @@ subroutine flusi_to_wabbit(help, params)
     integer(kind=ik)       :: iteration
 
     integer(kind=ik), allocatable     :: lgt_block(:, :)
-    real(kind=rk), allocatable        :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable        :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable     :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable     :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:)
-    integer(kind=ik), allocatable     :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable        :: real_send_buffer(:,:), real_receive_buffer(:,:)
     integer(kind=ik)                  :: hvy_n, lgt_n,level, Bs
     real(kind=rk), dimension(3)       :: domain
     character(len=3)                  :: Bs_read
@@ -87,9 +85,9 @@ subroutine flusi_to_wabbit(help, params)
         end if
         hvy_n = lgt_n
         params%number_blocks = lgt_n
-        call allocate_grid( params, lgt_block, hvy_block, hvy_neighbor,&
-            lgt_active, hvy_active, lgt_sortednumlist,.false., hvy_work, int_send_buffer, &
-            int_receive_buffer, real_send_buffer, real_receive_buffer )
+
+        call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            hvy_active, lgt_sortednumlist, .false.)
 
         call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor,&
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &

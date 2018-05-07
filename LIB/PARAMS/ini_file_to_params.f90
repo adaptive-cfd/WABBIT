@@ -99,8 +99,6 @@ subroutine ini_file_to_params( params, filename )
 
     ! saving options.
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
-    allocate( params%field_names(1:params%N_fields_saved) )
-    call read_param_mpi(FILE, 'Saving', 'field_names', params%field_names, (/"ux","uy","p "/) )
 
 
     !***************************************************************************
@@ -162,12 +160,11 @@ subroutine ini_file_to_params( params, filename )
     ! boundary condition
     call read_param_mpi(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
 
-    ! filter type
-    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no-filter" )
     ! filter frequency
-    call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
-    ! bogey shock detector threshold
-    call read_param_mpi(FILE, 'Discretization', 'r_th', params%r_th, 1e-3_rk )
+    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
+    if (params%filter_type /= "no_filter") then
+        call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
+    endif
 
     !***************************************************************************
     ! read statistics parameters
@@ -228,9 +225,14 @@ subroutine ini_file_to_params( params, filename )
                 d = 2
             endif
             params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
+
+            ! note in the above formula, many arrays allocated in allocate_grid are missing
+            ! this even though you want 1.0Gb in total, you end up with about 4Gb. So here
+            ! divide by that empirical factor and reserve a proper formula for future work
+            params%number_blocks = params%number_blocks / 4
+
             if (params%rank==0) write(*,'(80("-"))')
             if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
-
             if (params%rank==0) write(*,'("INIT: we allocated ",i6," blocks per rank (total: ",i7," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
             if (params%rank==0) write(*,'("INIT: consuming total memory of",f12.4,"GB")') maxmem/1000.0/1000.0/1000.0
 
@@ -257,5 +259,6 @@ subroutine ini_file_to_params( params, filename )
     close(15)
     open (15, file='timesteps_info.t', status='replace')
     close(15)
-
+    open (15, file='blocks_per_mpirank.t', status='replace')
+    close(15)
 end subroutine ini_file_to_params

@@ -28,11 +28,11 @@
 
 subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
-!---------------------------------------------------------------------------------------------
-! modules
+    !---------------------------------------------------------------------------------------------
+    ! modules
 
-!---------------------------------------------------------------------------------------------
-! variables
+    !---------------------------------------------------------------------------------------------
+    ! variables
 
     implicit none
 
@@ -58,56 +58,39 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     ! detail
     real(kind=rk)                       :: detail
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: Bs, g, R
     ! interpolation fields
     real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
-    ! light data (refinement status column) list for working
-    integer(kind=1), allocatable       :: my_refinement_status(:)
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
+    real(kind=rk)                       :: t0
+    !---------------------------------------------------------------------------------------------
+    ! interfaces
 
-    ! send/receive buffer for data synchronization
-    integer(kind=1), allocatable        :: my_lgt_block_send_buffer(:), my_lgt_block_receive_buffer(:)
-
-    ! maximum heavy id, use to synchronize reduced light data array, sum of heavy blocks, start of send buffer
-    integer(kind=ik)                    :: heavy_max, block_sum, buffer_start
-    ! list of max heavy ids, use to build send/receive buffer
-    integer(kind=ik)                    :: proc_heavy_max(params%number_procs), my_proc_heavy_max(params%number_procs)
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
 
     ! start time
-    sub_t0 = MPI_Wtime()
-
-    time_sum = 0.0_rk
+    t0 = MPI_Wtime()
 
     ! block number
     N = params%number_blocks
-
     ! grid parameter
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
+    ! index of refinement status
+    R  = params%max_treelevel+2
 
     ! set MPI parameter
-    rank         = params%rank
-
+    rank          = params%rank
     ! allocate interpolation fields
     allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
     allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
     ! coarsened field is half block size + 1/2
     allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
 
-    allocate( my_refinement_status( hvy_n ) )
-
-    my_refinement_status = 0
-
-!---------------------------------------------------------------------------------------------
-! main body
+    !---------------------------------------------------------------------------------------------
+    ! main body
 
     ! ------------------------------------------------------------------------------------
     ! third: calculate detail and set new refinement status
@@ -120,14 +103,25 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
         ! reset detail
         detail = 0.0_rk
 
-        ! check block level
         if ( lgt_block( lgt_id, params%max_treelevel+1) == params%max_treelevel ) then
-            ! block is on Jmax level -> discarding all details
-            ! coarsen block, note: all sister block are also on Jmax, so coarsening should allways work
-            my_refinement_status( k ) = -1
-
+            ! email, mario, 19.04.2018:
+            !> \todo Once the ghost nodes are fixed, we should remove the unnecessary removal of details at the finest level Jmax
+            ! Wenn ein Block (A) auf dem maxlevel ist und ein Nachbarblock (B)
+            ! nicht, dann kommt es zu einem Fehler in den redundanten Knoten. Der
+            ! Nachbarblock (B) wird vor dem Zeitschritt auf maxlevel verfeinert und
+            ! interpoliert dafür neue Punkte. (A) verändert sich nicht. Nun gibt es
+            ! aber bei jedem zweiten redundanten Punkt, gemeint sind die gemeinsamen
+            ! Punkten zwischen (A) und (B) Unterschiede. Der aktuelle
+            ! Korrekturmechanismus (fein überschreibt grob) greift hier aber nicht,
+            ! wenn beide Blöcke nach dem Zeitschritt auf maxlevel bleiben.
+            !
+            ! Daher wird aktuell die rechte Seite auf maxlevel (wenn notwendig)
+            ! ausgewertet, dieses level aber auf jeden Fall wieder um 1 reduziert,
+            ! so dass vor dem nächsten Zeitschritt alle Blöcke immer ein level nach
+            ! oben gehen können. Daher taucht in den Bildschirmausgaben,
+            ! gespeicherten Daten, ... auch maximal maxlevel-1 auf.
+            lgt_block( lgt_id, R ) = -1
         else
-            ! block is not on Jmax -> calculate details
             ! loop over all datafields
             do dF = 1, params%number_data_fields
                 if ( params%threeD_case ) then
@@ -144,89 +138,47 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
                     do i = 1, Bs+2*g
                         do j = 1, Bs+2*g
                             do l = 1, Bs+2*g
-                                detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
+                                detail = max( detail, abs(u1(i,j,l)-u2(i,j,l)) )
                             end do
                         end do
                     end do
+                else
+                    ! ********** 2D **********
+                    ! copy block data to array u1
+                    u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
+                    ! now, coarsen array u1 (restriction)
+                    call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
+                    ! then, re-interpolate to the initial level (prediciton)
+                    call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
 
-                    else
-                        ! ********** 2D **********
-                        ! copy block data to array u1
-                        u1(:,:,1) = hvy_block( :, :, 1, dF, hvy_active(k) )
-                        ! now, coarsen array u1 (restriction)
-                        call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
-                        ! then, re-interpolate to the initial level (prediciton)
-                        call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
-
-                        ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                        ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                        do i = 1, Bs+2*g
-                            do j = 1, Bs+2*g
-                                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
-                            end do
+                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                    do i = 1, Bs+2*g
+                        do j = 1, Bs+2*g
+                            detail = max( detail, abs(u1(i,j,1)-u2(i,j,1)) )
                         end do
+                    end do
 
-                  end if
-              end do
+                end if
+            end do
 
-              ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
-              ! the block is tagged as "wants to coarsen" by setting the tag -1
-              ! note gradedness and completeness may prevent it from actually going through with that
-              if (detail < params%eps) then
-              !if (detail < (params%eps * 2**( lgt_block(lgt_id, params%max_treelevel+1) - 1 ) )) then
-                  ! coarsen block, -1
-                  my_refinement_status( k ) = -1
-              end if
-
+            ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
+            ! the block is tagged as "wants to coarsen" by setting the tag -1
+            ! note gradedness and completeness may prevent it from actually going through with that
+            if (detail < params%eps) then
+                ! coarsen block, -1
+                lgt_block( lgt_id, R ) = -1
+            end if
         end if
-
     end do
 
     ! ------------------------------------------------------------------------------------
-    ! fourth: synchronize light data
-    ! set array for max heavy ids
-    my_proc_heavy_max = 0
-    heavy_max = maxval(hvy_active)
-    if (heavy_max == -1) heavy_max = 0
-    my_proc_heavy_max(rank+1) = heavy_max
-
-    ! synchronize array
-    call MPI_Allreduce(my_proc_heavy_max, proc_heavy_max, size(proc_heavy_max,1), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-    ! for readability, calc sum of all max heavy ids
-    block_sum = sum(proc_heavy_max)
-
-    ! now we can allocate send/receive buffer arrays
-    allocate( my_lgt_block_send_buffer( block_sum ), my_lgt_block_receive_buffer( block_sum ) )
-
-    ! reset send buffer
-    my_lgt_block_send_buffer = 0
-    buffer_start = sum(proc_heavy_max(1:rank))
-    do k = 1, hvy_n
-        my_lgt_block_send_buffer( buffer_start + hvy_active(k) ) = my_refinement_status(k)
-    end do
-
     ! synchronize light data
-    call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_receive_buffer, block_sum, MPI_INTEGER1, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-    ! write synchronized light data
-    ! loop over number of procs and reset lgt_block array
-    do k = 1, params%number_procs
-        ! proc k-1 has send data
-        if ( proc_heavy_max(k) /= 0 ) then
-            ! write received light data
-            lgt_block( (k-1)*N+1 : (k-1)*N + proc_heavy_max(k), params%max_treelevel+2 ) =  my_lgt_block_receive_buffer( sum(proc_heavy_max(1:k-1))+1 : sum(proc_heavy_max(1:k-1))+proc_heavy_max(k) )
-        else
-            ! nothing to do
-        end if
-    end do
+    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
 
     ! clean up
-    deallocate( u1, u2, u3, my_refinement_status )
-    deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer )
+    deallocate( u1, u2, u3 )
 
     ! timings
-    sub_t1 = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-    call toc( params, "threshold_block (w/o ghost synch.)", time_sum )
+    call toc( params, "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )
 end subroutine threshold_block

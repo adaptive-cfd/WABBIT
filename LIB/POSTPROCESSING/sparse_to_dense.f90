@@ -32,6 +32,7 @@ subroutine sparse_to_dense(help, params)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
+    integer(kind=1), allocatable            :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
@@ -44,152 +45,171 @@ subroutine sparse_to_dense(help, params)
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: com_matrix(:,:,:)
     integer(kind=ik), allocatable           :: com_lists(:, :, :, :)
-    integer(kind=ik)                        :: treecode_size
+    integer(kind=ik)                        :: treecode_size, number_dense_blocks
 !-----------------------------------------------------------------------------------------------------
 
-    if (help .eqv. .true.) then
-        if (params%rank==0) then
-            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)"
-        end if
+    if (help .and. params%rank==0 ) then
+        write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
+        write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)"
+        return
+    end if
+
+
+    ! get values from command line (filename and level for interpolation)
+    call get_command_argument(3, file_in)
+    call check_file_exists(trim(file_in))
+    call get_command_argument(4, file_out)
+    call get_command_argument(5, level_in)
+    read(level_in,*) level
+    call get_command_argument(6, order)
+    if (order == "4") then
+        params%order_predictor = "multiresolution_4th"
+        params%number_ghost_nodes = 4_ik
+    elseif (order == "2") then
+        params%order_predictor = "multiresolution_2nd"
+        params%number_ghost_nodes = 2_ik
     else
-        ! get values from command line (filename and level for interpolation)
-        call get_command_argument(3, file_in)
-        call check_file_exists(trim(file_in))
-        call get_command_argument(4, file_out)
-        call get_command_argument(5, level_in)
-        read(level_in,*) level
-        call get_command_argument(6, order)
-        if (order == "4") then
-            params%order_predictor = "multiresolution_4th"
-            params%number_ghost_nodes = 4_ik
-        elseif (order == "2") then
-            params%order_predictor = "multiresolution_2nd"
-            params%number_ghost_nodes = 2_ik
-        else
-            call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
-        end if
+        call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
+    end if
 
-        ! get some parameters from file
-        call open_file_hdf5( trim(adjustl(file_in)), file_id, .false.)
-        if ( params%threeD_case ) then
-            call get_size_datafield(4, file_id, "blocks", size_field)
-        else
-            call get_size_datafield(3, file_id, "blocks", size_field(1:3))
-        end if
-        call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
-        call close_file_hdf5(file_id)
-        call read_attributes(file_in, lgt_n, time, iteration, domain)
-        ! set max_treelevel for allocation of hvy_block
-        if (dims_treecode(1)<=level) then
-            params%max_treelevel = level
-        else
-            params%max_treelevel = int(dims_treecode(1), kind=ik)
-        end if
-        params%min_treelevel = level
-        params%Lx = domain(1)
-        params%Ly = domain(2)
-        if (params%threeD_case) then
-            params%number_blocks = (8_ik**params%max_treelevel)/params%number_procs&
-                + mod(8_ik**params%max_treelevel,params%number_procs)
-            params%Lz = domain(3)
-            max_neighbors = 74
-        else
-            params%number_blocks = (4_ik**params%max_treelevel)/params%number_procs&
-                + mod(4_ik**params%max_treelevel,params%number_procs)
-            max_neighbors = 12
-        end if
-        params%number_block_nodes = int(size_field(1),kind=ik)
-        params%number_data_fields  = 1
-        params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
-        ! allocate data
-        call allocate_grid(params, lgt_block, hvy_block, &
-            hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work, &
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
-        ! allocate communication arrays
-        call allocate_com_arrays(params, com_lists, com_matrix)
-        ! read field
-        call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
-        call read_field(file_in, 1, params, hvy_block, hvy_n)
-        ! create lists of active blocks (light and heavy data)
-        ! update list of sorted nunmerical treecodes, used for finding blocks
-        call create_active_and_sorted_lists( params, lgt_block, &
-            lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    if (params%rank==0) then
+        write(*,'(80("-"))')
+        write(*,*) "Wabbit sparse-to-dense. Will read a wabbit field and return a"
+        write(*,*) "full grid with all blocks at the chosen level."
+        write(*,'(A20,1x,A80)') "Reading file:", file_in
+        write(*,'(A20,1x,A80)') "Writing to file:", file_out
+        write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
+        write(*,'(A20,1x,i3)') "Target level:", level
+        write(*,'(80("-"))')
+    endif
+
+    ! get some parameters from file
+    call open_file_hdf5( trim(adjustl(file_in)), file_id, .false.)
+    if ( params%threeD_case ) then
+        call get_size_datafield(4, file_id, "blocks", size_field)
+    else
+        call get_size_datafield(3, file_id, "blocks", size_field(1:3))
+        size_field(4) = 0
+    end if
+    params%number_block_nodes = int(size_field(1),kind=ik)
+    call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
+    call close_file_hdf5(file_id)
+
+    call read_attributes(file_in, lgt_n, time, iteration, domain)
+
+    if (params%rank==0) then
+        write(*,'("Size of blocks-array in file: ",4(i6,1x))') size_field
+        write(*,'("So the file contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, params%number_block_nodes
+    endif
+
+    ! set max_treelevel for allocation of hvy_block
+    params%max_treelevel = max(level, int(dims_treecode(1), kind=ik))
+    params%min_treelevel = level
+
+    params%Lx = domain(1)
+    params%Ly = domain(2)
+    if (params%threeD_case) then
+        ! how many blocks do we need for the desired level?
+        number_dense_blocks = 8_ik**level
+        params%Lz = domain(3)
+        max_neighbors = 74
+    else
+        number_dense_blocks = 4_ik**level
+        max_neighbors = 12
+    end if
+    ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
+    !> \todo change that for 3d case
+    params%number_blocks = max(4_ik*lgt_n/params%number_procs, 4_ik*number_dense_blocks/params%number_procs)
+
+    params%number_data_fields  = 1
+    params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
+    ! allocate data
+    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, int_send_buffer,&
+        int_receive_buffer, real_send_buffer, real_receive_buffer)
+    ! allocate communication arrays
+    call allocate_com_arrays(params, com_lists, com_matrix)
+    ! read field
+    call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
+    call read_field(file_in, 1, params, hvy_block, hvy_n)
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, &
+        lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    ! balance the load
+    params%block_distribution="sfc_hilbert"
+    call balance_load(params, lgt_block, hvy_block,&
+        hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+
+    ! create lists of active blocks (light and heavy data) after load balancing (have changed)
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active,&
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor,&
+        hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, &
+        real_send_buffer, real_receive_buffer )
+    ! refine/coarse to attain desired level, respectively
+    !coarsen
+    do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
+        ! set refinement status to -1 (coarsen) everywhere
+        lgt_block(:, params%max_treelevel +2) = -1
+        ! check where coarsening is actually needed
+        call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        ! this might not be necessary since we start from an admissible grid
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
+        call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
+            hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, &
-            lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        ! balance the load
-        params%block_distribution="sfc_hilbert"
-        call balance_load(params, lgt_block, hvy_block,&
-            hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
-
-        ! create lists of active blocks (light and heavy data) after load balancing (have changed)
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n,&
+            lgt_sortednumlist, hvy_active, hvy_n )
+    end do
+    ! refine
+    do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
+        ! check where refinement is actually needed
+        do k=1, lgt_n
+            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
+                lgt_block(lgt_active(k), params%max_treelevel +2) = 1
+        end do
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
+        if ( params%threeD_case ) then
+            ! 3D:
+            call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+        else
+            ! 2D:
+            call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
+                hvy_active, hvy_n )
+        end if
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
             lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active,&
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor,&
-            hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
+            hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:),&
             com_matrix, .true., int_send_buffer, int_receive_buffer, &
             real_send_buffer, real_receive_buffer )
-        ! refine/coarse to attain desired level, respectively
-        !coarsen
-        do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
-            ! set refinement status to -1 (coarsen) everywhere
-            lgt_block(:, params%max_treelevel +2) = -1
-            ! check where coarsening is actually needed
-            call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-            ! this might not be necessary since we start from an admissible grid
-            call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
-            call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
-            call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
-            call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-                hvy_active, hvy_n, lgt_sortednumlist, .true. )
-            ! update neighbor relations
-            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n,&
-                lgt_sortednumlist, hvy_active, hvy_n )
-        end do
-        ! refine
-        do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
-            ! check where refinement is actually needed
-            do k=1, lgt_n
-                if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                    lgt_block(lgt_active(k), params%max_treelevel +2) = 1
-            end do
-            call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
-            if ( params%threeD_case ) then
-                ! 3D:
-                call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
-            else
-                ! 2D:
-                call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                    hvy_active, hvy_n )
-            end if
-            call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-            ! update neighbor relations
-            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-                lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor,&
-                hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:),&
-                com_matrix, .true., int_send_buffer, int_receive_buffer, &
-                real_send_buffer, real_receive_buffer )
-        end do
+    end do
 
-        call balance_load( params, lgt_block, hvy_block, &
-            hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        call write_field(file_out, time, iteration, 1, params, lgt_block, &
-            hvy_block, lgt_active, lgt_n, hvy_n)
+    call balance_load( params, lgt_block, hvy_block, &
+        hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call write_field(file_out, time, iteration, 1, params, lgt_block, &
+        hvy_block, lgt_active, lgt_n, hvy_n)
 
-        if (params%rank==0 ) then
-            write(*,'("Wrote data of input-file",a20," now on uniform grid (level",i3, ") to file",a20)'), &
-                trim(file_in), level, trim(file_out)
-             write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")'), &
-                 min_active_level( lgt_block, lgt_active, lgt_n ),&
-                 max_active_level( lgt_block, lgt_active, lgt_n )
-        end if
+    if (params%rank==0 ) then
+        write(*,'("Wrote data of input-file",a20," now on uniform grid (level",i3, ") to file",a20)'), &
+            trim(file_in), level, trim(file_out)
+         write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")'), &
+             min_active_level( lgt_block, lgt_active, lgt_n ),&
+             max_active_level( lgt_block, lgt_active, lgt_n )
     end if
 end subroutine sparse_to_dense

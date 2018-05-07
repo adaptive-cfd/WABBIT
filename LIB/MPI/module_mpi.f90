@@ -1,19 +1,19 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_MPI.f90
+!>\dir
+!> MPI synchronization routines
+
+!> \file 
+!> \brief File of MPI Module 
+
+
+!> \brief This module implements all MPI synchronization routines
+!> \details
+!>          * synchronization of ghost nodes
+!>          * synchronization of light data
+!>          * creation of rank block rank lists
+!>          * copy, write send and recieve buffers
 !> \version 0.4
 !> \author msr
-!> \brief MPI module
-!
-!>
-!! = log ======================================================================================
-!! \n
 !! 12/01/17 - create
-! ********************************************************************************************
-
 module module_MPI
 
 !---------------------------------------------------------------------------------------------
@@ -71,10 +71,10 @@ contains
     include "fill_receive_buffer.f90"
 
     ! soubroutine for get data with lock/unlock synchronization
-    include "RMA_lock_unlock_get_data.f90"
+    ! include "RMA_lock_unlock_get_data.f90"
 
     ! soubroutine to put data with lock/unlock synchronization
-    include "RMA_lock_unlock_put_data.f90"
+    ! include "RMA_lock_unlock_put_data.f90"
 
     ! non blocking data transfer
     include "isend_irecv_data.f90"

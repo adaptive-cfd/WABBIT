@@ -41,7 +41,8 @@ program main
     use module_time_step
     ! unit test module
     use module_unit_test
-    use module_ACM_new
+    ! bridge implementation of wabbit
+    use module_bridge_interface
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -56,7 +57,7 @@ program main
     integer(kind=ik)                    :: number_procs
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1
+    real(kind=rk)                       :: t0, t1, t2
 
     ! user defined parameter structure
     type (type_params)                  :: params
@@ -81,6 +82,12 @@ program main
     ! heavy work array  -> dim 5: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :)
 
+    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    ! heavy synch  -> dim 4: block id  ( 1:number_blocks )
+    integer(kind=1), allocatable          :: hvy_synch(:, :, :, :)
+
     ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
     !                             -> number_columns = 16 (...different neighbor relations:
     ! '__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW' )
@@ -104,6 +111,9 @@ program main
     ! number of active blocks (heavy data)
     integer(kind=ik)                    :: hvy_n
 
+    integer(kind=ik), allocatable       :: blocks_per_rank(:), blocks_per_rank2(:)
+
+
     ! time loop variables
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
@@ -116,7 +126,7 @@ program main
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0
-
+    logical                             :: test
     ! allocate com lists and com matrix here
     ! communication lists:
     ! dim 1: list elements
@@ -143,7 +153,8 @@ program main
     ! large numbers of processes and blocks per process
     integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
+    ! decide if data is saved or not
+    logical                             :: it_is_time_to_save_data
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -162,11 +173,14 @@ program main
     call MPI_Init(ierr)
     ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    params%rank         = rank
+    params%rank = rank
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
-    params%number_procs = number_procs
+    params%number_procs=number_procs
+    allocate(blocks_per_rank(1:number_procs),blocks_per_rank2(1:number_procs))
     ! output MPI status
+    params%WABBIT_COMM=MPI_COMM_WORLD
+    call set_mpi_comm_global(MPI_COMM_WORLD)
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
@@ -185,21 +199,21 @@ program main
     call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
-    ! Initialize parameters and grid
+    ! Initialize parameters,bridge and grid
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
     call get_command_argument( 2, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    ! initializes the communicator for Wabbit and creates a bridge if needed
+    call initialize_communicator(params)
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename )
-
-
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist,.true., hvy_work, int_send_buffer, &
-        int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, &
+        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
@@ -215,14 +229,12 @@ program main
     end if
     ! perform a convergence test on ghost node sync'ing
     ! I don't see a good reason to skip this test ever - I removed the condition here.
-    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
+    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
+    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
-!    if (params%test_wavelet_comp) then
-!        call unit_test_wavelet_compression( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, hvy_active )
-        ! reset the grid: all blocks are inactive and empty
-!        call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-!    end if
+
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
 
     !---------------------------------------------------------------------------
@@ -231,12 +243,25 @@ program main
     ! On all blocks, set the initial condition
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, int_send_buffer, &
-    int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
+    int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch )
+
+    ! Perform a first test of the redundant nodes right after setting the initial condition.
+    ! For most cases, the initial condition is set on all points, including ghost nodes. Therefore,
+    ! this test should work even without ghost nodes sync'ing first. If it doesn't then maybe we did
+    ! not set inicond on ghost nodes for this case.
+    ! it is to test the test redundant nodes routine.
+    test=.false.
+    if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
+    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+    if (rank==0) write(*,*) "Done testing redundant nodes."
+
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -264,37 +289,82 @@ program main
     if (rank==0) write(*,*) "starting main time loop"
 
     do while ( time<params%time_max .and. iteration<params%nt)
+        t2 = MPI_wtime()
 
         ! new iteration
         iteration = iteration + 1
 
+        !***********
+	! First we need to be sure that the ghost nodes are indeed sync'ed before we can
+        ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        test=.false. ! test
+
+      !  call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+      !  hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
+
+        if (test) then
+            iteration = 99
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+            call abort(111111,"Redundant nodes check failed - stopping.")
+        endif
+        !****************
+
         ! refine everywhere
         if ( params%adapt_mesh ) then
-            call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
 
+        !+++++++++++ serve any data request from the other side +++++++++++++
+        if (params%bridge_exists) then
+            call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
+            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)
+        endif
+        !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
         ! advance in time
-        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
+        hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
+        com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+
+        if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
+            (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+
+            it_is_time_to_save_data=.true.
+        else
+
+            it_is_time_to_save_data=.false.
+        endif
 
         ! filter
-        if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_block( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-        end if
+        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+
+            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+         end if
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
+            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
         endif
 
         ! statistics
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes for some derived qtys, for sure
-          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+          com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
           ! TODO make this nicer
           if (iteration==1 ) then
             open (15, file='meanflow.t', status='replace')
+            close(15)
+            open (15, file='forces.t', status='replace')
             close(15)
           endif
 
@@ -303,9 +373,10 @@ program main
         endif
 
         ! write data to disk
-        if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
+        if ( it_is_time_to_save_data) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-          call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+          com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
           ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
           ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -320,17 +391,29 @@ program main
         ! by what has been done in the last time step, then we flush the current timing to disk.
         call timing_next_timestep( params, iteration )
 
+	! it is useful to save the number of blocks per rank into a log file.
+        blocks_per_rank = 0
+        blocks_per_rank(rank+1) = lgt_n
+        call MPI_Allreduce(blocks_per_rank, blocks_per_rank2, number_procs, MPI_INTEGER, MPI_SUM, WABBIT_COMM, ierr)
+
+        t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
-             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=",i7," Jmin=",i2," Jmax=",i2)') &
+             iteration, time, t2, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
 
              open(14,file='timesteps_info.t',status='unknown',position='append')
-             write (14,'((g15.8,1x),i6,1x,i5,1x,i2,1x,i2)') time, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             write (14,'(2(g15.8,1x),i6,1x,i5,1x,i2,1x,i2)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
              close(14)
+
+             open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
+             write (14,'(g15.8,1x,i6,1x,1024(i4,1x))') time, iteration, blocks_per_rank2
+             close(14)
         end if
+
+
     end do
     !---------------------------------------------------------------------------
     ! end of main time loop
@@ -339,13 +422,19 @@ program main
 
     ! save end field to disk, only if timestep is not saved allready
     if ( abs(output_time-time) > 1e-10_rk ) then
-      ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-      call synchronize_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
-      ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-      ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
-      ! slots. the state vector (hvy_block) is copied if desired.
-      call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+        ! filter before write out
+        if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
+            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+        end if
+
+        ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+        ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+        ! slots. the state vector (hvy_block) is copied if desired.
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements
@@ -353,24 +442,24 @@ program main
     call timing_next_timestep( params, iteration )
 
     ! MPI Barrier before program ends
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    call MPI_Barrier(WABBIT_COMM, ierr)
 
     ! debug info output
     if ( params%debug ) then
         ! sum times
         debug%comp_time(:,2) = 0.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
         ! MPI Barrier before program ends
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        call MPI_Barrier(WABBIT_COMM, ierr)
 
         ! average times
         debug%comp_time(:,2) = debug%comp_time(:,2) / params%number_procs
         ! standard deviation
         debug%comp_time(:,3) = 0.0_rk
         debug%comp_time(:,4) = (debug%comp_time(:,4) - debug%comp_time(:,2))**2.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
         ! MPI Barrier before program ends
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        call MPI_Barrier(WABBIT_COMM, ierr)
 
         if (params%number_procs == 1) then
             debug%comp_time(:,3) = 0.0_rk
@@ -412,6 +501,7 @@ program main
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 
+    deallocate(blocks_per_rank,blocks_per_rank2)
     ! end mpi
     call MPI_Finalize(ierr)
 

@@ -10,7 +10,7 @@
 !> \brief create all active (lgt/hvy) lists, create also sorted list of active
 !! light blocks with numerical treecodes
 !! \n
-!! input:    
+!! input:
 !!           - light data
 !!
 !! output:
@@ -67,7 +67,15 @@ subroutine create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n,
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! reset old lists, use old numbers of active blocks
+    ! reset old lists, use old numbers of active blocks. If the old numbers are
+    ! invalid (too small too large), then we delete everything in the lists
+    !> \todo Check if resetting the arrays is not a waste of time in any case!
+    if (lgt_n>size(lgt_active)) lgt_n = size(lgt_active)
+    if (hvy_n>size(hvy_active)) hvy_n = size(hvy_active)
+
+    if (lgt_n<=0) lgt_n = size(lgt_active)
+    if (hvy_n<=0) hvy_n = size(hvy_active)
+
     lgt_active(1:lgt_n)          = -1
     hvy_active(1:hvy_n)          = -1
     lgt_sortednumlist(1:lgt_n,:) = -1

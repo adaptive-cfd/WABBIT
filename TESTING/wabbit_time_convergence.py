@@ -16,8 +16,11 @@ def do_test( basedir, name,  blob_width=0.01):
         dt=[]
         err=[]
         for dir in dirs:
-            dt.append( wabbit_tools.fetch_dt_dir(dir) )
-            err.append( wabbit_tools.wabbit_error(dir) )
+            if len(glob.glob(dir+'/*.h5')) != 0:
+                dt.append( wabbit_tools.fetch_dt_dir(dir) )
+                err.append( wabbit_tools.wabbit_error(dir) )
+            else:
+                print('There are no h5 files in '+dir)
 
         print(dirs)
 
@@ -30,13 +33,16 @@ def do_test( basedir, name,  blob_width=0.01):
 
 plt.close('all')
 plt.rcParams["text.usetex"] = True
+plt.rcParams["font.family"] = 'serif'
+plt.rcParams["font.serif"] = 'Times'
 
-do_test("B_SWIRL/dt1_equi_4th-4th-4th_","swirl-equi4th-4th-4th")
-do_test("B_SWIRL/dt2_equi_2nd-2nd-4th_","swirl-equi-2nd-2nd-4th")
-do_test("B_SWIRL/dt3_equi_4th-4th-3rd_","swirl-equi-4th-4th-3rd")
-do_test("B_SWIRL/dt5_nonequi_4th-4th-4th","swirl-nonequi-4th-4th-4th")
+do_test("B_SWIRL/dt1_equi_4th-4th-4th_","equi-4th-4th-4th")
+do_test("B_SWIRL/dt2_equi_2nd-2nd-4th_","equi-2nd-2nd-4th")
+do_test("B_SWIRL/dt3_equi_4th-4th-3rd_","equi-4th-4th-3rd")
+do_test("B_SWIRL/dt5_nonequi_4th-4th-4th","nonequi-4th-4th-4th")
 
 plt.grid()
+plt.title('Swirl test')
 plt.xlim([1e-5,1e-2])
 plt.legend()
 plt.xlabel('$\Delta t$')

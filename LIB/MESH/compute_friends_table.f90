@@ -109,7 +109,7 @@ subroutine compute_friends_table(params, hvy_neighbor, friends, hvy_active, hvy_
     friends_loc(rank+1,rank+1) = -1
 
     ! the friends must be known on all mpiranks
-    call MPI_Allreduce(friends_loc, friends, number_procs**2, MPI_INTEGER,MPI_SUM, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(friends_loc, friends, number_procs**2, MPI_INTEGER,MPI_SUM, WABBIT_COMM, ierr)
 
     deallocate(friends_loc)
 

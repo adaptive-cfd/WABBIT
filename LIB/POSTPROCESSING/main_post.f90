@@ -45,10 +45,14 @@ program main_post
     call MPI_Init(ierr)
     ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    params%rank         = rank
+    params%rank = rank
+
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
+    params%WABBIT_COMM  = MPI_COMM_WORLD
+
+    call set_mpi_comm_global(MPI_COMM_WORLD)
     ! output MPI status
     if (rank==0) then
         write(*,'(80("_"))')
@@ -74,6 +78,8 @@ program main_post
     end if
 
     select case(post_mode)
+    case("--mean")
+        call post_mean(params, help)
     case("--sparse-to-dense")
         call sparse_to_dense(help, params)
     case("--vorticity")
@@ -100,6 +106,7 @@ program main_post
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"
         write(*,*) "--sparse-to-dense"
+        write(*,*) "--mean"
         write(*,*) "--vorticity"
         write(*,*) "--keyvalues"
         write(*,*) "--compare-keys"

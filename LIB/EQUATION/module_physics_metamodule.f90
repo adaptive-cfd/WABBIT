@@ -1,3 +1,11 @@
+!----------------------------------------------------------------
+!> Interface between WABBIT and Physics Modules
+!> This module contains all functions which WABBIT provides to 
+!> implement your physics module
+!> \details 
+!> \version 0.5
+!> \author engels
+!----------------------------------------------------------------
 module module_physics_metamodule
 
     use module_precision
@@ -17,7 +25,8 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES, STATISTICS_meta
+    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,& 
+              STATISTICS_meta,FILTER_meta
     !**********************************************************************************************
 
 contains
@@ -222,13 +231,13 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx,  rhs, stage )
+     call STATISTICS_ACM( time, u, g, x0, dx, stage )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
 
    case ("navier_stokes")
-    !  call STATISTICS_NStokes( time, u, g, x0, dx, rhs, stage )
+      call STATISTICS_NStokes( time, u, g, x0, dx, stage )
 
    case default
      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
@@ -325,6 +334,50 @@ contains
    end select
 
  end subroutine INICOND_meta
+
+
+
+ !-----------------------------------------------------------------------------
+ ! wrapper for filter u -> u_tilde
+ !-----------------------------------------------------------------------------
+ subroutine FILTER_meta( physics, time, u, g, x0, dx, work_array)
+   implicit none
+   !> physics type 
+   character(len=*), intent(in) :: physics
+   !> time in physical units
+   real(kind=rk), intent (in) :: time
+
+   ! block data, containg the state vector. In general a 4D field (3 dims+components)
+   ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+   real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+   !> number of ghost nodes 
+   integer, intent(in) :: g
+
+   ! for each block, you'll need to know where it lies in physical space. The first
+   ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+   real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+   ! the work array is an additional array which can be used to store temporal
+   ! values of the statevector field
+   real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
+
+   select case(physics)
+   case ("ACM-new")
+     !call filter_ACM( time, u, g, x0, dx,  work_array)
+
+   case ("ConvDiff-new")
+     !call filter_convdiff( time, u, g, x0, dx, work_array)
+
+   case ("navier_stokes")
+     call filter_NStokes( time, u, g, x0, dx, work_array)
+
+   case default
+     call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown"//physics)
+
+   end select
+
+ end subroutine FILTER_meta
 
 
 

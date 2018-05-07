@@ -25,6 +25,8 @@ subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
       call draw_cylinder( mask, x0, dx, Bs, g )
     case('two-cylinders')
       call draw_two_cylinders( mask, x0, dx, Bs, g )
+    case('none')
+      mask = 0.0_rk
     case default
       call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
     end select

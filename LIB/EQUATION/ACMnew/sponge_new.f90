@@ -30,29 +30,22 @@ subroutine sponge_2D_NEW(sponge, x0, dx, Bs, g)
     real(kind=rk), dimension(2), intent(in)                   :: x0, dx
 
     ! auxiliary variables
-    real(kind=rk)                                             :: x, ddx
+    real(kind=rk)                                             :: x, y, tmp
     ! loop variables
     integer(kind=ik)                                          :: ix, iy
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! reset sponge array
     sponge = 0.0_rk
-!---------------------------------------------------------------------------------------------
-! main body
-    ddx = 0.1_rk*params_acm%Lx
 
     do iy=1, Bs+2*g
+      y = dble(iy-(g+1)) * dx(2) + x0(2)
        do ix=1, Bs+2*g
            x = dble(ix-(g+1)) * dx(1) + x0(1)
-           if ((params_acm%Lx-x) <= ddx) then
-               sponge(ix,iy) = (x-(params_acm%Lx-ddx))**2
-           elseif (x <= ddx) then
-               sponge(ix,iy) = (x-ddx)**2
-           else
-               sponge(ix,iy) = 0.0_rk
-           end if
+           ! distance to borders of domain
+           tmp = minval( (/x,y,-(x-params_acm%Lx),-(y-params_acm%Ly)/) )
+
+           call smoothstep(sponge(ix,iy), tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
        end do
     end do
 

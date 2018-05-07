@@ -1,14 +1,8 @@
 #!/bin/bash
 
-export mpi="nice mpirun -n 3"
-
 #-------------
-test1=0
-test2=0
-test3=1
-test4=0
-test5=0
-test6=0
+test1=1
+test2=1
 #-------------
 
 if [ "$test1" == "1" ]; then
@@ -37,32 +31,30 @@ if [ "$test1" == "1" ]; then
 		cd $dir
 		cp ../$ini .
 
-		ln -s ../../wabbit
+		ln -s ../../../wabbit
 
-		./replace_ini_value.sh $ini N_fields_saved 1
-		./replace_ini_value.sh $ini field_names phi
+		../replace_ini_value.sh $ini Saving N_fields_saved 1
+		../replace_ini_value.sh $ini Saving field_names phi
 
 
-		./replace_ini_value.sh $ini order_discretization FD_4th_central_optimized
-		./replace_ini_value.sh $ini order_predictor multiresolution_4th
+		../replace_ini_value.sh $ini Discretization order_discretization FD_4th_central_optimized
+		../replace_ini_value.sh $ini Discretization order_predictor multiresolution_4th
 
-		./replace_ini_value.sh $ini adapt_mesh 1
-		./replace_ini_value.sh $ini adapt_inicond 1
-		./replace_ini_value.sh $ini eps $j
-	 
-		./replace_ini_value.sh $ini number_block_nodes 17
-		./replace_ini_value.sh $ini number_ghost_nodes 4
-		./replace_ini_value.sh $ini max_treelevel 13
-		./replace_ini_value.sh $ini min_treelevel 1
-		./replace_ini_value.sh $ini nu 0.0
-		./replace_ini_value.sh $ini time_max 1.0
-		./replace_ini_value.sh $ini CFL 1.0
+		../replace_ini_value.sh $ini Blocks adapt_mesh 1
+		../replace_ini_value.sh $ini Blocks adapt_inicond 1
+		../replace_ini_value.sh $ini Blocks eps $j
+		../replace_ini_value.sh $ini Blocks number_block_nodes 17
+		../replace_ini_value.sh $ini Blocks number_ghost_nodes 4
+		../replace_ini_value.sh $ini Blocks max_treelevel 13
+		../replace_ini_value.sh $ini Blocks min_treelevel 1
 
-		./replace_ini_value.sh $ini blob_width 0.01
+		../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
+		../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
-		cleanhere -f
-	
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		../replace_ini_value.sh $ini Time time_max 1.0
+		../replace_ini_value.sh $ini Time CFL 1.0
+
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
@@ -91,260 +83,33 @@ if [ "$test2" == "1" ]; then
 		cd $dir
 		cp ../$ini .
 
-		ln -s ../../wabbit
+		ln -s ../../../wabbit
 
-		./replace_ini_value.sh $ini N_fields_saved 1
-		./replace_ini_value.sh $ini field_names phi
+		../replace_ini_value.sh $ini Saving N_fields_saved 1
+		../replace_ini_value.sh $ini Saving field_names phi
 
-		./replace_ini_value.sh $ini order_discretization FD_2nd_central
-		./replace_ini_value.sh $ini order_predictor multiresolution_2nd
+		../replace_ini_value.sh $ini Discretization order_discretization FD_2nd_central
+		../replace_ini_value.sh $ini Discretization order_predictor multiresolution_2nd
 
-		./replace_ini_value.sh $ini adapt_mesh 1
-		./replace_ini_value.sh $ini adapt_inicond 1
-		./replace_ini_value.sh $ini eps $j
-	 
-		./replace_ini_value.sh $ini number_block_nodes 17
-		./replace_ini_value.sh $ini number_ghost_nodes 4
-		./replace_ini_value.sh $ini max_treelevel 13
-		./replace_ini_value.sh $ini min_treelevel 1
-		./replace_ini_value.sh $ini nu 0.0
-		./replace_ini_value.sh $ini time_max 1.0
-		./replace_ini_value.sh $ini CFL 1.0
+		../replace_ini_value.sh $ini Blocks adapt_mesh 1
+		../replace_ini_value.sh $ini Blocks adapt_inicond 1
+		../replace_ini_value.sh $ini Blocks eps $j
+		../replace_ini_value.sh $ini Blocks number_block_nodes 17
+		../replace_ini_value.sh $ini Blocks number_ghost_nodes 4
+		../replace_ini_value.sh $ini Blocks max_treelevel 13
+		../replace_ini_value.sh $ini Blocks min_treelevel 1
 
-		./replace_ini_value.sh $ini blob_width 0.01
+		../replace_ini_value.sh $ini ConvectionDiffusion nu 0.0
+		../replace_ini_value.sh $ini ConvectionDiffusion blob_width 0.01
 
-		cleanhere -f
-	
-		$mpi ./wabbit 2D $ini --memory=0.75GB
+		../replace_ini_value.sh $ini Time time_max 1.0
+		../replace_ini_value.sh $ini Time CFL 1.0
+
+		$mpi ./wabbit 2D $ini --memory=3.0GB
 		i=$((i+1))
 		cd ..
 	done
 fi
 
 #--------------------------------------------------------------------------------
-
-if [ "$test3" == "1" ]; then
-	ini=adv-adaptive.ini
-	eps=(1.06081836e-06   1.42510267e-06   1.91448198e-06   2.57191381e-06
-	   3.45510729e-06   4.64158883e-06   6.23550734e-06   8.37677640e-06
-	   1.12533558e-05   1.51177507e-05   2.03091762e-05   2.72833338e-05
-	   3.66524124e-05   4.92388263e-05   6.61474064e-05   8.88623816e-05
-	   1.19377664e-04   1.60371874e-04   2.15443469e-04   2.89426612e-04
-	   3.88815518e-04   5.22334507e-04   7.01703829e-04   9.42668455e-04
-	   1.26638017e-03   1.70125428e-03   2.28546386e-03   3.07029063e-03
-	   4.12462638e-03   5.54102033e-03   7.44380301e-03   1.00000000e-02)
-	number=3
-	pre=adapt
-	# delete all data:
-	rm -r ${pre}${number}_*
-
-	i=0
-	for j in ${eps[@]}
-	do
-		dir=${pre}${number}_${i}_${j}
-		mkdir $dir
-		echo $dir
-		cd $dir
-		cp ../$ini .
-
-		ln -s ../../wabbit
-
-		./replace_ini_value.sh $ini N_fields_saved 1
-		./replace_ini_value.sh $ini field_names phi
-
-
-		./replace_ini_value.sh $ini order_discretization FD_4th_central_optimized
-		./replace_ini_value.sh $ini order_predictor multiresolution_4th
-
-		./replace_ini_value.sh $ini adapt_mesh 1
-		./replace_ini_value.sh $ini adapt_inicond 1
-		./replace_ini_value.sh $ini eps $j
-	 
-		./replace_ini_value.sh $ini number_block_nodes 17
-		./replace_ini_value.sh $ini number_ghost_nodes 4
-		./replace_ini_value.sh $ini max_treelevel 13
-		./replace_ini_value.sh $ini min_treelevel 1
-		./replace_ini_value.sh $ini nu 0.0
-		./replace_ini_value.sh $ini time_max 1.0
-		./replace_ini_value.sh $ini CFL 0.1
-
-		./replace_ini_value.sh $ini blob_width 0.01
-
-		cleanhere -f
-	
-		$mpi ./wabbit 2D $ini --memory=0.75GB
-		i=$((i+1))
-		cd ..
-	done
-fi
-
-#--------------------------------------------------------------------------------
-
-
-if [ "$test4" == "1" ]; then
-	ini=adv-adaptive.ini
-	eps=(	   1.12533558e-05   1.51177507e-05   2.03091762e-05   2.72833338e-05
-	   3.66524124e-05   4.92388263e-05   6.61474064e-05   8.88623816e-05
-	   1.19377664e-04   1.60371874e-04   2.15443469e-04   2.89426612e-04
-	   3.88815518e-04   5.22334507e-04   7.01703829e-04   9.42668455e-04
-	   1.26638017e-03   1.70125428e-03   2.28546386e-03   3.07029063e-03
-	   4.12462638e-03   5.54102033e-03   7.44380301e-03   1.00000000e-02)
-	number=4
-	pre=adapt
-	# delete all data:
-	rm -r ${pre}${number}_*
-
-	i=0
-	for j in ${eps[@]}
-	do
-		dir=${pre}${number}_${i}_${j}
-		mkdir $dir
-		echo $dir
-		cd $dir
-		cp ../$ini .
-
-		ln -s ../../wabbit
-
-		./replace_ini_value.sh $ini N_fields_saved 1
-		./replace_ini_value.sh $ini field_names phi
-
-
-		./replace_ini_value.sh $ini order_discretization FD_4th_central_optimized
-		./replace_ini_value.sh $ini order_predictor multiresolution_4th
-
-		./replace_ini_value.sh $ini adapt_mesh 1
-		./replace_ini_value.sh $ini adapt_inicond 1
-		./replace_ini_value.sh $ini eps $j
-	 
-		./replace_ini_value.sh $ini number_block_nodes 17
-		./replace_ini_value.sh $ini number_ghost_nodes 4
-		./replace_ini_value.sh $ini max_treelevel 13
-		./replace_ini_value.sh $ini min_treelevel 1
-		./replace_ini_value.sh $ini nu 0.0
-		./replace_ini_value.sh $ini time_max 1.0
-		./replace_ini_value.sh $ini CFL 0.5
-
-		./replace_ini_value.sh $ini blob_width 0.01
-
-		cleanhere -f
-	
-		$mpi ./wabbit 2D $ini --memory=0.75GB
-		i=$((i+1))
-		cd ..
-	done
-fi
-
-
-#--------------------------------------------------------------------------------
-
-
-if [ "$test5" == "1" ]; then
-	ini=adv-adaptive.ini
-	eps=(	   1.12533558e-05   1.51177507e-05   2.03091762e-05   2.72833338e-05
-	   3.66524124e-05   4.92388263e-05   6.61474064e-05   8.88623816e-05
-	   1.19377664e-04   1.60371874e-04   2.15443469e-04   2.89426612e-04
-	   3.88815518e-04   5.22334507e-04   7.01703829e-04   9.42668455e-04
-	   1.26638017e-03   1.70125428e-03   2.28546386e-03   3.07029063e-03
-	   4.12462638e-03   5.54102033e-03   7.44380301e-03   1.00000000e-02)
-	number=5
-	pre=adapt
-	# delete all data:
-	rm -r ${pre}${number}_*
-
-	i=0
-	for j in ${eps[@]}
-	do
-		dir=${pre}${number}_${i}_${j}
-		mkdir $dir
-		echo $dir
-		cd $dir
-		cp ../$ini .
-
-		ln -s ../../wabbit
-
-		./replace_ini_value.sh $ini N_fields_saved 1
-		./replace_ini_value.sh $ini field_names phi
-
-
-		./replace_ini_value.sh $ini order_discretization FD_4th_central_optimized
-		./replace_ini_value.sh $ini order_predictor multiresolution_4th
-
-		./replace_ini_value.sh $ini adapt_mesh 1
-		./replace_ini_value.sh $ini adapt_inicond 1
-		./replace_ini_value.sh $ini eps $j
-	 
-		./replace_ini_value.sh $ini number_block_nodes 17
-		./replace_ini_value.sh $ini number_ghost_nodes 4
-		./replace_ini_value.sh $ini max_treelevel 13
-		./replace_ini_value.sh $ini min_treelevel 1
-		./replace_ini_value.sh $ini nu 0.0
-		./replace_ini_value.sh $ini time_max 1.0
-		./replace_ini_value.sh $ini CFL 0.717
-
-		./replace_ini_value.sh $ini blob_width 0.01
-
-		cleanhere -f
-	
-		$mpi ./wabbit 2D $ini --memory=0.75GB
-		i=$((i+1))
-		cd ..
-	done
-fi
-
-
-#--------------------------------------------------------------------------------
-
-
-if [ "$test6" == "1" ]; then
-	ini=adv-adaptive.ini
-	eps=(	   1.12533558e-05   1.51177507e-05   2.03091762e-05   2.72833338e-05
-	   3.66524124e-05   4.92388263e-05   6.61474064e-05   8.88623816e-05
-	   1.19377664e-04   1.60371874e-04   2.15443469e-04   2.89426612e-04
-	   3.88815518e-04   5.22334507e-04   7.01703829e-04   9.42668455e-04
-	   1.26638017e-03   1.70125428e-03   2.28546386e-03   3.07029063e-03
-	   4.12462638e-03   5.54102033e-03   7.44380301e-03   1.00000000e-02)
-	number=6
-	pre=adapt
-	# delete all data:
-	rm -r ${pre}${number}_*
-
-	i=0
-	for j in ${eps[@]}
-	do
-		dir=${pre}${number}_${i}_${j}
-		mkdir $dir
-		echo $dir
-		cd $dir
-		cp ../$ini .
-
-		ln -s ../../wabbit
-
-		./replace_ini_value.sh $ini N_fields_saved 1
-		./replace_ini_value.sh $ini field_names phi
-
-
-		./replace_ini_value.sh $ini order_discretization FD_4th_central_optimized
-		./replace_ini_value.sh $ini order_predictor multiresolution_4th
-
-		./replace_ini_value.sh $ini adapt_mesh 1
-		./replace_ini_value.sh $ini adapt_inicond 1
-		./replace_ini_value.sh $ini eps $j
-	 
-		./replace_ini_value.sh $ini number_block_nodes 17
-		./replace_ini_value.sh $ini number_ghost_nodes 4
-		./replace_ini_value.sh $ini max_treelevel 13
-		./replace_ini_value.sh $ini min_treelevel 1
-		./replace_ini_value.sh $ini nu 0.0
-		./replace_ini_value.sh $ini time_max 1.0
-		./replace_ini_value.sh $ini CFL 0.05
-
-		./replace_ini_value.sh $ini blob_width 0.01
-
-		cleanhere -f
-	
-		$mpi ./wabbit 2D $ini --memory=0.75GB
-		i=$((i+1))
-		cd ..
-	done
-fi
 

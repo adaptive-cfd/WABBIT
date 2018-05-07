@@ -74,8 +74,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
                                                                fric_p(Bs+2*g, Bs+2*g), fric_u(Bs+2*g, Bs+2*g), fric_v(Bs+2*g, Bs+2*g), &
                                                                fric_T1(Bs+2*g, Bs+2*g), fric_T2(Bs+2*g, Bs+2*g), &
                                                                tau11(Bs+2*g, Bs+2*g), tau22(Bs+2*g, Bs+2*g), tau33(Bs+2*g, Bs+2*g), &
-                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g),mask(Bs+2*g, Bs+2*g),sponge(Bs+2*g, Bs+2*g,4)
-    ! derivatives
+                                                               tau12(Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g)
+                                                                 ! derivatives
     real(kind=rk)                                           :: u_x(Bs+2*g, Bs+2*g), u_y(Bs+2*g, Bs+2*g), v_x(Bs+2*g, Bs+2*g), v_y(Bs+2*g, Bs+2*g), &
                                                                p_x(Bs+2*g, Bs+2*g), p_y(Bs+2*g, Bs+2*g), T_x(Bs+2*g, Bs+2*g), T_y(Bs+2*g, Bs+2*g),&
                                                                div_U(Bs+2*g, Bs+2*g)
@@ -83,8 +83,6 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g)
 
-!---------------------------------------------------------------------------------------------
-! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -256,13 +254,6 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     rhs(:,:,3) = rhs(:,:,3) / phi(:,:,1)
 
     rhs(:,:,3) = rhs(:,:,3) + fric_v
-
-
-
-    if (params_ns%penalization) then
-        ! add volume penalization 
-        call add_constraints(rhs,Bs, g, x0,delta_x, phi)
-    endif
 
 
 end subroutine RHS_2D_navier_stokes

@@ -65,7 +65,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   ! on my section, which is the first and last light id?
   integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, heavy_id
   integer(kind=ik),allocatable        :: blocks_per_rank_list(:)
-  integer(kind=ik),allocatable        :: treecode(:), my_lgt_block(:,:)
+  integer(kind=ik),allocatable        :: treecode(:)
 
   !-----------------------------------------------------------------------------
   ! initialization
@@ -184,11 +184,7 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
   ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
   ! be synced. However, the light data has to.
-  allocate ( my_lgt_block(1:size(lgt_block,1),1:size(lgt_block,2)) )
-  my_lgt_block = lgt_block
-  lgt_block = 0
-  call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_MAX, MPI_COMM_WORLD, ierr)
-  deallocate( my_lgt_block )
+  call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
   ! as the grid has changed (we created it here), we now update the heavy and light
   ! active lists, as well as neighbor relations.

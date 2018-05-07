@@ -29,31 +29,32 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, simulation, hvy_work, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, simulation, hvy_work, hvy_synch, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 
-!---------------------------------------------------------------------------------------------
-! variables
+    !---------------------------------------------------------------------------------------------
+    ! variables
 
     implicit none
 
     !> user defined parameter structure
-    type (type_params), intent(inout)                 :: params
+    type (type_params), intent(inout)                   :: params
     !> light data array
-    integer(kind=ik), allocatable, intent(out)        :: lgt_block(:, :)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
-    real(kind=rk), allocatable, intent(out)           :: hvy_block(:, :, :, :, :)
+    real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy work array  )
-    real(kind=rk), allocatable, optional, intent(out) :: hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
+    integer(kind=1), allocatable, optional, intent(out) :: hvy_synch(:, :, :, :)
     !> neighbor array (heavy data)
-    integer(kind=ik), allocatable, intent(out)        :: hvy_neighbor(:,:)
+    integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)        :: lgt_active(:)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_active(:)
     !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)        :: hvy_active(:)
+    integer(kind=ik), allocatable, intent(out)          :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), allocatable, intent(out)     :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                  :: Bs, g, N_dF, number_blocks,&
+    integer(kind=ik)                                    :: Bs, g, N_dF, number_blocks,&
                                                       rank, number_procs, buffer_N, buffer_N_int
 
     !> send/receive buffer, integer and real
@@ -63,11 +64,11 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     logical, intent(in)                                  :: simulation
     integer(kind=ik)                                     :: rk_steps
 
-!---------------------------------------------------------------------------------------------
-! interfaces
+    !---------------------------------------------------------------------------------------------
+    ! interfaces
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
     ! set parameters for readability
     rank         = params%rank
     number_blocks   = params%number_blocks
@@ -89,14 +90,15 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         buffer_N_int = number_blocks * 12 * 3
     end if
 
-!---------------------------------------------------------------------------------------------
-! main body
+    !---------------------------------------------------------------------------------------------
+    ! main body
+
 
     if (rank == 0) then
-      write(*,'(80("_"))')
-      write(*,'(A)') "INIT: Beginning memory allocation and initialization."
-      write(*,'("INIT: mpisize=",i6)') params%number_procs
-      write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
+        write(*,'(80("_"))')
+        write(*,'(A)') "INIT: Beginning memory allocation and initialization."
+        write(*,'("INIT: mpisize=",i6)') params%number_procs
+        write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
     rk_steps = max(size(params%butcher_tableau,1)-1,params%N_fields_saved)
@@ -106,7 +108,11 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! datafields
         allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, N_dF, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        if (simulation) allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
+        if (simulation) then
+            allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
+            ! synch array, use for ghost nodes synchronization
+            allocate( hvy_synch( Bs+2*g, Bs+2*g, Bs+2*g, number_blocks ) )
+        end if
         ! 3D: maximal 74 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 74 ) )
     else
@@ -114,7 +120,11 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! datafields
         allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
         ! work data (Runge-Kutta substeps and old time level)
-        if (simulation) allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
+        if (simulation) then
+            allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
+            ! synch array, use for ghost nodes synchronization
+            allocate( hvy_synch( Bs+2*g, Bs+2*g, 1, number_blocks ) )
+        end if
         ! 2D: maximal 16 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 16 ) )
     end if
@@ -141,7 +151,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! reset data
     hvy_block = 9.99e99_rk
-    if (simulation) hvy_work = 9.99e99_rk
+    if (simulation) then
+        hvy_work = 9.99e99_rk
+        hvy_synch = -99
+    end if
     hvy_neighbor = -1
 
     ! allocate active list
@@ -151,16 +164,28 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     allocate( hvy_active( size(hvy_block, 5) ) )
 
     if (rank == 0) then
-      ! note we currently use 8byte per real and integer by default, so all the same bytes per point
-      write(*,'("INIT: Local memory footprint is ",g15.3,"GB per mpirank")') &
-      (size(hvy_block)+size(hvy_work)+size(lgt_block)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
-      write(*,'("INIT: TOTAL memory footprint is ",g15.3,"GB")') &
-      (size(hvy_block)+size(hvy_work)+size(lgt_block)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))*8.0_rk*real(number_procs,kind=rk)/1000.0_rk/1000.0_rk/1000.0_rk
+        if (simulation) then
+        ! note we currently use 8byte per real and integer by default, so all the same bytes per point
+        write(*,'("INIT: Local memory footprint is ",g15.3,"GB per mpirank")') &
+        (dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
+        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
+        + dble(size(real_send_buffer)) + dble(size(real_receive_buffer)) + dble(size(int_send_buffer)) &
+        + dble(size(int_receive_buffer)))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
 
-      write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
-      write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
-      write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
-    endif
+        write(*,'("INIT: TOTAL memory footprint is ",g15.3,"GB")') &
+        ((dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
+        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
+        + dble(size(real_send_buffer)) + dble(size(real_receive_buffer)) + dble(size(int_send_buffer)) &
+        + dble(size(int_receive_buffer)))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)
+
+        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
+        write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
+        write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
+          write(*,'("INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+          write(*,'("INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+        end if
+
+    end if
 
 
 end subroutine allocate_grid

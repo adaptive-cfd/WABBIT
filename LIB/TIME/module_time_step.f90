@@ -32,7 +32,7 @@ module module_time_step
 
     use module_operators, only: volume_integral
     ! to call RHS routines:
-    use module_physics_metamodule, only : RHS_meta, STATISTICS_meta
+    use module_physics_metamodule, only : RHS_meta, STATISTICS_meta, FILTER_meta
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -51,14 +51,9 @@ contains
     include "time_stepper.f90"
     include "set_RK_input.f90"
     include "RHS_wrapper.f90"
+    include "filter_wrapper.f90"
     include "statistics_wrapper.f90"
     include "final_stage_RK.f90"
-
-    ! filter
-    include "filter_block.f90"
-    include "filter_1D.f90"
-    include "wavelet_filter.f90"
-    include "bogey_filter.f90"
 
     ! dt calculation
     include "calculate_time_step.f90"

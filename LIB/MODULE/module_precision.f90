@@ -41,6 +41,8 @@ module module_precision
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+   integer(kind=ik)                            :: WABBIT_COMM
+
     interface abort
       module procedure abort1, abort2, abort3
     end interface
@@ -48,6 +50,15 @@ module module_precision
 ! main body
 
 contains
+  
+   !> \brief initialize global communicator of WABBIT MPI_World
+   subroutine set_mpi_comm_global(comm)
+      implicit none
+        integer, intent(in) :: comm
+
+      WABBIT_COMM=comm
+  end subroutine set_mpi_comm_global
+
 
   subroutine abort1(code,msg)
     implicit none
@@ -56,7 +67,7 @@ contains
     integer(kind=ik) :: mpierr
 
     write(*,*) msg
-    call MPI_ABORT( MPI_COMM_WORLD, code, mpierr)
+    call MPI_ABORT( WABBIT_COMM, code, mpierr)
   end subroutine
 
   subroutine abort2(code)
@@ -64,7 +75,7 @@ contains
     integer(kind=ik), intent(in) :: code
     integer(kind=ik) :: mpierr
 
-    call MPI_ABORT( MPI_COMM_WORLD, code, mpierr)
+    call MPI_ABORT( WABBIT_COMM, code, mpierr)
   end subroutine
 
   subroutine abort3(msg)
@@ -73,7 +84,7 @@ contains
     integer(kind=ik) :: mpierr
 
     write(*,*) msg
-    call MPI_ABORT( MPI_COMM_WORLD, 666, mpierr)
+    call MPI_ABORT( WABBIT_COMM, 666, mpierr)
   end subroutine
 
 end module module_precision

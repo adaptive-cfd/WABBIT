@@ -10,7 +10,7 @@ subroutine init_vortex_street(FILE)
   !call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/0.5_rk, 0.5_rk /) )
   !call read_param_mpi(FILE, 'VPM', 'radius', cyl%radius, 0.5_rk )
   cyl%x_cntr=(/ 0.2*domain_size(1) , 0.5*domain_size(2) /)  
-  cyl%radius=0.05*minval(domain_size)
+  cyl%radius=0.05_rk*min(domain_size(1),domain_size(2))
 
 end subroutine init_vortex_street
 
@@ -101,7 +101,7 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     T0      = 200.0_rk
     rho0    = 1.645_rk
     p0      = 101330.0_rk
-    u0      = 36.4_rk
+    u0      = 62.0_rk
 
     ! parameter for smoothing function (width)
     h       = 1.5_rk*max(dx(1), dx(2))

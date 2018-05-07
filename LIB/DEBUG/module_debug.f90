@@ -1,22 +1,18 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_debug.f90
+!===========================================================================
+!> Module for all debug subroutines
+!-------------------------------------------------------------------------!!!!
+!> \details
+!>
 !> \version 0.4
 !> \author msr
 !!
-!! \brief module for all debug subroutines
-!
-!>
-!! = log ======================================================================================
-!! \n
-!! 29/11/16 - create
+!!
+!> \date 29.11.16 - create
+!! \date 30.04.19 - check if debug arrays are allocated
+!!
 !!
 !! \todo  union with debug data structure
-! ********************************************************************************************
-
+! *****************************************************************************
 module module_debug
 
 !---------------------------------------------------------------------------------------------
@@ -25,10 +21,9 @@ module module_debug
     use mpi
     ! global parameters
     use module_params
-
+    use module_interpolation
 !---------------------------------------------------------------------------------------------
 ! variables
-
     implicit none
 
     !> global user defined debug structure
@@ -105,21 +100,27 @@ contains
 
       ! write time
       if ( params%debug ) then
-          ! find free or corresponding line
-          k = 1
-          do while ( debug%name_comp_time(k) /= "---" )
-              ! entry for current subroutine exists
-              if ( debug%name_comp_time(k) == name ) exit
-              k = k + 1
-          end do
-          ! write time
-          debug%name_comp_time(k) = name
-          if (present(call_counter)) then
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + real( call_counter, kind=rk)
-          else
-            debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1.0_rk
-          endif
-          debug%comp_time(k, 2)   = debug%comp_time(k, 2) + t_elapsed_this
+
+        ! check if allocate_init_debbuging was called before
+        if (.not. allocated(debug%name_comp_time)) then
+          call abort(5946,'ERROR [module_debug]: debug arrays are not allocated yet')
+        endif
+
+        ! find free or corresponding line
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! entry for current subroutine exists
+            if ( debug%name_comp_time(k) == name ) exit
+            k = k + 1
+        end do
+        ! write time
+        debug%name_comp_time(k) = name
+        if (present(call_counter)) then
+          debug%comp_time(k, 1)   = debug%comp_time(k, 1) + real( call_counter, kind=rk)
+        else
+          debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1.0_rk
+        endif
+        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + t_elapsed_this
       end if
 
     end subroutine toc

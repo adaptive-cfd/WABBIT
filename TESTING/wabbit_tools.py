@@ -83,7 +83,6 @@ def wabbit_error(dir, show=False, norm=2):
     exc = []
     for i in range(N):
         [X,Y] = np.meshgrid( np.arange(Bs)*dx[i,0]+x0[i,0] - 0.75, np.arange(Bs)*dx[i,1]+x0[i,1] -0.5 )
-        [X1,Y1] = np.meshgrid( np.arange(Bs)*dx[i,0]+x0[i,0], np.arange(Bs)*dx[i,1]+x0[i,1] )
 
         # periodization
         X[X<-0.5] = X[X<-0.5] + 1.0

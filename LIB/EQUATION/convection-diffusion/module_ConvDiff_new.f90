@@ -44,7 +44,7 @@ module module_convdiff_new
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
-    real(kind=rk) :: CFL, T_end
+    real(kind=rk) :: CFL, T_end, T_swirl
     real(kind=rk) :: Lx, Ly, Lz
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
@@ -124,8 +124,9 @@ contains
     call read_param_mpi(FILE, 'Saving', 'field_names', params_convdiff%names, (/"phi1","phi2","phi3"/) )
 
 
-    call read_param_mpi(FILE, 'Time', 'CFL', params_convdiff%CFL, 1.0_rk   )
-    call read_param_mpi(FILE, 'Time', 'time_max', params_convdiff%T_end, 1.0_rk   )
+    call read_param_mpi(FILE, 'Time', 'CFL', params_convdiff%CFL, 1.0_rk)
+    call read_param_mpi(FILE, 'Time', 'time_max', params_convdiff%T_end, 1.0_rk)
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'T_swirl', params_convdiff%T_swirl, params_convdiff%T_end)
 
     call clean_ini_file_mpi( FILE )
 
@@ -391,6 +392,20 @@ contains
       c0z = params_convdiff%z0(i)
 
       select case (params_convdiff%inicond(i))
+      case ("zero")
+          u(:,:,:,i) = 0.0_rk
+
+      case ("cyclogenesis")
+          do ix = 1, Bs+2*g
+              do iy = 1, Bs+2*g
+                  ! compute x,y coordinates from spacing and origin
+                  x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                  y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+
+                  u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i) )
+              end do
+          end do
+
       case("blob")
           if (params_convdiff%dim==2) then
             ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.

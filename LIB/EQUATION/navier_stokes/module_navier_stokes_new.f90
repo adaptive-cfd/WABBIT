@@ -540,6 +540,7 @@ contains
     dt = 9.9e9_rk
 
 
+
     if (maxval(abs(u))>1.0e7) then
         call abort(65761,"ERROR [module_navier_stokes_new.f90]: very large values in statevector")
     endif
@@ -553,14 +554,18 @@ contains
     endif
 
     ! calculate norm of velocity at every spatial point
-    if (UzF==-1) then
+    if (size(u,3)==1) then
         v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
         v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
 
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
+    if ( minval(u(:,:,:,pF))<0 ) then
+      call abort(23456,"Error [module_navier_stokes new]: pressure is smaller then 0!")
+    end if
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
+
     v_physical = v_physical/u(:,:,:,rhoF)
 
     ! CFL criteria CFL=v_physical/v_numerical where v_numerical=dx/dt
@@ -669,6 +674,7 @@ contains
          endif
       end do
 
+
       ! velocity set to 0
        u( :, :, :, UxF) = 0.0_rk
        u( :, :, :, UyF) = 0.0_rk
@@ -768,6 +774,7 @@ subroutine convert_statevector2D(phi,convert2format)
     ! vector containing the variables in the desired format
     real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
 
+
     select case( convert2format )
     case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
       ! density
@@ -810,6 +817,8 @@ subroutine pack_statevector2D(phi,format)
     real(kind=rk), intent(inout)      :: phi(1:,1:,1:)
     ! vector containing the variables in the desired format
     real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
+
+
 
     select case( format )
     case ("conservative") ! phi=(rho, rho u, rho v, e_tot)

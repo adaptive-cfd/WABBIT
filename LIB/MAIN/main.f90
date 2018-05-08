@@ -285,12 +285,19 @@ program main
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
+        if (rank==0) then
+            write(*,'(80("-"))')
+            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
+             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             max_active_level( lgt_block, lgt_active, lgt_n )
+
+        end if
+
         ! check redundant nodes
         if ( params%test_redundant_nodes ) then
 
             ! output
             if (rank==0) then
-                write(*,'(80("-"))')
                 write(*, '("DEBUG: start redundant nodes test")')
             end if
 
@@ -331,9 +338,8 @@ program main
 
         ! output on screen
         if (rank==0) then
-            write(*,'(80("-"))')
-            write(*, '("RUN: iteration=",i7,3x," time=",f16.9,3x," active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
-             iteration, time, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+            write(*, '("RUN: adapt the mesh, active blocks=",i7," Jmin=",i2," Jmax=",i2)') &
+             lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
 
         end if

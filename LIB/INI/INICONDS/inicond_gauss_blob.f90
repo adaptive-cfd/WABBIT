@@ -71,12 +71,15 @@ subroutine inicond_gauss_blob( params, u, x0, dx )
       do ix = g+1,Bs+g
         do iy = g+1,Bs+g
           do iz = g+1,Bs+g
+
             ! compute x,y coordinates from spacing and origin
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             y = dble(iy-(g+1)) * dx(2) + x0(2)
             z = dble(iz-(g+1)) * dx(3) + x0(3)
+
             ! shift to new gauss blob center
-            ! call shift_x_y( x, y, params%Lx,params%Ly )
+            call shift_x_y_z( x, y, z, params%Lx,params%Ly, params%Lz )
+
             ! set actual inicond gauss blob
             u(ix,iy,iz,1) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / sigma )
           end do
@@ -137,3 +140,48 @@ subroutine shift_x_y( x, y, Lx, Ly )
     end if
 
 end subroutine shift_x_y
+
+! function to ensure periodicity:
+! shift center of gauss blob to center of computational domain
+! if then point(x,y) outside domain -> set coordinates to (periodic) interior point
+subroutine shift_x_y_z( x, y, z, Lx, Ly, Lz )
+
+    use module_params
+
+    implicit none
+
+    ! coordinates
+    real(kind=rk), intent(inout)   :: x, y, z
+    ! domain size
+    real(kind=rk), intent(in)       :: Lx, Ly, Lz
+
+    x = x
+    y = y - 0.25_rk
+    z = z - 0.25_rk
+
+    ! check boundary
+    if ( y < 0.0_rk ) then
+        y = Ly + y
+    end if
+
+    if ( x < 0.0_rk ) then
+        x = Lx + x
+    end if
+
+    if ( z < 0.0_rk ) then
+        z = Lz + z
+    end if
+
+    if ( y > Ly ) then
+        y = Ly - y
+    end if
+
+    if ( x > Lx ) then
+        x = Lx - x
+    end if
+
+    if ( z > Lz ) then
+        z = Lz - z
+    end if
+
+end subroutine shift_x_y_z

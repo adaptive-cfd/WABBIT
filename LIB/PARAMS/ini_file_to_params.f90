@@ -286,6 +286,31 @@ subroutine ini_file_to_params( params, filename )
             ! read file
             call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
 
+        case('3D_advection')
+            ! domain size
+            call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Ly', params%Ly, 1.0_rk )
+            call read_param_mpi(FILE, 'Physics', 'Lz', params%Lz, 1.0_rk )
+
+            ! use convection velocity for time step calculation
+            allocate( params%physics%u0( 3*params%number_data_fields ) )
+
+
+            ! reset values, use as default values
+            params%physics%u0 = 0.0_rk
+            ! read velocity
+            call read_param_mpi(FILE, 'Physics', 'u0', params%physics%u0, params%physics%u0 )
+
+            ! read variable names
+            ! allocate names list
+            ! use convection-diffusion physics struct !
+            allocate( params%physics%names( params%number_data_fields ) )
+
+
+            params%physics%names = "---"
+            ! read file
+            call read_param_mpi(FILE, 'Physics', 'names', params%physics%names, params%physics%names )
+
         case('2D_acm')
             ! domain size
             call read_param_mpi(FILE, 'Physics', 'Lx', params%Lx, 1.0_rk )

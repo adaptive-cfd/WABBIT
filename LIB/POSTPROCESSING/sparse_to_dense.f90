@@ -37,8 +37,7 @@ subroutine sparse_to_dense(help, params)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable              :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    integer(hsize_t), dimension(4)          :: size_field
-    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k
+    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length, dim
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
     real(kind=rk), dimension(3)             :: domain
@@ -77,6 +76,11 @@ subroutine sparse_to_dense(help, params)
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
     ! we do not read an ini file, so defaults may not be set.
     params%non_uniform_mesh_correction = 1 ! This is an important switch for the OLD ghost nodes.
+    params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
+    ! we read only one datafield in this routine
+    params%number_data_fields  = 1
+    params%block_distribution="sfc_hilbert"
+
 
     if (params%rank==0) then
         write(*,'(80("-"))')
@@ -89,29 +93,23 @@ subroutine sparse_to_dense(help, params)
         write(*,'(80("-"))')
     endif
 
-    ! get some parameters from file
-    call open_file_hdf5( trim(adjustl(file_in)), file_id, .false.)
-    if ( params%threeD_case ) then
-        call get_size_datafield(4, file_id, "blocks", size_field)
-    else
-        call get_size_datafield(3, file_id, "blocks", size_field(1:3))
-        size_field(4) = 0
-    end if
-    params%number_block_nodes = int(size_field(1),kind=ik)
-    call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
-    call close_file_hdf5(file_id)
-
-    call read_attributes(file_in, lgt_n, time, iteration, domain)
+    ! read attributes from file. This is especially important for the number of
+    ! blocks the file contains: this will be the number of active blocks right
+    ! after reading.
+    call read_attributes(file_in, lgt_n, time, iteration, domain, bs, tc_length, dim)
 
     if (params%rank==0) then
-        write(*,'("Size of blocks-array in file: ",4(i6,1x))') size_field
-        write(*,'("So the file contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, params%number_block_nodes
+        write(*,'("Data dimension: ",i1,"D")') dim
+        write(*,'("So the file contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, bs
+        write(*,'("Domain size is ",3(g12.4,1x))') domain
+        write(*,'("Time=",g12.4," it=",i9)') time, iteration
+        write(*,'("Length of treecodes in file=",i3)') tc_length
     endif
 
     ! set max_treelevel for allocation of hvy_block
-    params%max_treelevel = max(level, int(dims_treecode(1), kind=ik))
+    params%max_treelevel = max(level, tc_length)
     params%min_treelevel = level
-
+    params%number_block_nodes = bs
     params%Lx = domain(1)
     params%Ly = domain(2)
     if (params%threeD_case) then
@@ -127,8 +125,6 @@ subroutine sparse_to_dense(help, params)
     !> \todo change that for 3d case
     params%number_blocks = max(4_ik*lgt_n/params%number_procs, 4_ik*number_dense_blocks/params%number_procs)
 
-    params%number_data_fields  = 1
-    params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
         hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, int_send_buffer,&
@@ -138,6 +134,7 @@ subroutine sparse_to_dense(help, params)
     ! read field
     call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
     call read_field(file_in, 1, params, hvy_block, hvy_n)
+
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_active_and_sorted_lists( params, lgt_block, &
@@ -145,10 +142,9 @@ subroutine sparse_to_dense(help, params)
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, &
         lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
     ! balance the load
-    params%block_distribution="sfc_hilbert"
-    call balance_load(params, lgt_block, hvy_block,&
-        hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
 
     ! create lists of active blocks (light and heavy data) after load balancing (have changed)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
@@ -157,7 +153,6 @@ subroutine sparse_to_dense(help, params)
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active,&
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    write(*,*) shape(lgt_block), "hvy:", shape(hvy_block)
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
     com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
@@ -211,8 +206,8 @@ subroutine sparse_to_dense(help, params)
         hvy_block, lgt_active, lgt_n, hvy_n)
 
     if (params%rank==0 ) then
-        write(*,'("Wrote data of input-file",a20," now on uniform grid (level",i3, ") to file",a20)'), &
-            trim(file_in), level, trim(file_out)
+        write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)'), &
+            trim(adjustl(file_in)), level, trim(adjustl(file_out))
          write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")'), &
              min_active_level( lgt_block, lgt_active, lgt_n ),&
              max_active_level( lgt_block, lgt_active, lgt_n )

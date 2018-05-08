@@ -82,10 +82,14 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
-    if ( (rank == 0) ) then
+    if ( rank == 0 ) then
         write(*,'(80("_"))')
         write(*,'(A)') "READING: initializing grid from file..."
-        write(*,'( "Nblocks=",i6," (on all cpus)")') lgt_n
+        write(*,'("Filename: ",A)') trim(adjustl(fname))
+        ! NOTE: we pass the routine lgt_n, which must be previsouly read from the
+        ! file. This is done using read_attributes. This can possibly be merged here
+        ! and mustnt be done in the caller
+        write(*,'("Expected Nblocks=",i6," (on all cpus)")') lgt_n
         ! check if there is already some data on the grid
         if ( maxval(lgt_block(:,1))>=0 ) then
             write(*,'(A)') "ERROR: READ_MESH is called with NON_EMPTY DATA!!!!!"
@@ -158,5 +162,13 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
 
     deallocate(my_lgt_block)
     deallocate(block_treecode)
+
+    ! it is useful to print out the information on active levels in the file
+    ! to get an idea how it looks like and if the desired dense level is larger
+    ! or smaller
+    if (params%rank==0) then
+        write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
+        max_active_level( lgt_block )
+    endif
 
 end subroutine read_mesh

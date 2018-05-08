@@ -46,6 +46,7 @@ module module_hdf5_wrapper
     use mpi
     ! global parameters
     use module_params
+    use module_precision
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -161,6 +162,28 @@ contains
     ! Close dataset
     call h5dclose_f(dset_id, error)
   end subroutine get_size_datafield
+
+
+  subroutine get_rank_datafield(file_id, dsetname, datarank)
+    implicit none
+    ! returns dimensionality (datarank) of the array in the file (e.g. 4D array)
+    integer, intent(out)             :: datarank ! data dimensionality (2D or 3D)
+    integer(hid_t), intent(in)                :: file_id
+    character(len=*),intent(in)               :: dsetname
+    integer(hid_t)                            :: dset_id       ! dataset identifier
+    integer(hid_t)                            :: filespace     ! dataspace identifier in file
+    integer                                   :: error  ! error flags
+
+    ! Open an existing dataset.
+    call h5dopen_f(file_id, dsetname, dset_id, error)
+    ! get its dataspace
+    call h5dget_space_f(dset_id, filespace, error)
+    ! get the dimensions of the field in the file
+    call h5sget_simple_extent_ndims_f(filespace, datarank, error)
+    ! Close dataset
+    call h5dclose_f(dset_id, error)
+end subroutine get_rank_datafield
+
 
   subroutine read_int_dset_mpi_hdf5_2D(file_id, dsetname, lbounds, ubounds, field )
     implicit none

@@ -1797,7 +1797,7 @@ subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch,
 
                     ! count synchronized data
                     ! note: only for first datafield
-                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1
+                    if (dF==1) hvy_synch( i, j, k, hvy_id ) = hvy_synch( i, j, k, hvy_id ) + 1_1
 
                     ! increase buffer counter
                     buffer_i = buffer_i + 1

@@ -39,9 +39,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
 
     ! real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:2)
     real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3)
-    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv,nu
-    real(kind=rk) :: u_dx, u_dy, u_dxdx, u_dydy
-    real(kind=rk) :: u_dz, u_dzdz
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu
+    real(kind=rk) :: u_dx, u_dy, u_dz
+    real(kind=rk) :: u_dxdx, u_dydy, u_dzdz
     real(kind=rk) :: xcb, ycb, beta, x,y, sech
     ! loop variables
     integer(kind=ik) :: ix, iy, iz, i, N, ia1, ia2, ib1, ib2, ia, ib
@@ -172,6 +172,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
             ! 3D
             !!!!!!!!!!!!!
         else
+            dz_inv = 1.0_rk / dx(3)
+            dz2_inv = 1.0_rk / (dx(3)**2)
             ! create the advection velocity field, which may be time and space dependent
             call create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
 
@@ -180,43 +182,82 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
                 !-----------------------------------------------------------------------
                 ! 3D, 2nd order
                 !-----------------------------------------------------------------------
-                do ix = g+1, Bs+g
-                    do iy = g+1, Bs+g
-                        do iz = g+1, Bs+g
-                            u_dx = (phi(ix+1,iy,iz,i)-phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
-                            u_dy = (phi(ix,iy+1,iz,i)-phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
-                            ! u_dz = (phi(ix,iy,iz+1,i)-phi(ix,iy,iz-1,i))*dy_inv*0.5_rk
+                if (nu>=1.0e-10) then ! with viscosity
+                    do ix = g+1, Bs+g
+                        do iy = g+1, Bs+g
+                            do iz = g+1, Bs+g
+                                u_dx = (phi(ix+1,iy,iz,i) - phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
+                                u_dy = (phi(ix,iy+1,iz,i) - phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
+                                u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
 
-                            ! u_dxdx = (phi(ix-1,iy,iz,i)-2.0_rk*phi(ix,iy,iz,i)+phi(ix+1,iy,iz,i))*dx2_inv
-                            ! u_dydy = (phi(ix,iy-1,iz,i)-2.0_rk*phi(ix,iy,iz,i)+phi(ix,iy+1,iz,i))*dy2_inv
-                            ! u_dzdz = (phi(ix,iy,iz-1,i)-2.0_rk*phi(ix,iy,iz,i)+phi(ix,iy,iz+1,i))*dy2_inv
+                                u_dxdx = (phi(ix-1,iy,iz,i) -2.0_rk*phi(ix,iy,iz,i) + phi(ix+1,iy,iz,i))*dx2_inv
+                                u_dydy = (phi(ix,iy-1,iz,i) -2.0_rk*phi(ix,iy,iz,i) + phi(ix,iy+1,iz,i))*dy2_inv
+                                u_dzdz = (phi(ix,iy,iz-1,i) -2.0_rk*phi(ix,iy,iz,i) + phi(ix,iy,iz+1,i))*dz2_inv
 
-                            rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy !-u0(ix,iy,iz,3)*u_dz !&
-                            ! + nu*(u_dxdx+u_dydy+u_dzdz)
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz &
+                                + nu*(u_dxdx+u_dydy+u_dzdz)
+                            end do
                         end do
                     end do
-                end do
+                else ! no viscosity
+                    do ix = g+1, Bs+g
+                        do iy = g+1, Bs+g
+                            do iz = g+1, Bs+g
+                                u_dx = (phi(ix+1,iy,iz,i) - phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
+                                u_dy = (phi(ix,iy+1,iz,i) - phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
+                                u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
+
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
+                            end do
+                        end do
+                    end do
+                endif
 
             case("FD_4th_central_optimized")
                 !-----------------------------------------------------------------------
                 ! 3D, 4th order
                 !-----------------------------------------------------------------------
-                ! do ix = g+1, Bs+g
-                !     do iy = g+1, Bs+g
-                !         ! gradient
-                !         u_dx = (a(-3)*phi(ix-3,iy,i) + a(-2)*phi(ix-2,iy,i) + a(-1)*phi(ix-1,iy,i) + a(0)*phi(ix,iy,i)&
-                !         +  a(+3)*phi(ix+3,iy,i) + a(+2)*phi(ix+2,iy,i) + a(+1)*phi(ix+1,iy,i))*dx_inv
-                !         u_dy = (a(-3)*phi(ix,iy-3,i) + a(-2)*phi(ix,iy-2,i) + a(-1)*phi(ix,iy-1,i) + a(0)*phi(ix,iy,i)&
-                !         +  a(+3)*phi(ix,iy+3,i) + a(+2)*phi(ix,iy+2,i) + a(+1)*phi(ix,iy+1,i))*dy_inv
-                !
-                !         u_dxdx = (b(-2)*phi(ix-2,iy,1) + b(-1)*phi(ix-1,iy,1) + b(0)*phi(ix,iy,1)&
-                !         + b(+1)*phi(ix+1,iy,1) + b(+2)*phi(ix+2,iy,1))*dx2_inv
-                !         u_dydy = (b(-2)*phi(ix,iy-2,1) + b(-1)*phi(ix,iy-1,1) + b(0)*phi(ix,iy,1)&
-                !         + b(+1)*phi(ix,iy+1,1) + b(+2)*phi(ix,iy+2,1))*dy2_inv
-                !
-                !         rhs(ix,iy,i) = -u0(ix,iy,1)*u_dx -u0(ix,iy,2)*u_dy + nu*(u_dxdx+u_dydy)
-                !     end do
-                ! end do
+                if (nu>=1.0e-10) then ! with viscosity
+                    do ix = g+1, Bs+g
+                        do iy = g+1, Bs+g
+                            do iz = g+1, Bs+g
+                                ! gradient
+                                u_dx = (a(-3)*phi(ix-3,iy,iz,i) + a(-2)*phi(ix-2,iy,iz,i) + a(-1)*phi(ix-1,iy,iz,i) + a(0)*phi(ix,iy,iz,i)&
+                                     +  a(+3)*phi(ix+3,iy,iz,i) + a(+2)*phi(ix+2,iy,iz,i) + a(+1)*phi(ix+1,iy,iz,i))*dx_inv
+                                u_dy = (a(-3)*phi(ix,iy-3,iz,i) + a(-2)*phi(ix,iy-2,iz,i) + a(-1)*phi(ix,iy-1,iz,i) + a(0)*phi(ix,iy,iz,i)&
+                                     +  a(+3)*phi(ix,iy+3,iz,i) + a(+2)*phi(ix,iy+2,iz,i) + a(+1)*phi(ix,iy+1,iz,i))*dy_inv
+                                u_dz = (a(-3)*phi(ix,iy,iz-3,i) + a(-2)*phi(ix,iy,iz-2,i) + a(-1)*phi(ix,iy,iz-1,i) + a(0)*phi(ix,iy,iz,i)&
+                                     +  a(+3)*phi(ix,iy,iz+3,i) + a(+2)*phi(ix,iy,iz+2,i) + a(+1)*phi(ix,iy,iz+1,i))*dz_inv
+
+                                u_dxdx = (b(-2)*phi(ix-2,iy,iz,i) + b(-1)*phi(ix-1,iy,iz,i) + b(0)*phi(ix,iy,iz,i)&
+                                       +  b(+1)*phi(ix+1,iy,iz,i) + b(+2)*phi(ix+2,iy,iz,i))*dx2_inv
+                                u_dydy = (b(-2)*phi(ix,iy-2,iz,i) + b(-1)*phi(ix,iy-1,iz,i) + b(0)*phi(ix,iy,iz,i)&
+                                       +  b(+1)*phi(ix,iy+1,iz,i) + b(+2)*phi(ix,iy+2,iz,i))*dy2_inv
+                                u_dzdz = (b(-2)*phi(ix,iy,iz-2,i) + b(-1)*phi(ix,iy,iz-1,i) + b(0)*phi(ix,iy,iz,i)&
+                                       +  b(+1)*phi(ix,iy,iz+1,i) + b(+2)*phi(ix,iy,iz+2,i))*dy2_inv
+
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz + nu*(u_dxdx+u_dydy+u_dzdz)
+
+                            end do
+                        end do
+                    end do
+                else ! no viscosity
+                    do ix = g+1, Bs+g
+                        do iy = g+1, Bs+g
+                            do iz = g+1, Bs+g
+                                ! gradient
+                                u_dx = (a(-3)*phi(ix-3,iy,iz,i) + a(-2)*phi(ix-2,iy,iz,i) + a(-1)*phi(ix-1,iy,iz,i) + a(0)*phi(ix,iy,iz,i)&
+                                     +  a(+3)*phi(ix+3,iy,iz,i) + a(+2)*phi(ix+2,iy,iz,i) + a(+1)*phi(ix+1,iy,iz,i))*dx_inv
+                                u_dy = (a(-3)*phi(ix,iy-3,iz,i) + a(-2)*phi(ix,iy-2,iz,i) + a(-1)*phi(ix,iy-1,iz,i) + a(0)*phi(ix,iy,iz,i)&
+                                     +  a(+3)*phi(ix,iy+3,iz,i) + a(+2)*phi(ix,iy+2,iz,i) + a(+1)*phi(ix,iy+1,iz,i))*dy_inv
+                                u_dz = (a(-3)*phi(ix,iy,iz-3,i) + a(-2)*phi(ix,iy,iz-2,i) + a(-1)*phi(ix,iy,iz-1,i) + a(0)*phi(ix,iy,iz,i)&
+                                     +  a(+3)*phi(ix,iy,iz+3,i) + a(+2)*phi(ix,iy,iz+2,i) + a(+1)*phi(ix,iy,iz+1,i))*dz_inv
+
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
+                            end do
+                        end do
+                    end do
+                endif
 
             case default
                 call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
@@ -238,7 +279,7 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
     real(kind=rk), parameter :: tau= 0.30_rk, t0=0.0_rk, t1=0.55_rk, t2=1.0_rk, u1=1.0_rk, u2=-1.2221975311385904
     real(kind=rk) :: u_this
 
-    integer :: ix,iy, N
+    integer(kind=ik) :: ix,iy
     real(kind=rk) :: x,y,c0x,c0y, T, c0,c1,c2,c3, phi, r, ut
 
     u0 = 0.0_rk
@@ -251,8 +292,8 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
 
     select case(params_convdiff%velocity(i))
     case ("cyclogenesis")
-        do iy = 1, Bs + 2*g
-            do ix = 1, Bs + 2*g
+        do ix = 1, Bs + 2*g
+            do iy = 1, Bs + 2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
                 ! radius
@@ -269,8 +310,8 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
 
     case ("swirl")
 
-        do iy = 1, Bs + 2*g
-            do ix = 1, Bs + 2*g
+        do ix = 1, Bs + 2*g
+            do iy = 1, Bs + 2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
 
@@ -297,10 +338,25 @@ subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
     real(kind=rk), intent(in) :: dx(1:3), x0(1:3)
     real(kind=rk), intent(inout) :: u0(:,:,:,1:)
 
-    integer :: ix,iy, N
-    real(kind=rk) :: x,y,c0x,c0y, T
+    integer(kind=ik) :: ix, iy, iz
+    real(kind=rk) :: x, y, z, c0x, c0y, c0z, T
 
     select case(params_convdiff%velocity(i))
+    case ("swirl-helix")
+        do ix = 1, Bs + 2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            do iy = 1, Bs + 2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                do iz = 1, Bs + 2*g
+                    z = dble(iz-(g+1)) * dx(3) + x0(3)
+
+                    u0(ix,iy,iz,1) = cos((pi*time)/T) * (sin(pi*x))**2 * sin(2*pi*y)
+                    u0(ix,iy,iz,2) = cos((pi*time)/T) * (sin(pi*y))**2 * (-sin(2*pi*x))
+                    u0(ix,iy,iz,3) = cos((pi*time)/T)
+                end do
+            end do
+        end do
+
     case("constant")
         u0(:,:,:,1) = params_convdiff%u0x(i)
         u0(:,:,:,2) = params_convdiff%u0y(i)

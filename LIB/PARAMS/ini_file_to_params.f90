@@ -116,7 +116,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
     ! read output write frequency
     call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
-    ! assume start at time 0.0 
+    ! assume start at time 0.0
     params%next_write_time = 0.0_rk + params%write_time
     ! read value of fixed time step
     call read_param_mpi(FILE, 'Time', 'dt_fixed', params%dt_fixed, 0.0_rk )

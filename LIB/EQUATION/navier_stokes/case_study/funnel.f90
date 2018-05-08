@@ -294,7 +294,7 @@ subroutine mean_quant(integral,area)
     call MPI_ALLREDUCE(tmp  ,integral, Nq , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
     call MPI_ALLREDUCE(area ,A       , 1  , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
-    if (A==0) then
+    if ( abs(A) <= 1.0e-13_rk) then
       call abort(24636,"Error [funnel.f90]: only chuck norris can devide by zero!!")
     endif
 

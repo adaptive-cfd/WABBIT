@@ -481,7 +481,7 @@ end subroutine wavelet_filter
 !! \date 21/09/17 - create
 !! \date 29/04/18 - update for new physics branch (pKrah)
 
-subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
+subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -489,6 +489,8 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
     implicit none
     !> params structure of navier stokes
     type(type_params_filter),intent(in) :: filter
+    !> grid parameter
+    integer(kind=ik), intent(in)        :: g, Bs, N_dF
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
     !> heavy work
@@ -499,8 +501,6 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
 
     ! loop parameter
     integer(kind=ik)                    :: i, j, l, dF
-!    ! grid parameter
-!    integer(kind=ik)                    :: Bs, g, N_dF
 
     ! filtered values and array for old block data
     real(kind=rk)                       :: phi_tilde(3), r_xyz(3), r_th, eps, c1, c2, c_stencil(4)
@@ -518,8 +518,6 @@ subroutine bogey_filter(filter,Bs,g,N_dF, block_data,xx0,ddx,hvy_WORK)
 
     ! /todo: move to ini file
     character(len=80)                   :: detector_method, sigma_method
-    !> grid parameter
-    integer(kind=ik)                    :: g, Bs,N_dF
 
 !---------------------------------------------------------------------------------------------
 ! interfaces

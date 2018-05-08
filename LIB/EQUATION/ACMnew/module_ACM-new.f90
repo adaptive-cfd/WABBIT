@@ -8,7 +8,7 @@
 !> \version 0.5
 !> \author engels
 !! \date pls add creation date
-!!    
+!!
 ! ********************************************************************************************
 
 module module_acm_new
@@ -495,7 +495,7 @@ contains
               params_acm%error(4:6) = params_acm%error(4:6) + sqrt(tmp(1:3)**2)
           end do
         end do
-	params_acm%error = params_acm%error*dx(1)*dx(2)
+        params_acm%error = params_acm%error*dx(1)*dx(2)
       end if
 
       ! compute force
@@ -620,7 +620,7 @@ contains
 
     real(kind=rk)    :: x,y
     integer(kind=ik) :: Bs, ix, iy
-    
+
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 

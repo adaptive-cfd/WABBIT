@@ -130,7 +130,7 @@ $(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/m
 	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes_new.o $(OBJDIR)/module_ACM-new.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o
+$(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \

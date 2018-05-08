@@ -33,7 +33,7 @@ subroutine post_mean(params, help)
   integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
   integer(hsize_t), dimension(4)          :: size_field
   integer(hid_t)                          :: file_id
-  integer(kind=ik)                        :: lgt_id, k, Bs, nz, iteration, lgt_n, hvy_n
+  integer(kind=ik)                        :: lgt_id, k, Bs, nz, iteration, lgt_n, hvy_n, dim
   real(kind=rk), dimension(3)             :: x0, dx
   real(kind=rk), dimension(3)             :: domain
   real(kind=rk)                           :: time
@@ -44,7 +44,7 @@ subroutine post_mean(params, help)
   real(kind=rk)    :: x,y,z
   real(kind=rk)    :: maxi,mini,squari,meani,qi
   real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-  integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, g
+  integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, g, tc_length
 
 
 
@@ -63,29 +63,14 @@ subroutine post_mean(params, help)
   write (*,*) "Computing spatial mean of file: "//trim(adjustl(fname))
   call check_file_exists( fname )
 
-  ! ! get some parameters from the file
-  call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
+  ! et some parameters from the file
+  call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
 
-  if ( params%threeD_case ) then
-    call get_size_datafield(4, file_id, "blocks", size_field)
-  else
-    call get_size_datafield(3, file_id, "blocks", size_field(1:3))
-  end if
-
-  call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
-  params%max_treelevel = int(dims_treecode(1), kind=ik)
-
-  call close_file_hdf5(file_id)
-
-  params%number_block_nodes = int(size_field(1),kind=ik)
+  params%number_block_nodes = Bs
   params%number_data_fields = 1
   params%number_ghost_nodes = 0
   g = 0
-
-
-write(*,*) " here it comes"
-  call read_attributes(fname, lgt_n, time, iteration, domain)
-
+  params%max_treelevel = tc_length
   params%Lx = domain(1)
   params%Ly = domain(2)
   params%Lz = domain(3)
@@ -105,7 +90,6 @@ write(*,*) " here it comes"
 
   ! compute an additional quantity that depends also on the position
   ! (the others are translation invariant)
-  Bs = params%number_block_nodes
   if (params%threeD_case) then
     nz = Bs
   else

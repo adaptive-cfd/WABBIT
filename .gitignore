@@ -9,3 +9,7 @@ TESTING/B_SWIRL/adaptiv*_swirl-*
 *.log
 *.t
 *.h5
+*.o
+*.mod
+OBJ
+*.xmf

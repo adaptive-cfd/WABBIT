@@ -36,97 +36,97 @@ module module_params
     type type_params
 
         ! maximal time for main time loop
-        real(kind=rk)                                :: time_max
+        real(kind=rk)                                :: time_max=0.0_rk
         ! CFL criteria for time step calculation
-        real(kind=rk)                                :: CFL
+        real(kind=rk)                                :: CFL=0.0_rk
         ! dt
-        real(kind=rk)                                :: dt_fixed, dt_max
+        real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
-        integer(kind=ik)                             :: nt, inicond_refinements
+        integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
         ! data writing frequency
-        integer(kind=ik)                             :: write_freq
+        integer(kind=ik)                             :: write_freq=0
         ! data writing frequency
-        character(len=80)                            :: write_method
+        character(len=80)                            :: write_method="fixed_time"
         ! data writing frequency
-        real(kind=rk)                                :: write_time
+        real(kind=rk)                                :: write_time=0.1_rk
         ! data next write time, store here the next time for output data
-        real(kind=rk)                                :: next_write_time
+        real(kind=rk)                                :: next_write_time=0.0_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau
 
         ! threshold for wavelet indicator
-        real(kind=rk)                                :: eps
+        real(kind=rk)                                :: eps=0.0_rk
         ! minimal level for blocks in data tree
-        integer(kind=ik)                             :: min_treelevel
+        integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree
-        integer(kind=ik)                             :: max_treelevel
+        integer(kind=ik)                             :: max_treelevel=0
 
         ! order of refinement predictor
-        character(len=80)                            :: order_predictor
+        character(len=80)                            :: order_predictor=""
         ! order of spatial discretization
-        character(len=80)                            :: order_discretization
+        character(len=80)                            :: order_discretization=""
         ! boundary condition
-        character(len=80)                            :: boundary_cond
+        character(len=80)                            :: boundary_cond=""
         ! initial condition
-        character(len=80)                            :: initial_cond
+        character(len=80)                            :: initial_cond=""
         ! files we want to read for inital cond.
         character(len=80), dimension(:), allocatable :: input_files
 
         ! grid parameter
-        integer(kind=ik)                             :: number_domain_nodes
-        integer(kind=ik)                             :: number_block_nodes
-        integer(kind=ik)                             :: number_ghost_nodes
+        integer(kind=ik)                             :: number_domain_nodes=0
+        integer(kind=ik)                             :: number_block_nodes=0
+        integer(kind=ik)                             :: number_ghost_nodes=0
 
         ! switch for mesh adaption
-        logical                                      :: adapt_mesh, adapt_inicond
+        logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
 
         ! number of allocated heavy data fields per process
-        integer(kind=ik)                             :: number_blocks
+        integer(kind=ik)                             :: number_blocks=0
         ! number of allocated data fields in heavy data array, number of fields in heavy work data (depend from time step scheme, ...)
-        integer(kind=ik)                             :: number_data_fields
-        integer(kind=ik)                             :: number_fields
+        integer(kind=ik)                             :: number_data_fields=0
+        integer(kind=ik)                             :: number_fields=0
 
         ! block distribution for load balancing (also used for start distribution)
-        character(len=80)                            :: block_distribution
+        character(len=80)                            :: block_distribution=""
 
         ! debug flag
         logical                                      :: debug=.false.
 
         ! use non-uniform mesh correction
-        logical                                      :: non_uniform_mesh_correction
+        logical                                      :: non_uniform_mesh_correction=.true.
 
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------
         ! physics type
-        character(len=80)                            :: physics_type
+        character(len=80)                            :: physics_type=""
 
         ! domain length
-        real(kind=rk)                                :: Lx, Ly, Lz
+        real(kind=rk)                                :: Lx=0.0_rk, Ly=0.0_rk, Lz=0.0_rk
 
         ! use third dimension
-        logical                                     :: threeD_case
-        integer(kind=ik)                            :: dim ! can be 2 or 3
+        logical                                     :: threeD_case=.false.
+        integer(kind=ik)                            :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
-        real(kind=rk)    :: tsave_stats, next_stats_time=0.0_rk
-        integer(kind=ik) :: nsave_stats
+        real(kind=rk)    :: tsave_stats=0.0_rk, next_stats_time=0.0_rk
+        integer(kind=ik) :: nsave_stats=0
 
         ! -------------------------------------------------------------------------------------
         ! MPI
         ! -------------------------------------------------------------------------------------
         ! data exchange method
-        character(len=80)                           :: mpi_data_exchange
+        character(len=80)                           :: mpi_data_exchange=""
         ! process rank
-        integer(kind=ik)                            :: rank
+        integer(kind=ik)                            :: rank=-1
         ! number of processes
-        integer(kind=ik)                            :: number_procs
+        integer(kind=ik)                            :: number_procs=-1
         ! WABBIT communicator
         integer(kind=ik)                            :: WABBIT_COMM
-        
+
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
@@ -138,26 +138,26 @@ module module_params
                !! particle connection
         !--------------------------------------------------------------------------------------
         !! - description of the connection
-        character(len=80)                :: particleConnection
+        character(len=80)                :: particleConnection=""
         !! - folder where particle data is stored
-        character(len=100)               :: particleDataFolder
+        character(len=100)               :: particleDataFolder=""
         !! - file name of the particle data
-        character(len=100)               :: particleDataFile
+        character(len=100)               :: particleDataFile=""
         !! - file name of the particle data parameters
-        character(len=100)               :: particleDataParams
+        character(len=100)               :: particleDataParams=""
         !! - command to use for the particle program (over bridge)
-        character(len=100)               :: particleCommand
+        character(len=100)               :: particleCommand=""
         !! - Usage of a common myWorld_comm
         logical                          :: bridgeCommonMPI
         !! - Consideration of the particle side as master in case of several myWorld_comms
         logical                          :: bridgeFluidMaster
-  
+
 
 
         ! -------------------------------------------------------------------------------------
         ! saving
         ! -------------------------------------------------------------------------------------
-        integer(kind=ik) :: N_fields_saved
+        integer(kind=ik) :: N_fields_saved=0
         character(len=80), allocatable, dimension(:) :: field_names
 
 

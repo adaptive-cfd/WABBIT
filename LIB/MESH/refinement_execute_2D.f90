@@ -10,10 +10,10 @@
 !> \brief Refine mesh (2D version). All cpu loop over their heavy data and check if the refinement
 !! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
 !! level and create four new blocks, each carrying a part of the interpolated data.
-!! As all CPU first work individually, the light data array is synced.
+!! As all CPU first work individually, the light data array is synced afterwards.
 !
-!> \note The interpolation (or prediction) operator here is applied to a block EXCLUDING
-!! any ghost nodes.
+!> \note The interpolation (or prediction) operator here is applied to a block INCLUDING
+!! any ghost nodes. You must sync first.
 !
 !> \details
 !! input:    - params, light and heavy data \n
@@ -79,10 +79,14 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
-    allocate( data_predict_fine(Bs+2*g+(Bs+2*g-1),Bs+2*g+(Bs+2*g-1)) )
-    ! allocate( data_predict_fine(2*Bs-1, 2*Bs-1) )
-    ! allocate( data_predict_coarse(Bs, Bs) )
+    ! NOTE: the predictor for the refinement acts on the extended blocks i.e. it
+    ! includes the ghost nodes layer. Therefore, you MUST call sync_ghosts before this routine.
+    ! The datafield for prediction is one level up, i.e. it contains Bs+g + (Bs+2g-1) points
+    allocate( data_predict_fine( 2*(Bs+2*g)-1, 2*(Bs+2*g)-1 ) )
+    ! the coarse field has the same size as the block.
     allocate( data_predict_coarse(Bs+2*g, Bs+2*g) )
+    ! the new_data field holds the interior part of the new, refined block (which
+    ! will become four blocks), without the ghost nodes.
     allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields) )
 
 !---------------------------------------------------------------------------------------------
@@ -105,23 +109,19 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! first: interpolate block data
             ! loop over all data fields
             do dF = 1, params%number_data_fields
-                ! NOTE: the refinement interpolation acts on the blocks interior
-                ! nodes and ignores ghost nodes.
-                ! data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
+                ! NOTE: the refinement interpolation acts on the entire block including ghost nodes.
                 data_predict_coarse = hvy_block(:, :, dF, hvy_active(k) )
-                ! reset data
-                data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
-                ! save new data
-                new_data(:,:,dF) = data_predict_fine(2*g+1:Bs+2*g+(Bs+2*g-1)-2*g,2*g+1:Bs+2*g+(Bs+2*g-1)-2*g)
+                ! save new data, but cut ghost nodes.
+                new_data(:,:,dF) = data_predict_fine( 2*g+1:Bs+2*g+(Bs+2*g-1)-2*g, 2*g+1:Bs+2*g+(Bs+2*g-1)-2*g )
             end do
 
             ! ------------------------------------------------------------------------------------------------------
             ! second: split new data and write into new blocks
             !--------------------------
             ! first new block
-            ! find free heavy id, use free light id subroutine with reduced light data list for this
+            ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
 
@@ -142,7 +142,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             !--------------------------
             ! second new block
-            ! find free heavy id, use free light id subroutine with reduced light data list for this
+            ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
 
@@ -163,7 +163,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             !--------------------------
             ! third new block
-            ! find free heavy id, use free light id subroutine with reduced light data list for this
+            ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
 
@@ -207,6 +207,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     end do
 
+    ! synchronize light data
     call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
     ! clean up

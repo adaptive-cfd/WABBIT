@@ -111,8 +111,7 @@ program main
     ! number of active blocks (heavy data)
     integer(kind=ik)                    :: hvy_n
 
-    integer(kind=ik), allocatable       :: blocks_per_rank(:), blocks_per_rank2(:)
-
+    integer(kind=ik), allocatable       :: blocks_per_rank(:)
 
     ! time loop variables
     real(kind=rk)                       :: time, output_time
@@ -177,7 +176,7 @@ program main
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs=number_procs
-    allocate(blocks_per_rank(1:number_procs),blocks_per_rank2(1:number_procs))
+    allocate(blocks_per_rank(1:number_procs))
     ! output MPI status
     params%WABBIT_COMM=MPI_COMM_WORLD
     call set_mpi_comm_global(MPI_COMM_WORLD)
@@ -228,11 +227,11 @@ program main
        call unit_test_treecode( params )
     end if
     ! perform a convergence test on ghost node sync'ing
-    ! I don't see a good reason to skip this test ever - I removed the condition here.
-    call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-
+    if (params%debug) then
+        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
+        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
+        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    endif
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
@@ -391,10 +390,8 @@ program main
         ! by what has been done in the last time step, then we flush the current timing to disk.
         call timing_next_timestep( params, iteration )
 
-	! it is useful to save the number of blocks per rank into a log file.
-        blocks_per_rank = 0
-        blocks_per_rank(rank+1) = lgt_n
-        call MPI_Allreduce(blocks_per_rank, blocks_per_rank2, number_procs, MPI_INTEGER, MPI_SUM, WABBIT_COMM, ierr)
+	    ! it is useful to save the number of blocks per rank into a log file.
+        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
 
         t2 = MPI_wtime() - t2
         ! output on screen
@@ -409,7 +406,7 @@ program main
              close(14)
 
              open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,1024(i4,1x))') time, iteration, blocks_per_rank2
+             write (14,'(g15.8,1x,i6,1x,1024(i4,1x))') time, iteration, blocks_per_rank
              close(14)
         end if
 
@@ -494,6 +491,10 @@ program main
 
     end if
 
+    call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch, &
+        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+
     ! computing time output on screen
     call cpu_time(t1)
     if (rank==0) then
@@ -501,7 +502,7 @@ program main
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 
-    deallocate(blocks_per_rank,blocks_per_rank2)
+    deallocate(blocks_per_rank)
     ! end mpi
     call MPI_Finalize(ierr)
 

@@ -29,7 +29,9 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, simulation, hvy_work, hvy_synch, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
+    lgt_sortednumlist, simulation, hvy_work, hvy_synch, int_send_buffer, int_receive_buffer, &
+    real_send_buffer, real_receive_buffer)
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -60,7 +62,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> send/receive buffer, integer and real
     integer(kind=ik), allocatable, optional, intent(out) :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable, optional, intent(out)    :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    !> do we have to allocate everything? 
+    !> do we have to allocate everything?
     logical, intent(in)                                  :: simulation
     integer(kind=ik)                                     :: rk_steps
 
@@ -105,40 +107,67 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:
+        if (rank == 0) write(*,'("INIT: Allocating a 3D case.")')
         ! datafields
         allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, N_dF, number_blocks ) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_block", shape(hvy_block)
+
+
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
+            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_work", shape(hvy_work)
+
             ! synch array, use for ghost nodes synchronization
             allocate( hvy_synch( Bs+2*g, Bs+2*g, Bs+2*g, number_blocks ) )
+            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
         end if
+
         ! 3D: maximal 74 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 74 ) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_neighbor", shape(hvy_neighbor)
     else
         ! 2D:
+        if (rank==0) write(*,'("INIT: Allocating a 2D case.")')
         ! datafields
         allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_block", shape(hvy_block)
+
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
+            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",5(i9,1x))') "hvy_work", shape(hvy_work)
+
             ! synch array, use for ghost nodes synchronization
             allocate( hvy_synch( Bs+2*g, Bs+2*g, 1, number_blocks ) )
+            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
         end if
+
         ! 2D: maximal 16 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 16 ) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_neighbor", shape(hvy_neighbor)
     end if
 
     ! allocate memory
     allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2) )
+    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_block", shape(lgt_block)
+
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
+    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_sortednumlist", shape(lgt_sortednumlist)
 
     if (simulation) then
         ! allocate synch buffer
         allocate( int_send_buffer( buffer_N_int, number_procs) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "int_send_buffer", shape(int_send_buffer)
+
         allocate( int_receive_buffer( buffer_N_int, number_procs) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "int_receive_buffer", shape(int_receive_buffer)
+
         allocate( real_send_buffer( buffer_N, number_procs) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "real_send_buffer", shape(real_send_buffer)
+
         allocate( real_receive_buffer( buffer_N, number_procs) )
+        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "real_receive_buffer", shape(real_receive_buffer)
     end if
     ! reset data:
     ! all blocks are inactive, reset treecode
@@ -149,19 +178,21 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     lgt_block(:, params%max_treelevel+2) = 0
 
 
-    ! reset data
-    hvy_block = 9.99e99_rk
-    if (simulation) then
-        hvy_work = 9.99e99_rk
-        hvy_synch = -99
-    end if
-    hvy_neighbor = -1
+    ! ! reset data
+    ! hvy_block = 9.99e99_rk
+    ! if (simulation) then
+    !     hvy_work = 9.99e99_rk
+    !     hvy_synch = -99
+    ! end if
+    ! hvy_neighbor = -1
 
     ! allocate active list
     allocate( lgt_active( size(lgt_block, 1) ) )
+    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_active", shape(lgt_active)
 
     ! note: 5th dimension in heavy data is block id
     allocate( hvy_active( size(hvy_block, 5) ) )
+    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_active", shape(hvy_active)
 
     if (rank == 0) then
         if (simulation) then
@@ -189,3 +220,62 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
 
 end subroutine allocate_grid
+
+
+
+
+
+subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
+    lgt_sortednumlist, hvy_work, hvy_synch, int_send_buffer, &
+    int_receive_buffer, real_send_buffer, real_receive_buffer)
+
+    !---------------------------------------------------------------------------------------------
+    ! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(inout)                   :: params
+    !> light data array
+    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
+    !> heavy work array  )
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
+    integer(kind=1), allocatable, optional, intent(out) :: hvy_synch(:, :, :, :)
+    !> neighbor array (heavy data)
+    integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
+    !> list of active blocks (light data)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_active(:)
+    !> list of active blocks (light data)
+    integer(kind=ik), allocatable, intent(out)          :: hvy_active(:)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
+    !> send/receive buffer, integer and real
+    integer(kind=ik), allocatable, optional, intent(out) :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), allocatable, optional, intent(out)    :: real_send_buffer(:,:), real_receive_buffer(:,:)
+
+    if (params%rank == 0) then
+        write(*,'(80("---"))')
+        write(*,'(A)') "FREE: Beginning freeying of memory."
+    endif
+
+    if (allocated(hvy_block)) deallocate( hvy_block )
+    if (allocated(hvy_work)) deallocate( hvy_work )
+    if (allocated(hvy_synch)) deallocate( hvy_synch )
+    if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
+    if (allocated(lgt_block)) deallocate( lgt_block )
+    if (allocated(lgt_sortednumlist)) deallocate( lgt_sortednumlist )
+    if (allocated(int_send_buffer)) deallocate( int_send_buffer )
+    if (allocated(int_receive_buffer)) deallocate( int_receive_buffer )
+    if (allocated(real_send_buffer)) deallocate( real_send_buffer )
+    if (allocated(real_receive_buffer)) deallocate( real_receive_buffer )
+    if (allocated(lgt_active)) deallocate( lgt_active )
+    if (allocated(hvy_active)) deallocate( hvy_active )
+
+    if (params%rank == 0) then
+        write(*,'(A)') "All memory is cleared!"
+        write(*,'(80("---"))')
+    endif
+
+end subroutine deallocate_grid

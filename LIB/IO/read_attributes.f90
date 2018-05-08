@@ -61,16 +61,16 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     if (datarank == 3) then
         ! 2D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs = size_field(1)
-        Nb = size_field(3)
+        Bs = int( size_field(1), kind=ik)
+        Nb = int( size_field(3), kind=ik)
         domain(3) = 0.0_rk
         dim = 2
 
     elseif (datarank == 4) then
         ! 3D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs = size_field(1)
-        Nb = size_field(4)
+        Bs = int( size_field(1), kind=ik)
+        Nb = int( size_field(4), kind=ik)
         dim = 3
 
     else

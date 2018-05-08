@@ -104,7 +104,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         ! Create the first mesh on the coarsest treelevel
         !---------------------------------------------------------------------------
-        call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true. )
+        call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+             lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true. )
 
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition

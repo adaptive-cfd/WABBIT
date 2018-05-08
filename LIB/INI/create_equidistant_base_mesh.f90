@@ -22,7 +22,8 @@
 !
 ! ********************************************************************************************
 
-subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity )
+subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity )
 
   !---------------------------------------------------------------------------------------------
   ! variables

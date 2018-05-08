@@ -45,7 +45,7 @@ function max_active_level( lgt_block, lgt_active, lgt_n )
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n
-
+            Jmax = max(Jmax, lgt_block( lgt_active(k), max_treelevel+1))
         end do
 
     else

@@ -15,7 +15,7 @@ subroutine sparse_to_dense(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid, allocate_com_arrays
+    use module_initialization, only: allocate_grid, allocate_com_arrays, deallocate_grid
     use module_mpi
 
     implicit none
@@ -53,7 +53,6 @@ subroutine sparse_to_dense(help, params)
         return
     end if
 
-
     ! get values from command line (filename and level for interpolation)
     call get_command_argument(3, file_in)
     call check_file_exists(trim(file_in))
@@ -75,7 +74,7 @@ subroutine sparse_to_dense(help, params)
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
     ! we do not read an ini file, so defaults may not be set.
-    params%non_uniform_mesh_correction = 1 ! This is an important switch for the OLD ghost nodes.
+    params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
     ! we read only one datafield in this routine
     params%number_data_fields  = 1
@@ -98,24 +97,16 @@ subroutine sparse_to_dense(help, params)
     ! after reading.
     call read_attributes(file_in, lgt_n, time, iteration, domain, bs, tc_length, dim)
 
-    if (params%rank==0) then
-        write(*,'("Data dimension: ",i1,"D")') dim
-        write(*,'("So the file contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, bs
-        write(*,'("Domain size is ",3(g12.4,1x))') domain
-        write(*,'("Time=",g12.4," it=",i9)') time, iteration
-        write(*,'("Length of treecodes in file=",i3)') tc_length
-    endif
-
     ! set max_treelevel for allocation of hvy_block
     params%max_treelevel = max(level, tc_length)
     params%min_treelevel = level
     params%number_block_nodes = bs
     params%Lx = domain(1)
     params%Ly = domain(2)
+    params%Lz = domain(3)
     if (params%threeD_case) then
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
-        params%Lz = domain(3)
         max_neighbors = 74
     else
         number_dense_blocks = 4_ik**level
@@ -123,12 +114,25 @@ subroutine sparse_to_dense(help, params)
     end if
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
-    params%number_blocks = max(4_ik*lgt_n/params%number_procs, 4_ik*number_dense_blocks/params%number_procs)
+    params%number_blocks = max(lgt_n/params%number_procs, number_dense_blocks/params%number_procs) + 10
+
+    if (params%rank==0) then
+        write(*,'("Data dimension: ",i1,"D")') dim
+        write(*,'("File contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, bs
+        write(*,'("Domain size is ",3(g12.4,1x))') domain
+        write(*,'("Time=",g12.4," it=",i9)') time, iteration
+        write(*,'("Length of treecodes in file=",i3," in memory=",i3)') tc_length, params%max_treelevel
+        write(*,'("   NCPU=",i6)') params%number_procs
+        write(*,'("File   Nb=",i6," blocks")') lgt_n
+        write(*,'("Memory Nb=",i6)') params%number_blocks
+        write(*,'("Dense  Nb=",i6)') number_dense_blocks
+    endif
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
         hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, int_send_buffer,&
         int_receive_buffer, real_send_buffer, real_receive_buffer)
+
     ! allocate communication arrays
     call allocate_com_arrays(params, com_lists, com_matrix)
     ! read field
@@ -206,10 +210,14 @@ subroutine sparse_to_dense(help, params)
         hvy_block, lgt_active, lgt_n, hvy_n)
 
     if (params%rank==0 ) then
-        write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)'), &
+        write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
             trim(adjustl(file_in)), level, trim(adjustl(file_out))
-         write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")'), &
+         write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")') &
              min_active_level( lgt_block, lgt_active, lgt_n ),&
              max_active_level( lgt_block, lgt_active, lgt_n )
     end if
+
+    call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch, &
+        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
 end subroutine sparse_to_dense

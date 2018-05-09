@@ -215,6 +215,9 @@ subroutine ini_file_to_params( params, filename )
         call get_command_argument(i, memstring)
         ! is memory limitation used?
         if ( index(memstring,"--memory=")==1 ) then
+            if (params%rank==0) write(*,'(80("-"))')
+            if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
+
             ! read memory from command line and convert to bytes
             read(memstring(10:len_trim(memstring)-2),* ) maxmem
             ! how much memory is reserved, in bytes?
@@ -224,18 +227,22 @@ subroutine ini_file_to_params( params, filename )
             else
                 d = 2
             endif
+
             params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
 
             ! note in the above formula, many arrays allocated in allocate_grid are missing
             ! this even though you want 1.0Gb in total, you end up with about 4Gb. So here
             ! divide by that empirical factor and reserve a proper formula for future work
             params%number_blocks = params%number_blocks / 4
+            if (params%rank==0) write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
 
-            if (params%rank==0) write(*,'(80("-"))')
-            if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
-            if (params%rank==0) write(*,'("INIT: we allocated ",i6," blocks per rank (total: ",i7," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
-            if (params%rank==0) write(*,'("INIT: consuming total memory of",f12.4,"GB")') maxmem/1000.0/1000.0/1000.0
+            ! this is the number of blocks the code can allocate for the given memory.
+            ! However, if the maximum number of blocks on maxlevel is smaller, then we
+            ! allocate only that
+            params%number_blocks = min( nint( dble((2.0_rk**d)**params%max_treelevel) / dble(params%number_procs)), params%number_blocks)
 
+            if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') nint( dble((2**d)**params%max_treelevel) / dble(params%number_procs))
+            if (params%rank==0) write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
         endif
     end do
 

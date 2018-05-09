@@ -57,7 +57,7 @@ endif
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG= -fpp
-FFLAGS = -FR -O3 -warn all -traceback -check bounds -heap-arrays
+FFLAGS = -FR -O3 -warn all,nounused -traceback -check bounds -debug all -check all,noarg_temp_created
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled

@@ -124,7 +124,7 @@ program main
     integer(kind=ik)                    :: k, max_neighbors
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0
+    real(kind=rk)                       :: sub_t0, t4
     logical                             :: test
     ! allocate com lists and com matrix here
     ! communication lists:
@@ -294,28 +294,34 @@ program main
         iteration = iteration + 1
 
         !***********
-	! First we need to be sure that the ghost nodes are indeed sync'ed before we can
-        ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-        test=.false. ! test
+        t4 = MPI_wtime()
+        if (params%debug) then
+    	    ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
+            ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            test=.false. ! test
 
-        if (params%debug) call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
+            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
 
-        if (test) then
-            iteration = 99
-            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
-            call abort(111111,"Redundant nodes check failed - stopping.")
+            if (test) then
+                iteration = 99
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+                call abort(111111,"Redundant nodes check failed - stopping.")
+            endif
         endif
+        call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
         !****************
 
         ! refine everywhere
+        t4 = MPI_wtime()
         if ( params%adapt_mesh ) then
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
             com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
+        call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
 
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
@@ -325,9 +331,11 @@ program main
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         ! advance in time
+        t4 = MPI_wtime()
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
         hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
         com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
 
         if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
             (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
@@ -346,12 +354,14 @@ program main
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
          end if
 
+         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
         endif
+        call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
 
         ! statistics
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
@@ -412,6 +422,7 @@ program main
 
 
     end do
+
     !---------------------------------------------------------------------------
     ! end of main time loop
     !---------------------------------------------------------------------------

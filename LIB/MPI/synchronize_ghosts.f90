@@ -87,6 +87,9 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     logical :: sync
     character(len=80) :: method
     integer(kind=ik)  :: count
+    real(kind=rk) :: t0
+
+    t0 = MPI_wtime()
 
     count = command_argument_count()
     call get_command_argument(count, method)
@@ -104,6 +107,7 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
         real_receive_buffer )
     endif
 
+    call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )
 ! sync=.false. ! test
 !         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
 !         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync)

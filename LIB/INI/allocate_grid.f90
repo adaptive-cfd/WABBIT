@@ -256,7 +256,7 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     real(kind=rk), allocatable, optional, intent(out)    :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     if (params%rank == 0) then
-        write(*,'(80("---"))')
+        write(*,'(80("-"))')
         write(*,'(A)') "FREE: Beginning freeying of memory."
     endif
 
@@ -275,7 +275,7 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     if (params%rank == 0) then
         write(*,'(A)') "All memory is cleared!"
-        write(*,'(80("---"))')
+        write(*,'(80("-"))')
     endif
 
 end subroutine deallocate_grid

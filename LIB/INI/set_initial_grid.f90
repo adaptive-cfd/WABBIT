@@ -85,12 +85,12 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   ! main body
     if (params%rank==0) then
       write(*,*) "Setting initial condition on all blocks."
-      write(*,*) "Initial condition is ", params%initial_cond
       write(*,*) "Adaptive initial condition is: ", adapt
     endif
 
     ! choose between reading from files and creating datafields analytically
     if (params%initial_cond == 'read_from_files') then
+        if (params%rank==0) write(*,*) "Initial condition is read from file!"
         !-----------------------------------------------------------------------
         ! read initial condition from file
         !-----------------------------------------------------------------------
@@ -101,6 +101,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
 
     else
+        if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------
         ! Create the first mesh on the coarsest treelevel
         !---------------------------------------------------------------------------

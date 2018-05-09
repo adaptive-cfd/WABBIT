@@ -194,28 +194,25 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     allocate( hvy_active( size(hvy_block, 5) ) )
     if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_active", shape(hvy_active)
 
-    if (rank == 0) then
-        if (simulation) then
+    if (rank == 0 .and. simulation) then
+        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
+        write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
+        write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
+        write(*,'("INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+        write(*,'("INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+
         ! note we currently use 8byte per real and integer by default, so all the same bytes per point
-        write(*,'("INIT: Local memory footprint is ",g15.3,"GB per mpirank")') &
+        write(*,'("INIT: Measured (true) local (on 1 cpu) memory footprint is ",g15.3,"GB per mpirank")') &
         (dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
         + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
         + dble(size(real_send_buffer)) + dble(size(real_receive_buffer)) + dble(size(int_send_buffer)) &
         + dble(size(int_receive_buffer)))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
 
-        write(*,'("INIT: TOTAL memory footprint is ",g15.3,"GB")') &
+        write(*,'("INIT: Measured (true) TOTAL (on all CPU) memory footprint is ",g15.3,"GB")') &
         ((dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
         + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
         + dble(size(real_send_buffer)) + dble(size(real_receive_buffer)) + dble(size(int_send_buffer)) &
         + dble(size(int_receive_buffer)))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)
-
-        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
-        write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
-        write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
-          write(*,'("INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
-          write(*,'("INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
-        end if
-
     end if
 
 

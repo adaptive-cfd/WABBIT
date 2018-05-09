@@ -229,7 +229,7 @@ subroutine ini_file_to_params( params, filename )
                 d = 2
             endif
 
-            params%number_blocks = nint( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
+            params%number_blocks = ceiling( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
 
             ! note in the above formula, many arrays allocated in allocate_grid are missing
             ! this even though you want 1.0Gb in total, you end up with about 4Gb. So here
@@ -240,10 +240,11 @@ subroutine ini_file_to_params( params, filename )
             ! this is the number of blocks the code can allocate for the given memory.
             ! However, if the maximum number of blocks on maxlevel is smaller, then we
             ! allocate only that. Note the security factor of 2
-            Nblocks_Jmax = 2*(2**d)*nint( dble((2.0_rk**d)**params%max_treelevel) / dble(params%number_procs))
-            params%number_blocks = min( Nblocks_Jmax, params%number_blocks)
-
-            if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') Nblocks_Jmax
+            ! Nblocks_Jmax = 2 * (2**d) * (2**params%max_treelevel)
+            ! Nblocks_Jmax = ceiling( dble(Nblocks_Jmax) / dble(params%number_procs) )
+            ! params%number_blocks = min( Nblocks_Jmax, params%number_blocks)
+            !
+            ! if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') Nblocks_Jmax
             if (params%rank==0) write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
         endif
     end do

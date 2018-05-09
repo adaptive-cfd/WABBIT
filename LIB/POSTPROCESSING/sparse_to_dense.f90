@@ -70,6 +70,15 @@ subroutine sparse_to_dense(help, params)
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
 
+    if (params%threeD_case) then
+        ! how many blocks do we need for the desired level?
+        number_dense_blocks = 8_ik**level
+        max_neighbors = 74
+    else
+        number_dense_blocks = 4_ik**level
+        max_neighbors = 12
+    end if
+
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
@@ -88,7 +97,7 @@ subroutine sparse_to_dense(help, params)
         write(*,'(A20,1x,A80)') "Reading file:", file_in
         write(*,'(A20,1x,A80)') "Writing to file:", file_out
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
-        write(*,'(A20,1x,i3)') "Target level:", level
+        write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
         write(*,'(80("-"))')
     endif
 
@@ -104,17 +113,10 @@ subroutine sparse_to_dense(help, params)
     params%Lx = domain(1)
     params%Ly = domain(2)
     params%Lz = domain(3)
-    if (params%threeD_case) then
-        ! how many blocks do we need for the desired level?
-        number_dense_blocks = 8_ik**level
-        max_neighbors = 74
-    else
-        number_dense_blocks = 4_ik**level
-        max_neighbors = 12
-    end if
+
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
-    params%number_blocks = max(lgt_n/params%number_procs, number_dense_blocks/params%number_procs) + 10
+    params%number_blocks = ceiling( 1.5*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
 
     if (params%rank==0) then
         write(*,'("Data dimension: ",i1,"D")') dim
@@ -180,7 +182,7 @@ subroutine sparse_to_dense(help, params)
     ! refine
     do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
         ! check where refinement is actually needed
-        do k=1, lgt_n
+        do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
                 lgt_block(lgt_active(k), params%max_treelevel +2) = 1
         end do
@@ -212,7 +214,7 @@ subroutine sparse_to_dense(help, params)
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
             trim(adjustl(file_in)), level, trim(adjustl(file_out))
-         write(*,'("Minlevel:", i3," Maxlevel:" i3, " (should be identical now)")') &
+         write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now)")') &
              min_active_level( lgt_block, lgt_active, lgt_n ),&
              max_active_level( lgt_block, lgt_active, lgt_n )
     end if

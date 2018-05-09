@@ -43,7 +43,7 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
-FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb
+FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled

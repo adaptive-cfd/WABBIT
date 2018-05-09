@@ -238,8 +238,8 @@ subroutine ini_file_to_params( params, filename )
 
             ! this is the number of blocks the code can allocate for the given memory.
             ! However, if the maximum number of blocks on maxlevel is smaller, then we
-            ! allocate only that
-            params%number_blocks = min( nint( dble((2.0_rk**d)**params%max_treelevel) / dble(params%number_procs)), params%number_blocks)
+            ! allocate only that. Note the security factor of 2
+            params%number_blocks = min( 2*nint( dble((2.0_rk**d)**params%max_treelevel) / dble(params%number_procs)), params%number_blocks)
 
             if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') nint( dble((2**d)**params%max_treelevel) / dble(params%number_procs))
             if (params%rank==0) write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs

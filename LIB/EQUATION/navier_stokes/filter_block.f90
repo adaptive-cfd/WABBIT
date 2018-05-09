@@ -3,16 +3,7 @@
 !---------------------------------------------------!!!!
 
 
-
-    ! old (not-filterd) statevector
-    ! -----------------------------
-    ! + filter values are added to the original statevector
-    ! + is initialiced in init_filter
-    ! real(kind=rk), allocatable          :: block_old(:, :, :)
-
-
 !> \brief this function must be called before filter_block!
-
 subroutine init_filter(filter, FILE )
     implicit none
     !> pointer to inifile
@@ -281,27 +272,12 @@ end subroutine filter_block
 !=====================================================================
 !  1D FILTER
 !=====================================================================
-
-
+!> \brief 1D Filter subroutine
 !> \details
-!> \name filter_1D.f90
 !> \version 0.5
 !> \author msr
-!
-!> \brief 1D Filter subroutine
-!
-!>
-!! input:    - filter stencil, data array, position of value to filter \n
-!! output:   - filtered data \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 27/03/17 - create
-!! 02/05/17 - return filtered value separatly
-!
-! ********************************************************************************************
-
+!! \date 27/03/17 - create
+!! \date 02/05/17 - return filtered value separatly
 subroutine filter_1D(phi, phi_tilde, a)
 
 !---------------------------------------------------------------------------------------------

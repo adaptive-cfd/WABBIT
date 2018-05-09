@@ -7,17 +7,17 @@
 !> This module implements the mask function on each Block
 !!          \f[
 !!                           \chi(x,t)\quad \forall\;  x\in\mathcal{–}^l
-!!            \f]           
+!!            \f]
 !!                        for Volume penalization
 !> To increase peformance there are certain tasks:
 !> \todo
 !>       + include update flag: block_updated
 !>                - if true the mask needs to be computed again
-!>                - if false the grid has not changed on the proc rank and the mask function stays 
+!>                - if false the grid has not changed on the proc rank and the mask function stays
 !!                  the same
-!!       + maybe it is better to have a global mask on the finest grid level and coarsen it for 
+!!       + maybe it is better to have a global mask on the finest grid level and coarsen it for
 !!         lower levels on the specific Blocks
-!!    
+!!
 !> \version 23.2.2018
 !> \author P.Krah
 !-----------------------------------------------------------------
@@ -41,7 +41,7 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: init_penalization,add_constraints,get_mask,mean_quant,integrate_over_pump_area
+  PUBLIC :: shockVals,init_penalization,add_constraints,get_mask,mean_quant,integrate_over_pump_area
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -58,26 +58,31 @@ module module_ns_penalization
   !> Available mask geometrys
   !! ------------------------
   !!
-  !!    | geometry    | geometrical properties                             |  
+  !!    | geometry    | geometrical properties                             |
   !!    |-------------|----------------------------------------------------|
   !!    | \b cylinder |   \c x_cntr(1:2),\c radius                              |
   !!    | \b funnel   |   \c offset(1:2),\c Nr_plates, \c dx_plates,\c diameter_slope  \c dout, \c dmin \c dmax,\c Nr_plates, \c dx_plates  |
   !!    | \b fplate   |   \c x_0(1:2),\c R_in, \c R_out , \c width         |
   !!     ------------------------------------------
   type :: type_cylinder
-      real(kind=rk), dimension(2) :: x_cntr 
-      real(kind=rk)               :: radius  
+      real(kind=rk), dimension(2) :: x_cntr
+      real(kind=rk)               :: radius
   end type type_cylinder
+
+  type :: type_shock_params
+      real(kind=rk) :: rho_left,u_left,p_left
+      real(kind=rk) :: rho_right,u_right,p_right
+  end type type_shock_params
 
 
 
   type :: type_funnel_plate
     real(kind=rk) :: x0(1:2)
-    real(kind=rk) :: width 
+    real(kind=rk) :: width
     real(kind=rk) :: r_in
-    real(kind=rk) :: r_out   
-  end type type_funnel_plate 
- 
+    real(kind=rk) :: r_out
+  end type type_funnel_plate
+
 
   type :: type_funnel
       real(kind=rk)       ::outer_diameter         ! outer diameter
@@ -85,29 +90,29 @@ module module_ns_penalization
       real(kind=rk)       ::min_inner_diameter     ! minimal inner diameter
       integer(kind=ik)    ::nr_plates              ! Number of plates
       real(kind=rk)       ::plates_distance        ! distance between origin of plates
-      real(kind=rk)       ::plates_thickness       ! 
+      real(kind=rk)       ::plates_thickness       !
       real(kind=rk)       ::temperatur             ! temperatur of plates
-      
+
 
       real(kind=rk)       ::length                 ! total length of funnel
       real(kind=rk)       ::slope                  ! slope of funnel
       real(kind=rk)       ::offset(2)              ! offset of funnel in x and y
-      
+
       ! parameters of flow inlet outlet
-      real(kind=rk)       ::pump_diameter          
+      real(kind=rk)       ::pump_diameter
       real(kind=rk)       ::pump_x_center
       real(kind=rk)       ::jet_radius             ! slope of funnel
-      real(kind=rk)       ::wall_thickness       ! 
-    
-      real(kind=rk)       ::inlet_velocity(2)       ! 
-      real(kind=rk)       ::inlet_density       ! 
-      real(kind=rk)       ::inlet_pressure       ! 
-      real(kind=rk)       ::outlet_pressure       ! 
-      real(kind=rk)       ::pump_speed       ! 
-      real(kind=rk)       ::pump_density      ! 
-      real(kind=rk)       ::pump_pressure     ! 
+      real(kind=rk)       ::wall_thickness       !
 
-      
+      real(kind=rk)       ::inlet_velocity(2)       !
+      real(kind=rk)       ::inlet_density       !
+      real(kind=rk)       ::inlet_pressure       !
+      real(kind=rk)       ::outlet_pressure       !
+      real(kind=rk)       ::pump_speed       !
+      real(kind=rk)       ::pump_density      !
+      real(kind=rk)       ::pump_pressure     !
+
+
       type(type_funnel_plate), allocatable:: plate(:)
   end type type_funnel
 
@@ -115,6 +120,7 @@ module module_ns_penalization
   !------------------------------------------------
   type(type_funnel)   , save :: funnel
   type(type_cylinder) , save :: cyl
+  type(type_shock_params) , save :: shock_params
   !------------------------------------------------
 
 contains
@@ -122,7 +128,7 @@ contains
 include "funnel.f90"
 include "vortex_street.f90"
 include "sod_shock_tube.f90"
-
+include "simple_shock.f90"
 
 
 !> \brief reads parameters for mask function from file
@@ -133,7 +139,7 @@ subroutine init_penalization( params_ns,FILE )
     type(inifile) ,intent(inout)       :: FILE
    !> params structure of navier stokes
     type(type_params_ns),intent(inout)  :: params_ns
-    
+
      if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
@@ -143,12 +149,15 @@ subroutine init_penalization( params_ns,FILE )
     ! =============================================================================
     ! parameters needed for ns_physics module
     ! -----------------------------------------------------------------------------
-    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .true.)
-    call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
+    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .false.)
+
 
     if (params_ns%penalization) then
+      call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
       call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk )
       call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
+    else
+      return
     endif
 
     ! =============================================================================
@@ -170,21 +179,23 @@ subroutine init_penalization( params_ns,FILE )
     R_domain =domain_size(2)*0.5_rk
 
     select case(mask_geometry)
-    case ('sod_shock_tube')
+    case ('simple-shock')
+      call init_simple_shock(params_ns,FILE)
+    case('sod_shock_tube')
       ! nothing to do
     case ('vortex_street','cylinder')
       call init_vortex_street(FILE)
-    case ('funnel') 
+    case ('funnel')
       call init_funnel(FILE)
     case default
       call abort(8546501,"[module_ns_penalization.f90] ERROR: geometry for VPM is unknown"//mask_geometry)
-    
+
     end select
-  
+
 end subroutine init_penalization
 
 
- 
+
 subroutine get_mask(mask, x0, dx, Bs, g )
 
 
@@ -194,13 +205,13 @@ subroutine get_mask(mask, x0, dx, Bs, g )
     real(kind=rk), dimension(:,:), intent(inout) :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
-    
+
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     select case(mask_geometry)
-    case('sod_shock_tube')
+    case('simple-shock','sod_shock_tube')
      call draw_sod_shock_tube(mask, x0, dx, Bs, g,'boundary')
     case('vortex_street','cylinder')
       call draw_cylinder(mask, x0, dx, Bs, g )
@@ -229,18 +240,20 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
     integer(kind=ik), intent(in)    :: g, Bs
     !> rhs
     real(kind=rk), intent(inout)    :: rhs(Bs+2*g, Bs+2*g,4)
-    !> state variables 
+    !> state variables
     real(kind=rk), intent(in)       :: phi(Bs+2*g, Bs+2*g,4)
     !> spacing and origin of block
-    real(kind=rk), intent(in)       :: x0(2), dx(2)   
+    real(kind=rk), intent(in)       :: x0(2), dx(2)
     !--------------------------------------------------------
      real(kind=rk)                  :: penalization(Bs+2*g, Bs+2*g,4)
-   
+
     ! 1. compute volume penalization term for the different case studies
-    
+
     select case(mask_geometry)
     case('sod_shock_tube')
       call add_sod_shock_tube(penalization, x0, dx, Bs, g, phi )
+    case('simple-shock')
+      call add_simple_shock(penalization,x0,dx,Bs,g,phi)
     case('vortex_street','cylinder')
       call add_cylinder(penalization, x0, dx, Bs, g, phi )
     case('funnel')
@@ -249,7 +262,7 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
       call abort(120401,"ERROR: geometry for VPM is unknown"//mask_geometry)
     end select
 
-    
+
 
     ! 2. add penalty to the right hand side
 
@@ -261,7 +274,7 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
     rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( :, :,3)
     ! p component (preasure/energy)
     rhs(:,:,4)=rhs(:,:,4) -                   penalization( :, :,4)
-    
+
     !rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *penalization( :, :,4)
 
 end subroutine add_constraints
@@ -270,7 +283,7 @@ end subroutine add_constraints
 
 
 
-    
+
 !==========================================================================
   !> \brief This subroutine returns the value f of a smooth step function \n
   !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
@@ -282,7 +295,7 @@ end subroutine add_constraints
   !> \image html maskfunction.bmp "plot of chi(delta)"
   !> \image latex maskfunction.eps "plot of chi(delta)"
     function smoothstep(delta,h)
-      
+
       implicit none
       real(kind=rk), intent(in)  :: delta,h
 
@@ -291,7 +304,7 @@ end subroutine add_constraints
       ! cos shaped smoothing (compact in phys.space)
       !-------------------------------------------------
       if (delta<=-h) then
-        f = 1.0_rk 
+        f = 1.0_rk
       elseif ( -h<delta .and. delta<+h  ) then
         f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
       else
@@ -309,8 +322,8 @@ end subroutine add_constraints
 function soft_bump(x,x0,width,h)
 
   real(kind=rk), intent(in)      :: x, x0, h, width
-  real(kind=rk)                  :: soft_bump,d 
-    
+  real(kind=rk)                  :: soft_bump,d
+
     d=x-x0
 
     if (d>=h .and. d<=width-h) then
@@ -329,7 +342,7 @@ function soft_bump2(x,x0,width,h)
 
   real(kind=rk), intent(in)      :: x, x0, h, width
   real(kind=rk)                  :: soft_bump2,max_R,smooth_width,radius
-    
+
   max_R       = width*0.5_rk
   radius      = abs(x-x0-width*0.5_rk)
   smooth_width= 0.05_rk*max_R
@@ -343,8 +356,8 @@ end function soft_bump2
 function jet_stream(radius,max_R,smooth_width)
 
   real(kind=rk), intent(in)      :: radius, smooth_width,max_R
-  real(kind=rk)                  :: jet_stream 
-    
+  real(kind=rk)                  :: jet_stream
+
     jet_stream=0.5_rk*(1-tanh((radius-(max_R-0.5_rk*smooth_width))*2*PI/smooth_width ))
 end function jet_stream
 
@@ -355,22 +368,46 @@ function transition(x,x0,trans_width,val_left,val_rigth)
   real(kind=rk), intent(in)     :: x
   !> beginning point of transition
   real(kind=rk), intent(in)     :: x0
-  !> length of transition region 
+  !> length of transition region
   real(kind=rk), intent(in)     :: trans_width
-  !> values at the left and right of the transition region  
+  !> values at the left and right of the transition region
   real(kind=rk), intent(in)     ::val_left,val_rigth
 
-  !--------------------------------------------   
+  !--------------------------------------------
   real(kind=rk)                  :: s,units,transition
 
-    
+
     ! convert transition range from 2pi to trans_width
     units  = trans_width/(2*PI)
     ! transition function 0<s<1
     s         = 0.5_rk+0.5_rk * tanh((x-x0-0.5_rk*trans_width)/units)
-    
+
     transition= s * val_rigth + (1-s) * val_left
 end function transition
+
+
+!> \brief This function calculates from \f$\rho_1,u_1,p_1$\f
+!> values \f$\rho_2,u_2,p_2$\f on the ohter side
+!> of the shock
+subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
+    implicit none
+    !> one side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(in)      ::rho1,u1,p1
+    !> other side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(out)      ::rho2,u2,p2
+    !> heat capacity ratio
+    real(kind=rk), intent(in)      ::gamma
+
+    real(kind=rk)                ::cstar_sq
+
+
+    cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
+    !sqrt(cstar_sq)
+    u2 = cstar_sq /u1;
+    rho2 = (rho1*u1)/u2;
+    p2= (p1+ rho1*u1**2 )-rho2*u2**2;
+end subroutine shockVals
+
 
 
 

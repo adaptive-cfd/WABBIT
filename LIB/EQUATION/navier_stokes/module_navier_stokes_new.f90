@@ -442,9 +442,13 @@ contains
       if (maxval(abs(u))>1.0e5) then
         call abort(6661,"ns fail: very very large values in state vector.")
       endif
-      ! compute force
+      ! compute mean density and pressure
       allocate(mask(Bs+2*g, Bs+2*g))
-      call get_mask(mask, x0, dx, Bs, g)
+      if ( params_ns%penalization ) then
+        call get_mask(mask, x0, dx, Bs, g)
+      else
+        mask=0.0_rk
+      end if
 
 
       if (size(u,3)==1) then
@@ -455,11 +459,11 @@ contains
           y = dble(iy-(g+1)) * dx(2) + x0(2)
           do ix=g+1, Bs+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-            !if (mask(ix,iy)<1e-10) then
+            if (mask(ix,iy)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
                   tmp(2) = tmp(2)   + u(ix,iy, 1, pF)
                   tmp(3) = tmp(3)   + 1.0_rk
-            !endif
+            endif
           enddo
         enddo
 
@@ -487,7 +491,8 @@ contains
 
        if (params_ns%mpirank == 0) then
          ! write mean flow to disk...
-         write(*,*) "area=",area/params_ns%Lx/params_ns%Ly,params_ns%mean_density/area ,params_ns%mean_pressure/area
+         write(*,*) "mean_area/Lx/Ly=",area/params_ns%Lx/params_ns%Ly,'density=', &
+                    params_ns%mean_density/area , 'pressure=',params_ns%mean_pressure/area
          open(14,file='meandensity.t',status='unknown',position='append')
          write (14,'(4(es15.8,1x))') time, params_ns%mean_density
          close(14)
@@ -607,7 +612,7 @@ contains
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     integer(kind=ik)          :: Bs,ix
-    real(kind=rk)             :: x
+    real(kind=rk)             :: x,tmp(1:3),b
 
 
     ! compute the size of blocks
@@ -646,6 +651,39 @@ contains
           ! set Uz to zero
           u( :, :, :, UzF) = 0.0_rk
       endif
+    case ("simple-shock")
+      ! chooses values such that shock should not move
+      ! in space according to initial conditions
+
+      call shockVals(rho_init,u_init(1),p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
+      ! check for usefull inital values
+      if ( tmp(1)<0 .or. tmp(3)<0 ) then
+        call abort(3572,"ERROR [module_navier_stokes_new.f90]: initial values are insufficient for simple-shock")
+      end if
+      do ix=g+1, Bs+g
+         x = dble(ix-(g+1)) * dx(1) + x0(1)
+         ! left region
+         b=0.5_rk*(1-tanh((abs(x-params_ns%Lx*0.75_rk)-params_ns%Lx*0.2_rk)*2*PI/(10*dx(1)) ))
+         u( ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
+         u(ix, : , :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
+         u(ix, : , :, UyF)  = 0.0_rk
+         u( ix, :, :, pF)   = p_init-b*(p_init - tmp(3))
+
+
+
+        !  if (x <= params_ns%Lx*0.25_rk .and. x < params_ns%Lx*0.75_rk) then
+        !    u( ix, :, :, rhoF) = dsqrt(rho_init)
+        !    u(ix, : , :, UxF)  = dsqrt(rho_init) * u_init(1)
+        !    u(ix, : , :, UyF)  = 0.0_rk
+        !    u( ix, :, :, pF)   = p_init
+        !  else
+        !    u( ix, :, :, rhoF) = dsqrt(tmp(1))
+        !    u(ix, : , :, UxF)  = dsqrt(tmp(1)) *tmp(2)
+        !    u(ix, : , :, UyF)  = 0.0_rk
+        !    u( ix, :, :, pF)   = tmp(3)
+        !  endif
+      end do
+
     case ("sod_shock_tube")
       ! Sods test case: shock tube
       ! ---------------------------
@@ -663,7 +701,7 @@ contains
       ! rho=0.125
       ! p  =0.1
       ! u  =0
-      do ix=1, Bs+2*g
+      do ix=1+g, Bs+g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
          ! left region
          if (x <= params_ns%Lx*0.5_rk) then
@@ -716,7 +754,6 @@ contains
     end select
 
   end subroutine INICOND_NStokes
-
 
 
 
@@ -880,6 +917,7 @@ subroutine convert2format(phi_in,format_in,phi_out,format_out)
       call convert_statevector2D(phi_out,format_out)
     endif
 end subroutine convert2format
+
 
 
 

@@ -101,7 +101,7 @@ $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_ini_files_parser_mpi.o\
-	funnel.f90 vortex_street.f90 sod_shock_tube.f90
+	funnel.f90 vortex_street.f90 sod_shock_tube.f90 simple_shock.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\

@@ -118,8 +118,9 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
     call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
-
-
+    params_ns%initial_density=rho_init
+    params_ns%initial_velocity=u_init
+    params_ns%initial_pressure=p_init
     !
 
     if (params_ns%mpirank==0) then
@@ -360,8 +361,8 @@ contains
 
       ! called for each block.
       if (size(u,3)==1) then
-        !call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-        call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        !call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
 
         if (params_ns%penalization) then
         ! add volume penalization

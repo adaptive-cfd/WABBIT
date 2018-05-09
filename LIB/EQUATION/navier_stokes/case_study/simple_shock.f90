@@ -158,3 +158,26 @@ subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
 
 
 end subroutine add_simple_shock
+
+
+!> \brief This function calculates from \f$\rho_1,u_1,p_1$\f
+!> values \f$\rho_2,u_2,p_2$\f on the ohter side
+!> of the shock
+subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
+    implicit none
+    !> one side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(in)      ::rho1,u1,p1
+    !> other side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(out)      ::rho2,u2,p2
+    !> heat capacity ratio
+    real(kind=rk), intent(in)      ::gamma
+
+    real(kind=rk)                ::cstar_sq
+
+
+    cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
+    !sqrt(cstar_sq)
+    u2 = cstar_sq /u1;
+    rho2 = (rho1*u1)/u2;
+    p2= (p1+ rho1*u1**2 )-rho2*u2**2;
+end subroutine shockVals

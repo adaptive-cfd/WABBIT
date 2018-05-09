@@ -87,18 +87,28 @@ module module_navier_stokes_params
         real(kind=rk)                               :: Pr
         ! dynamic viscosity
         real(kind=rk)                               :: mu0
-        ! width of initialcond
-        real(kind=rk)                               :: inicond_width
         ! dissipation switch
         logical                                     :: dissipation
         ! variable names
         character(len=80), allocatable              :: names(:)
-        ! înitial condition
-        character(len=80)                           :: inicond
         ! type used for the spatial discretization
         character(len=80)                           :: discretization
-        ! ------------------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        ! initial conditions
+        !---------------------------------------------------------------------------------
+        ! înitial condition
+        character(len=80)                           :: inicond
+        ! width of initialcond
+        real(kind=rk)                               :: inicond_width
+        ! width of initialcond
+        real(kind=rk)                               :: initial_density
+        ! width of initialcond
+        real(kind=rk)                               :: initial_pressure
+        ! width of initialcond
+        real(kind=rk)                               :: initial_velocity(3)
+        ! --------------------------------------------------------------------------------
         ! penalization
+        ! --------------------------------------------------------------------------------
         logical                                     :: penalization,smooth_mask=.True., sponge_layer
         ! penalization parameter and sponge parameter
         real(kind=rk)                               :: C_eta,C_sp

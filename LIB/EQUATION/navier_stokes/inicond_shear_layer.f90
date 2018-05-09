@@ -34,7 +34,7 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
 
     !> spacing and origin of block
     real(kind=rk), intent(in)               :: x0(1:3),dx(1:3)
-    
+
     ! grid
     integer(kind=ik),intent(in)             :: Bs, g
 
@@ -52,9 +52,9 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
 ! variables initialization
 
 
-    rho0 = 1.0_rk
-    p0   = 5.0_rk!2.5_rk
-    u0   = 0.0_rk
+    rho0 = params_ns%initial_density
+    p0   = params_ns%initial_pressure
+    u0   = params_ns%initial_velocity(1)
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -113,4 +113,3 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
     endif
 
 end subroutine inicond_shear_layer
-

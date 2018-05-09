@@ -43,7 +43,7 @@ subroutine ini_file_to_params( params, filename )
     ! maximum memory available on all cpus
     real(kind=rk)                                   :: maxmem
     ! power used for dimensionality (d=2 or d=3)
-    integer(kind=ik)                                :: d,i
+    integer(kind=ik)                                :: d,i, Nblocks_Jmax
     ! string read from command line call
     character(len=80)                               :: memstring
 
@@ -240,9 +240,10 @@ subroutine ini_file_to_params( params, filename )
             ! this is the number of blocks the code can allocate for the given memory.
             ! However, if the maximum number of blocks on maxlevel is smaller, then we
             ! allocate only that. Note the security factor of 2
-            params%number_blocks = min( 2*nint( dble((2.0_rk**d)**params%max_treelevel) / dble(params%number_procs)), params%number_blocks)
+            Nblocks_Jmax = 2*(2**d)*nint( dble((2.0_rk**d)**params%max_treelevel) / dble(params%number_procs))
+            params%number_blocks = min( Nblocks_Jmax, params%number_blocks)
 
-            if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') nint( dble((2**d)**params%max_treelevel) / dble(params%number_procs))
+            if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') Nblocks_Jmax
             if (params%rank==0) write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
         endif
     end do

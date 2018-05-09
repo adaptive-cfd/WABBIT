@@ -36,7 +36,7 @@ contains
     implicit none
     integer(kind=tsize), intent(inout) :: number, element
     ! extract digit
-    element = mod( number, 10)
+    element = mod( number, 10_tsize)
     ! remove it from number
     number = number / 10
   end subroutine
@@ -94,7 +94,7 @@ end subroutine adjacent4
           ! NORTH
           !*********************************************************************
           call pop(treecode_this, tmp)
-          treecode_neighbor = modulo( tmp + 2, 4)
+          treecode_neighbor = modulo( tmp + 2_tsize, 4_tsize)
           i = 1 ! i=0 is done above
           do while (i < maxdigits .and. go)
             ! last element is used to distinguish
@@ -109,7 +109,7 @@ end subroutine adjacent4
             else
               ! transition to different quadrant.
               call pop(treecode_this, tmp)
-              treecode_neighbor = treecode_neighbor + (modulo(tmp+2,4)) * 10**i
+              treecode_neighbor = treecode_neighbor + (modulo(tmp+2,4_tsize)) * 10**i
               i = i + 1
             endif
           enddo
@@ -119,7 +119,7 @@ end subroutine adjacent4
           ! SOUTH
           !*********************************************************************
           call pop(treecode_this, tmp)
-          treecode_neighbor = modulo( tmp + 2, 4)
+          treecode_neighbor = modulo( tmp + 2_tsize, 4_tsize)
           i = 1 ! i=0 is done above
           do while (i < maxdigits .and. go)
             ! last element is used to distinguish
@@ -134,7 +134,7 @@ end subroutine adjacent4
             else
               ! transition to different quadrant.
               call pop(treecode_this, tmp)
-              treecode_neighbor = treecode_neighbor + (modulo(tmp+2,4)) * 10**i
+              treecode_neighbor = treecode_neighbor + (modulo(tmp+2_tsize,4_tsize)) * 10**i
               i = i + 1
             endif
           enddo
@@ -144,9 +144,9 @@ end subroutine adjacent4
           !*********************************************************************
           call pop(treecode_this, tmp)
           if (tmp == 0 .or. tmp == 2) then
-            treecode_neighbor = modulo( tmp+1 , 4)
+            treecode_neighbor = modulo( tmp+1_tsize , 4_tsize)
           else
-            treecode_neighbor = modulo( tmp-1 , 4)
+            treecode_neighbor = modulo( tmp-1_tsize , 4_tsize)
           endif
 
           i = 1 ! i=0 is done above
@@ -164,9 +164,9 @@ end subroutine adjacent4
               ! transition to different quadrant.
               call pop(treecode_this, tmp)
               if ( tmp == 1 .or. tmp == 3) then
-                treecode_neighbor = treecode_neighbor + (modulo(tmp-1,4)) * 10**i
+                treecode_neighbor = treecode_neighbor + (modulo(tmp-1_tsize,4_tsize)) * 10**i
               else
-                treecode_neighbor = treecode_neighbor + (modulo(tmp+1,4)) * 10**i
+                treecode_neighbor = treecode_neighbor + (modulo(tmp+1_tsize,4_tsize)) * 10**i
               endif
               i = i + 1
             endif
@@ -177,9 +177,9 @@ end subroutine adjacent4
           !*********************************************************************
           call pop(treecode_this, tmp)
           if (tmp == 0 .or. tmp == 2) then
-            treecode_neighbor = modulo( tmp+1 , 4)
+            treecode_neighbor = modulo( tmp+1_tsize , 4_tsize)
           else
-            treecode_neighbor = modulo( tmp-1 , 4)
+            treecode_neighbor = modulo( tmp-1_tsize , 4_tsize)
           endif
 
           i = 1 ! i=0 is done above
@@ -197,9 +197,9 @@ end subroutine adjacent4
               ! transition to different quadrant.
               call pop(treecode_this, tmp)
               if ( tmp == 1 .or. tmp == 3) then
-                treecode_neighbor = treecode_neighbor + (modulo(tmp-1,4)) * 10**i
+                treecode_neighbor = treecode_neighbor + (modulo(tmp-1_tsize,4_tsize)) * 10**i
               else
-                treecode_neighbor = treecode_neighbor + (modulo(tmp+1,4)) * 10**i
+                treecode_neighbor = treecode_neighbor + (modulo(tmp+1_tsize,4_tsize)) * 10**i
               endif
               i = i + 1
             endif
@@ -247,7 +247,7 @@ end subroutine adjacent4
 
       ! first entry treecode(1) is indeed level one (and not the root, which would be 0 and is excluded)
       do l = 1, maxdigits
-          treeL = mod(treecode,10)
+          treeL = mod(treecode,10_tsize)
           treecode = treecode / 10
           select case (treeL)
             case (0)
@@ -358,7 +358,7 @@ end subroutine adjacent4
     temp = decNum
 
     DO WHILE(temp > 0)
-      bineq = bineq + (MOD(temp, 2) * (MOD(temp, 2) * (10 ** power)))
+      bineq = bineq + (MOD(temp, 2_tsize) * (MOD(temp, 2_tsize) * (10 ** power)))
       power = power + 1
       temp = temp / 2
     END DO
@@ -378,7 +378,7 @@ end subroutine adjacent4
     tmp = i
     j = 1
     do while ( j <= maxdigits )
-      flipint = MOD(tmp,10) + flipint*10
+      flipint = MOD(tmp,10_tsize) + flipint*10
       tmp = tmp / 10
       j = j+1
     end do

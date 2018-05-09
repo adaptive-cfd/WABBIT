@@ -228,7 +228,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             ! refinement status changed
             if ( refine_change(k) > -99 ) then
                 ! change light data
-                lgt_block( lgt_id, max_treelevel+2 ) = max( lgt_block( lgt_id, max_treelevel+2 ), refine_change(k) )
+                lgt_block( lgt_id, max_treelevel+2 ) = max( int(lgt_block( lgt_id, max_treelevel+2 ), kind=1), refine_change(k) )
                 ! set grid status since if we changed something, we have to repeat the entire process
                 grid_changed = .true.
             end if

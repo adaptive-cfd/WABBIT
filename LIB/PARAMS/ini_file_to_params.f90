@@ -194,6 +194,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Debug', 'test_wavelet_comp', params%test_wavelet_comp, .false.)
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
+    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
 
     !***************************************************************************
     ! read PHYSICS parameters
@@ -248,10 +249,12 @@ subroutine ini_file_to_params( params, filename )
 
 
     ! clean up
+    if (params%rank==0) write(*,'("INIT: cleaning ini file")')
     call clean_ini_file_mpi(FILE)
 
 
     ! check ghost nodes number
+    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
     if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
@@ -262,10 +265,14 @@ subroutine ini_file_to_params( params, filename )
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
-    open (15, file='dt.t', status='replace')
-    close(15)
-    open (15, file='timesteps_info.t', status='replace')
-    close(15)
-    open (15, file='blocks_per_mpirank.t', status='replace')
-    close(15)
+    if (params%rank==0) then
+        write(*,'("INIT: resetting some *.t files.")')
+
+        open (44, file='dt.t', status='replace')
+        close(44)
+        open (44, file='timesteps_info.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank.t', status='replace')
+        close(44)
+    endif
 end subroutine ini_file_to_params

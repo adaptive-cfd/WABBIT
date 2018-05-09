@@ -547,12 +547,14 @@ contains
         call MPI_REDUCE(tmp, params_acm%error, 6, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD,mpierr)
         !params_acm%error(1:3) = params_acm%error(1:3)/params_acm%error(4:6)
         params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%Lx*params_acm%Ly)
+
         if (params_acm%mpirank == 0) then
           ! write error to disk...
           open(15,file='error_taylor_green.t',status='unknown',position='append')
           write (15,'(4(es15.8,1x))') time, params_acm%error(1:3)
           close(15)
         end if
+        
       end if
     case default
       call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")

@@ -35,6 +35,7 @@ endif
 # COMPILER-DEPENDEND PART
 #-------------------------------------------------------------------------------
 # GNU compiler
+#-------------------------------------------------------------------------------
 ifeq ($(shell $(FC) --version 2>&1 | head -n 1 | head -c 3),GNU)
 # Specify directory for compiled modules:
 FFLAGS += -J$(OBJDIR) # specify directory for modules.
@@ -53,7 +54,9 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -
 FFLAGS += -I$(HDF_INC)
 endif
 
+#-------------------------------------------------------------------------------
 # Intel compiler
+#-------------------------------------------------------------------------------
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG= -fpp
@@ -67,6 +70,20 @@ HDF_INC = $(HDF_ROOT)/include
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
 endif
+
+#-------------------------------------------------------------------------------
+# IBM compiler
+#-------------------------------------------------------------------------------
+ifeq ($(shell $(FC) -qversion 2>&1 | head -c 3),IBM)
+#the xlf compiler is complaining because the arguments to MAX() in the
+#code below are of two different types; ct0 is double precision and -0.999
+#is single (-0.999d0 would be double). If you want xlf to auto-promote
+#single precision constants to doubles, add the compiler option "-qdpc".
+FFLAGS += -O3 -qnohot -qfullpath -qdpc -qmoddir=$(OBJDIR)
+FFLAGS += -I$(OBJDIR)
+endif
+
+
 
 # Both programs are compiled by default.
 all: directories wabbit wabbit-post #doc
@@ -152,7 +169,7 @@ $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
-	get_block_max_velocity_norm.f90 statistics_wrapper.f90 filter_wrapper.f90
+	statistics_wrapper.f90 filter_wrapper.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \

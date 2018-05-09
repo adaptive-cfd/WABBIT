@@ -226,8 +226,9 @@ program main
     if (params%test_treecode) then
        call unit_test_treecode( params )
     end if
+
     ! perform a convergence test on ghost node sync'ing
-    if (params%debug) then
+    if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
         hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
         int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
@@ -249,11 +250,13 @@ program main
     ! this test should work even without ghost nodes sync'ing first. If it doesn't then maybe we did
     ! not set inicond on ghost nodes for this case.
     ! it is to test the test redundant nodes routine.
-    test=.false.
-    if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
-    if (params%debug) call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
-    if (rank==0) write(*,*) "Done testing redundant nodes."
+    if (params%debug) then
+        test=.false.
+        if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+        if (rank==0) write(*,*) "Done testing redundant nodes."
+    endif
 
 
     if (params%initial_cond /= "read_from_files") then
@@ -370,11 +373,11 @@ program main
           com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
           ! TODO make this nicer
-          if (iteration==1 ) then
-            open (15, file='meanflow.t', status='replace')
-            close(15)
-            open (15, file='forces.t', status='replace')
-            close(15)
+          if (iteration==1 .and. rank==0) then
+            open (77, file='meanflow.t', status='replace')
+            close(77)
+            open (77, file='forces.t', status='replace')
+            close(77)
           endif
 
           call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)

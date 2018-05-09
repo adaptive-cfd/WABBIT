@@ -55,7 +55,7 @@ module module_hdf5_wrapper
 
     ! Precision of doubles
     character(len=80) :: field_precision = "double" !"single"
-    integer, parameter :: max_chunk = 1024
+    integer(kind=hsize_t), parameter :: max_chunk = 1024
 
     ! interface for writing attributes. an attribute is an object which is attached
     ! to a dataset, in our case a array saved in the file. we put useful information
@@ -1816,8 +1816,8 @@ subroutine init_empty_file( fname )
   implicit none
   character (len=*), intent(in) :: fname
 
-  open (15, file=fname, status='replace')
-  close(15)
+  open (55, file=fname, status='replace')
+  close(55)
 
 end subroutine init_empty_file
 

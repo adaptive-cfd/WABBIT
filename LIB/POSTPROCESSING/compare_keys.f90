@@ -68,9 +68,9 @@ subroutine compare_keys(help, key1, key2)
             ! on some machines, returning an exit code (exit(1)) does not work
             ! so write your exit code in a small txt file as well. this allows unit tests
             ! on turing.
-            open (15, file='return', status='replace')
-            write(15,'(i1)') 0
-            close(15)
+            open (22, file='return', status='replace')
+            write(22,'(i1)') 0
+            close(22)
             call exit(0)
         else
             ! very bad
@@ -79,9 +79,9 @@ subroutine compare_keys(help, key1, key2)
             ! on some machines, returning an exit code (exit(1)) does not work
             ! so write your exit code in a small txt file as well. this allows unit tests
             ! on turing.
-            open (15, file='return', status='replace')
-            write(15,'(i1)') 1
-            close(15)
+            open (22, file='return', status='replace')
+            write(22,'(i1)') 1
+            close(22)
             call exit(1)
         endif
     end if

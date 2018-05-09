@@ -26,7 +26,7 @@ subroutine check_file_exists(fname)
   inquire ( file=fname, exist=exist1 )
   if ( exist1 .eqv. .false.) then
     write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
-    stop
+    call abort( 191919, "File not found...."//trim(adjustl(fname)) )
   endif
 
 end subroutine check_file_exists

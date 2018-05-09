@@ -133,7 +133,7 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
             write(*,*) "something went wrong - during balancing, we lost or gained some blocks", excess_blocks
             write(*,*) "or we have more than +-1 block difference among them"
             write(*,*) opt_dist_list
-            stop
+            call abort(11191,"ERROR lost some blocks")
         end if
     end if
 

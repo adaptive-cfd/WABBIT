@@ -20,7 +20,7 @@
 !!           - direction for neighbor search
 !!           - list of active blocks
 !!
-!! output:   
+!! output:
 !!           - neighbor list array
 !!
 ! -------------------------------------------------------------------------------------------------------------------------
@@ -197,8 +197,7 @@ subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, d
                 ! error case
                 print*, "for this block:", my_treecode
                 print*, "I cannot find:", neighbor
-                print*, 'ERROR: can not find edge neighbor'
-                stop
+                call abort(363791, 'ERROR: can not find edge neighbor')
             end if
 
             ! second neighbor virtual treecode, one level up
@@ -219,8 +218,7 @@ subroutine find_neighbor_edge_2D(heavy_id, light_id, lgt_block, max_treelevel, d
                 ! error case
                 print*, "for this block:", my_treecode
                 print*, "I cannot find:", neighbor
-                print*, 'ERROR: can not find edge neighbor'
-                stop
+                call abort(363792, 'ERROR: can not find edge neighbor')
             end if
 
         end if

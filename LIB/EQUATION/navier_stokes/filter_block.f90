@@ -315,8 +315,7 @@ subroutine filter_1D(phi, phi_tilde, a)
         write(*,'(80("_"))')
         print*, phi
         print*, a
-        write(*,*) "ERROR: filter stencil has wrong size"
-        stop
+        call abort(123980,"ERROR: filter stencil has wrong size")
     end if
 
     ! filter data

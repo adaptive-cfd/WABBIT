@@ -34,7 +34,7 @@ module module_interpolation
     PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-  
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -53,8 +53,7 @@ contains
         nfine = size(fine,1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "ERROR: restriction_2D: arrays wrongly sized.."
-          stop
+          call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 
         coarse = 0.0_rk
@@ -75,8 +74,7 @@ contains
         nfine = size(fine,1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "ERROR: restriction_3D: arrays wrongly sized.."
-          stop
+          call abort(888192,"ERROR: restriction_3D: arrays wrongly sized..")
         endif
 
         !coarse          = 0.0_rk
@@ -102,8 +100,7 @@ contains
         nfine   = size(fine, 1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "ERROR: prediction_2D: arrays wrongly sized.."
-          stop
+          call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
         endif
 
         ! inititalize fine field (actually not necessary)
@@ -153,8 +150,7 @@ contains
              end do
         else
              ! error case
-             write(*,*) "ERROR: prediction_2D: wrong method.."
-             stop
+             call abort(888194,"ERROR: prediction_2D: wrong method..")
         endif
 
     end subroutine prediction_2D
@@ -177,8 +173,7 @@ contains
         nfine   = size(fine, 1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "ERROR: prediction_3D: arrays wrongly sized.."
-          stop
+          call abort(888195,"ERROR: prediction_3D: arrays wrongly sized..")
         endif
 
         ! inititalize fine field (actually not necessary)
@@ -253,8 +248,7 @@ contains
 
         else
              ! error case
-             write(*,*) "ERROR: prediction_2D: wrong method.."
-             stop
+             call abort(888196,"ERROR: prediction_2D: wrong method..")
         endif
 
     end subroutine prediction_3D
@@ -274,8 +268,7 @@ contains
         nfine = size(fine,1)
 
         if ( 2*ncoarse-1 /= nfine ) then
-          write(*,*) "ERROR: prediction1d: arrays wrongly sized.."
-          stop
+          call abort(888197,"ERROR: prediction1d: arrays wrongly sized..")
         endif
 
         ! this is the multiresolution predition operator.

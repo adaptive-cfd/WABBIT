@@ -11,21 +11,21 @@
 !> \note works only for block on same process
 !
 !> \details
-!! input:    
+!! input:
 !!           - heavy data array
 !!           - sender block id
 !!           - receiver block id
 !!           - neighbor relations between sender/receiver
 !!           - level difference between these two blocks
 !!
-!! output:   
+!! output:
 !!           - heavy data array
 !!
 !! \n
 ! --------------------------------------------------------------------------------------------
 !> neighbor codes: \n
 ! ---------------
-!> for imagination:  
+!> for imagination:
 !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
 !!                   - edge: boundary between two sides - use sides numbers for coding
 !!                   - corner: between three sides - so use all three sides numbers
@@ -137,7 +137,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case (there should be no level difference between sender/receiver)
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__2/___'
@@ -153,7 +153,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case (there should be no level difference between sender/receiver)
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__3/___'
@@ -169,7 +169,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case (there should be no level difference between sender/receiver)
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__4/___'
@@ -185,7 +185,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case (there should be no level difference between sender/receiver)
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__5/___'
@@ -201,7 +201,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case (there should be no level difference between sender/receiver)
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__6/___'
@@ -217,7 +217,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case (there should be no level difference between sender/receiver)
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_12/___'
@@ -233,7 +233,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_13/___'
@@ -249,7 +249,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_14/___'
@@ -265,7 +265,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_15/___'
@@ -281,7 +281,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_62/___'
@@ -297,7 +297,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_63/___'
@@ -313,7 +313,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_64/___'
@@ -329,7 +329,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_65/___'
@@ -345,7 +345,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_23/___'
@@ -361,7 +361,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_25/___'
@@ -377,7 +377,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_43/___'
@@ -393,7 +393,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_45/___'
@@ -409,7 +409,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '123/___'
@@ -447,7 +447,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '134/___'
@@ -485,7 +485,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '145/___'
@@ -523,7 +523,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
         ! '152/___'
         case(22)
@@ -560,7 +560,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '623/___'
@@ -598,7 +598,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '634/___'
@@ -636,7 +636,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '645/___'
@@ -674,7 +674,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '652/___'
@@ -712,7 +712,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__1/123'
@@ -744,7 +744,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__1/134'
@@ -776,7 +776,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__1/145'
@@ -808,7 +808,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__1/152'
@@ -840,7 +840,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__2/123'
@@ -872,7 +872,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__2/623'
@@ -904,7 +904,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__2/152'
@@ -936,7 +936,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__2/652'
@@ -967,7 +967,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__3/123'
@@ -999,7 +999,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__3/623'
@@ -1031,7 +1031,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__3/134'
@@ -1063,7 +1063,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__3/634'
@@ -1095,7 +1095,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__4/134'
@@ -1127,7 +1127,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__4/634'
@@ -1159,7 +1159,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__4/145'
@@ -1191,7 +1191,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__4/645'
@@ -1223,7 +1223,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__5/145'
@@ -1255,7 +1255,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__5/645'
@@ -1287,7 +1287,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__5/152'
@@ -1319,7 +1319,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__5/652'
@@ -1350,7 +1350,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__6/623'
@@ -1382,7 +1382,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__6/634'
@@ -1414,7 +1414,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__6/645'
@@ -1446,7 +1446,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '__6/652'
@@ -1477,7 +1477,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_12/123'
@@ -1508,7 +1508,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_12/152'
@@ -1540,7 +1540,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_13/123'
@@ -1572,7 +1572,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_13/134'
@@ -1603,7 +1603,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_14/134'
@@ -1634,7 +1634,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_14/145'
@@ -1666,7 +1666,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_15/145'
@@ -1697,7 +1697,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_15/152'
@@ -1729,7 +1729,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
          ! '_62/623'
@@ -1760,7 +1760,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_62/652'
@@ -1791,7 +1791,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_63/623'
@@ -1823,7 +1823,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_63/634'
@@ -1854,7 +1854,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_64/634'
@@ -1885,7 +1885,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_64/645'
@@ -1917,7 +1917,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_65/645'
@@ -1948,7 +1948,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_65/652'
@@ -1979,7 +1979,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_23/123'
@@ -2010,7 +2010,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_23/623'
@@ -2042,7 +2042,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_25/152'
@@ -2073,7 +2073,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_25/652'
@@ -2104,7 +2104,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_43/134'
@@ -2135,7 +2135,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_43/634'
@@ -2167,7 +2167,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_45/145'
@@ -2198,7 +2198,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
         ! '_45/645'
@@ -2230,7 +2230,7 @@ subroutine copy_ghost_nodes_3D( params, hvy_block, sender_id, receiver_id, neigh
                 ! error case
                 write(*,'(80("_"))')
                 write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                stop
+                call abort(77730)
             end if
 
     end select

@@ -73,8 +73,7 @@ subroutine compute_affinity(params, my_block_list, hvy_neighbor, rank, rank_part
 
     ! error case
     if( size(affinity) /= params%number_blocks ) then
-        write(*,*)"unforeseen"
-        stop
+        call abort(3637911, 'ERROR: unforseen....')
     endif
 
     ! loop over all active heavy

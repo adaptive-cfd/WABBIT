@@ -83,7 +83,7 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
                 ! error case
                 write(*,'(80("!"))')
                 write(*, '("ERROR: lgt_block is not synchron, lgt_block id: ",i5," position: ", i5)') k, l
-                stop
+                call abort(12399)
             end if
 
         end do

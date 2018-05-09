@@ -123,7 +123,7 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
         else
             write(*,*) "ERROR: discretization method in discretization is unknown"
             write(*,*) discretization
-            stop
+            call abort(19111, "ERROR: discretization method in discretization is unknown")
         end if
     else
         if (discretization == "FD_2nd_central" ) then
@@ -149,7 +149,7 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
         else
             write(*,*) "ERROR: discretization method in discretization is unknown"
             write(*,*) discretization
-            stop
+            call abort(19111, "ERROR: discretization method in discretization is unknown")
         end if
     end if
 

@@ -169,8 +169,7 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
                 ! error case
                 write(*,*) "my treecode", lgt_block( light_id, : )
                 write(*,*) "neighbor treecode", virt_treecode
-                print*, 'ERROR: can not find corner neighbor)'
-                stop
+                call abort(292928, 'ERROR: can not find corner neighbor')
             end if
 
         end if

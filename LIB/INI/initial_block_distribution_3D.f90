@@ -11,24 +11,24 @@
 !> \note field phi is 3D, but third dimension is not used
 !
 !> \details
-!! input:    
+!! input:
 !!           - parameters
 !!           - light block data array
 !!           - heavy block data array
 !!           - start field phi
 !!
-!! output:   
+!! output:
 !!           - filled light and heavy data array
 !!
 !! = log ======================================================================================
 !!
-!! 07/11/16  
+!! 07/11/16
 !!            - switch to v0.4
 !!
-!! 05/12/16  
+!! 05/12/16
 !!            - add dummy space filling curve distribution
 !!
-!! 26/01/17  
+!! 26/01/17
 !!            - use process rank from params struct
 !!            - remove sfc distribution: for sfc start dist, call balance_load after this routine
 !!            - use v0.5 hvy data array, but still work only for 2D data
@@ -115,8 +115,7 @@ subroutine initial_block_distribution_3D( params, lgt_block, hvy_block, phi )
 
     ! check given domain and block size
     if ( Ds /= (num_blocks_x-1)*(Bs-1) + Bs ) then
-        print*, "ERROR: blocksize do not fit into domain size"
-        stop
+        call abort(83855,"ERROR: blocksize do not fit into domain size")
     end if
 
     ! output decomposition information

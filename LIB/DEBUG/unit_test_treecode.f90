@@ -50,7 +50,7 @@ use module_treelib
 
             do iz = 1, 1000
             if ( newtreecode == neighbor ) then
-              stop
+              call abort(123980)
             endif
             enddo
     enddo
@@ -76,7 +76,7 @@ use module_treelib
 
             do iz = 1,1000
             if (array_compare(treecode, n, params%max_treelevel)) then
-              stop
+              call abort(123980)
             endif
           enddo
     enddo

@@ -547,7 +547,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
                                 if ( real_start > real_N ) then
                                    write(*,'(80("-"))')
                                    write(*, '("ERROR: block ", i3 , " not found in receive buffer")') hvy_active(k)
-                                   stop
+                                   call abort(99914)
                                 end if
 
                                 ! write external ghost nodes

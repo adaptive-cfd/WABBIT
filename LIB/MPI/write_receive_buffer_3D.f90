@@ -10,18 +10,18 @@
 !> \brief write received buffer to heavy data with integer and real buffer
 !
 !>
-!! input:    
+!! input:
 !!           - params struct
 !!           - received buffer
 !!
-!! output:   
+!! output:
 !!           - heavy data array
 !!
 !! \n
 ! --------------------------------------------------------------------------------------------
 !> neighbor codes: \n
 ! ---------------
-!> for imagination:  
+!> for imagination:
 !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
 !!                   - edge: boundary between two sides - use sides numbers for coding
 !!                   - corner: between three sides - so use all three sides numbers
@@ -594,7 +594,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -628,7 +628,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -662,7 +662,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -696,7 +696,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -730,7 +730,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -764,7 +764,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -798,7 +798,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -832,7 +832,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -866,7 +866,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -900,7 +900,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -934,7 +934,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -968,7 +968,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1002,7 +1002,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1036,7 +1036,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1070,7 +1070,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1104,7 +1104,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1138,7 +1138,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1172,7 +1172,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1206,7 +1206,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1240,7 +1240,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1274,7 +1274,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1308,7 +1308,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1342,7 +1342,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1376,7 +1376,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1410,7 +1410,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
             ! '_12/152'
@@ -1443,7 +1443,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1477,7 +1477,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1511,7 +1511,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1545,7 +1545,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1579,7 +1579,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1613,7 +1613,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1647,7 +1647,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1681,7 +1681,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1715,7 +1715,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1749,7 +1749,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1783,7 +1783,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1817,7 +1817,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1851,7 +1851,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1885,7 +1885,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1919,7 +1919,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1953,7 +1953,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -1987,7 +1987,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -2021,7 +2021,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -2055,7 +2055,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -2090,7 +2090,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -2125,7 +2125,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -2159,7 +2159,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 
@@ -2193,7 +2193,7 @@ subroutine write_receive_buffer_3D(params, int_buffer, recv_buff, hvy_block)
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(094861)
                     end if
                 end do
 

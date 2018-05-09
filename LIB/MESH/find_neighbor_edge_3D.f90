@@ -437,8 +437,7 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
                     print*, dir
                     print*, my_treecode
                     print*, neighbor
-                    print*, 'ERROR: can not find edge neighbor'
-                    stop
+                    call abort(363733, 'ERROR: can not find edge neighbor')
                 end if
 
             end do

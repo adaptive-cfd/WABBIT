@@ -65,8 +65,7 @@ subroutine get_free_light_id( id, lgt_block, N )
 
     ! error catching: is there no more free blocks on the list?
     if (id == -1) then
-      write(*,*) "ERROR: We try to fetch a light free block ID from the list but all blocks are used."
-      stop
+      call abort(6363709, "ERROR: We try to fetch a light free block ID from the list but all blocks are used.")
     end if
 
 end subroutine get_free_light_id

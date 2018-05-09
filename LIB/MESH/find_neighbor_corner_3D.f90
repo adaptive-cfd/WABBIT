@@ -253,8 +253,7 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
 
             else
                 ! error case
-                print*, 'ERROR: can not find corner neighbor)'
-                stop
+                call abort(26363, 'ERROR: can not find corner neighbor')
             end if
 
         end if

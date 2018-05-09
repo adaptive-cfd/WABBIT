@@ -318,8 +318,7 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
                     print*, dir
                     print*, my_treecode
                     print*, neighbor
-                    print*, 'ERROR: can not find face neighbor'
-                    stop
+                    call abort(72727,'ERROR: can not find face neighbor')
                 end if
 
             end do

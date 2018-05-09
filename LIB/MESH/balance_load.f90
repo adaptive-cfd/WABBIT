@@ -501,7 +501,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             write(*,'(80("_"))')
             write(*,*) "ERROR: block distribution scheme is unknown"
             write(*,*) distribution
-            stop
+            call abort(1882, "ERROR: block distribution scheme is unknown")
 
     end select
 

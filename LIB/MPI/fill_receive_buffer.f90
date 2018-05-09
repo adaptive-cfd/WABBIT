@@ -72,7 +72,7 @@ subroutine fill_receive_buffer( params, int_send_buffer, real_send_buffer, int_r
             write(*,'(80("_"))')
             write(*,*) "ERROR: data exchange method is unknown"
             write(*,*) params%mpi_data_exchange
-            stop
+            call abort(99912222,"ERROR: data exchange method is unknown")
 
     end select
 

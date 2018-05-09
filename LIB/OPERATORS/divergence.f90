@@ -7,7 +7,7 @@
 !> \brief computation of the divergence from a given velocity field
 !
 ! = log ======================================================================================
-!> \date  13/04/18 - create hashcode: commit 
+!> \date  13/04/18 - create hashcode: commit
 !-----------------------------------------------------------------------------------------------------
 subroutine divergence(u, v, w, dx, Bs, g, discretization, div)
 
@@ -87,7 +87,7 @@ subroutine divergence(u, v, w, dx, Bs, g, discretization, div)
         else
             write(*,*) "ERROR: discretization method in discretization is unknown"
             write(*,*) discretization
-            stop
+            call abort(19111, "ERROR: discretization method in discretization is unknown")
         end if
     else
         if (discretization == "FD_2nd_central" ) then
@@ -113,7 +113,7 @@ subroutine divergence(u, v, w, dx, Bs, g, discretization, div)
         else
             write(*,*) "ERROR: discretization method in discretization is unknown"
             write(*,*) discretization
-            stop
+            call abort(19111, "ERROR: discretization method in discretization is unknown")
         end if
     end if
 

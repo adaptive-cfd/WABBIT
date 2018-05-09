@@ -10,13 +10,13 @@
 !> \brief write send buffer with given com list
 !
 !>
-!! input:    
+!! input:
 !!           - heavy data array
 !!           - params struct
 !!           - communications list
 !!           - number of communications to send/receive
 !!
-!! output:   
+!! output:
 !!           - send buffer
 !!
 !! \n
@@ -201,7 +201,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -250,7 +250,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -298,7 +298,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -346,7 +346,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -381,7 +381,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -414,7 +414,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -447,7 +447,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -480,7 +480,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -514,7 +514,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -547,7 +547,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -578,7 +578,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -611,7 +611,7 @@ subroutine create_send_buffer_2D(params, hvy_block, com_list, com_number, send_b
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -800,7 +800,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -849,7 +849,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -897,7 +897,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -945,7 +945,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
 
                 end do
@@ -980,7 +980,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1013,7 +1013,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1046,7 +1046,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1079,7 +1079,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1113,7 +1113,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1146,7 +1146,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1177,7 +1177,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 
@@ -1210,7 +1210,7 @@ subroutine create_redundant_send_buffer_2D(params, hvy_block, com_list, com_numb
                         ! error case
                         write(*,'(80("_"))')
                         write(*,*) "ERROR: can not synchronize ghost nodes, mesh is not graded"
-                        stop
+                        call abort(87100)
                     end if
                 end do
 

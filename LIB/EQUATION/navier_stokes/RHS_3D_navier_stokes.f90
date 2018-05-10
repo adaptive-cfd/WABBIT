@@ -437,7 +437,7 @@ subroutine  diffz_c_3D( Bs, g, dz, u, dudz)
     real(kind=rk), intent(out)      :: dudz(Bs+2*g, Bs+2*g, Bs+2*g)
 
     integer                         :: i, n
-
+    
     n = size(u,1)
 
     dudz(:,:,1) = ( u(:,:,n-1) - 8.0_rk*u(:,:,n) + 8.0_rk*u(:,:,2) - u(:,:,3) ) / (12.0_rk*dz)

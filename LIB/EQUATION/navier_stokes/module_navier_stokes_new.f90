@@ -862,6 +862,9 @@ subroutine pack_statevector2D(phi,format)
     select case( format )
     case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
       ! sqrt(rho)
+      if ( minval(phi(:,:,1))<0 ) then
+        call abort(457881,"ERROR [module_navier_stokes.f90]: density smaller then 0!!")
+      end if
       converted_vector(:,:,1)=sqrt(phi(:,:,1))
       ! sqrt(rho) u
       converted_vector(:,:,2)=phi(:,:,2)/converted_vector(:,:,1)

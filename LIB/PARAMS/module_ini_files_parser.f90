@@ -9,7 +9,7 @@
 !! note we expect lines to end on a colon (;)
 !! commented lines beginning with # ; ! are ignored.\n
 !! The ini files are organized in sections and values:\n
-!!              
+!!
 !!        [Section]
 !!        parameter=10;
 !-------------------------------------------------------------------------------
@@ -567,9 +567,9 @@ contains
         params_bool = .false.
       end select
 
-      write (value,'(L)') params_bool
+      write (value,'(L1)') params_bool
     else
-      write (value,'(L," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
+      write (value,'(L1," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
       params_bool = defaultvalue
     endif
 

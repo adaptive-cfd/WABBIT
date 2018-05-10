@@ -116,7 +116,7 @@ subroutine sparse_to_dense(help, params)
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
-    params%number_blocks = ceiling( 1.5*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
+    params%number_blocks = ceiling( 2.0*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
 
     if (params%rank==0) then
         write(*,'("Data dimension: ",i1,"D")') dim

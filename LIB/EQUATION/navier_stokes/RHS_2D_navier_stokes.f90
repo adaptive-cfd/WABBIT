@@ -311,6 +311,7 @@ end subroutine diff1y_zentral
 !---------------------------------------------------------------------------------------------
 
 subroutine  diffx_c( Bs, g, dx, u, dudx)
+    use module_params
     integer(kind=ik), intent(in)    :: g, Bs
     real(kind=rk), intent(in)       :: dx
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
@@ -320,21 +321,25 @@ subroutine  diffx_c( Bs, g, dx, u, dudx)
 
     n = size(u,1)
 
-    dudx(1,:) = ( u(n-1,:) - 8.0_rk*u(n,:) + 8.0_rk*u(2,:) - u(3,:) ) / (12.0_rk*dx)
-    dudx(2,:) = ( u(n,:)   - 8.0_rk*u(1,:) + 8.0_rk*u(3,:) - u(4,:) ) / (12.0_rk*dx)
+    !dudx(1,:) = ( u(n-1,:) - 8.0_rk*u(n,:) + 8.0_rk*u(2,:) - u(3,:) ) / (12.0_rk*dx)
+    !dudx(2,:) = ( u(n,:)   - 8.0_rk*u(1,:) + 8.0_rk*u(3,:) - u(4,:) ) / (12.0_rk*dx)
+    dudx(1,:) = ( u(2,:) - u(1,:) ) / (dx)
+    dudx(2,:) = ( u(3,:) - u(1,:) ) / (2.0_rk*dx)
 
     forall ( i = 3:n-2 )
        dudx(i,:) = ( u(i-2,:) - 8.0_rk*u(i-1,:) + 8.0_rk*u(i+1,:) - u(i+2,:) ) / (12.0_rk*dx)
     end forall
 
-    dudx(n-1,:) = ( u(n-3,:) - 8.0_rk*u(n-2,:) + 8.0_rk*u(n,:) - u(1,:) ) / (12.0_rk*dx)
-    dudx(n,:)   = ( u(n-2,:) - 8.0_rk*u(n-1,:) + 8.0_rk*u(1,:) - u(2,:) ) / (12.0_rk*dx)
+    !dudx(n-1,:) = ( u(n-3,:) - 8.0_rk*u(n-2,:) + 8.0_rk*u(n,:) - u(1,:) ) / (12.0_rk*dx)
+    !dudx(n,:)   = ( u(n-2,:) - 8.0_rk*u(n-1,:) + 8.0_rk*u(1,:) - u(2,:) ) / (12.0_rk*dx)
+    dudx(n-1,:) = ( u(n,:) - u(n-2,:) ) / (2.0_rk*dx)
+    dudx(n,:)   = ( u(n,:) - u(n-1,:) ) / (dx)
 
 end subroutine diffx_c
 
-!---------------------------------------------------------------------------------------------
 
 subroutine  diffy_c( Bs, g, dy, u, dudy)
+    use module_params
     integer(kind=ik), intent(in)    :: g, Bs
     real(kind=rk), intent(in)       :: dy
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
@@ -344,17 +349,23 @@ subroutine  diffy_c( Bs, g, dy, u, dudy)
 
     n = size(u,1)
 
-    dudy(:,1) = ( u(:,n-1) - 8.0_rk*u(:,n) + 8.0_rk*u(:,2) - u(:,3) ) / (12.0_rk*dy)
-    dudy(:,2) = ( u(:,n)   - 8.0_rk*u(:,1) + 8.0_rk*u(:,3) - u(:,4) ) / (12.0_rk*dy)
+    !dudy(:,1) = ( u(:,n-1) - 8.0_rk*u(:,n) + 8.0_rk*u(:,2) - u(:,3) ) / (12.0_rk*dy)
+    !dudy(:,2) = ( u(:,n)   - 8.0_rk*u(:,1) + 8.0_rk*u(:,3) - u(:,4) ) / (12.0_rk*dy)
+    dudy(:,1) = ( u(:,2) - u(:,1) ) / (dy)
+    dudy(:,2) = ( u(:,3) - u(:,1) ) / (2.0_rk*dy)
 
     forall ( i = 3:n-2 )
        dudy(:,i) = ( u(:,i-2) - 8.0_rk*u(:,i-1) + 8.0_rk*u(:,i+1) - u(:,i+2) ) / (12.0_rk*dy)
     end forall
 
-    dudy(:,n-1) = ( u(:,n-3) - 8.0_rk*u(:,n-2) + 8.0_rk*u(:,n) - u(:,1) ) / (12.0_rk*dy)
-    dudy(:,n)   = ( u(:,n-2) - 8.0_rk*u(:,n-1) + 8.0_rk*u(:,1) - u(:,2) ) / (12.0_rk*dy)
+    !dudy(:,n-1) = ( u(:,n-3) - 8.0_rk*u(:,n-2) + 8.0_rk*u(:,n) - u(:,1) ) / (12.0_rk*dy)
+    !dudy(:,n)   = ( u(:,n-2) - 8.0_rk*u(:,n-1) + 8.0_rk*u(:,1) - u(:,2) ) / (12.0_rk*dy)
+    dudy(:,n-1) = ( u(:,n) - u(:,n-2) ) / (2.0_rk*dy)
+    dudy(:,n)   = ( u(:,n) - u(:,n-1) ) / (dy)
 
 end subroutine diffy_c
+
+
 
 !>\brief main function of RHS_2D_navier_stokes
 subroutine RHS_1D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
@@ -576,6 +587,3 @@ subroutine RHS_1D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 
 
 end subroutine RHS_1D_navier_stokes
-
-
-

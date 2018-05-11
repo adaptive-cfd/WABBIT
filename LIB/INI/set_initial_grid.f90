@@ -32,7 +32,7 @@
 
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, &
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch)
+    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch, hvy_work)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -46,6 +46,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   integer(kind=ik), intent(inout)      :: lgt_block(:, :)
   !> heavy data array - block data
   real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
+  !> heavy work data array - block data.
+  real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
   !> neighbor array (heavy data)
   integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
   !> list of active blocks light data)
@@ -138,7 +140,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -178,7 +180,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! balance the load
-    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks

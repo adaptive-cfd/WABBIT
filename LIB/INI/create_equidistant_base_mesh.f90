@@ -122,7 +122,6 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
     call abort("ERROR: on the coarsest grid, we seem to have gained/lost some blocks during distribution...")
   end if
 
-
   !-----------------------------------------------------------------------------
   ! Generate and distribute the blocks
   !-----------------------------------------------------------------------------
@@ -154,12 +153,10 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
               call hvy_id_to_lgt_id( lgt_id_first, 1, params%rank, params%number_blocks )
               call hvy_id_to_lgt_id( lgt_id_last, params%number_blocks, params%rank, params%number_blocks )
 
-              ! find and set free heavy data id, note: look for free id in light data, but use
-              ! search routine only on MY LOCAL light data -> so, returned id works directly on heavy data
-              call get_free_light_id( heavy_id, lgt_block( lgt_id_first:lgt_id_last, 1 ), params%number_blocks )
-
-              ! look for global light id of this block
-              call hvy_id_to_lgt_id( lgt_id, heavy_id, params%rank, params%number_blocks )
+              ! get a free block on this rank
+              call get_free_local_light_id( params, icpu, lgt_block, lgt_id)
+              ! and the corresponding heavy id
+              call lgt_id_to_hvy_id( heavy_id, lgt_id, icpu, params%number_blocks )
 
               ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
               lgt_block( lgt_id, 1:params%max_treelevel ) = treecode
@@ -176,7 +173,8 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
             ! it cannot -> choose another cpu
             cycle
           end if
-        end do
+        end do ! loop over cpu
+
       end do
     end do
   end do

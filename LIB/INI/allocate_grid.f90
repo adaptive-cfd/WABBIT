@@ -44,7 +44,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
-    !> heavy work array  )
+    !> heavy work array
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
     integer(kind=1), allocatable, optional, intent(out) :: hvy_synch(:, :, :, :)
     !> neighbor array (heavy data)

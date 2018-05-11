@@ -24,7 +24,7 @@
 !> \image html load_balancing.svg width=500
 ! ********************************************************************************************
 
-subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -50,12 +50,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    !> heavy work data array - block data.
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
 
-    ! send/receive buffer, note: size is equal to block data array, because if a block want to send all his data
-    real(kind=rk), allocatable          :: buffer_data( :, :, :, :, : )
     integer(kind=ik), allocatable       :: buffer_light( : )
-    ! light id start
-    integer(kind=ik)                    :: my_light_start
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
@@ -66,14 +64,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik)                    :: tag
     ! MPI status
     integer                             :: status(MPI_status_size)
-    ! distribution type
-    character(len=80)                   :: distribution
     ! block distribution lists
     integer(kind=ik), allocatable       :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
     ! loop variables
-    integer(kind=ik)                    :: k, N, num_blocks, l, com_i, com_N, heavy_id, sfc_id
-    ! com plan
-    integer(kind=ik), allocatable       :: com_plan(:,:)
+    integer(kind=ik)                    :: k, N, l, com_i, com_N, heavy_id, sfc_id, neq
     ! size of data array
     integer(kind=ik)                    :: data_size
     ! free light/heavy data id
@@ -90,12 +84,15 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    if (params%number_procs == 1) then
+        ! on only one proc, no balancing is required
+        return
+    endif
+
     ! start time
     t0 = MPI_Wtime()
 
     tag = 0
-
-    distribution    = params%block_distribution
 
     ! MPI_parameters
     rank = params%rank
@@ -103,31 +100,20 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     WABBIT_COMM  = params%WABBIT_COMM
     ! allocate block to proc lists
     allocate( opt_dist_list(1:number_procs), dist_list(1:number_procs))
-
-    ! allocate com plan, maximal number of communications: every proc send every other proc something
-    allocate( com_plan( number_procs*(number_procs-1), 3 ) )
-    com_plan = -1
-
     ! allocate sfc com list, maximal number of communications is when every proc wants to send all of his blocks
+    ! NOTE: it is not necessary or wise to reset this array (it is large!)
     allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
-    sfc_com_list = -1
 
-    ! allocate space filling curve list, maximal number of elements = max number of blocks
+    ! allocate space filling curve list, number of elements is the number of active blocks
+    ! and for each block, we store the space-filling-curve-index and the lgt ID
     allocate( sfc_sorted_list( lgt_n, 2) )
 
-    ! allocate buffer arrays here
-    allocate( buffer_data( size(hvy_block,1), size(hvy_block,2), &
-              size(hvy_block,3), size(hvy_block,4), size(hvy_block,5) ) )
+    ! allocate buffer arrays
     allocate( buffer_light( params%number_blocks ) )
 
     ! number of blocks
     N = params%number_blocks
-
-    ! reset block count
-    num_blocks = 0
-
-    ! light data start line
-    my_light_start = rank*params%number_blocks
+    neq = params%number_data_fields
 
     ! size of data array, use for readability
     data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3) * size(hvy_block,4)
@@ -136,10 +122,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    if (params%number_procs == 1) then
-        ! on only one proc, no balancing is required
-        return
-    endif
 
     !---------------------------------------------------------------------------------
     ! First step: define how many blocks each mpirank should have.
@@ -150,7 +132,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! and how many it should have, if equally distributed: "opt_dist_list(myrank+1)"
 
 
-    select case(distribution)
+    select case(params%block_distribution)
         case("equal")! simple uniformly distribution
 
             allocate( affinity(1:params%number_blocks) )
@@ -300,7 +282,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             ! 1st: calculate space filling curve index for all blocks
             !---------------------------------------------------------------------------------
             do k = 1, lgt_n
-                select case (distribution)
+                select case (params%block_distribution)
                 case("sfc_z")
                     !-----------------------------------------------------------
                     ! Z - curve
@@ -402,6 +384,9 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                 end if
             end do
 
+            ! counted one too far
+            com_i = com_i - 1
+
             !---------------------------------------------------------------------------------
             ! 3rd: actual communication (send/recv)
             !---------------------------------------------------------------------------------
@@ -429,7 +414,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                             call lgt_id_to_hvy_id( heavy_id, lgt_id, rank, params%number_blocks )
 
                             ! send buffer: fill buffer, heavy data
-                            buffer_data(:, :, :, :, l+1 ) = hvy_block(:, :, :, :, heavy_id )
+                            hvy_work(:, :, :, 1:neq, l+1 ) = hvy_block(:, :, :, 1:neq, heavy_id )
                             ! ... light data
                             buffer_light( l+1 ) = lgt_id
 
@@ -442,8 +427,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                         end do
 
                         ! send data
-                        call MPI_Send( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
-                        call MPI_Send( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
+                        call MPI_Send( buffer_light(1:l), l, MPI_INTEGER4, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
+                        call MPI_Send( hvy_work(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
 
                         ! delete all com list elements
                         sfc_com_list(k:k+l-1, :) = -1
@@ -465,8 +450,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                         end do
 
                         ! receive data
-                        call MPI_Recv( buffer_light, l, MPI_INTEGER4, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
-                        call MPI_Recv( buffer_data, data_size*l, MPI_REAL8, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
+                        call MPI_Recv( buffer_light(1:l), l, MPI_INTEGER4, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
+                        call MPI_Recv( hvy_work(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
 
                         ! delete first com list element after receiving data
                         sfc_com_list(k, :) = -1
@@ -482,7 +467,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                             ! copy the data from the buffers
                             lgt_block( lgt_free_id, :) = lgt_block( buffer_light(l), : )
-                            hvy_block(:, :, :, :, hvy_free_id) = buffer_data(:, :, :, :, l)
+                            hvy_block(:, :, :, 1:neq, hvy_free_id) = hvy_work(:, :, :, 1:neq, l)
 
                         end do
                     else
@@ -500,7 +485,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         case default
             write(*,'(80("_"))')
             write(*,*) "ERROR: block distribution scheme is unknown"
-            write(*,*) distribution
+            write(*,*) params%block_distribution
             call abort(1882, "ERROR: block distribution scheme is unknown")
 
     end select
@@ -508,9 +493,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! clean up
     deallocate( opt_dist_list )
     deallocate( dist_list )
-    deallocate( com_plan )
     deallocate( sfc_com_list )
-    deallocate( buffer_data )
     deallocate( buffer_light )
     deallocate( sfc_sorted_list )
 

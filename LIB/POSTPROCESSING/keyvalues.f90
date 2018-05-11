@@ -30,6 +30,7 @@ subroutine keyvalues(fname, params, help)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
+    real(kind=rk), allocatable              :: hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(hsize_t), dimension(4)          :: size_field
@@ -79,6 +80,11 @@ subroutine keyvalues(fname, params, help)
 
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, .false.)
+
+    ! the work array needs to be allocated as balance load requires a buffer.
+    ! it can However be smaller than what is allocated in allocate_grid.
+    allocate( hvy_work( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4), size(hvy_block,5)  ) )
+
     call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call read_field(fname, 1, params, hvy_block, hvy_n )
     call create_active_and_sorted_lists( params, lgt_block, &
@@ -103,7 +109,7 @@ subroutine keyvalues(fname, params, help)
         tree = 0_ik
         params%block_distribution=trim(curves(i))
         call balance_load(params,lgt_block,hvy_block,hvy_neighbor,&
-        lgt_active,lgt_n,hvy_active,hvy_n)
+        lgt_active,lgt_n,hvy_active,hvy_n, hvy_work)
         call create_active_and_sorted_lists( params, lgt_block, &
         lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
@@ -169,5 +175,7 @@ subroutine keyvalues(fname, params, help)
         write (*,'(A)') "These values can be used to compare two HDF5 files"
         close (59)
     endif
+
+    deallocate( hvy_work )
 
 end subroutine keyvalues

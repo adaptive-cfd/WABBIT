@@ -243,7 +243,7 @@ program main
     ! On all blocks, set the initial condition
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, int_send_buffer, &
-    int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch )
+    int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch, hvy_work )
 
     ! Perform a first test of the redundant nodes right after setting the initial condition.
     ! For most cases, the initial condition is set on all points, including ghost nodes. Therefore,
@@ -362,7 +362,7 @@ program main
         if ( params%adapt_mesh ) then
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
 

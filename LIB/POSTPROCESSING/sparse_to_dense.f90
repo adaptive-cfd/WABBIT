@@ -116,7 +116,7 @@ subroutine sparse_to_dense(help, params)
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
-    params%number_blocks = ceiling( 2.0*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
+    params%number_blocks = ceiling( 4.0*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
 
     if (params%rank==0) then
         write(*,'("Data dimension: ",i1,"D")') dim
@@ -150,7 +150,8 @@ subroutine sparse_to_dense(help, params)
         lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! balance the load
-    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n)
+    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    lgt_n, hvy_active, hvy_n, hvy_work)
 
     ! create lists of active blocks (light and heavy data) after load balancing (have changed)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
@@ -205,7 +206,7 @@ subroutine sparse_to_dense(help, params)
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+        hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     call write_field(file_out, time, iteration, 1, params, lgt_block, &

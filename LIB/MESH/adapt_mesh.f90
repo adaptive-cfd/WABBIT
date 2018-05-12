@@ -35,7 +35,7 @@
 
 subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix, int_send_buffer,&
-     int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+     int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -53,6 +53,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy work data array - block data.
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -115,7 +117,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
         com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-        
+
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
@@ -168,7 +170,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
-    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
 
 
     !> load balancing destroys the lists again, so we have to create them one last time to

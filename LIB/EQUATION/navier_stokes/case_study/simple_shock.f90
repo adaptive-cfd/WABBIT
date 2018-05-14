@@ -160,8 +160,8 @@ subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
 end subroutine add_simple_shock
 
 
-!> \brief This function calculates from \f$\rho_1,u_1,p_1$\f
-!> values \f$\rho_2,u_2,p_2$\f on the ohter side
+!> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
+!> values \f$\rho_2,u_2,p_2\f$ on the ohter side
 !> of the shock
 subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
     implicit none

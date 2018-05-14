@@ -131,7 +131,7 @@ contains
       dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
-      write(*,'("maximal resolution: ",T40,i5,x,"x",i5)') nx_max/2, nx_max/2
+      write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max/2, nx_max/2
     endif
 
     ! set global parameters pF,rohF, UxF etc
@@ -640,7 +640,7 @@ contains
 
     case ("zeros")
       ! add ambient pressure
-      u( :, :, :, pF) = p_init
+      u( :, :, :, pF) = params_ns%initial_pressure
       ! set rho
       u( :, :, :, rhoF) = sqrt(rho_init)
       ! set Ux
@@ -738,13 +738,13 @@ contains
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = p_init + 1000.0_rk * u( :, :, :, pF)
+        u( :, :, :, pF) = params_ns%initial_pressure + 1000.0_rk * u( :, :, :, pF)
         ! set rho
-        u( :, :, :, rhoF) = sqrt(rho_init)
+        u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
         ! set Ux
-        u( :, :, :, UxF) = 0.0_rk
+        u( :, :, :, UxF) = params_ns%initial_velocity(1)
         ! set Uy
-        u( :, :, :, UyF) = 0.0_rk
+        u( :, :, :, UyF) = params_ns%initial_velocity(2)
 
         if (size(u,3).ne.1) then
             ! set Uz to zero

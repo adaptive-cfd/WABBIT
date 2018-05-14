@@ -1,7 +1,7 @@
 !-------------------------------------------------------------!
 !> This module contains the basic tools to create 2 MPI worlds
 !-------------------------------------------------------------!
-module module_bridge  
+module module_bridge
 
 use MPI
 
@@ -49,6 +49,8 @@ public :: getMinMaxCommonWorldRanks
 
 contains
 
+
+
 !> @brief      Creates two mpi worlds by splitting the processes of the common
 !>             communicator in two subsets
 !
@@ -57,7 +59,7 @@ contains
 !> @param      worldIndex world index which is a unique tag for the two
 !>                          groups (integer)
 !
-!> @return      bridgeToSet 
+!> @return      bridgeToSet
 subroutine createMPIWorlds (bridgeToSet, worldIndex)
 !! distinguish between the sub-worlds by splitting the processes
 !! Subroutine-declarations
@@ -71,26 +73,26 @@ integer                                  :: commonComm             ! MPI common 
   !! - set the communicator in the common world
   call MPI_comm_dup(MPI_Comm_world, commonComm, ierr)
   bridgeToSet%commonWorld = commonComm
-  
+
   !! - determine the size and rank in the common world
   call MPI_comm_size(bridgeToSet%commonWorld, bridgeToSet%commonWorldSize, ierr)
   call MPI_comm_rank(bridgeToSet%commonWorld, bridgeToSet%commonWorldRank, ierr)
-  
-  
+
+
   !! - according to the value of worldIndex, split the MPI_Comm_world
   call MPI_comm_split(bridgeToSet%commonWorld, worldIndex, bridgeToSet%commonWorldRank, &
                       bridgeToSet%myWorld, ierr)
-  
+
   !! - determine the size and rank in the local world
   call MPI_comm_size(bridgeToSet%myWorld, bridgeToSet%myWorldSize, ierr)
   call MPI_comm_rank(bridgeToSet%myWorld, bridgeToSet%myWorldRank, ierr)
-  
+
   !! determine the size of the other world
   bridgeToSet%otherWorldSize = bridgeToSet%commonWorldSize - bridgeToSet%myWorldSize
-  
+
   !! set the min and max common rank of the two worlds
   call getMinMaxCommonWorldRanks(bridgeToSet)
-  
+
   !! get the communicator of the other world
   write(*,*) ' '
   write(*,*) 'Fluid side: total world size: ', bridgeToSet%commonWorldSize
@@ -106,7 +108,7 @@ end subroutine createMPIWorlds
 !!!!-------------------------------------------------------------------------!!!!
 
 
-!> @brief      create a new set of processes (slave program) 
+!> @brief      create a new set of processes (slave program)
 !>             called by a master program - master side
 !>             Subroutine-declarations
 !
@@ -117,7 +119,7 @@ end subroutine createMPIWorlds
 !> @return     bridgeToSet
 subroutine createMPIWorldsMaster (bridgeToSet, slaveSize, slaveCommand)
 
- 
+
 type(bridgeMPI)  , intent(out)           :: bridgeToSet            ! type bridge to allocate in a world
 integer          , intent(in)            :: slaveSize              ! index to chose the world in which the bridge is allocated
 character(len=*) , intent(in)            :: slaveCommand           ! command line of the slave program
@@ -128,21 +130,21 @@ integer, dimension(slaveSize)            :: ierrs                  ! MPI communi
   ! As master, create a new set of processes for the slave side
   !! - assign my world to the master intracommunicator
   call MPI_comm_dup(MPI_comm_world, bridgeToSet%myWorld, ierr)
-  
+
   !! - according to the value of slaveSize, create a new set of processes
   call MPI_comm_spawn(slaveCommand, MPI_argv_null, slaveSize, MPI_info_null, 0, &
                       bridgeToSet%myWorld, bridgeToSet%otherWorld, ierrs, ierr)
-  
+
   !! - determine the size and rank in the local world
   call MPI_comm_size(bridgeToSet%myWorld, bridgeToSet%myWorldSize, ierr)
   call MPI_comm_rank(bridgeToSet%myWorld, bridgeToSet%myWorldRank, ierr)
-  
+
   !! - determine the size of the other world
   call MPI_comm_remote_size(bridgeToSet%otherWorld, bridgeToSet%otherWorldSize, ierr)
-  
+
   !! - define the new common world (master get the high ranks in the common world)
   call MPI_intercomm_merge(bridgeToSet%otherWorld, .true., bridgeToSet%commonWorld, ierr)
-  
+
   !! - Determine the ranks/size values in the common world
   call MPI_comm_size(bridgeToSet%commonWorld, bridgeToSet%commonWorldSize, ierr)
   call MPI_comm_rank(bridgeToSet%commonWorld, bridgeToSet%commonWorldRank, ierr)
@@ -162,20 +164,20 @@ integer                                  :: ierr                   ! MPI communi
   ! As slave, determine the master who created the processes and assign the resulting values
   !! - assign my world to the master intracommunicator
   call MPI_comm_dup(MPI_comm_world, bridgeToSet%myWorld, ierr)
-  
+
   !! - determine the size and rank in the local world
   call MPI_comm_size(bridgeToSet%myWorld, bridgeToSet%myWorldSize, ierr)
   call MPI_comm_rank(bridgeToSet%myWorld, bridgeToSet%myWorldRank, ierr)
-  
+
   !! - get the intercommunicator of the other world
   call MPI_comm_get_parent(bridgeToSet%otherWorld, ierr)
-  
+
   !! - determine the size of the other world
   call MPI_comm_remote_size(bridgeToSet%otherWorld, bridgeToSet%otherWorldSize, ierr)
-  
+
   !! - define the new common world (master get the high ranks in the common world)
   call MPI_intercomm_merge(bridgeToSet%otherWorld, .false., bridgeToSet%commonWorld, ierr)
-  
+
   !! - Determine the ranks/size values in the common world
   call MPI_comm_size(bridgeToSet%commonWorld, bridgeToSet%commonWorldSize, ierr)
   call MPI_comm_rank(bridgeToSet%commonWorld, bridgeToSet%commonWorldRank, ierr)
@@ -199,14 +201,14 @@ integer                                  :: ierr                   ! MPI communi
   !! get the maximal rank
   call MPI_allreduce(myBridge%commonWorldRank, myBridge%maxMyWorldRank, 1, &
                      MPI_integer, MPI_max, myBridge%myWorld, ierr)
-  
+
   ! Fluid world and check
   !!  if all local processes have the first ranks in the common world
   if ((myBridge%minMyWorldRank.eq.0).and. &
       (myBridge%maxMyWorldRank.eq.(myBridge%myWorldSize - 1))) then
     myBridge%minOtherWorldRank = myBridge%myWorldSize
     myBridge%maxOtherWorldRank = myBridge%commonWorldSize-1
-  !! if all local processes have the last ranks in the common world 
+  !! if all local processes have the last ranks in the common world
   else if ((myBridge%minMyWorldRank.eq.(myBridge%commonWorldSize - myBridge%myWorldSize)).and. &
            (myBridge%maxMyWorldRank.eq.(myBridge%commonWorldSize - 1))) then
     myBridge%minOtherWorldRank = 0
@@ -218,7 +220,7 @@ integer                                  :: ierr                   ! MPI communi
       call MPI_abort(myBridge%commonWorld, 99, ierr)               ! Abort the execution
     end if                                                         ! end condition on the rank in the local world
   end if
-  
+
 end subroutine getMinMaxCommonWorldRanks
 
 end module module_bridge

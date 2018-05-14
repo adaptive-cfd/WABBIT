@@ -79,7 +79,7 @@ subroutine init_filter(filter, FILE )
 
             case('no_filter')
                 ! do nothing..
-
+                return
             case('wavelet')
                 ! order of predictor for refinement
                 call read_param_mpi(FILE, 'Discretization', 'order_predictor', filter%order_predictor, "---" )

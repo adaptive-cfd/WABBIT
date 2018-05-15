@@ -58,7 +58,7 @@ subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     ! loop over all active blocks
     do k = 1, lgt_n
 
-        if ((lgt_block( lgt_active(k), Jmax+2 ) ==  1).and.(lgt_block( lgt_active(k), Jmax+1 ) >= Jmax)) then
+        if ((lgt_block( lgt_active(k), Jmax+2 ) == +1).and.(lgt_block( lgt_active(k), Jmax+1 ) >= Jmax)) then
             ! can not refine (set flag to 0 = stay)
             lgt_block( lgt_active(k), Jmax+2 ) = 0
         end if

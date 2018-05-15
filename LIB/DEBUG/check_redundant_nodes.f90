@@ -27,7 +27,8 @@
 ! ********************************************************************************************
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
+     stop_status, stage0 )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -60,6 +61,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! status of nodes check: if true: stops program
     logical, intent(inout)              :: stop_status
+    ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
+    ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
+    ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
+    logical, intent(in):: stage0
 
     ! MPI parameter
     integer(kind=ik)                    :: rank
@@ -84,7 +89,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     integer(kind=ik)                        :: buffer_size, buffer_position
 
     ! grid parameter
-    integer(kind=ik)                                :: Bs, g
+    integer(kind=ik)                                :: Bs, g, stage_start
     ! number of datafields
     integer(kind=ik)                                :: NdF
 
@@ -188,28 +193,42 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         end do
     end if
 
+    stage_start = 1
+    stages = 1
+
     ! set number of synch stages
     if ( data_writing_type == 'staging' ) then
         ! all four stages
-        ! NOTE: WE CAN ACTUALLY SKIP STAGE 4
         stages = 4
-    else
-        ! only one stage
-        stages = 1
+        ! if zeroth stage is specified, we do only that, and not all the other stages
+        if (stage0) then
+            stage_start=0
+            stages = 0
+        endif
     end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
+
     ! loop over all synch stages
-    do synch_stage = 1, stages
+    do synch_stage = stage_start, stages
 
-        if (synch_stage==3)  then
-            data_bounds_type = "exclude_redundant"
-        else
-            data_bounds_type = "include_redundant"
+        ! in the staging type the ghost nodes bounds depend on the stage as well
+        if (data_writing_type=="staging") then
+            if (synch_stage==3)  then
+                data_bounds_type = "exclude_redundant"
+
+            elseif (synch_stage == 0) then
+                ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
+                ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
+                ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
+                data_bounds_type = "only_redundant"
+
+            else
+                data_bounds_type = "include_redundant"
+            endif
         endif
-
 
         ! reset integer send buffer position
         int_pos = 2
@@ -219,31 +238,31 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
         ! loop over active heavy data
         if (data_writing_type=="average") then
-        do k = 1, hvy_n
+            do k = 1, hvy_n
 
-            ! reset synch array
-            ! alles auf null, knoten im block auf 1
-            ! jeder später gespeicherte knoten erhöht wert um 1
-            ! am ende der routine wird der wert aus dem synch array ggf. für die durchschnittsberechnung benutzt
-            ! synch array hat die maximale anzahl von blöcken pro prozess alloziiert, so dass die heavy id unverändert
-            ! benutzt werden kann
-            ! ghost nodes layer auf 1 setzen, wenn nur die redundanten Knoten bearbeitet werden
-            if (data_bounds_type == 'only_redundant') then
-                hvy_synch(:, :, :, hvy_active(k)) = 1
-            else
-                hvy_synch(:, :, :, hvy_active(k)) = 0
-            end if
-            ! alles knoten im block werden auf 1 gesetzt
+                ! reset synch array
+                ! alles auf null, knoten im block auf 1
+                ! jeder später gespeicherte knoten erhöht wert um 1
+                ! am ende der routine wird der wert aus dem synch array ggf. für die durchschnittsberechnung benutzt
+                ! synch array hat die maximale anzahl von blöcken pro prozess alloziiert, so dass die heavy id unverändert
+                ! benutzt werden kann
+                ! ghost nodes layer auf 1 setzen, wenn nur die redundanten Knoten bearbeitet werden
+                if (data_bounds_type == 'only_redundant') then
+                    hvy_synch(:, :, :, hvy_active(k)) = 1
+                else
+                    hvy_synch(:, :, :, hvy_active(k)) = 0
+                end if
+                ! alles knoten im block werden auf 1 gesetzt
 
-            ! todo: ist erstmal einfacher als nur die redundaten zu setzen, aber unnötig
-            ! so gibt es aber nach der synch keine nullen mehr, kann ggf. als synch test verwendet werden?
-            if ( params%threeD_case ) then
-                hvy_synch( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, hvy_active(k)) = 1
-            else
-                hvy_synch( g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) = 1
-            end if
+                ! todo: ist erstmal einfacher als nur die redundaten zu setzen, aber unnötig
+                ! so gibt es aber nach der synch keine nullen mehr, kann ggf. als synch test verwendet werden?
+                if ( params%threeD_case ) then
+                    hvy_synch( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, hvy_active(k)) = 1
+                else
+                    hvy_synch( g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) = 1
+                end if
 
-        end do
+            end do
         end if
 
         ! loop over active heavy data
@@ -289,7 +308,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
                         call read_hvy_data( params, data_buffer, buffer_size, &
                         hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
-
                     else
                         ! interpoliere daten
                         call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
@@ -319,9 +337,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         ! synch status for staging method
                         synch = .true.
                         if (data_writing_type == 'staging') then
-                            call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                            call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, &
+                            hvy_active(k), neighborhood, lgt_block(lgt_id,params%max_treelevel+2), lgt_block(neighbor_light_id,params%max_treelevel+2)  )
                         end if
-
                         ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
                         com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
 
@@ -329,7 +347,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             ! active block send data to his neighbor block
                             ! fill int/real buffer
                             call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), hvy_id, neighborhood, level_diff )
-
                         else
                             ! neighbor block send data to active block
                             ! write -1 to int_send buffer, placeholder
@@ -420,7 +437,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                             case('compare')
                                 ! compare data
-                                call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff )
+                                call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
+                                call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, &
+                                 lgt_block(lgt_id, params%max_treelevel+2), treecode2int( lgt_block(lgt_id, 1:params%max_treelevel) ) )
 
                         end select
 
@@ -469,7 +488,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
 
                         ! set synch status
-                        call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood )
+                        call set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, &
+                        hvy_active(k), neighborhood, lgt_block(lgt_id, params%max_treelevel+2), lgt_block(neighbor_light_id,params%max_treelevel+2) )
                         ! synch == .true. bedeutet, dass der aktive block seinem nachbarn daten gibt
                         ! hier sind wir aber auf der seite des empfängers, das bedeutet, neighbor_synch muss ausgewertet werden
 
@@ -503,6 +523,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                                     ! write data
                                     call write_hvy_data( params, data_buffer(1:buffer_size), data_bounds, hvy_block, hvy_active(k) )
+
                                     ! done, exit the while loop?
                                     test2=.true.
                                     exit
@@ -1811,7 +1832,7 @@ end subroutine add_hvy_data
 
 !############################################################################################################
 
-subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff )
+subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, my_ref, tc )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -1830,29 +1851,34 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     !> heavy data array - block data
     real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
     !> hvy id
-    integer(kind=ik), intent(in)                    :: hvy_id, level_diff
+    integer(kind=ik), intent(in)                    :: hvy_id, level_diff, my_ref
     ! status of nodes check: if true: stops program
     logical, intent(inout)              :: stop_status
+    integer(kind=tsize)::tc
 
     ! loop variable
-    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven, bs, g
 
     ! error threshold
     real(kind=rk)                                   :: eps
 
     ! error norm
     real(kind=rk)       :: error_norm
+    real(kind=rk), allocatable :: tmp(:,:), tmp2(:,:)
 
-!---------------------------------------------------------------------------------------------
-! interfaces
+    Bs = params%number_block_nodes
+    g = params%number_ghost_nodes
+
+    allocate( tmp(1:Bs+2*g,1:Bs+2*g), tmp2(1:Bs+2*g,1:Bs+2*g))
+    tmp = 0.0_rk
+    tmp2 = 0.0_rk
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
     buffer_i = 1
 
     ! set error threshold
-    eps = 1e-9_rk
+    eps = 1e-14_rk
 
     ! reset error norm
     error_norm = 0.0_rk
@@ -1877,8 +1903,10 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
                 do k = data_bounds(1,3), data_bounds(2,3)
 
                     if (level_diff/=-1) then
-                        ! pointwise error norm
+                        ! on the same level, the comparison just takes all points, no odd/even downsampling required.
                         error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                        tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i ))
+                        tmp2(i,j) = 7.7_rk
                     else
                         ! if the level diff is -1, I compare with interpolated (upsampled) data. that means every EVEN
                         ! point is the result of interpolation, and not truely redundant.
@@ -1894,11 +1922,15 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
                             ! even number of ghost nodes
                             if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)/=0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0))) then
                                 error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                                tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i ))
+                                tmp2(i,j) = 7.7_rk
                             endif
                         else
                             ! odd number of ghost nodes
                             if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)==0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)==0))) then
                                 error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                                tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i ))
+                                tmp2(i,j) = 7.7_rk
                             endif
                         endif
                     endif
@@ -1910,10 +1942,29 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     end do
 
     if (error_norm > eps)  then
-        ! error message
-        write(*,*) "ERROR: difference in redundant nodes", error_norm, level_diff, hvy_id, params%rank
+        write(*,'("ERROR: difference in redundant nodes ",es12.4," level_diff=",i2, " hvy_id=",i8, " rank=",i5 )') &
+        error_norm, level_diff, hvy_id, params%rank
+        write(*,*) "refinement status", my_ref, "tc=", tc
         ! stop program
         stop_status = .true.
+
+        write(*,*) "---"
+        do i =  Bs+2*g, 1, -1
+            write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
+        enddo
+        write(*,*) "---"
+        do j = Bs+2*g, 1, -1
+            do i = 1, Bs+2*g
+                if (tmp(i,j)==0.0_rk) then
+                    write(*,'(" null    ")', advance="no")
+                else
+                    write(*,'((es8.1,1x))', advance="no") tmp(i,j)
+                endif
+            enddo
+            write(*,*) " "
+        enddo
+        write(*,*) "---"
+
         ! mark block by putting a dot in the middle. this way, we can identify all
         ! blocks that have problems. If we set the entire block to 100, then subsequent
         ! synchronizations fail because of that. If we set just a point in the middle, it
@@ -1921,6 +1972,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, :, :, hvy_id ) = 100.0_rk
     end if
 
+    deallocate(tmp, tmp2)
 end subroutine compare_hvy_data
 
 !############################################################################################################
@@ -2075,7 +2127,8 @@ end subroutine isend_irecv_data_2
 
 !############################################################################################################
 
-subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_id, neighborhood )
+subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, &
+    hvy_id, neighborhood, my_ref_status, neighbor_ref_status )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -2092,7 +2145,7 @@ subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy
     logical, intent(inout)    :: synch, neighbor_synch
 
     ! level diffenrence
-    integer(kind=ik), intent(in)        :: level_diff
+    integer(kind=ik), intent(in)        :: level_diff, my_ref_status, neighbor_ref_status
 
     ! heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
@@ -2119,6 +2172,20 @@ subroutine set_synch_status( synch_stage, synch, neighbor_synch, level_diff, hvy
     ! stage 4: special
     synch = .false.
     neighbor_synch = .false.
+
+    ! this is the zeroth stage. it corrects blocks that are on the same level, but have a different history. one is on Jmax from
+    ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
+    ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
+    if ((synch_stage==0) .and. (level_diff==0)) then
+        if ((my_ref_status==11) .and. (neighbor_ref_status/=11)) then
+            ! if a block has the +11 status, it must send data to the neighbor, if that is not +11
+            synch = .true.
+        elseif ((my_ref_status/=11) .and. (neighbor_ref_status==11)) then
+            ! if a block is not +11 and its neighbor is, then unpack data
+            neighbor_synch = .true.
+        endif
+    endif
+
 
     ! stage 1
     if ( (synch_stage == 1) .and. (level_diff == 1) ) then

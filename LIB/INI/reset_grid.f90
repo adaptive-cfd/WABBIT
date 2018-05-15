@@ -95,5 +95,5 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     lgt_n = size(lgt_active,1)
     hvy_n = size(hvy_active,1)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    
+
 end subroutine reset_grid

@@ -91,9 +91,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     endif
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
-    !! except if they are already on the highest level.
-    !> \todo  FIXME: For consistency, it would be better to always refine (allowing one level
-    !! beyond maxlevel), but afterwards coarsen to fall back to maxlevel again
+    !! except if they are already on the highest level. Note that those blocks have
+    !! the status +11   
     if ( params%threeD_case ) then
         ! 3D:
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
@@ -113,5 +112,5 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 !---------------------------------------------------------------------------------------------
 ! End of routine
     call toc( params, "refine_mesh", MPI_wtime()-t0 )
-    
+
 end subroutine refine_mesh

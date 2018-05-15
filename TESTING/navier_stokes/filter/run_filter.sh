@@ -8,17 +8,23 @@
 test_dir="./TESTING/"
 dir="./TESTING/navier_stokes/filter/"
 params=$1
+
+# check if file exists
+if [ ! -e $params ]
+then
+	echo  file $params you passed in argument one does not exists
+	echo "call: run_filter params.ini 00000000010000 filter_name"
+	exit
+fi
+
 # write time
 times=$2
 # list of prefixes the test generates
 prefixes=(Ux p rho)
 # list of filters
-filters=(explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
+filter=$3
 #filters=(explicit_5pt bogey_shock)
 
-
-for filter in ${filters[@]}
-	do
 
 	echo " "
 	echo " "
@@ -51,6 +57,4 @@ for filter in ${filters[@]}
 	echo " "
 	echo " "
 	echo " "
-done
-
 exit 0

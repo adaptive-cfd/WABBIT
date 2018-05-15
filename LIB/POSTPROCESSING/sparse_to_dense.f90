@@ -85,10 +85,10 @@ subroutine sparse_to_dense(help, params)
     ! we do not read an ini file, so defaults may not be set.
     params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
+    allocate(params%butcher_tableau(1,1))
     ! we read only one datafield in this routine
     params%number_data_fields  = 1
     params%block_distribution="sfc_hilbert"
-
 
     if (params%rank==0) then
         write(*,'(80("-"))')
@@ -166,10 +166,11 @@ subroutine sparse_to_dense(help, params)
     ! refine/coarse to attain desired level, respectively
     !coarsen
     do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
-        ! set refinement status to -1 (coarsen) everywhere
-        lgt_block(:, params%max_treelevel +2) = -1
-        ! check where coarsening is actually needed
-        call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
+        do k = 1, lgt_n
+            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
+                lgt_block(lgt_active(k), params%max_treelevel +2) = -1
+        end do
         ! this might not be necessary since we start from an admissible grid
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )

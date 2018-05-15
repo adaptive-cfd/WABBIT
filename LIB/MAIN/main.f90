@@ -125,7 +125,7 @@ program main
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4
-    logical                             :: test
+    logical                             :: test, go_sync
     ! allocate com lists and com matrix here
     ! communication lists:
     ! dim 1: list elements
@@ -254,7 +254,7 @@ program main
         test=.false.
         if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test )
+             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false. )
         if (rank==0) write(*,*) "Done testing redundant nodes."
     endif
 
@@ -295,18 +295,20 @@ program main
 
         ! new iteration
         iteration = iteration + 1
-
-        !***********
+        
+        !***********************************************************************
+        ! check redundant nodes
+        !***********************************************************************
         t4 = MPI_wtime()
         if (params%debug) then
-    	    ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
+            ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
             ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
             com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-            test=.false. ! test
 
+            test=.false. ! test
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test)
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false.)
 
             if (test) then
                 iteration = 99
@@ -315,7 +317,7 @@ program main
             endif
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
-        !****************
+
 
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
@@ -324,15 +326,33 @@ program main
         endif
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+        !***********************************************************************
         ! refine everywhere
+        !***********************************************************************
         t4 = MPI_wtime()
         if ( params%adapt_mesh ) then
+            ! synchronization before refinement (because the interpolation takes place on the extended blocks
+            ! including the ghost nodes). Note that at this point, the issue with maxlevel, thus the fact that
+            ! some blocks have the +11 status, is not relevant yet. It becomes relevant only after refining, when
+            ! two neighboring blocks on the same level have different redundant nodes. in that case, the block
+            ! that just stayed on Jmax has the status +11.
+            ! NOTE: in the sync ghosts wrapper, the 0th stage (where these redundant nodes are corrected) is
+            ! completely DISABLED
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
             com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+
+            ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+
+            ! now the refinement is done and we still have +11 status. now we have blocks on the same level and
+            ! one has the +11 status. now: one time, we correct the redunant fuckers, then remove the +11 status.
+            go_sync = .true. ! this is the only place where we explicitly call zeroth stage
+            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, go_sync, .true. )
+
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
-
 
         ! advance in time
         t4 = MPI_wtime()

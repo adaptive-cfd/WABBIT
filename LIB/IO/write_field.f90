@@ -197,6 +197,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             endif
 
+            ! uncomment if you want to save the refinement status for some reason:
+            ! procs(l) = lgt_block( lgt_active(k), params%max_treelevel+2 )
+
             ! next block
             l = l + 1
         endif

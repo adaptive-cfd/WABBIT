@@ -93,6 +93,9 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         neighbor_num = 16
     end if
 
+    ! NOTE: The status +11 is required for ghost nodes synching, if the maxlevel
+    ! is reached. It means just the same as 0 (stay) in the context of this routine
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -138,7 +141,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                               ! block can not coarsen, if neighbor wants to refine
                               if ( neighbor_status == -1 ) then
                                   ! neighbor wants to coarsen, as do I, we're on the same level -> ok
-                              elseif ( neighbor_status == 0 ) then
+                              elseif ( neighbor_status == 0 .or. neighbor_status == 11 ) then
                                   ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
                               elseif ( neighbor_status == 1 ) then
                                   ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
@@ -150,7 +153,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                               ! neighbor on lower level
                               if ( neighbor_status == -1 ) then
                                   ! neighbor wants to coarsen, as do I, he is one level coarser, -> ok
-                              elseif ( neighbor_status == 0 ) then
+                              elseif ( neighbor_status == 0 .or. neighbor_status == 11 ) then
                                   ! neighbor wants to stay, I want to coarsen, he is one level coarser, -> ok
                               elseif ( neighbor_status == 1 ) then
                                   ! neighbor wants to refine, I want to coarsen,  he is one level coarser, -> ok
@@ -162,7 +165,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                   ! ... so I also have to refine (not only can I NOT coarsen, I actually
                                   ! have to refine!)
                                   my_refine_change( k ) = +1
-                              elseif ( neighbor_status == 0) then
+                              elseif ( neighbor_status == 0 .or. neighbor_status == 11) then
                                   ! neighbor wants to stay and I want to coarsen, but
                                   ! I cannot do that (there would be two levels between us)
                                   ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
@@ -182,7 +185,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             !-----------------------------------------------------------------------
             ! this block wants to stay on his level
             !-----------------------------------------------------------------------
-            elseif (lgt_block( lgt_active(k) , max_treelevel+2 ) == 0) then
+        elseif (lgt_block( lgt_active(k) , max_treelevel+2 ) == 0 .or. lgt_block( lgt_active(k) , max_treelevel+2 ) == 11 ) then
                     ! loop over all neighbors
                     do i = 1, neighbor_num
                       ! neighbor exists ? If not, this is a bad error

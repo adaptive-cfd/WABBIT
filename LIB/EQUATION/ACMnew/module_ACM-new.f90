@@ -350,14 +350,14 @@ contains
       endif
 
       if (params_acm%dim == 2) then
-        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1))*dx(1)*dx(2)
-        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2))*dx(1)*dx(2)
-        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 3))*dx(1)*dx(2)
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
+        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 3))*dx(1)*dx(2)
       else
-        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 4))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 4))*dx(1)*dx(2)*dx(3)
       endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
     case ("post_stage")
@@ -471,12 +471,12 @@ contains
       endif
 
       if (params_acm%dim == 2) then
-        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1))*dx(1)*dx(2)
-        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2))*dx(1)*dx(2)
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
       else
-        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 2))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 3))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
+        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
       endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
       if (params_acm%forcing_type(1) .eq. "taylor_green") then
@@ -504,8 +504,8 @@ contains
       eps_inv = 1.0_rk / params_acm%C_eta
 
       if (params_acm%dim == 2) then
-        params_acm%force(1) = params_acm%force(1) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 1)*mask(g+1:Bs+g, g+1:Bs+g)*eps_inv)*dx(1)*dx(2)
-        params_acm%force(2) = params_acm%force(2) + sum(u(g+1:Bs+g, g+1:Bs+g, 1, 2)*mask(g+1:Bs+g, g+1:Bs+g)*eps_inv)*dx(1)*dx(2)
+        params_acm%force(1) = params_acm%force(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)*mask(g+1:Bs+g-1, g+1:Bs+g-1)*eps_inv)*dx(1)*dx(2)
+        params_acm%force(2) = params_acm%force(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)*mask(g+1:Bs+g-1, g+1:Bs+g-1)*eps_inv)*dx(1)*dx(2)
         params_acm%force(3) = 0.d0
       else
         call abort(6661,"ACM 3D not implemented.")

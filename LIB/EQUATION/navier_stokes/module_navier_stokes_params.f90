@@ -63,10 +63,12 @@ module module_navier_stokes_params
   !               NAVIER STOKES PARAMETER
   !---------------------------------------------------------
   type :: type_params_ns
+        ! coordinate system
+        character(len=80)                           :: coordinates="cartesian"
         ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
         ! spatial domain
-        real(kind=rk)                               :: Lx, Ly, Lz
+        real(kind=rk)                               :: Lx, Ly, Lz, R_max
         ! number data fields
         integer(kind=ik)                            :: number_data_fields
         ! number of block nodes
@@ -151,10 +153,20 @@ contains
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
     ! dimension
     call read_param_mpi(FILE, 'Dimensionality', 'dim', params_ns%dim, 2 )
+    !
+    call read_param_mpi(FILE, 'Navier_Stokes', 'Coordinate_system', params_ns%coordinates, &
+                                                                    params_ns%coordinates )
     ! spatial domain size
     call read_param_mpi(FILE, 'DomainSize', 'Lx', params_ns%Lx, 1.0_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Ly', params_ns%Ly, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Lz', params_ns%Lz, 0.0_rk )
+    if ( params_ns%dim==3 ) then
+      call read_param_mpi(FILE, 'DomainSize', 'Lz', params_ns%Lz, 0.0_rk )
+    end if
+    if ( params_ns%coordinates=="cylindrical" ) then
+      params_ns%R_max=params_ns%Ly*0.5_rk
+      if ( params_ns%mpirank==0 ) write(*,'("maximal Radius" ,T30,"R_max",T60,"=",TR1, e10.2 )') params_ns%R_max
+    end if
+
     ! read adiabatic coefficient
     call read_param_mpi(FILE, 'Navier_Stokes', 'gamma_', params_ns%gamma_, 0.0_rk )
     ! read specific gas constant

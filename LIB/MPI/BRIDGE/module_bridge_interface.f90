@@ -61,17 +61,25 @@ public :: position_to_lgt_id
  contains
 
 !===========================================================================
-subroutine getParticleProcesses
-!! read out from the command line the amount of fluid processes to start
-character(10)                            :: nbParticleProcesses       ! (total) number of fluid processes
+!> \brief read out from the command line the amount of fluid processes to start
+subroutine getParticleProcesses(params)
 
-  ! Read out the total number of fluid processes to start from the given command line
+!> structure containing the parameters
+type(type_params), intent(in)         :: params
+
+! (total) number of fluid processes
+character(10)                            :: nbParticleProcesses
+
+  ! Read out the total number of particle processes
+  !to start from the given command line
   call get_command_argument(3, nbParticleProcesses)
 
-  ! Assign this number in the first value of processesFluid (1 otherwise)
+  ! Assign this number in the first value of processesParticle (1 otherwise)
   processesParticle = 1
   read(nbParticleProcesses,'(i10)') processesParticle(1)
-  write(*,*) 'Number of Particle Processes: ', processesParticle(1)
+  if ( params%rank==0 ) then
+    write(*,*) 'Number of Particle Processes: ', processesParticle(1)
+  endif
 end subroutine getParticleProcesses
 !===========================================================================
 
@@ -86,7 +94,7 @@ type(type_params), intent(in)                :: params             !> structure 
 integer                                      :: ierr               ! MPI communication error
 integer         , dimension(MPI_STATUS_SIZE) :: status             ! MPI communication status
 double precision, dimension(3,2)             :: Domain     ! received domain parameters to transform
-integer         , dimension(4)             :: discretizationParams ! Number of grid points and processes
+integer         , dimension(5)             :: discretizationParams ! Number of grid points and processes
 character(len=80)                            :: geometry
 
 
@@ -94,8 +102,13 @@ character(len=80)                            :: geometry
   if (myBridge%myWorldRank == 0) then                              ! check if the process is the root process
 
     ! - receive the discretization parameters
-    discretizationParams=(/ params%number_block_nodes,params%number_blocks,params%max_treelevel,params%dim /)
-    call MPI_send(discretizationParams, 4, MPI_integer, myBridge%minOtherWorldRank, &
+    discretizationParams=(/ params%number_block_nodes,  &
+                            params%number_blocks,       &
+                            params%max_treelevel,       &
+                            params%dim,                 &
+                            params%number_procs/)
+
+    call MPI_send(discretizationParams, 5, MPI_integer, myBridge%minOtherWorldRank, &
                   parameters_delivery, myBridge%commonWorld,  ierr)
 
     !! - receive the domain parameters
@@ -312,33 +325,43 @@ end subroutine serve_data_request
 
 
 
+!> \brief Initialize global communicator
+!> \details There are two possible scenarios:
+!!      + Bridge Modus:
+!!            - 2 communicators for the two MPI-WORLDS are created
+!!      + Default Modus:
+!!            - the MPI_COMM_WORLD is duplicated to WABBIT_COMM:
+!!            - thus it creates a new communicator that has a new communication
+!!              context but contains the same group of processes as the
+!!              input communicator
 subroutine initialize_communicator(params)
-!> \brief initialize global communicator
-!! Subroutine-declarations
-type(type_params), intent(inout), optional  :: params         !> given structure containing the parameters
+
+!> given structure containing the parameters
+type(type_params), intent(inout), optional  :: params
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 integer                                     :: ierr
 
   ! Initialize the particle MPI world (according to the given kind of hierarchy)
   if (params%bridge_exists) then                             ! if there is a single WABBIT_COMM
 
-    if (params%bridge%myWorldRank==0) then
+    if (params%rank==0) then
        write(*,*) ''
        write(*,*) '-----------------'
        write(*,*) 'Modus: BRIDGE'
        write(*,*) '-----------------'
     end if
+    params%bridge%myWorld=params%WABBIT_COMM
     call init_bridge(params%bridge,params)                              ! initialization using split
   else                                                              ! if there are different WABBIT_COMM
      call MPI_comm_dup(WABBIT_COMM, params%bridge%myWorld, ierr)
      call MPI_comm_size(params%bridge%myWorld, params%bridge%myWorldSize, ierr)
      call MPI_comm_rank(params%bridge%myWorld, params%bridge%myWorldRank, ierr)
   end if
+  ! after communicator is created set it to the global communicator of WABBIT
   call set_mpi_comm_global(params%bridge%myWorld)
   params%rank         = params%bridge%myWorldRank
   params%number_procs = params%bridge%myWorldSize
   params%WABBIT_COMM  = params%bridge%myWorld
-
 end subroutine initialize_communicator
 
 !===========================================================================
@@ -346,32 +369,32 @@ end subroutine initialize_communicator
 
 !===========================================================================
 
-subroutine init_bridge(myBridge, givenParams)
+subroutine init_bridge(myBridge,params)
 !! call every necessary subroutine / function to initialize the fluid world
 !! Subroutine-declarations
 type(bridgeMPI)  , intent(out)              :: myBridge            ! type bridge on the fluid side
-type(type_params), intent(inout)            :: givenParams         ! given structure containing the parameters
+type(type_params), intent(inout)            :: params         ! given structure containing the parameters
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! integer                                     :: unitNum = 1         ! file handle
 integer                                     :: ierr                ! MPI communication error
 
- !    paramsInit = givenParams                                       ! associate the effective parameters structure to the given one
+ !    paramsInit = params                                       ! associate the effective parameters structure to the given one
 
   ! Get the total number of fluid processes
-  call getParticleProcesses
+  call getParticleProcesses(params)
   ! Initialize the particle MPI world (according to the given kind of hierarchy)
-  if (givenParams%bridgeCommonMPI) then                             ! if there is a single WABBIT_COMM
+  if (params%bridgeCommonMPI) then                             ! if there is a single WABBIT_COMM
     call createMPIWorlds(myBridge, 1)                              ! initialization using split
   else                                                             ! if there are different WABBIT_COMM
-    if (givenParams%bridgeFluidMaster) then
-!      write(*,*) "write particlecommand: ", givenParams%particleCommand                   ! if the fluid side is the master
-      call createMPIWorldsMaster(myBridge, processesParticle(1), givenParams%particleCommand) ! initialization using spawn (slave)
+    if (params%bridgeFluidMaster) then
+!      write(*,*) "write particlecommand: ", params%particleCommand                   ! if the fluid side is the master
+      call createMPIWorldsMaster(myBridge, processesParticle(1), params%particleCommand) ! initialization using spawn (slave)
     else                                                           ! if the fluid side is the slave
       call createMPIWorldsSlave(myBridge)                          ! initialization using spawn (master)
     end if                                                         ! end condition regarding the role of the particle side
   end if                                                           ! end condition regarding the WABBIT_COMM structure
 !   write(*,*) 'Fluid side - MPI worlds are created'
-   call send_fixed_params(myBridge,givenParams)
+   call send_fixed_params(myBridge,params)
 !   write(*,*) 'fixed params send to particle world'
   ! ! Make sure the given number of process for the particle world match the number of processes in the parameters file
   ! if (myBridge%myWorldSize /= (paramsInit%NumberProcesses)) then   ! condition on the total number of processes
@@ -458,6 +481,7 @@ integer                         :: d               ! count integer for dimension
 double precision, dimension(3)  :: dx,x0,x1              ! seperation
 integer                         :: k
 !> \detail
+
     do k=1,lgt_n ! loop over all active blocks
 
        call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
@@ -468,7 +492,7 @@ integer                         :: k
        !                    x0(1) -------------------------- x1(1)
        !                         |                           |
        !                         |         lgt_id            |
-       !                         |               *           |
+       !                         |               *            |
        !                         |               (position)  |
        !                         |                           |
        !                    x0(2) -------------------------- x1(2)
@@ -489,7 +513,8 @@ integer                         :: k
 
 
     enddo
-     write(*,'("[bridgefluid.f90:] No block found for position=", f6.3," STOP!")')position(1)
+     write(*,'("[bridgefluid.f90:] No block found for position=", f3.6," STOP!")')position(1)
+     write(*,*),position
      call abort(272372)
 end function position_to_lgt_id
 

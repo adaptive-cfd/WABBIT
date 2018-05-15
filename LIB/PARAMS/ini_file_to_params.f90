@@ -139,8 +139,8 @@ subroutine ini_file_to_params( params, filename )
     ! which, well, reads some files. This is the same for all physics modules. The only
     ! other initial condition is "physics-module", which means the modules decide what inicond
     ! is set.
-    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
+    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
 
     if (params%initial_cond == 'read_from_files') then
         ! read variable names
@@ -175,11 +175,6 @@ subroutine ini_file_to_params( params, filename )
     ! assume start at time 0.0 /todo change if start with reloaded data
     params%next_stats_time = 0.0_rk + params%tsave_stats
 
-    !***************************************************************************
-    ! read MPI parameters
-    !
-    ! data exchange method
-    call read_param_mpi(FILE, 'MPI', 'mpi_data_exchange', params%mpi_data_exchange, "---" )
 
     !***************************************************************************
     ! read DEBUG parameters
@@ -202,6 +197,12 @@ subroutine ini_file_to_params( params, filename )
     ! first: read physics type
     call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "physics-module" )
+    !***************************************************************************
+    ! read MPI parameters
+    !
+    ! data exchange method
+    call init_MPI(params, FILE )
+
 
     ! NOTE: this routine initializes WABBIT AND NOT THE PHYSICS MODULES THEMSELVES!
 
@@ -278,3 +279,37 @@ subroutine ini_file_to_params( params, filename )
         close(44)
     endif
 end subroutine ini_file_to_params
+
+
+
+
+!> @brief     reads parameters for initializing a bridge from file
+  subroutine init_MPI(params, FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)     :: FILE
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+
+    if (params%rank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: MPI Communication!"
+      write(*,'(" ----------------------------")')
+    endif
+
+    call read_param_mpi(FILE, 'MPI', 'mpi_data_exchange', params%mpi_data_exchange, "---" )
+
+    ! READ Bridge Parameter
+    ! ----------------------
+    ! decide if we need a bridge
+    call read_param_mpi(FILE, 'BRIDGE', 'connect_with_bridge', params%bridge_exists, .false.)
+    if (params%bridge_exists) then               ! if a bridge structure is required
+      call read_param_mpi(FILE, 'BRIDGE', 'bridgeCommonMPI', params%bridgeCommonMPI, .false. )
+      call read_param_mpi(FILE, 'BRIDGE', 'bridgeFluidMaster', params%bridgeFluidMaster, .false. )
+      call read_param_mpi(FILE, 'BRIDGE', 'particleCommand', params%particleCommand, "---" )
+    endif
+
+  end subroutine init_MPI
+
+!!!!-------------------------------------------------------------------------!!!!

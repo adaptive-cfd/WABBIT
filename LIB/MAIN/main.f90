@@ -318,6 +318,15 @@ program main
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
+
+        !+++++++++++ serve any data request from the other side +++++++++++++
+        if (params%bridge_exists) then
+          call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
+          call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)
+        endif
+        !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
         !***********************************************************************
         ! refine everywhere
         !***********************************************************************
@@ -344,13 +353,6 @@ program main
 
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
-
-        !+++++++++++ serve any data request from the other side +++++++++++++
-        if (params%bridge_exists) then
-            call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)
-        endif
-        !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         ! advance in time
         t4 = MPI_wtime()

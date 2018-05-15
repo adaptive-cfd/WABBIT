@@ -137,19 +137,11 @@ module module_params
         !--------------------------------------------------------------------------------------
                !! particle connection
         !--------------------------------------------------------------------------------------
-        !! - description of the connection
-        character(len=80)                :: particleConnection=""
-        !! - folder where particle data is stored
-        character(len=100)               :: particleDataFolder=""
-        !! - file name of the particle data
-        character(len=100)               :: particleDataFile=""
-        !! - file name of the particle data parameters
-        character(len=100)               :: particleDataParams=""
         !! - command to use for the particle program (over bridge)
         character(len=100)               :: particleCommand=""
         !! - Usage of a common myWorld_comm
         logical                          :: bridgeCommonMPI
-        !! - Consideration of the particle side as master in case of several myWorld_comms
+        !! - Consideration of the fluid side as master in case of several myWorld_comms
         logical                          :: bridgeFluidMaster
 
 

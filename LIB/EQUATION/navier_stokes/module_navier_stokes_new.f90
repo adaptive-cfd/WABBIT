@@ -54,6 +54,7 @@ contains
 
   include "RHS_2D_navier_stokes.f90"
   include "RHS_3D_navier_stokes.f90"
+  include "RHS_2D_cylinder.f90"
   include "filter_block.f90"
   include "inicond_shear_layer.f90"
 !-----------------------------------------------------------------------------
@@ -131,7 +132,7 @@ contains
       dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
-      write(*,'("maximal resolution: ",T40,i5,x,"x",i5)') nx_max/2, nx_max/2
+      write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max/2, nx_max/2
     endif
 
     ! set global parameters pF,rohF, UxF etc
@@ -361,7 +362,16 @@ contains
 
       ! called for each block.
       if (size(u,3)==1) then
-        call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+
+
+        select case(params_ns%coordinates)
+        case ("cartesian")
+          call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        case("cylindrical")
+          call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        case default
+          call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
+        end select
         !call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
 
         if (params_ns%penalization) then
@@ -455,10 +465,10 @@ contains
       if (size(u,3)==1) then
         ! compute density and pressure only in physical domain
         tmp(1:3) =0.0_rk
-
-        do iy=g+1, Bs+g
+        ! we do not want to sum over redudant points so exclude Bs+g!!!
+        do iy=g+1, Bs+g-1
           y = dble(iy-(g+1)) * dx(2) + x0(2)
-          do ix=g+1, Bs+g
+          do ix=g+1, Bs+g-1
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             if (mask(ix,iy)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
@@ -640,7 +650,7 @@ contains
 
     case ("zeros")
       ! add ambient pressure
-      u( :, :, :, pF) = p_init
+      u( :, :, :, pF) = params_ns%initial_pressure
       ! set rho
       u( :, :, :, rhoF) = sqrt(rho_init)
       ! set Ux
@@ -738,13 +748,13 @@ contains
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = p_init + 1000.0_rk * u( :, :, :, pF)
+        u( :, :, :, pF) = params_ns%initial_pressure + 1000.0_rk * u( :, :, :, pF)
         ! set rho
-        u( :, :, :, rhoF) = sqrt(rho_init)
+        u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
         ! set Ux
-        u( :, :, :, UxF) = 0.0_rk
+        u( :, :, :, UxF) = params_ns%initial_velocity(1)
         ! set Uy
-        u( :, :, :, UyF) = 0.0_rk
+        u( :, :, :, UyF) = params_ns%initial_velocity(2)
 
         if (size(u,3).ne.1) then
             ! set Uz to zero

@@ -29,7 +29,8 @@
 !! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
+subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, indicator  )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -44,6 +45,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    !> heavy work data array - block data.
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
@@ -92,7 +95,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
     !! except if they are already on the highest level. Note that those blocks have
-    !! the status +11   
+    !! the status +11
     if ( params%threeD_case ) then
         ! 3D:
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
@@ -105,6 +108,17 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! active blocks so other routines can loop just over these active blocks
     !! and do not have to ensure that the active list is up-to-date
     ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+    !> At this point the refinement is done. Since not all blocks are refined, namely only those
+    !! that were not on Jmax, Now, the distribution of blocks may no longer
+    !! be balanced, so we have to balance load now
+    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+    hvy_active, hvy_n, hvy_work )
+
+
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )

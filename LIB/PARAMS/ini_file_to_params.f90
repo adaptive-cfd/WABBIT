@@ -277,6 +277,8 @@ subroutine ini_file_to_params( params, filename )
         close(44)
         open (44, file='blocks_per_mpirank.t', status='replace')
         close(44)
+        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
+        close(44)
     endif
 end subroutine ini_file_to_params
 

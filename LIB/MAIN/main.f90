@@ -295,7 +295,7 @@ program main
 
         ! new iteration
         iteration = iteration + 1
-        
+
         !***********************************************************************
         ! check redundant nodes
         !***********************************************************************
@@ -343,7 +343,8 @@ program main
             com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
             ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
 
             ! now the refinement is done and we still have +11 status. now we have blocks on the same level and
             ! one has the +11 status. now: one time, we correct the redunant fuckers, then remove the +11 status.
@@ -354,12 +355,15 @@ program main
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
 
+        !***********************************************************************
         ! advance in time
+        !***********************************************************************
         t4 = MPI_wtime()
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
         hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
         com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
         call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
+
 
         if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
             (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
@@ -376,9 +380,20 @@ program main
             com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
-         end if
+        end if
 
-         t4 = MPI_wtime()
+        ! it is useful to save the number of blocks per rank into a log file.
+        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+        if (rank==0) then
+             open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
+             write (14,'(g15.8,1x,i6,1x,1024(i4,1x))') time, iteration, blocks_per_rank
+             close(14)
+        end if
+
+        !***********************************************************************
+        ! Adapt mesh (coarsening where possible)
+        !***********************************************************************
+        t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &

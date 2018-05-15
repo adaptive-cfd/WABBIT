@@ -130,7 +130,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             !! go up one level where a refinement indicator tells us to do so, but in the current code
             !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
             !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
 
             ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
@@ -159,7 +159,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     if (params%inicond_refinements > 0) then
       do k = 1, params%inicond_refinements
         ! refine entire mesh.
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         ! set initial condition
         call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
       enddo

@@ -22,6 +22,7 @@ subroutine compare_keys(help, key1, key2)
 
     integer(kind=ik) :: i
     real(kind=rk) :: data1(1:6), data2(1:6), error(1:6)
+    integer(kind=ik) :: curves1(1:2), curves2(1:2), error_curve(1:2)
     !-----------------------------------------------------------------------------------------------------
 
     if (help) then
@@ -36,18 +37,19 @@ subroutine compare_keys(help, key1, key2)
         write(*,*) "Key2: ", trim(adjustl(key2))
 
         open(59, file = key1, status = 'unknown', action='read')
-        read(59,'(6(es15.8,1x))') data1
+        read(59,'(6(es15.8,1x), 2(i12,1x))') data1, curves1
         close(59)
 
         open(59, file = key2, status = 'unknown', action='read')
-        read(59,'(6(es15.8,1x))') data2
+        read(59,'(6(es15.8,1x),2(i12,1x))') data2, curves2
         close(59)
 
         write (*,'("present  : time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') data1
-
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=" ,i12, " sfc_z=",i12)') &
+        data1, curves1
         write (*,'("reference: time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') data2
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=" ,i12, " sfc_z=",i12)') &
+        data2, curves2
 
         ! errors:
         do i = 1, 6
@@ -57,11 +59,13 @@ subroutine compare_keys(help, key1, key2)
                 error(i) = dabs( (data2(i)-data1(i)) )
             end if
         enddo
-
+        do i = 1, 2
+            error_curve(i) = abs( (curves2(i)-curves1(i)) )
+        end do
         write (*,'("err(rel) : time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') error
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=",i12, " sfc_z=", i12)') error, error_curve
 
-        if (maxval(error)<1.0e-4) then
+        if (maxval(error)<1.0e-4 .and. maxval(error_curve)<1.0e-4) then
             ! all cool
             write (*,*) "okay!"
 

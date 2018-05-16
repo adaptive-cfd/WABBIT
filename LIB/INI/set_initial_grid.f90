@@ -101,7 +101,6 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! therefore, there is still a grid-level (=wabbit) parameter "params%initial_cond"
         ! which can be read_from_files or anything else.
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
-
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------
@@ -152,19 +151,19 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             endif
           enddo
         endif
+        ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
+        ! for example if one does non-adaptive non-equidistant spatial convergence tests
+        if (params%inicond_refinements > 0) then
+            do k = 1, params%inicond_refinements
+                ! refine entire mesh.
+                call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+                    lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+                ! set initial condition
+                call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+            enddo
+        endif
     end if
 
-    ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
-    ! for example if one does non-adaptive non-equidistant spatial convergence tests
-    if (params%inicond_refinements > 0) then
-      do k = 1, params%inicond_refinements
-        ! refine entire mesh.
-        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
-        ! set initial condition
-        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
-      enddo
-    endif
 
     !---------------------------------------------------------------------------
     ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks

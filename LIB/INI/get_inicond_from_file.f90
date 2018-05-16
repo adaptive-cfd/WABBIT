@@ -85,6 +85,8 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
             write (*,'(A)') "proceed, with fingers crossed."
         end if
     end if
+    if (lgt_n > size(lgt_block,1)) &
+        call abort(743734, 'ERROR: Not enough memory allocated for the saved field!')
 
     ! read treecode from first input file
     call read_mesh(params%input_files(1), params, lgt_n, hvy_n, lgt_block)

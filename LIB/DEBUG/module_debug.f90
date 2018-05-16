@@ -19,6 +19,9 @@ module module_debug
 ! modules
 
     use mpi
+    ! I ave added the moduöe treelib here because I want the redundant node check to
+    ! spit out the numerical treecode of blocks.
+    use module_treelib
     ! global parameters
     use module_params
     use module_interpolation

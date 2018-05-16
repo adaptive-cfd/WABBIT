@@ -58,9 +58,13 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! reset refinement status to "stay"
+    ! reset refinement status to "stay", unless its status is +11. This special
+    ! status indicates that the block is on Jmax and has not been interpolated.
+    ! NOTE: resetting the refinement status is in fact not necessary.
     do k = 1, lgt_n
-      lgt_block( lgt_active(k), Jmax+2 ) = 0
+        if (lgt_block( lgt_active(k), Jmax+2 ) /= 11) then
+            lgt_block( lgt_active(k), Jmax+2 ) = 0
+        endif
     enddo
 
 
@@ -75,7 +79,11 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
           ! to refine the entire mesh at the beginning of a time step, if error
           ! control is desired.
           do k = 1, lgt_n
-              lgt_block( lgt_active(k), params%max_treelevel+2 ) = +1
+              ! do not refine blocks with +11 status, as they are on the maxlevel
+              ! already (so no refinement allowed)
+              if ( lgt_block( lgt_active(k), params%max_treelevel+2 ) /= 11 ) then
+                  lgt_block( lgt_active(k), params%max_treelevel+2 ) = +1
+              end if
           end do
 
       case ("random")

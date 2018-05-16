@@ -24,15 +24,15 @@ times=000000050000
 
 
 
-${dir}/run_all_filter.sh ${params} ${times}
 
 
-	echo "============================"
-	echo "run done, analyzing data now"
-	echo "============================"
 
 for filter in ${filters[@]}
 do
+	${dir}/run_filter.sh ${params} ${times} ${filter}
+	echo "============================"
+	echo "run done, analyzing data now"
+	echo "============================"
 	# loop over all HDF5 files and generate keyvalues using wabbit
 	for p in ${prefixes[@]}
 	do

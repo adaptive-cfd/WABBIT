@@ -124,11 +124,14 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
           ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
           do while ( lgt_n /= lgt_n_old  .and. iter<params%max_treelevel)
             lgt_n_old = lgt_n
+
             ! push up the entire grid one level.
             !> \todo It would be better to selectively
             !! go up one level where a refinement indicator tells us to do so, but in the current code
-            !! versions it is easier to use everywhere
-            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
+            !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
+            !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
+            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
 
             ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this
@@ -144,7 +147,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
             iter = iter + 1
             if (params%rank == 0) then
-              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmax=",i2)') iter,lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
+              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') iter, lgt_n, &
+              min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
             endif
           enddo
         endif
@@ -155,7 +159,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     if (params%inicond_refinements > 0) then
       do k = 1, params%inicond_refinements
         ! refine entire mesh.
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         ! set initial condition
         call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
       enddo

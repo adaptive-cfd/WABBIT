@@ -94,17 +94,19 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     count = command_argument_count()
     call get_command_argument(count, method)
 
-    if (method=="--new") then
-        ! new routine
-        sync = .true.
-        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync )
-
-    else
+    if (method=="--old") then
         ! OLD routine
         call synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
         com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
         real_receive_buffer )
+
+        write(*,*) "WARNING --old sync'ing is deprecated: we now allow blocks to stay on jmax, which --old cannot allow"
+
+    else
+        ! new routine
+        sync = .true.
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync, .false. )
     endif
 
     call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )

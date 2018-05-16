@@ -52,7 +52,7 @@ module module_navier_stokes_params
       ! switch functio (tanh,abs)
       character(len=80)                           :: sigma_switch
       ! save filter strength sigma
-      logical                                     :: save_filter_strength
+      logical                                     :: save_filter_strength=.false.
 
   end type type_params_filter
   !=========================================================

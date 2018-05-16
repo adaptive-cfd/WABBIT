@@ -155,7 +155,8 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
         ! refine some blocks
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "random" )
         ! random adapt some blocks
         call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, &

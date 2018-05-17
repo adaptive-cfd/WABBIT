@@ -85,7 +85,7 @@ subroutine init_filter(filter, FILE )
                 call read_param_mpi(FILE, 'Discretization', 'order_predictor', filter%order_predictor, "---" )
                 ! read threshold value
                 call read_param_mpi(FILE, 'Blocks', 'eps', filter%eps, 1e-3_rk )
-
+                call abort(23574,"wavelet filter is out off order since commit  9a91f9aa309ef7f48c7ab986f27469acb646adb1")
             case('bogey_shock')
                 ! bogey shock detector threshold
                 call read_param_mpi(FILE, 'Discretization', 'r_th', filter%r_th, 1e-3_rk )
@@ -355,7 +355,6 @@ end subroutine filter_1D
 !
 !> \brief wavelet filter subroutine
 !! \date 24/07/17 - create
-!! \date 29/04/18 - update for new physics branch (pKrah)
 subroutine wavelet_filter(filter,Bs,g, block_data)
     use module_interpolation, only :    restriction_3D,restriction_2D,&
                                         prediction_2D,prediction_3D
@@ -406,9 +405,9 @@ subroutine wavelet_filter(filter,Bs,g, block_data)
         ! the block should be filtered, overwrite block data with predicted data
         if (detail < filter%eps) then
             ! wavelet filtering
-            !block_data(:,:,:) = u2(:,:,:)
+            block_data(:,:,:) = u2(:,:,:)
             ! note: do not filter redundant nodes, to avoid instabilities
-            block_data(g+2:Bs+g-1,g+2:Bs+g-1,g+2:Bs+g-1) = u2(g+2:Bs+g-1,g+2:Bs+g-1,g+2:Bs+g-1)
+            !block_data(g+2:Bs+g-1,g+2:Bs+g-1,g+2:Bs+g-1) = u2(g+2:Bs+g-1,g+2:Bs+g-1,g+2:Bs+g-1)
         end if
 
     else
@@ -420,8 +419,8 @@ subroutine wavelet_filter(filter,Bs,g, block_data)
         ! then, re-interpolate to the initial level (prediciton)
         call prediction_2D ( u3(:,:,1), u2(:,:,1), filter%order_predictor )  ! coarse, fine
 
-        ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-        ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+        ! ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+        ! ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
         ! do i = 1, Bs+2*g
         !     do j = 1, Bs+2*g
         !         detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
@@ -430,12 +429,12 @@ subroutine wavelet_filter(filter,Bs,g, block_data)
 
         ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
         ! the block should be filtered, overwrite block data with predicted data
-        ! if (detail < params%eps) then
+    !    if (detail < filter%eps) then
             ! wavelet filtering
-            !block_data(:,:,1) = u2(:,:,1)
+          !  block_data(:,:,1) = u2(:,:,1)
             ! note: do not filter redundant nodes, to avoid instabilities
             block_data(g+2:Bs+g-1,g+2:Bs+g-1,1) = u2(g+2:Bs+g-1,g+2:Bs+g-1,1)
-        ! end if
+    !    end if
 
     end if
 

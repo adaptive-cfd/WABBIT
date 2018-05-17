@@ -26,6 +26,7 @@ module module_ns_penalization
 
   !---------------------------------------------------------------------------------------------
   ! modules
+  use module_navier_stokes_params
   use module_precision
   use module_ini_files_parser_mpi
   use mpi
@@ -132,15 +133,15 @@ include "simple_shock.f90"
 
 
 !> \brief reads parameters for mask function from file
-subroutine init_penalization( params_ns,FILE )
+subroutine init_penalization( params,FILE )
     use module_navier_stokes_params
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)       :: FILE
    !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params_ns
+    type(type_params_ns),intent(inout)  :: params
 
-     if (params_ns%mpirank==0) then
+     if (params%mpirank==0) then
       write(*,*)
       write(*,*)
       write(*,*) "PARAMS: penalization and geometries!"
@@ -149,13 +150,13 @@ subroutine init_penalization( params_ns,FILE )
     ! =============================================================================
     ! parameters needed for ns_physics module
     ! -----------------------------------------------------------------------------
-    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .false.)
+    call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
 
 
-    if (params_ns%penalization) then
-      call read_param_mpi(FILE, 'VPM', 'geometry', params_ns%geometry, "cylinder")
-      call read_param_mpi(FILE, 'Physics', 'C_sp',  params_ns%C_sp, 0.01_rk )
-      call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
+    if (params%penalization) then
+      call read_param_mpi(FILE, 'VPM', 'geometry', params%geometry, "cylinder")
+      call read_param_mpi(FILE, 'Physics', 'C_sp',  params%C_sp, 0.01_rk )
+      call read_param_mpi(FILE, 'VPM', 'C_eta', params%C_eta, 0.01_rk )
     else
       return
     endif
@@ -180,7 +181,7 @@ subroutine init_penalization( params_ns,FILE )
 
     select case(mask_geometry)
     case ('simple-shock')
-      call init_simple_shock(params_ns,FILE)
+      call init_simple_shock(params,FILE)
     case('sod_shock_tube')
       ! nothing to do
     case ('vortex_street','cylinder')

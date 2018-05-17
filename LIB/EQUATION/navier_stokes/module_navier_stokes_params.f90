@@ -131,6 +131,8 @@ module module_navier_stokes_params
   ! statevector index
   integer(kind=ik) ,save,public :: rhoF,UxF,UyF,UzF,pF
 
+  type(type_params_ns)          :: params_ns
+
 contains
 
   include "initial_conditions.f90"
@@ -219,6 +221,33 @@ subroutine init_other_params(params_ns, FILE )
 
   end subroutine init_other_params
 
+
+
+  subroutine continue_periodic(x,L)
+        !> position x
+        real(kind=rk), intent(inout)     :: x
+        !> domain length
+        real(kind=rk), intent(in)     :: L
+
+        real(kind=rk)                  :: min_dx
+
+        if ( x>L ) then
+          x=x-L
+        elseif( x<0 ) then
+          ! note it is actually x=L-abs(x) but since x is negative its
+          x=L+x
+        else
+          ! do nothing
+        endif
+
+        min_dx = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly)&
+                          / real(params_ns%Bs-1, kind=rk)
+        ! u(x=0) should be set equal to u(x=L)
+        if ( abs(x-L)<min_dx*0.5_rk ) then
+          x = 0.0_rk
+        end if
+
+  end subroutine continue_periodic
 
 
 

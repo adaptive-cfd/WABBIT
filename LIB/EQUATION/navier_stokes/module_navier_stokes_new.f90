@@ -41,12 +41,13 @@ module module_navier_stokes_new
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  type(type_params_ns),save :: params_ns
+
 
 
   ! real(kind=rk)   ,parameter :: rho_init=1.645_rk,p_init=101330.0_rk,u_init=36.4_rk,v0_=0.0_rk,T_init=200!273.15_rk
   real(kind=rk)       ,save :: rho_init=1_rk,p_init=1.0_rk,T_init=1!273.15_rk
   real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,0.0_rk/)
+  real(kind=rk)        ,save:: dx_min
 
 
 contains
@@ -72,7 +73,6 @@ contains
     type(inifile)               :: FILE
     integer(kind=ik)            :: dF
     integer(kind=ik)            :: mpicode,nx_max
-    real(kind=rk)               :: dx_min
 
 
     ! ==================================================================
@@ -712,8 +712,9 @@ contains
       ! rho=0.125
       ! p  =0.1
       ! u  =0
-      do ix=1+g, Bs+g
+      do ix=1, Bs+2*g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
+         call continue_periodic(x,params_ns%Lx)
          ! left region
          if (x <= params_ns%Lx*0.5_rk) then
            u( ix, :, :, rhoF) = 1.0_rk
@@ -765,6 +766,8 @@ contains
     end select
 
   end subroutine INICOND_NStokes
+
+
 
 
 

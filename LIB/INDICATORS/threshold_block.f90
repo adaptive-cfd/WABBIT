@@ -64,9 +64,6 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     ! light data (refinement status column) list for working
     integer(kind=1), allocatable       :: my_refinement_status(:)
 
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
-
     ! send/receive buffer for data synchronization
     integer(kind=1), allocatable        :: my_lgt_block_send_buffer(:), my_lgt_block_receive_buffer(:)
 
@@ -80,11 +77,6 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
-    ! start time
-    sub_t0 = MPI_Wtime()
-
-    time_sum = 0.0_rk
 
     ! block number
     N = params%number_blocks
@@ -225,8 +217,4 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     deallocate( u1, u2, u3, my_refinement_status )
     deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer )
 
-    ! timings
-    sub_t1 = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-    call toc( params, "threshold_block (w/o ghost synch.)", time_sum )
 end subroutine threshold_block

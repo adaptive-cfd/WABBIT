@@ -61,9 +61,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !> how to choose blocks for refinement
     character(len=*), intent(in)           :: indicator
 
-    ! cpu time variables for running time calculation
-    real(kind=rk)                           :: t0
     integer(kind=ik)                        :: k
+
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -71,17 +72,25 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    ! timing
+    sub_t0 = MPI_Wtime()
+
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    t0 = MPI_Wtime()
 
     !> (a) loop over the blocks and set their refinement status.
     call refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
 
+    ! timing
+    call toc( params, "-refine mesh: indicator", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
+
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+
+    ! timing
+    call toc( params, "-refine mesh: respect min max level", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
 
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
     !! no way gradedness can be damaged, so we skip the call in this case. However,
@@ -89,6 +98,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     if ( indicator /= "everywhere") then
       call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
     endif
+
+    ! timing
+    call toc( params, "-refine mesh: gradedness", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
     !! except if they are already on the highest level.
@@ -102,16 +115,25 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
         call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
     end if
 
+    ! timing
+    call toc( params, "-refine mesh: execute", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
+
     !> (e) as the grid changed now with the refinement, we have to update the list of
     !! active blocks so other routines can loop just over these active blocks
     !! and do not have to ensure that the active list is up-to-date
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
+    ! timing
+    call toc( params, "-refine mesh: sort list", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
+
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-!---------------------------------------------------------------------------------------------
-! End of routine
-    call toc( params, "refine_mesh", MPI_wtime()-t0 )
-    
+    ! timing
+    call toc( params, "-refine mesh: update neighbors", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
+
 end subroutine refine_mesh

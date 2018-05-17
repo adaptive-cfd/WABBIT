@@ -56,8 +56,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     integer(kind=ik)                                :: k
     ! file name
     character(len=80)                               :: fname
-    ! cpu time variables for running time calculation
-    real(kind=rk)                                   :: t0
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -67,9 +65,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    ! start time
-    t0 = MPI_Wtime()
 
     do k = 1, params%number_data_fields
 
@@ -108,6 +103,4 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
     end do
 
-    ! timing
-    call toc( params, "save_data", MPI_wtime()-t0 )
 end subroutine save_data

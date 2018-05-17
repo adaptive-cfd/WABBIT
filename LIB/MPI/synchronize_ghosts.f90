@@ -148,13 +148,13 @@ logical                             :: synch_method
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    if ( params%debug ) then
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! start time
-        sub_t0 = MPI_Wtime()
-
-        time_sum = 0.0_rk
-    end if
+!    if ( params%debug ) then
+!        !call MPI_Barrier(MPI_COMM_WORLD, ierr)
+!        ! start time
+!        sub_t0 = MPI_Wtime()
+!
+!        time_sum = 0.0_rk
+!    end if
 
 
 !#######################################
@@ -849,23 +849,23 @@ else
 
 end if
 
-    if ( params%debug ) then
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        ! end time
-        sub_t1 = MPI_Wtime()
-        time_sum = time_sum + (sub_t1 - sub_t0)
-        ! write time
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "synch. ghosts" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "synch. ghosts"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
-    end if
+!    if ( params%debug ) then
+!        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+!        ! end time
+!        sub_t1 = MPI_Wtime()
+!        time_sum = time_sum + (sub_t1 - sub_t0)
+!        ! write time
+!        ! find free or corresponding line
+!        k = 1
+!        do while ( debug%name_comp_time(k) /= "---" )
+!            ! entry for current subroutine exists
+!            if ( debug%name_comp_time(k) == "synch. ghosts" ) exit
+!            k = k + 1
+!        end do
+!        ! write time
+!        debug%name_comp_time(k) = "synch. ghosts"
+!        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
+!        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
+!    end if
 
 end subroutine synchronize_ghosts

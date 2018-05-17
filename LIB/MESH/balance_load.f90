@@ -78,8 +78,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik)                    :: data_size
     ! free light/heavy data id
     integer(kind=ik)                    :: lgt_free_id, hvy_free_id, lgt_id
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0
+
     ! space filling curve list
     integer(kind=ik), allocatable       :: sfc_com_list(:,:), sfc_sorted_list(:,:)
     ! hilbert code
@@ -89,9 +88,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
-    ! start time
-    t0 = MPI_Wtime()
 
     tag = 0
 
@@ -508,6 +504,4 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     deallocate( buffer_light )
     deallocate( sfc_sorted_list )
 
-    ! timing
-    call toc( params, "balance_load", MPI_wtime()-t0 )
 end subroutine balance_load

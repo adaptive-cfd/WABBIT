@@ -75,11 +75,17 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! light data list for working
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block, 1), params%max_treelevel+2)
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! timing
+    sub_t0 = MPI_Wtime()
 
     N = params%number_blocks
 
@@ -318,6 +324,10 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     end do
 
+    ! timing
+    call toc( params, "---refine execute 3D: refine data", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
+
     ! synchronize light data
     lgt_block = 0
     call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -326,5 +336,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     deallocate( data_predict_fine  )
     deallocate( data_predict_coarse  )
     deallocate( new_data  )
+
+    ! timing
+    call toc( params, "---refine execute 3D: synch light data", MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
 
 end subroutine refinement_execute_3D

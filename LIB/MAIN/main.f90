@@ -123,7 +123,7 @@ program main
     logical                             :: stop_status, my_stop_status
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1
+    real(kind=rk)                       :: sub_t0
 
     ! allocate com lists and com matrix here
     ! communication lists:
@@ -265,12 +265,15 @@ program main
     end if
 
     ! timing
-    call toc( params, "init_data", MPI_wtime()-sub_t0 )
+    call toc( params, "MAIN: init_data", MPI_wtime()-sub_t0 )
 
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
     do while ( time < params%time_max )
+
+        ! timing
+        sub_t0 = MPI_Wtime()
 
         ! new iteration
         iteration = iteration + 1
@@ -279,6 +282,10 @@ program main
         if ( params%adapt_mesh ) then
             call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
+
+        ! timing
+        call toc( params, "MAIN: refine mesh", MPI_wtime()-sub_t0 )
+        sub_t0 = MPI_Wtime()
 
         ! advance in time
         call time_stepper( time, params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
@@ -290,6 +297,10 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n )
 
         end if
+
+        ! timing
+        call toc( params, "MAIN: time stepper", MPI_wtime()-sub_t0 )
+        sub_t0 = MPI_Wtime()
 
         ! check redundant nodes
         if ( params%test_redundant_nodes ) then
@@ -324,10 +335,18 @@ program main
 
         end if
 
+        ! timing
+        call toc( params, "MAIN: redundant nodes check", MPI_wtime()-sub_t0 )
+        sub_t0 = MPI_Wtime()
+
         ! filter
         if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .and. params%filter_type/="no_filter") then
             call filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end if
+
+        ! timing
+        call toc( params, "MAIN: filter block", MPI_wtime()-sub_t0 )
+        sub_t0 = MPI_Wtime()
 
         ! adapt the mesh
         if ( params%adapt_mesh ) then
@@ -342,6 +361,10 @@ program main
 
         end if
 
+        ! timing
+        call toc( params, "MAIN: adapt mesh", MPI_wtime()-sub_t0 )
+        sub_t0 = MPI_Wtime()
+
         ! write data to disk
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
@@ -352,6 +375,10 @@ program main
           output_time = time
           params%next_write_time = params%next_write_time + params%write_time
         endif
+
+        ! timing
+        call toc( params, "MAIN: save data", MPI_wtime()-sub_t0 )
+        sub_t0 = MPI_Wtime()
 
         ! at the end of a time step, we increase the total counters/timers for all measurements
         ! by what has been done in the last time step, then we flush the current timing to disk.
@@ -419,7 +446,18 @@ program main
             end do
 
             write(*,'(80("_"))')
-            write(*, '("sum: ", 2x,f12.3)', advance='yes') sum(debug%comp_time(:,2))
+
+            sub_t0 = 0.0_rk
+            k = 1
+            do while ( debug%name_comp_time(k) /= "---" )
+                if (debug%name_comp_time(k)(1:4) == "MAIN") then
+                    sub_t0 = sub_t0 + debug%comp_time(k,2)
+                end if
+                ! loop variable
+                k = k + 1
+            end do
+
+            write(*, '("sum (MAIN): ", 2x,f12.3)', advance='yes') sub_t0
 
         end if
 

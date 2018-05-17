@@ -64,9 +64,6 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, sub_t1, time_sum
-
     ! stencil array, note: size is fixed
     real(kind=rk)                       :: stencil(19)
 
@@ -86,8 +83,6 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
-    time_sum = 0.0_rk
 
     ! grid parameter
     Bs    = params%number_block_nodes
@@ -175,8 +170,6 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
 
     ! synchronize ghostnodes
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-    ! start time
-    sub_t0 = MPI_Wtime()
 
     ! loop over all active heavy data blocks
     do k = 1, hvy_n
@@ -263,23 +256,5 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
 
     ! clean up
     deallocate(block_old)
-
-    ! end time
-    sub_t1   = MPI_Wtime()
-    time_sum = time_sum + (sub_t1 - sub_t0)
-    ! write time
-    if ( params%debug ) then
-        ! find free or corresponding line
-        k = 1
-        do while ( debug%name_comp_time(k) /= "---" )
-            ! entry for current subroutine exists
-            if ( debug%name_comp_time(k) == "filter block" ) exit
-            k = k + 1
-        end do
-        ! write time
-        debug%name_comp_time(k) = "filter block"
-        debug%comp_time(k, 1)   = debug%comp_time(k, 1) + 1
-        debug%comp_time(k, 2)   = debug%comp_time(k, 2) + time_sum
-    end if
 
 end subroutine filter_block

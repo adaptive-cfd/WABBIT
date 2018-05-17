@@ -78,13 +78,16 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
     else
         ! 2D case
         ! create shear layer, Uy field
-        do ix = g+1,Bs+g
-            do iy = g+1,Bs+g
+        do ix = 1,Bs+2*g
+            do iy = 1,Bs+2*g
 
                 ! compute x,y coordinates from spacing and origin
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
-
+                ! ensure that coordinates are continued periodicaly
+                ! otherwise problems in redudant nodes.
+                call continue_periodic(x,params_ns%Lx)
+                call continue_periodic(y,params_ns%Ly)
                 ! shear layer, setup [1]
                 ! Uy
                 if ( x <= 0.5_rk*params_ns%Lx ) then

@@ -1,9 +1,9 @@
 !> \brief reads parameters for mask function from file
-subroutine init_simple_shock(params_ns,FILE)
+subroutine init_simple_shock(params,FILE)
   use module_navier_stokes_params
   implicit none
   !> params structure of navier stokes
-   type(type_params_ns),intent(in)  :: params_ns
+   type(type_params_ns),intent(in)  :: params
  ! character(len=*), intent(in) :: filename
   type(inifile) , intent(inout) :: FILE
 
@@ -13,7 +13,7 @@ subroutine init_simple_shock(params_ns,FILE)
   call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', shock_params%rho_left, 2.0_rk )
 
   call shockVals( shock_params%rho_left,shock_params%u_left,shock_params%p_left, &
-                  shock_params%rho_right,shock_params%u_right,shock_params%p_right,params_ns%gamma_)
+                  shock_params%rho_right,shock_params%u_right,shock_params%p_right,params%gamma_)
 
 
 end subroutine init_simple_shock

@@ -14,7 +14,9 @@ echo "testing filters"
 # list of prefixes the test generates
 prefixes=(Ux p rho)
 # list of filters
-filters=(explicit_5pt explicit_7pt explicit_9pt explicit_11pt wavelet bogey_shock)
+filters=(explicit_5pt explicit_7pt explicit_9pt explicit_11pt bogey_shock)
+#filters=(bogey_shock)
+
 #filters=(explicit_5pt )
 
 ## change this list in run_all_filter.sh to!!

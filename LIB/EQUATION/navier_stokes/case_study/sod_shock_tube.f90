@@ -3,7 +3,7 @@
 
 !==========================================================================
 !> \brief Compute mask function of sod shock tube
-!> \detail 
+!> \detail
 !>      +For boundary_type=='left'
 !>             -> mask will be generatet for 0<x<0.1*Lx
 !>      +For boundary_type=='rigth'
@@ -45,7 +45,7 @@ subroutine draw_sod_shock_tube(mask, x0, dx, Bs, g, boundary_type )
 
               mask(ix,:) = smoothstep(x-x_boundary(1),h) &
                          + smoothstep(x_boundary(2)-x,h)
-          
+
        end do
 
 end subroutine draw_sod_shock_tube
@@ -64,9 +64,9 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
     real(kind=rk), dimension(:,:,:), intent(inout)   :: penalization
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)          :: x0, dx
-    !> statevector 
+    !> statevector
     real(kind=rk), dimension(:,:,:), intent(in)      :: phi
-      !> statevector 
+      !> statevector
     real(kind=rk)                                    :: mask
 
     ! auxiliary variables
@@ -86,7 +86,7 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
     ! reset mask array
     mask         = 0.0_rk
     penalization = 0.0_rk
-   
+
     ! parameter for smoothing function (width)
     h       = 1.5_rk*max(dx(1), dx(2))
 
@@ -94,18 +94,18 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
     u           = phi(:,:,2)/phi(:,:,1)
     v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
-    
+
     ! penalization term
     !-------------------
 
     ! left boundary
-    
+
     x_L      =0.1_rk*domain_size(1)
     p_L      = 1.0_rk
     rho_L    = 1.0_rk
 
     ! right boundary
-    
+
     x_R      =domain_size(1)*0.9_rk
     rho_R    = 0.125_rk
     p_R      = 0.1_rk
@@ -114,16 +114,17 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
 
     do ix=1, Bs+2*g
       x = dble(ix-(g+1)) * dx(1) + x0(1)
+      call continue_periodic(x,domain_size(1))
       if (x<domain_size(1)*0.5_rk) then
-        mask      = smoothstep(x-x_L,h)  
+        mask      = smoothstep(x-x_L,h)
         rho_ref   = rho_L
         p_ref     = p_L
       else
-        mask      = smoothstep(x_R-x,h)   
+        mask      = smoothstep(x_R-x,h)
         rho_ref   = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),rho_R,rho_L)
         p_ref     = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),p_R  ,p_L    )
-      endif  
-     
+      endif
+
       ! density
       penalization(ix,:,1)= penalization(ix,:,1) + C_sp_inv*mask * ( rho(ix,:) - rho_ref )
       ! x-velocity
@@ -133,8 +134,6 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
       ! preasure
       penalization(ix,:,4)= penalization(ix,:,4) + C_sp_inv*mask *( p(ix,:) - p_ref )
     end do
-    
+
 
 end subroutine add_sod_shock_tube
-
-

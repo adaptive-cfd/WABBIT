@@ -163,6 +163,12 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         ! set initial condition
         call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+
+        if (params%rank == 0) then
+            write(*,'(" did ",i2," refinement stage (beyond what is required for the &
+            &prescribed precision eps) Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') k, lgt_n, &
+            min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
+        endif
       enddo
     endif
 
@@ -194,6 +200,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     if (params%rank == 0) then
+        write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') lgt_n, &
+        min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
       write(*,'("Initial grid and initial condition terminated.")')
     endif
 end subroutine set_initial_grid

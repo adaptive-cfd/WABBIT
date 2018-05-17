@@ -78,8 +78,8 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
     else
         ! 2D case
         ! create shear layer, Uy field
-        do ix = g+1,Bs+g
-            do iy = g+1,Bs+g
+        do ix = 1,Bs+2*g
+            do iy = 1,Bs+2*g
 
                 ! compute x,y coordinates from spacing and origin
                 x = dble(ix-(g+1)) * dx(1) + x0(1)

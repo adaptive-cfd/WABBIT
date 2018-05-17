@@ -143,7 +143,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
                 !data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
                 data_predict_coarse = hvy_block(:, :, dF, hvy_active(k) )
                 ! reset data
-                data_predict_fine   = 9.0e9_rk
+                !data_predict_fine   = 9.0e9_rk
                 ! interpolate data
                 call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
                 ! save new data

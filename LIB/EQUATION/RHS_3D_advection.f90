@@ -179,8 +179,8 @@ subroutine f_x_y_z_t( u01, u02, u03, x, y, z, time )
     t_a = 3.0_rk
 
     ! calculate velocity
-    u01 = cos((pi*time)/t_a) * (sin(pi*x))**2 * sin(2*pi*y)
-    u02 = cos((pi*time)/t_a) * (sin(pi*y))**2 * (-sin(2*pi*x))
-    u03 = -sin((2*pi*time)/t_a) !0.0_rk
+    u01 = dcos((pi*time)/t_a) * (dsin(pi*x))**2 * dsin(2.0_rk*pi*y)
+    u02 = dcos((pi*time)/t_a) * (dsin(pi*y))**2 * (-dsin(2.0_rk*pi*x))
+    u03 = -dsin((2.0_rk*pi*time)/t_a) !0.0_rk
 
 end subroutine f_x_y_z_t

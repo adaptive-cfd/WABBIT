@@ -118,7 +118,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         ! 'exclude_redundant', 'include_redundant', 'only_redundant'
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging_old', 'staging_new', 'compare'
-        data_writing_type = 'staging_new'
+        data_writing_type = 'staging_old'
 
     else
         ! nodes test
@@ -155,15 +155,15 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! todo: use reseting subroutine from MPI module
     if ( (params%test_ghost_nodes_synch) .and. (data_bounds_type /= 'only_redundant') ) then
         !-- x-direction
-        hvy_block(1:g, :, :, :, : )           = 9.0e9_rk
-        hvy_block(Bs+g+1:Bs+2*g, :, :, :, : ) = 9.0e9_rk
+        hvy_block(1:g, :, :, :, : )           = 55.0e9_rk
+        hvy_block(Bs+g+1:Bs+2*g, :, :, :, : ) = 55.0e9_rk
         !-- y-direction
-        hvy_block(:, 1:g, :, :, : )           = 9.0e9_rk
-        hvy_block(:, Bs+g+1:Bs+2*g, :, :, : ) = 9.0e9_rk
+        hvy_block(:, 1:g, :, :, : )           = 55.0e9_rk
+        hvy_block(:, Bs+g+1:Bs+2*g, :, :, : ) = 55.0e9_rk
         !-- z-direction
         if ( params%threeD_case ) then
-            hvy_block(:, :, 1:g, :, : )           = 9.0e9_rk
-            hvy_block(:, :, Bs+g+1:Bs+2*g, :, : ) = 9.0e9_rk
+            hvy_block(:, :, 1:g, :, : )           = 55.0e9_rk
+            hvy_block(:, :, Bs+g+1:Bs+2*g, :, : ) = 55.0e9_rk
         end if
     end if
 
@@ -190,10 +190,15 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! set number of synch stages
     if ( data_writing_type == 'staging_old' ) then
-        ! all four stages
-        stages = 4
+        if ( params%threeD_case ) then
+            ! five stages
+            stages = 5
+        else
+            ! four stages
+            stages = 4
+        end if
     elseif ( data_writing_type == 'staging_new' ) then
-        ! only three stages
+        ! three stages
         stages = 3
     else
         ! only one stage
@@ -207,15 +212,30 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     do synch_stage = 1, stages
 
         if ( data_writing_type == 'staging_old' ) then
-            ! stage 3: coarse to fine, stage 4: correction step
-            if (synch_stage==3) then
-                data_bounds_type = 'exclude_redundant'
-            end if
-            if (synch_stage==4) then
-                data_bounds_type = 'include_redundant'
+            if ( params%threeD_case ) then
+                ! 3D
+                ! stage 3: coarse to fine, stage 5: correction step
+                if (synch_stage==3) then
+                    data_bounds_type = 'exclude_redundant'
+                end if
+                if (synch_stage==5) then
+                    data_bounds_type = 'include_redundant'
+                end if
+
+            else
+                ! 2D
+                ! stage 3: coarse to fine, stage 4: correction step
+                if (synch_stage==3) then
+                    data_bounds_type = 'exclude_redundant'
+                end if
+                if (synch_stage==4) then
+                    data_bounds_type = 'include_redundant'
+                end if
+
             end if
 
         elseif ( data_writing_type == 'staging_new' ) then
+            ! 2D
             ! stage 2: coarse to fine, stage 3: level_diff=0
             if (synch_stage==2) then
                 data_bounds_type = 'exclude_redundant'
@@ -223,7 +243,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
             if (synch_stage==3) then
                 data_bounds_type = 'include_redundant'
             end if
-
         end if
 
         ! reset integer send buffer position
@@ -354,7 +373,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                             case('staging_old', 'staging_new')
                                 ! set synch status
-                                call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood, data_writing_type )
+                                call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), lgt_id, neighbor_light_id, neighborhood, data_writing_type )
 
                                 ! data has to synchronize in current stage
                                 if (synch) then
@@ -375,7 +394,8 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         ! synch status for staging method
                         if ( (data_writing_type == 'staging_old') .or. (data_writing_type == 'staging_new') ) then
                             ! set synch status
-                            call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood, data_writing_type )
+                            call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), lgt_id, neighbor_light_id, neighborhood, data_writing_type )
+
                         else
                             ! synch status is allways true
                             synch = .true.
@@ -479,7 +499,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                                     ! do nothing
                                 else
                                     ! compare data
-                                    call compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, neighborhood )
+                                    call compare_hvy_data( params, lgt_block, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, neighborhood )
                                 end if
 
                         end select
@@ -529,7 +549,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
 
                         ! set synch status
-                        call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), neighborhood, data_writing_type )
+                        call set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_active(k), lgt_id, neighbor_light_id, neighborhood, data_writing_type )
                         ! synch == .true. bedeutet, dass der aktive block seinem nachbarn daten gibt
                         ! hier sind wir aber auf der seite des empfängers, das bedeutet, neighbor_synch muss ausgewertet werden
 
@@ -4974,7 +4994,7 @@ end subroutine add_hvy_data
 
 !############################################################################################################
 
-subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, neighborhood )
+subroutine compare_hvy_data( params, lgt_block, data_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, neighborhood )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -4986,6 +5006,8 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
 
     !> user defined parameter structure
     type (type_params), intent(in)                  :: params
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> data buffer
     real(kind=rk), intent(in)                 :: data_buffer(:)
     !> data_bounds
@@ -5000,7 +5022,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     logical, intent(inout)              :: stop_status
 
     ! loop variable
-    integer(kind=ik)                                :: i, j, k, dF, buffer_i
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i, lgt_id
 
     ! error threshold
     real(kind=rk)                                   :: eps
@@ -5017,7 +5039,7 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
     buffer_i = 1
 
     ! set error threshold
-    eps = 1e-9_rk
+    eps = 1e-12_rk!1e-9_rk
 
     ! reset error norm
     error_norm = 0.0_rk
@@ -5035,7 +5057,8 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
 
                     if (level_diff/=-1) then
                         ! pointwise error norm
-                        error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                        error_norm = max(error_norm, dabs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+
                     else
                         ! if the level diff is -1, I compare with interpolated (upsampled) data. that means every EVEN
                         ! point is the result of interpolation, and not truely redundant.
@@ -5049,10 +5072,11 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
                         !   - old method, sync stage 4 deactivated: finds all occurances of "3finer blocks on corner problem" (okay)
                         !   - new method, averaging, no error found (makes sense: okay)
                         if ( (mod(i,2)/=0) .and. (mod(j,2)/=0) .and. (mod(k,2)/=0) ) then
-
-                            error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
+                            ! pointwise error norm
+                            error_norm = max(error_norm, dabs(hvy_block( i, j, k, dF, hvy_id ) - data_buffer( buffer_i )))
 
                         end if
+
                     end if
                     buffer_i = buffer_i + 1
 
@@ -5061,9 +5085,12 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         end do
     end do
 
+    ! calculate light id
+    call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+
     if (error_norm > eps)  then
         ! error message
-        write(*,*) "ERROR: difference in redundant nodes", error_norm, level_diff, neighborhood
+        write(*,*) "ERROR: difference in redundant nodes", error_norm, level_diff, neighborhood, lgt_block(lgt_id,:)
         ! stop program
         stop_status = .true.
         ! mark block by putting a dot in the middle. this way, we can identify all
@@ -5228,7 +5255,7 @@ end subroutine isend_irecv_data_2
 
 !############################################################################################################
 
-subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_id, neighborhood, data_writing_type )
+subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_diff, hvy_neighbor, hvy_id, lgt_id, neighbor_lgt_id, neighborhood, data_writing_type )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -5256,6 +5283,9 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
     ! list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_id
 
+    ! level diffenrence
+    integer(kind=ik), intent(in)        :: lgt_id, neighbor_lgt_id
+
     !> neighborhood relation, id from dirs
     integer(kind=ik), intent(in)                    :: neighborhood
 
@@ -5276,347 +5306,221 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
 
     if ( data_writing_type == 'staging_old' ) then
 
-        ! set synch stage
-        ! stage 1: level +1
-        ! stage 2: level 0
-        ! stage 3: level -1
-        ! stage 4: special
-
-        ! stage 1
-        if ( (synch_stage == 1) .and. (level_diff == 1) ) then
-            ! block send data
-            synch = .true.
-        elseif ( (synch_stage == 1) .and. (level_diff == -1) ) then
-            ! neighbor send data
-            neighbor_synch = .true.
-        end if
-
-        ! stage 2
-        if ( (synch_stage == 2) .and. (level_diff == 0) ) then
-            ! block send data
-            synch = .true.
-            ! neighbor send data
-            neighbor_synch = .true.
-        end if
-
-        ! stage 3
-        if ( (synch_stage == 3) .and. (level_diff == -1) ) then
-            ! block send data
-            synch = .true.
-        elseif ( (synch_stage == 3) .and. (level_diff == 1) ) then
-            ! neighbor send data
-            neighbor_synch = .true.
-        end if
-
-        ! check dimension
         if ( params%threeD_case ) then
             ! 3D
+            ! set synch stage
+            ! stage 1: level +1
+            ! stage 2: level 0 (include)
+            ! stage 3: level 0 (exclude)
+            ! stage 4: level -1
+            ! stage 5: special
+
+            ! stage 1
+            if ( (synch_stage == 1) .and. (level_diff == 1) ) then
+                ! block send data
+                synch = .true.
+            elseif ( (synch_stage == 1) .and. (level_diff == -1) ) then
+                ! neighbor send data
+                neighbor_synch = .true.
+            end if
+
+            ! stage 2
+            if ( (synch_stage == 2) .and. (level_diff == 0) ) then
+                if ( lgt_id > neighbor_lgt_id ) then
+                    ! block send data
+                    synch = .true.
+                else
+                    ! neighbor send data
+                    neighbor_synch = .true.
+                end if
+            end if
+
+            ! stage 3
+            if ( (synch_stage == 3) .and. (level_diff == 0) ) then
+                if ( lgt_id < neighbor_lgt_id ) then
+                    ! block send data
+                    synch = .true.
+                else
+                    ! neighbor send data
+                    neighbor_synch = .true.
+                end if
+            end if
+
             ! stage 4
-            if ( (synch_stage == 4) .and. (level_diff == 0) ) then
+            if ( (synch_stage == 4) .and. (level_diff == -1) ) then
+                ! block send data
+                synch = .true.
+            elseif ( (synch_stage == 4) .and. (level_diff == 1) ) then
+                ! neighbor send data
+                neighbor_synch = .true.
+            end if
 
-                ! corner '123/___'
-                if ( neighborhood == 19 ) then
-                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & ! '__1/123'
-                         (hvy_neighbor( hvy_id, 28) /= -1) .or. & ! '__1/134'
-                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & ! '__1/152'
+            ! stage 5
+            if ( (synch_stage == 5) .and. (level_diff == 0) ) then
 
-                         (hvy_neighbor( hvy_id, 31) /= -1) .or. & ! '__2/123'
-                         (hvy_neighbor( hvy_id, 32) /= -1) .or. & ! '__2/623'
-                         (hvy_neighbor( hvy_id, 33) /= -1) .or. & ! '__2/152'
-
-                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & ! '__3/123'
-                         (hvy_neighbor( hvy_id, 36) /= -1) .or. & ! '__3/623'
-                         (hvy_neighbor( hvy_id, 37) /= -1) .or. & ! '__3/134'
-
-                         (hvy_neighbor( hvy_id, 51) /= -1) .or. & ! '_12/123'
-                         (hvy_neighbor( hvy_id, 53) /= -1) .or. & ! '_13/123'
-                         (hvy_neighbor( hvy_id, 67) /= -1) ) then ! '_23/123'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '134/___'
-                if ( neighborhood == 20 ) then
-                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & ! '__1/123'
-                         (hvy_neighbor( hvy_id, 28) /= -1) .or. & ! '__1/134'
-                         (hvy_neighbor( hvy_id, 29) /= -1) .or. & ! '__1/145'
-
-                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & ! '__3/123'
-                         (hvy_neighbor( hvy_id, 37) /= -1) .or. & ! '__3/134'
-                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & ! '__3/634'
-
-                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & ! '__4/134'
-                         (hvy_neighbor( hvy_id, 40) /= -1) .or. & ! '__4/634'
-                         (hvy_neighbor( hvy_id, 41) /= -1) .or. & ! '__4/145'
-
-                         (hvy_neighbor( hvy_id, 54) /= -1) .or. & ! '_13/134'
-                         (hvy_neighbor( hvy_id, 55) /= -1) .or. & ! '_14/134'
-                         (hvy_neighbor( hvy_id, 71) /= -1) ) then ! '_43/134'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '145/___'
-                if ( neighborhood == 21 ) then
-                    if ( (hvy_neighbor( hvy_id, 28) /= -1) .or. & ! '__1/134'
-                         (hvy_neighbor( hvy_id, 29) /= -1) .or. & ! '__1/145'
-                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & ! '__1/152'
-
-                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & ! '__4/134'
-                         (hvy_neighbor( hvy_id, 41) /= -1) .or. & ! '__4/145'
-                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & ! '__4/645'
-
-                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & ! '__5/145'
-                         (hvy_neighbor( hvy_id, 44) /= -1) .or. & ! '__5/645'
-                         (hvy_neighbor( hvy_id, 45) /= -1) .or. & ! '__5/152'
-
-                         (hvy_neighbor( hvy_id, 56) /= -1) .or. & ! '_14/145'
-                         (hvy_neighbor( hvy_id, 57) /= -1) .or. & ! '_15/145'
-                         (hvy_neighbor( hvy_id, 73) /= -1) ) then ! '_45/145'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '152/___'
-                if ( neighborhood == 22 ) then
-                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & ! '__1/123'
-                         (hvy_neighbor( hvy_id, 29) /= -1) .or. & ! '__1/145'
-                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & ! '__1/152'
-
-                         (hvy_neighbor( hvy_id, 31) /= -1) .or. & ! '__2/123'
-                         (hvy_neighbor( hvy_id, 33) /= -1) .or. & ! '__2/152'
-                         (hvy_neighbor( hvy_id, 34) /= -1) .or. & ! '__2/652'
-
-                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & ! '__5/145'
-                         (hvy_neighbor( hvy_id, 45) /= -1) .or. & ! '__5/152'
-                         (hvy_neighbor( hvy_id, 46) /= -1) .or. & ! '__5/652'
-
-                         (hvy_neighbor( hvy_id, 52) /= -1) .or. & ! '_12/152'
-                         (hvy_neighbor( hvy_id, 58) /= -1) .or. & ! '_15/152'
-                         (hvy_neighbor( hvy_id, 69) /= -1) ) then ! '_25/152'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '623/___'
-                if ( neighborhood == 23 ) then
-                    if ( (hvy_neighbor( hvy_id, 31) /= -1) .or. & ! '__2/123'
-                         (hvy_neighbor( hvy_id, 32) /= -1) .or. & ! '__2/623'
-                         (hvy_neighbor( hvy_id, 33) /= -1) .or. & ! '__2/652'
-
-                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & ! '__3/123'
-                         (hvy_neighbor( hvy_id, 36) /= -1) .or. & ! '__3/623'
-                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & ! '__3/634'
-
-                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & ! '__6/623'
-                         (hvy_neighbor( hvy_id, 48) /= -1) .or. & ! '__6/634'
-                         (hvy_neighbor( hvy_id, 50) /= -1) .or. & ! '__6/652'
-
-                         (hvy_neighbor( hvy_id, 59) /= -1) .or. & ! '_62/623'
-                         (hvy_neighbor( hvy_id, 61) /= -1) .or. & ! '_63/623'
-                         (hvy_neighbor( hvy_id, 68) /= -1) ) then ! '_23/623'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '634/___'
-                if ( neighborhood == 24 ) then
-                    if ( (hvy_neighbor( hvy_id, 36) /= -1) .or. & ! '__3/623'
-                         (hvy_neighbor( hvy_id, 37) /= -1) .or. & ! '__3/134'
-                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & ! '__3/634'
-
-                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & ! '__4/134'
-                         (hvy_neighbor( hvy_id, 40) /= -1) .or. & ! '__4/634'
-                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & ! '__4/645'
-
-                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & ! '__6/623'
-                         (hvy_neighbor( hvy_id, 48) /= -1) .or. & ! '__6/634'
-                         (hvy_neighbor( hvy_id, 49) /= -1) .or. & ! '__6/645'
-
-                         (hvy_neighbor( hvy_id, 62) /= -1) .or. & ! '_63/634'
-                         (hvy_neighbor( hvy_id, 63) /= -1) .or. & ! '_64/634'
-                         (hvy_neighbor( hvy_id, 72) /= -1) ) then ! '_43/634'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '645/___'
-                if ( neighborhood == 25 ) then
-                    if ( (hvy_neighbor( hvy_id, 40) /= -1) .or. & ! '__4/634'
-                         (hvy_neighbor( hvy_id, 41) /= -1) .or. & ! '__4/145'
-                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & ! '__4/645'
-
-                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & ! '__5/145'
-                         (hvy_neighbor( hvy_id, 44) /= -1) .or. & ! '__5/645'
-                         (hvy_neighbor( hvy_id, 46) /= -1) .or. & ! '__5/652'
-
-                         (hvy_neighbor( hvy_id, 48) /= -1) .or. & ! '__6/634'
-                         (hvy_neighbor( hvy_id, 49) /= -1) .or. & ! '__6/645'
-                         (hvy_neighbor( hvy_id, 50) /= -1) .or. & ! '__6/652'
-
-                         (hvy_neighbor( hvy_id, 64) /= -1) .or. & ! '_64/645'
-                         (hvy_neighbor( hvy_id, 65) /= -1) .or. & ! '_65/645'
-                         (hvy_neighbor( hvy_id, 74) /= -1) ) then ! '_45/645'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! corner '652/___'
-                if ( neighborhood == 26 ) then
-                    if ( (hvy_neighbor( hvy_id, 32) /= -1) .or. & ! '__2/623'
-                         (hvy_neighbor( hvy_id, 33) /= -1) .or. & ! '__2/152'
-                         (hvy_neighbor( hvy_id, 34) /= -1) .or. & ! '__2/652'
-
-                         (hvy_neighbor( hvy_id, 44) /= -1) .or. & ! '__5/645'
-                         (hvy_neighbor( hvy_id, 45) /= -1) .or. & ! '__5/152'
-                         (hvy_neighbor( hvy_id, 46) /= -1) .or. & ! '__5/652'
-
-                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & ! '__6/623
-                         (hvy_neighbor( hvy_id, 49) /= -1) .or. & ! '__6/645'
-                         (hvy_neighbor( hvy_id, 50) /= -1) .or. & ! '__6/652'
-
-                         (hvy_neighbor( hvy_id, 60) /= -1) .or. & ! '_62/652'
-                         (hvy_neighbor( hvy_id, 66) /= -1) .or. & ! '_65/652'
-                         (hvy_neighbor( hvy_id, 70) /= -1) ) then ! '_25/652'
-                        synch = .true.
-                        neighbor_synch = .true.
-                    end if
-                end if
-
-                ! edge '_12/___'
+                ! '_12/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 7 ) then
-                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & ! '__1/123'
-                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & ! '__1/152'
-                         (hvy_neighbor( hvy_id, 31) /= -1) .or. & ! '__2/123'
-                         (hvy_neighbor( hvy_id, 33) /= -1) ) then ! '__2/152'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & !'__1/123'
+                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & !'__1/152'
+                         (hvy_neighbor( hvy_id, 31) /= -1) .or. & !'__2/123'
+                         (hvy_neighbor( hvy_id, 33) /= -1) ) then !'__2/152'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_13/___'
+                ! '_13/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 8 ) then
-                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & ! '__1/123'
-                         (hvy_neighbor( hvy_id, 28) /= -1) .or. & ! '__1/134'
-                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & ! '__3/123'
-                         (hvy_neighbor( hvy_id, 37) /= -1) ) then ! '__3/134'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & !'__1/123'
+                         (hvy_neighbor( hvy_id, 28) /= -1) .or. & !'__1/134'
+                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & !'__3/123'
+                         (hvy_neighbor( hvy_id, 37) /= -1) ) then !'__3/134'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_14/___'
+                ! '_14/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 9 ) then
-                    if ( (hvy_neighbor( hvy_id, 28) /= -1) .or. & ! '__1/134'
-                         (hvy_neighbor( hvy_id, 29) /= -1) .or. & ! '__1/145'
-                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & ! '__4/134'
-                         (hvy_neighbor( hvy_id, 41) /= -1) ) then ! '__4/145'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 28) /= -1) .or. & !'__1/134'
+                         (hvy_neighbor( hvy_id, 29) /= -1) .or. & !'__1/145'
+                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & !'__4/134'
+                         (hvy_neighbor( hvy_id, 41) /= -1) ) then !'__4/145'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_15/___'
+                ! '_15/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 10 ) then
-                    if ( (hvy_neighbor( hvy_id, 29) /= -1) .or. & ! '__1/145'
-                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & ! '__1/152'
-                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & ! '__5/145'
-                         (hvy_neighbor( hvy_id, 45) /= -1) ) then ! '__5/152'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 29) /= -1) .or. & !'__1/145'
+                         (hvy_neighbor( hvy_id, 30) /= -1) .or. & !'__1/152'
+                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & !'__5/145'
+                         (hvy_neighbor( hvy_id, 45) /= -1) ) then !'__5/152'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_62/___'
+                ! '_62/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 11 ) then
-                    if ( (hvy_neighbor( hvy_id, 32) /= -1) .or. & ! '__2/623'
-                         (hvy_neighbor( hvy_id, 34) /= -1) .or. & ! '__2/652'
-                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & ! '__6/623'
-                         (hvy_neighbor( hvy_id, 50) /= -1) ) then ! '__6/652'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 32) /= -1) .or. & !'__2/623'
+                         (hvy_neighbor( hvy_id, 34) /= -1) .or. & !'__2/652'
+                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & !'__6/623'
+                         (hvy_neighbor( hvy_id, 50) /= -1) ) then !'__6/652'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_63/___'
+                ! '_63/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 12 ) then
-                    if ( (hvy_neighbor( hvy_id, 36) /= -1) .or. & ! '__3/623'
-                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & ! '__3/634'
-                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & ! '__6/623'
-                         (hvy_neighbor( hvy_id, 48) /= -1) ) then ! '__6/634'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 36) /= -1) .or. & !'__3/623'
+                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & !'__3/634'
+                         (hvy_neighbor( hvy_id, 47) /= -1) .or. & !'__6/623'
+                         (hvy_neighbor( hvy_id, 48) /= -1) ) then !'__6/634'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_64/___'
+                ! '_64/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 13 ) then
-                    if ( (hvy_neighbor( hvy_id, 40) /= -1) .or. & ! '__4/634'
-                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & ! '__4/645'
-                         (hvy_neighbor( hvy_id, 48) /= -1) .or. & ! '__6/634'
-                         (hvy_neighbor( hvy_id, 49) /= -1) ) then ! '__6/645'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 40) /= -1) .or. & !'__4/634'
+                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & !'__4/645'
+                         (hvy_neighbor( hvy_id, 48) /= -1) .or. & !'__6/634'
+                         (hvy_neighbor( hvy_id, 49) /= -1) ) then !'__6/645'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_65/___'
+                ! '_65/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 14 ) then
-                    if ( (hvy_neighbor( hvy_id, 44) /= -1) .or. & ! '__5/645'
-                         (hvy_neighbor( hvy_id, 46) /= -1) .or. & ! '__5/652'
-                         (hvy_neighbor( hvy_id, 49) /= -1) .or. & ! '__6/645'
-                         (hvy_neighbor( hvy_id, 50) /= -1) ) then ! '__6/652'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 44) /= -1) .or. & !'__5/645'
+                         (hvy_neighbor( hvy_id, 46) /= -1) .or. & !'__5/652'
+                         (hvy_neighbor( hvy_id, 49) /= -1) .or. & !'__6/645'
+                         (hvy_neighbor( hvy_id, 50) /= -1) ) then !'__6/652'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_23/___'
+                ! '_23/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 15 ) then
-                    if ( (hvy_neighbor( hvy_id, 31) /= -1) .or. & ! '__2/123'
-                         (hvy_neighbor( hvy_id, 32) /= -1) .or. & ! '__2/623'
-                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & ! '__3/123'
-                         (hvy_neighbor( hvy_id, 36) /= -1) ) then ! '__3/623'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 31) /= -1) .or. & !'__2/123'
+                         (hvy_neighbor( hvy_id, 32) /= -1) .or. & !'__2/623'
+                         (hvy_neighbor( hvy_id, 35) /= -1) .or. & !'__3/123'
+                         (hvy_neighbor( hvy_id, 36) /= -1) ) then !'__3/623'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_25/___'
+                ! '_25/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 16 ) then
-                    if ( (hvy_neighbor( hvy_id, 33) /= -1) .or. & ! '__2/152'
-                         (hvy_neighbor( hvy_id, 34) /= -1) .or. & ! '__2/652'
-                         (hvy_neighbor( hvy_id, 45) /= -1) .or. & ! '__5/152'
-                         (hvy_neighbor( hvy_id, 46) /= -1) ) then ! '__5/652'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 33) /= -1) .or. & !'__2/152'
+                         (hvy_neighbor( hvy_id, 34) /= -1) .or. & !'__2/652'
+                         (hvy_neighbor( hvy_id, 45) /= -1) .or. & !'__5/152'
+                         (hvy_neighbor( hvy_id, 46) /= -1) ) then !'__5/652'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_43/___'
+                ! '_43/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 17 ) then
-                    if ( (hvy_neighbor( hvy_id, 37) /= -1) .or. & ! '__3/134'
-                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & ! '__3/634'
-                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & ! '__4/134'
-                         (hvy_neighbor( hvy_id, 40) /= -1) ) then ! '__4/634'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 37) /= -1) .or. & !'__3/134'
+                         (hvy_neighbor( hvy_id, 38) /= -1) .or. & !'__3/634'
+                         (hvy_neighbor( hvy_id, 39) /= -1) .or. & !'__4/134'
+                         (hvy_neighbor( hvy_id, 40) /= -1) ) then !'__4/634'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
                 end if
 
-                ! edge '_45/___'
+                ! '_45/___'
+                ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction
+                ! check edge neigborhood, send data again
                 if ( neighborhood == 18 ) then
-                    if ( (hvy_neighbor( hvy_id, 41) /= -1) .or. & ! '__4/145'
-                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & ! '__4/645'
-                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & ! '__5/145'
-                         (hvy_neighbor( hvy_id, 44) /= -1) ) then ! '__5/645'
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 41) /= -1) .or. & !'__4/145'
+                         (hvy_neighbor( hvy_id, 42) /= -1) .or. & !'__4/645'
+                         (hvy_neighbor( hvy_id, 43) /= -1) .or. & !'__5/145'
+                         (hvy_neighbor( hvy_id, 44) /= -1) ) then !'__5/645'
                         synch = .true.
                         neighbor_synch = .true.
                     end if
@@ -5625,6 +5529,37 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
             end if
 
         else
+            ! set synch stage
+            ! stage 1: level +1
+            ! stage 2: level 0
+            ! stage 3: level -1
+            ! stage 4: special
+
+            ! stage 1
+            if ( (synch_stage == 1) .and. (level_diff == 1) ) then
+                ! block send data
+                synch = .true.
+            elseif ( (synch_stage == 1) .and. (level_diff == -1) ) then
+                ! neighbor send data
+                neighbor_synch = .true.
+            end if
+            ! stage 2
+            if ( (synch_stage == 2) .and. (level_diff == 0) ) then
+                ! block send data
+                synch = .true.
+                ! neighbor send data
+                neighbor_synch = .true.
+            end if
+
+            ! stage 3
+            if ( (synch_stage == 3) .and. (level_diff == -1) ) then
+                ! block send data
+                synch = .true.
+            elseif ( (synch_stage == 3) .and. (level_diff == 1) ) then
+                ! neighbor send data
+                neighbor_synch = .true.
+            end if
+
             ! 2D
             ! stage 4
             if ( (synch_stage == 4) .and. (level_diff == 0) ) then

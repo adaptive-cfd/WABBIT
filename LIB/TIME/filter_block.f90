@@ -59,7 +59,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, i, j, l, dF, N_dF
+    integer(kind=ik)                    :: k, i, j, l, dF, N_dF, lgt_id
 
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
@@ -76,6 +76,9 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
     ! filtered values and array for old block data
     real(kind=rk)                       :: phi_tilde(3)
     real(kind=rk), allocatable          :: block_old(:, :, :)
+
+    ! spacing and origin of a block
+    real(kind=rk)                       :: xx0(1:3), ddx(1:3)
 
 
 !---------------------------------------------------------------------------------------------
@@ -150,7 +153,7 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
             ! do nothing..
 
         case('bogey_shock')
-            ! do nothing..
+            ! do nothing
 
         case default
             write(*,'(80("_"))')
@@ -172,7 +175,6 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
 
     ! synchronize ghostnodes
     call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .false., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-
     ! start time
     sub_t0 = MPI_Wtime()
 
@@ -237,14 +239,19 @@ subroutine filter_block( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, 
                 select case(params%filter_type)
 
                     case('wavelet')
-                    ! wavelet filter
-                    call wavelet_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
+                        ! wavelet filter
+                        call wavelet_filter( params, hvy_block(:, :, :, dF, hvy_active(k) ))
 
                     case('bogey_shock')
-                    ! shock filter
-                    if ( dF == 1 ) then
-                        call bogey_filter( params, hvy_block(:, :, :, 1:N_dF, hvy_active(k) ))
-                    end if
+                        ! convert given hvy_id to lgt_id for block spacing routine
+                        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+                        ! get block spacing for RHS
+                        call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+
+                        ! shock filter
+                        if ( dF == 1 ) then
+                            call bogey_filter( params, params%number_ghost_nodes, params%number_block_nodes, params%number_data_fields, hvy_block(:, :, :, 1:N_dF, hvy_active(k) ), xx0, ddx, lgt_block(lgt_id, params%max_treelevel+1) )
+                        end if
 
                 end select
 

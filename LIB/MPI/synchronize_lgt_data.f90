@@ -148,10 +148,11 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     if (refinement_status_only) then
         !> \todo We should avoid resetting the entire array, as it can be expensive.
         !> maybe one can figure out using the input array what must be deleted
-        lgt_block(:,size(lgt_block,2)) = 0
+        !lgt_block(:,size(lgt_block,2)) = 0
     else
         !> \todo We should avoid resetting the entire array, as it can be expensive.
-        lgt_block(:,:) = -1
+        !lgt_block(:,:) = -1
+        lgt_block(:,1) = -1
     endif
 
 

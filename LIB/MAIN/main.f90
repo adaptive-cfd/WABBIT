@@ -180,11 +180,9 @@ program main
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
 
-
     ! start time
     sub_t0 = MPI_Wtime()
     call cpu_time(t0)
-
 
     ! unit test off
     params%unit_test    = .false.
@@ -254,8 +252,8 @@ program main
         ! save initial condition to disk
         ! we don't need this for an initial condition we got from a file (there already is this file)
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-        call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-        call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+        !call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+        !call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
     end if
 
     ! max neighbor num
@@ -313,7 +311,7 @@ program main
             call MPI_Allreduce(my_stop_status, stop_status, 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
 
             ! fourth: stop program if necessary
-            if (stop_status) then
+            if ( stop_status ) then
                ! save data
                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
                stop
@@ -344,14 +342,13 @@ program main
 
         end if
 
-
         ! write data to disk
         if ( (params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0).or.(params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
           call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists, com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
           call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n )
-          call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
-          call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+          !call write_vorticity(hvy_work, hvy_block, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
+          !call write_mask(hvy_work, lgt_block, hvy_active, hvy_n, params, time, iteration, lgt_active, lgt_n)
           output_time = time
           params%next_write_time = params%next_write_time + params%write_time
         endif

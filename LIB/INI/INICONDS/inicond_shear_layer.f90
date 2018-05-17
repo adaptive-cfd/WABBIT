@@ -115,7 +115,7 @@ subroutine inicond_shear_layer( params, u, x0, dx )
                 end if
 
                 ! Ux
-                u(ix, iy, 1, UxF) = 0.05_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params%Ly )
+                u(ix, iy, 1, UxF) = 0.01_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params%Ly )
 
             end do
         end do
@@ -123,10 +123,9 @@ subroutine inicond_shear_layer( params, u, x0, dx )
         ! set p field
         u(:, :, 1, pF)   = p0
 
-        !
-        u(:, :, 1, rhoF) = sqrt(u(:, :, 1, rhoF))
-        u(:, :, 1, UxF)  = u(:, :, 1, UxF) * (u(:, :, 1, rhoF))**2
-        u(:, :, 1, UyF)  = u(:, :, 1, UyF) * (u(:, :, 1, rhoF))**2
+        u(:, :, 1, rhoF) = dsqrt(u(:, :, 1, rhoF))
+        u(:, :, 1, UxF)  = u(:, :, 1, UxF) * (u(:, :, 1, rhoF))
+        u(:, :, 1, UyF)  = u(:, :, 1, UyF) * (u(:, :, 1, rhoF))
 
     endif
 

@@ -80,8 +80,17 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
     ! MPI error variable
     integer(kind=ik)                    :: ierr
 
+    ! cpu time variables for running time calculation
+    real(kind=rk)                       :: sub_t0
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    ! init timing here, use for procs without active blocks
+    sub_t0 = MPI_Wtime()
+    call toc( params, "-adapt mesh: synch ghost", MPI_wtime()-sub_t0, .true. )
+    call toc( params, "-adapt mesh: indicator, gradedness, completeness", MPI_wtime()-sub_t0, .true. )
+    call toc( params, "-adapt mesh: coarse mesh", MPI_wtime()-sub_t0, .true. )
 
     lgt_n_old = 0
     iteration = 0
@@ -100,6 +109,9 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
     !! if it's constant, its because no more blocks are refined)
     do while ( lgt_n_old /= lgt_n )
 
+        ! timing
+        sub_t0 = MPI_Wtime()
+
         lgt_n_old = lgt_n
 
         !> (a) check where coarsening is possible
@@ -107,6 +119,11 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+
+        ! timing
+        call toc( params, "-adapt mesh: synch ghost", MPI_wtime()-sub_t0, .false. )
+        sub_t0 = MPI_Wtime()
+
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
@@ -121,8 +138,16 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
         !> (d) ensure completeness
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
+        ! timing
+        call toc( params, "-adapt mesh: indicator, gradedness, completeness", MPI_wtime()-sub_t0, .false. )
+        sub_t0 = MPI_Wtime()
+
         !> (e) adapt the mesh, i.e. actually merge blocks
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+
+        ! timing
+        call toc( params, "-adapt mesh: coarse mesh", MPI_wtime()-sub_t0, .false. )
+        sub_t0 = MPI_Wtime()
 
         ! the following calls are indeed required (threshold->ghosts->neighbors->active)
         ! update lists of active blocks (light and heavy data)
@@ -135,19 +160,19 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
         iteration = iteration + 1
     end do
 
-    !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
-    !! they may have passed several level also. Now, the distribution of blocks may no longer
-    !! be balanced, so we have to balance load now
-    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
-
-
-    !> load balancing destroys the lists again, so we have to create them one last time to
-    !! end on a valid mesh
-    !! update lists of active blocks (light and heavy data)
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+!    !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
+!    !! they may have passed several level also. Now, the distribution of blocks may no longer
+!    !! be balanced, so we have to balance load now
+!    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+!
+!
+!    !> load balancing destroys the lists again, so we have to create them one last time to
+!    !! end on a valid mesh
+!    !! update lists of active blocks (light and heavy data)
+!    ! update list of sorted nunmerical treecodes, used for finding blocks
+!    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+!
+!    ! update neighbor relations
+!    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
 end subroutine adapt_mesh

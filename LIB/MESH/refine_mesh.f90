@@ -128,8 +128,14 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
+    ! need additional load balancing in 3D
+    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n )
+
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
     ! timing
-    call toc( params, "-refine mesh: sort list", MPI_wtime()-sub_t0, .true. )
+    call toc( params, "-refine mesh: load balancing", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
     ! update neighbor relations

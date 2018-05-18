@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 
-subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration)
+subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, new_predicted_data, new_block_data)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -69,6 +69,9 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_synch,
   !> time loop variables
   real(kind=rk), intent(inout)         :: time
   integer(kind=ik), intent(inout)      :: iteration
+
+    !> data arrays for predicted data
+    real(kind=rk), intent(inout)        :: new_predicted_data(:,:,:), new_block_data(:,:,:,:)
 
   !> if .false. the code initializes on the coarsest grid, if .true. iterations
   !> are performed and the mesh is refined to gurantee the error eps
@@ -114,7 +117,7 @@ subroutine set_blocks_initial_condition(params, lgt_block, hvy_block, hvy_synch,
             !> \todo It would be better to selectively
             !! go up one level where a refinement indicator tells us to do so, but in the current code
             !! versions it is easier to use everywhere
-            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere", new_predicted_data, new_block_data )
 
             ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this

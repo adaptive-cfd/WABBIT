@@ -29,7 +29,7 @@
 !! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator )
+subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, new_predicted_data, new_block_data )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -61,6 +61,9 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !> how to choose blocks for refinement
     character(len=*), intent(in)           :: indicator
 
+    !> data arrays for predicted data
+    real(kind=rk), intent(inout)        :: new_predicted_data(:,:,:), new_block_data(:,:,:,:)
+
     integer(kind=ik)                        :: k
 
     ! cpu time variables for running time calculation
@@ -82,14 +85,14 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     call refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
 
     ! timing
-    call toc( params, "-refine mesh: indicator", MPI_wtime()-sub_t0 )
+    call toc( params, "-refine mesh: indicator", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
 
     ! timing
-    call toc( params, "-refine mesh: respect min max level", MPI_wtime()-sub_t0 )
+    call toc( params, "-refine mesh: respect min max level", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
@@ -100,7 +103,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     endif
 
     ! timing
-    call toc( params, "-refine mesh: gradedness", MPI_wtime()-sub_t0 )
+    call toc( params, "-refine mesh: gradedness", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
@@ -109,14 +112,14 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! beyond maxlevel), but afterwards coarsen to fall back to maxlevel again
     if ( params%threeD_case ) then
         ! 3D:
-        call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+        call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n, new_predicted_data, new_block_data )
     else
         ! 2D:
-        call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
+        call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n, new_predicted_data(:,:,1), new_block_data(:,:,1,:) )
     end if
 
     ! timing
-    call toc( params, "-refine mesh: execute", MPI_wtime()-sub_t0 )
+    call toc( params, "-refine mesh: execute", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
     !> (e) as the grid changed now with the refinement, we have to update the list of
@@ -126,14 +129,14 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
     ! timing
-    call toc( params, "-refine mesh: sort list", MPI_wtime()-sub_t0 )
+    call toc( params, "-refine mesh: sort list", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! timing
-    call toc( params, "-refine mesh: update neighbors", MPI_wtime()-sub_t0 )
+    call toc( params, "-refine mesh: update neighbors", MPI_wtime()-sub_t0, .true. )
     sub_t0 = MPI_Wtime()
 
 end subroutine refine_mesh

@@ -46,9 +46,6 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     real(kind=rk), intent(inout)          :: time
     integer(kind=ik), intent(inout)       :: iteration
 
-
-    ! cpu time variables for running time calculation
-    real(kind=rk)                         :: t0
     ! number of files to read from
     integer(kind=ik)                      :: N_files
     ! loop variable
@@ -58,8 +55,6 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
 
     ! number of files to read from
     N_files = params%number_data_fields
-    ! start time
-    t0 = MPI_wtime()
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -72,6 +67,4 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
         call read_field(params%input_files(dF), dF, params, hvy_block, hvy_n )
     end do
 
-    ! timing
-    call toc( params, "read_data", MPI_wtime()-t0 )
 end subroutine get_inicond_from_file

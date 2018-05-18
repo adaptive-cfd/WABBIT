@@ -92,16 +92,15 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     lgt_end = lgt_id
     lgt_num = lgt_end - lgt_start + 1
 
-
     ! Next, we figure out how much the union of all the different subsets (lgt_start:lgt_end)
     ! on all the mpiranks.
     my_proc_lgt_num(:) = 0
     my_proc_lgt_num(mpirank+1) = lgt_num
     ! synchronize array
     call MPI_Allreduce(my_proc_lgt_num, proc_lgt_num, mpisize, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
+
     ! this is the global buffer size
     buffer_size = sum(proc_lgt_num)
-
 
     ! now we can allocate send/receive buffer arrays
     allocate( my_lgt_block_send_buffer( buffer_size, size(lgt_block,2) ) )
@@ -155,7 +154,6 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
         lgt_block(:,1) = -1
     endif
 
-
     ! unpack synchronized buffer into the light data array.
     ! loop over number of procs and reset lgt_block array
     do k = 1, mpisize
@@ -173,4 +171,5 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     end do
 
     deallocate(proc_lgt_num, my_proc_lgt_num, my_lgt_block, my_lgt_block_send_buffer, my_lgt_block_recv_buffer)
+
 end subroutine

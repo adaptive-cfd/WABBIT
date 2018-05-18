@@ -24,7 +24,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, new_predicted_data, new_block_data  )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -61,6 +61,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+
+    !> data arrays for predicted data
+    real(kind=rk), intent(inout)        :: new_predicted_data(:,:,:), new_block_data(:,:,:,:)
 
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
@@ -153,7 +156,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
         ! refine some blocks
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random" )
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", new_predicted_data, new_block_data  )
         ! random adapt some blocks
         call adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     end do

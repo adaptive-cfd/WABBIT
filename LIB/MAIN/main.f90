@@ -152,6 +152,9 @@ program main
     integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
+    !> data arrays for predicted data
+    real(kind=rk), allocatable        :: new_predicted_data(:,:,:), new_block_data(:,:,:,:)
+
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -200,7 +203,7 @@ program main
     call ini_file_to_params( params, filename )
 
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+    call allocate_grid( params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, new_predicted_data, new_block_data )
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
@@ -217,7 +220,7 @@ program main
     ! perform a convergence test on ghost node sync'ing
     ! all unit tests should be deselectable
     if (params%test_ghost_nodes_synch) then
-        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, new_predicted_data, new_block_data )
         call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     end if
 
@@ -246,7 +249,7 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition
-    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, params%adapt_mesh, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration )
+    call set_blocks_initial_condition( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_n, hvy_n, lgt_sortednumlist, params%adapt_mesh, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, new_predicted_data, new_block_data )
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk
@@ -265,7 +268,7 @@ program main
     end if
 
     ! timing
-    call toc( params, "MAIN: init_data", MPI_wtime()-sub_t0 )
+    call toc( params, "MAIN: init_data", MPI_wtime()-sub_t0, .true. )
 
     !---------------------------------------------------------------------------
     ! main time loop
@@ -280,11 +283,11 @@ program main
 
         ! refine everywhere
         if ( params%adapt_mesh ) then
-            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere", new_predicted_data, new_block_data )
         endif
 
         ! timing
-        call toc( params, "MAIN: refine mesh", MPI_wtime()-sub_t0 )
+        call toc( params, "MAIN: refine mesh", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! advance in time
@@ -299,7 +302,7 @@ program main
         end if
 
         ! timing
-        call toc( params, "MAIN: time stepper", MPI_wtime()-sub_t0 )
+        call toc( params, "MAIN: time stepper", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! check redundant nodes
@@ -336,7 +339,7 @@ program main
         end if
 
         ! timing
-        call toc( params, "MAIN: redundant nodes check", MPI_wtime()-sub_t0 )
+        call toc( params, "MAIN: redundant nodes check", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! filter
@@ -345,7 +348,7 @@ program main
         end if
 
         ! timing
-        call toc( params, "MAIN: filter block", MPI_wtime()-sub_t0 )
+        call toc( params, "MAIN: filter block", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! adapt the mesh
@@ -362,7 +365,7 @@ program main
         end if
 
         ! timing
-        call toc( params, "MAIN: adapt mesh", MPI_wtime()-sub_t0 )
+        call toc( params, "MAIN: adapt mesh", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! write data to disk
@@ -377,7 +380,7 @@ program main
         endif
 
         ! timing
-        call toc( params, "MAIN: save data", MPI_wtime()-sub_t0 )
+        call toc( params, "MAIN: save data", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! at the end of a time step, we increase the total counters/timers for all measurements

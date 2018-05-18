@@ -29,7 +29,7 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, new_predicted_data, new_block_data)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -54,6 +54,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_
     integer(kind=ik), allocatable, intent(out)      :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)   :: lgt_sortednumlist(:,:)
+
+    !> data arrays for predicted data
+    real(kind=rk), allocatable, intent(out)         :: new_predicted_data(:,:,:), new_block_data(:,:,:,:)
+
     ! local shortcuts:
     integer(kind=ik)                                :: Bs, g, N_dF, number_blocks, rank, number_procs, buffer_N, buffer_N_int
 
@@ -129,6 +133,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_work, hvy_synch, hvy_
     allocate( int_receive_buffer( buffer_N_int, number_procs) )
     allocate( real_send_buffer( buffer_N, number_procs) )
     allocate( real_receive_buffer( buffer_N, number_procs) )
+
+    ! predicted data arrays
+    allocate( new_predicted_data( 2*(Bs+2*g)-1, 2*(Bs+2*g)-1, 2*(Bs+2*g)-1) )
+    allocate( new_block_data( 2*Bs-1, 2*Bs-1, 2*Bs-1, N_dF ) )
 
     ! reset data:
     ! all blocks are inactive, reset treecode

@@ -10,7 +10,7 @@ subroutine allocate_init_debugging(params)
   if ( params%debug ) then
 
       ! allocate array for time measurements - data
-      allocate( debug%comp_time( 30, 4 )  )
+      allocate( debug%comp_time( 50, 4 )  )
 
       ! reset times
       debug%comp_time = 0.0_rk

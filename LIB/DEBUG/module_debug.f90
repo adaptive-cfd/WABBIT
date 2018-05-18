@@ -47,7 +47,7 @@ module module_debug
         ! names of time measurements
         ! row number: id
         ! column: name
-        character(len=40), dimension(:), allocatable        :: name_comp_time
+        character(len=60), dimension(:), allocatable        :: name_comp_time
 
     end type type_debug
 
@@ -96,14 +96,19 @@ contains
 
     ! For a given NAME, increase the function call counter by one and store the
     ! elapsed time in the global arrays.
-    subroutine toc( params, name, t_elapsed_this, call_counter )
+    subroutine toc( params, name, t_elapsed_this, barrier_on, call_counter )
       implicit none
       type (type_params), intent(in) :: params
       character(len=*), intent(in) :: name
       real(kind=rk), intent(in) :: t_elapsed_this
+      logical, intent(in) :: barrier_on
       integer, optional, intent(in) :: call_counter
 
       integer :: k
+
+      if (barrier_on) then
+          call MPI_Barrier(MPI_COMM_WORLD, k)
+      end if
 
       ! write time
       if ( params%debug ) then

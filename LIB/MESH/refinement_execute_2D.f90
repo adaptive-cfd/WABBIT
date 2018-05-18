@@ -28,7 +28,7 @@
 !!
 ! ********************************************************************************************
 
-subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_n, new_predicted_data, new_block_data )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -50,6 +50,9 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
+    !> data arrays for predicted data
+    real(kind=rk), intent(inout)        :: new_predicted_data(:,:), new_block_data(:,:,:)
+
     ! loop variables
     integer(kind=ik)                    :: k, N, dF
     ! light id start
@@ -62,8 +65,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
-    ! data fields for interpolation
-    real(kind=rk), allocatable          :: new_data(:,:,:), data_predict_coarse(:,:), data_predict_fine(:,:)
+
     ! free light/heavy data id
     integer(kind=ik)                    :: free_heavy_id
 
@@ -101,14 +103,6 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    ! data fields for interpolation
-    ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
-    allocate( data_predict_fine( 2*(Bs+2*g)-1, 2*(Bs+2*g)-1 ) )
-    ! allocate( data_predict_fine(2*Bs-1, 2*Bs-1) )
-    ! allocate( data_predict_coarse(Bs, Bs) )
-    allocate( data_predict_coarse(Bs+2*g, Bs+2*g) )
-    allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields) )
-
     ! allocate lgt data working array
     allocate( my_lgt_block(N, params%max_treelevel+2 ) )
     ! set light data list for working, only light data coresponding to proc
@@ -138,17 +132,10 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! first: interpolate block data
             ! loop over all data fields
             do dF = 1, params%number_data_fields
-                ! NOTE: the refinement interpolation acts on the blocks interior
-                ! nodes and ignores ghost nodes.
-                !data_predict_coarse = hvy_block(g+1:Bs+g, g+1:Bs+g, dF, hvy_active(k) )
-                data_predict_coarse = hvy_block(:, :, dF, hvy_active(k) )
-                ! reset data
-                !data_predict_fine   = 9.0e9_rk
                 ! interpolate data
-                call prediction_2D(data_predict_coarse, data_predict_fine, params%order_predictor)
+                call prediction_2D(hvy_block(:, :, dF, hvy_active(k)), new_predicted_data, params%order_predictor)
                 ! save new data
-                !new_data(:,:,dF) = data_predict_fine
-                new_data(:, :, dF) = data_predict_fine(2*g+1:2*g+1+2*Bs-2, 2*g+1:2*g+1+2*Bs-2)
+                new_block_data(:, :, dF) = new_predicted_data(2*g+1:2*g+1+2*Bs-2, 2*g+1:2*g+1+2*Bs-2)
             end do
 
             ! ------------------------------------------------------------------------------------------------------
@@ -170,7 +157,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
-                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, dF)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_block_data(1:Bs, 1:Bs, dF)
             end do
 
             !--------------------------
@@ -190,7 +177,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
-                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, dF)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_block_data(1:Bs, Bs:2*Bs-1, dF)
             end do
 
             !--------------------------
@@ -210,7 +197,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
-                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, dF)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_block_data(Bs:2*Bs-1, 1:Bs, dF)
             end do
 
             ! save heavy id, if new block id is larger than old one
@@ -234,7 +221,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
-                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, dF)
+                hvy_block( g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_block_data(Bs:2*Bs-1, Bs:2*Bs-1, dF)
             end do
 
         end if
@@ -275,9 +262,6 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     end do
 
     ! clean up
-    deallocate( data_predict_fine )
-    deallocate( data_predict_coarse )
-    deallocate( new_data )
     deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer, my_lgt_block )
 
 end subroutine refinement_execute_2D

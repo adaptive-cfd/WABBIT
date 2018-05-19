@@ -8,7 +8,7 @@
 !
 ! ********************************************************************************************
 
-subroutine RHS_3D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
+subroutine RHS_3D_advection(rhs, phi, xx0, ddx, g, Bs, time, order_discretization)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -22,26 +22,25 @@ subroutine RHS_3D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
     implicit none
 
     !> grid parameter
-    integer(kind=ik), intent(in)                                :: g, Bs
+    integer(kind=ik), intent(in)                    :: g, Bs
     !> rhs parameter
-    real(kind=rk), intent(in)                                   :: xx0(1:3), ddx(1:3), time
+    real(kind=rk), intent(in)                       :: xx0(1:3), ddx(1:3), time
     !> datafield
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g, Bs+2*g), intent(inout)     :: phi
-    ! order discretization
-    character(len=80)                                           :: order_discretization
+    real(kind=rk), intent(in)                       :: phi(Bs+2*g, Bs+2*g, Bs+2*g)
+    !> order discretization
+    character(len=80)                               :: order_discretization
+    !> rhs field
+    real(kind=rk), intent(inout)                    :: rhs(Bs+2*g, Bs+2*g, Bs+2*g)
 
-    ! auxiliary fields for rhs calculation
-    real(kind=rk), dimension(Bs+2*g, Bs+2*g, Bs+2*g)                    :: rhs
     ! auxiliary variables
-    real(kind=rk)                                               :: phi_dx, phi_dy, phi_dz, dx_inv, dy_inv, dz_inv
-    real(kind=rk)                                               :: a(-3:+3), b1, b2, b3 ,b4 ,b5
+    real(kind=rk)                                   :: dx_inv, dy_inv, dz_inv
+    real(kind=rk)                                   :: a(-3:+3), b1, b2, b3 ,b4 ,b5
     ! loop variables
-    integer                                                     :: ix, iy, iz
-
-    ! velocity components
-    real(kind=rk)                                               :: u01, u02, u03
+    integer                                         :: ix, iy, iz
     ! coordinates
-    real(kind=rk)                                               :: x, y, z
+    real(kind=rk)                                   :: x, y, z
+    ! swirl t end
+    real(kind=rk)                                   :: t_a
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -49,23 +48,33 @@ subroutine RHS_3D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    rhs = 0.0_rk
+    ! set t end, note: in order to use multiplication we actually set 1/t_a
+    t_a = 1.0_rk/3.0_rk
 
-    ! division is expensive, multiplication is cheap, so here we save some time
-    dx_inv = 1.0_rk / (ddx(1))
-    dy_inv = 1.0_rk / (ddx(2))
-    dz_inv = 1.0_rk / (ddx(3))
+    if (order_discretization == "FD_2nd_central" ) then
+        ! division is expensive, multiplication is cheap, so here we save some time
+        dx_inv = 1.0_rk / (2.0_rk*ddx(1))
+        dy_inv = 1.0_rk / (2.0_rk*ddx(2))
+        dz_inv = 1.0_rk / (2.0_rk*ddx(3))
+    else
+        ! division is expensive, multiplication is cheap, so here we save some time
+        dx_inv = 1.0_rk / (ddx(1))
+        dy_inv = 1.0_rk / (ddx(2))
+        dz_inv = 1.0_rk / (ddx(3))
+    end if
 
-    ! Tam & Webb, 4th order optimized (for first derivative)
-    a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
-         0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    if (order_discretization == "FD_4th_central_optimized") then
+        ! Tam & Webb, 4th order optimized (for first derivative)
+        a=(/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
+             0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
-    ! 4th order coefficients for second derivative
-    b1 = -1.0_rk/12.0_rk
-    b2 = 4.0_rk/3.0_rk
-    b3 = -5.0_rk/2.0_rk
-    b4 = 4.0_rk/3.0_rk
-    b5 = -1.0_rk/12.0_rk
+        ! 4th order coefficients for second derivative
+        b1 = -1.0_rk/12.0_rk
+        b2 = 4.0_rk/3.0_rk
+        b3 = -5.0_rk/2.0_rk
+        b4 = 4.0_rk/3.0_rk
+        b5 = -1.0_rk/12.0_rk
+    end if
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -82,15 +91,15 @@ subroutine RHS_3D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
                 ! calculate coordinates form ix, iy
                 call coords_ix_iy_iz( x, y, z, ix-g, iy-g, iz-g, ddx, xx0 )
 
-                ! calculate velocity, depends on x,y,t
-                call f_x_y_z_t( u01, u02, u03, x, y, z, time )
-
-                phi_dx = (phi(ix+1,iy,iz)-phi(ix-1,iy,iz))/(2.0_rk*ddx(1))
-                phi_dy = (phi(ix,iy+1,iz)-phi(ix,iy-1,iz))/(2.0_rk*ddx(2))
-                phi_dz = (phi(ix,iy,iz+1)-phi(ix,iy,iz-1))/(2.0_rk*ddx(3))
-
                 ! compute (assemble) final right hand side
-                rhs(ix,iy,iz) = - u01 * phi_dx - u02 * phi_dy - u03 * phi_dz
+                rhs(ix,iy,iz) = - (dcos((pi*time)*t_a) * (dsin(pi*(x)))**2 &
+                                * dsin(2.0_rk*pi*(y))) &
+                                * (phi(ix+1,iy,iz)-phi(ix-1,iy,iz))*dx_inv &
+                                - (dcos((pi*time)*t_a) * (dsin(pi*(y)))**2 &
+                                * (-dsin(2.0_rk*pi*(x)))) &
+                                * (phi(ix,iy+1,iz)-phi(ix,iy-1,iz))*dy_inv &
+                                - (-dsin((2.0_rk*pi*time)*t_a)) &
+                                * (phi(ix,iy,iz+1)-phi(ix,iy,iz-1))*dz_inv
 
           end do
         end do
@@ -108,18 +117,18 @@ subroutine RHS_3D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
                 ! calculate coordinates form ix, iy
                 call coords_ix_iy_iz( x, y, z, ix-g, iy-g, iz-g, ddx, xx0 )
 
-                ! calculate velocity, depends on x,y,t
-                call f_x_y_z_t( u01, u02, u03, x, y, z, time )
-
-              phi_dx = (a(-3)*phi(ix-3,iy,iz) + a(-2)*phi(ix-2,iy,iz) + a(-1)*phi(ix-1,iy,iz) + a(0)*phi(ix,iy,iz)&
-                     +  a(+3)*phi(ix+3,iy,iz) + a(+2)*phi(ix+2,iy,iz) + a(+1)*phi(ix+1,iy,iz))*dx_inv
-              phi_dy = (a(-3)*phi(ix,iy-3,iz) + a(-2)*phi(ix,iy-2,iz) + a(-1)*phi(ix,iy-1,iz) + a(0)*phi(ix,iy,iz)&
-                     +  a(+3)*phi(ix,iy+3,iz) + a(+2)*phi(ix,iy+2,iz) + a(+1)*phi(ix,iy+1,iz))*dy_inv
-              phi_dz = (a(-3)*phi(ix,iy,iz-3) + a(-2)*phi(ix,iy,iz-2) + a(-1)*phi(ix,iy,iz-1) + a(0)*phi(ix,iy,iz)&
-                     +  a(+3)*phi(ix,iy,iz+3) + a(+2)*phi(ix,iy,iz+2) + a(+1)*phi(ix,iy,iz+1))*dz_inv
-
-              ! compute (assemble) final right hand side
-              rhs(ix,iy,iz) = - u01 * phi_dx - u02 * phi_dy - u03 * phi_dz
+                ! compute (assemble) final right hand side
+                rhs(ix,iy,iz) = - (dcos((pi*time)*t_a) * (dsin( pi*( x ) ))**2 &
+                                * dsin(2.0_rk*pi*( y ))) &
+                                * (a(-3)*phi(ix-3,iy,iz) + a(-2)*phi(ix-2,iy,iz) + a(-1)*phi(ix-1,iy,iz) + a(0)*phi(ix,iy,iz) &
+                                +  a(+3)*phi(ix+3,iy,iz) + a(+2)*phi(ix+2,iy,iz) + a(+1)*phi(ix+1,iy,iz))*dx_inv &
+                                - (dcos((pi*time)*t_a) * (dsin(pi*( y )))**2 &
+                                * (-dsin(2.0_rk*pi*( x )))) &
+                                * (a(-3)*phi(ix,iy-3,iz) + a(-2)*phi(ix,iy-2,iz) + a(-1)*phi(ix,iy-1,iz) + a(0)*phi(ix,iy,iz) &
+                                +  a(+3)*phi(ix,iy+3,iz) + a(+2)*phi(ix,iy+2,iz) + a(+1)*phi(ix,iy+1,iz))*dy_inv &
+                                - (-dsin((2.0_rk*pi*time)*t_a)) &
+                                * (a(-3)*phi(ix,iy,iz-3) + a(-2)*phi(ix,iy,iz-2) + a(-1)*phi(ix,iy,iz-1) + a(0)*phi(ix,iy,iz) &
+                                +  a(+3)*phi(ix,iy,iz+3) + a(+2)*phi(ix,iy,iz+2) + a(+1)*phi(ix,iy,iz+1))*dz_inv
 
             end do
         end do
@@ -130,10 +139,6 @@ subroutine RHS_3D_advection(phi, xx0, ddx, g, Bs, time, order_discretization)
       write(*,*) order_discretization
       stop
     end if
-
-    ! return
-    !> \todo DO NOT OVERWRITE?
-    phi = rhs
 
 end subroutine RHS_3D_advection
 
@@ -159,28 +164,28 @@ subroutine coords_ix_iy_iz( x, y, z, ix, iy, iz, ddx, xx0 )
 
 end subroutine coords_ix_iy_iz
 
-! --------------------------------------------------------------------------------------------
-! function to calculate velocity from x,y coordinates and time t
-subroutine f_x_y_z_t( u01, u02, u03, x, y, z, time )
-
-    use module_params
-
-    implicit none
-
-    ! coordinates
-    real(kind=rk), intent(inout)   :: u01, u02, u03
-    ! coordinates and time
-    real(kind=rk), intent(in)      :: x, y, z, time
-
-    ! swirl t end
-    real(kind=rk)                  :: t_a
-
-    ! set t end
-    t_a = 3.0_rk
-
-    ! calculate velocity
-    u01 = dcos((pi*time)/t_a) * (dsin(pi*x))**2 * dsin(2.0_rk*pi*y)
-    u02 = dcos((pi*time)/t_a) * (dsin(pi*y))**2 * (-dsin(2.0_rk*pi*x))
-    u03 = -dsin((2.0_rk*pi*time)/t_a) !0.0_rk
-
-end subroutine f_x_y_z_t
+!! --------------------------------------------------------------------------------------------
+!! function to calculate velocity from x,y coordinates and time t
+!subroutine f_x_y_z_t( u01, u02, u03, x, y, z, time )
+!
+!    use module_params
+!
+!    implicit none
+!
+!    ! coordinates
+!    real(kind=rk), intent(inout)   :: u01, u02, u03
+!    ! coordinates and time
+!    real(kind=rk), intent(in)      :: x, y, z, time
+!
+!    ! swirl t end
+!    real(kind=rk)                  :: t_a
+!
+!    ! set t end
+!    t_a = 3.0_rk
+!
+!    ! calculate velocity
+!    u01 = dcos((pi*time)/t_a) * (dsin(pi*x))**2 * dsin(2.0_rk*pi*y)
+!    u02 = dcos((pi*time)/t_a) * (dsin(pi*y))**2 * (-dsin(2.0_rk*pi*x))
+!    u03 = -dsin((2.0_rk*pi*time)/t_a) !0.0_rk
+!
+!end subroutine f_x_y_z_t

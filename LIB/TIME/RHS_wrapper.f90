@@ -221,6 +221,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                     ! RHS (compute k-coefficients)
                     ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l)) (time-dependent rhs)
                     call RHS_3D_advection( hvy_work( :, :, :, (dF-1)*5+j+1, hvy_active(k) ), &
+                                       hvy_block(:, :, :, dF, hvy_active(k) ), &
                                        x0(1:3), dx(1:3), g, Bs, &
                                        time + rk_coeff*dt, &
                                        params%order_discretization  )

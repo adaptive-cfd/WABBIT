@@ -2,8 +2,8 @@
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 get_free_light_id.f90 \
-RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 RHS_3D_convection_diffusion.f90 \
-RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 RHS_2D_advection.f90 RHS_3D_advection.f90 \
+RHS_2D_convection_diffusion.f90 RHS_2D_navier_stokes.f90 RHS_3D_convection_diffusion.f90 RHS_3D_advection.f90\
+RHS_3D_navier_stokes.f90 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 RHS_2D_advection.f90 \
 RHS_2D_acm.f90 RHS_3D_acm.f90 create_mask.f90 cylinder.f90 two_cylinders.f90 sphere.f90 startup_conditioner.f90 sponge.f90
 
 # Object and module directory:
@@ -130,7 +130,7 @@ $(OBJDIR)/module_MPI.o: module_MPI.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o\
 	filter_block.f90 filter_1D.f90 calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 save_data_t.f90 \
-	wavelet_filter.f90 get_block_max_velocity_norm.f90 bogey_filter.f90
+	wavelet_filter.f90 get_block_max_velocity_norm.f90 bogey_filter.f90 RHS_3D_advection.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_MPI.o \

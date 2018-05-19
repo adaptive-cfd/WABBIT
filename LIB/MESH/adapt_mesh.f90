@@ -86,12 +86,6 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! init timing here, use for procs without active blocks
-    sub_t0 = MPI_Wtime()
-    call toc( params, "-adapt mesh: synch ghost", MPI_wtime()-sub_t0, .true. )
-    call toc( params, "-adapt mesh: indicator, gradedness, completeness", MPI_wtime()-sub_t0, .true. )
-    call toc( params, "-adapt mesh: coarse mesh", MPI_wtime()-sub_t0, .true. )
-
     lgt_n_old = 0
     iteration = 0
 
@@ -121,16 +115,14 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
         call synchronize_ghosts( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
 
         ! timing
-        call toc( params, "-adapt mesh: synch ghost", MPI_wtime()-sub_t0, .false. )
+        call toc( params, "-adapt mesh: synch ghost", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! calculate detail
         call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
 
-
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
@@ -139,14 +131,14 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
         call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         ! timing
-        call toc( params, "-adapt mesh: indicator, gradedness, completeness", MPI_wtime()-sub_t0, .false. )
+        call toc( params, "-adapt mesh: indicator, gradedness, completeness", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         !> (e) adapt the mesh, i.e. actually merge blocks
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
         ! timing
-        call toc( params, "-adapt mesh: coarse mesh", MPI_wtime()-sub_t0, .false. )
+        call toc( params, "-adapt mesh: coarse mesh", MPI_wtime()-sub_t0, .true. )
         sub_t0 = MPI_Wtime()
 
         ! the following calls are indeed required (threshold->ghosts->neighbors->active)
@@ -156,6 +148,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, lg
 
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+        ! timing
+        call toc( params, "-adapt mesh: update neighbors", MPI_wtime()-sub_t0, .true. )
+        sub_t0 = MPI_Wtime()
 
         iteration = iteration + 1
     end do

@@ -353,7 +353,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                         else
                             ! interpoliere daten
-                            call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
+                            call restrict_predict_data( params, Bs, g, NdF, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block(:,:,:,:,hvy_active(k)) )
 
                             ! lese daten, verwende interpolierte daten
                             data_size_x = data_bounds(2,1)-data_bounds(1,1)+1
@@ -3784,7 +3784,7 @@ end subroutine calc_data_bounds
 
 !############################################################################################################
 
-subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_id )
+subroutine restrict_predict_data( params, Bs, g, NdF, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -3796,8 +3796,14 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
     !> user defined parameter structure
     type (type_params), intent(in)                  :: params
+
+    !> grid parameter
+    integer(kind=ik), intent(in)                    :: Bs, g
+    !> number of datafields
+    integer(kind=ik), intent(in)                    :: NdF
+
     !> data buffer
-    real(kind=rk), intent(out)                 :: res_pre_data(:,:,:,:)
+    real(kind=rk), intent(out)                      :: res_pre_data(Bs+2*g, Bs+2*g, Bs+2*g, NdF)
     !> data_bounds
     integer(kind=ik), intent(inout)                 :: data_bounds(2,3)
     !> neighborhood relation, id from dirs
@@ -3807,15 +3813,10 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
     ! data_bounds_type
     character(len=25), intent(in)                   :: data_bounds_type
     !> heavy data array - block data
-    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
-    !> hvy id
-    integer(kind=ik), intent(in)                    :: hvy_id
+    real(kind=rk), intent(in)                       :: hvy_block(Bs+2*g, Bs+2*g, Bs+2*g, NdF)
 
     ! loop variable
     integer(kind=ik)                                :: i, j, k, dF, iN, jN, kN
-
-    ! grid parameter
-    integer(kind=ik)                                :: Bs, g
 
     ! start and edn shift values
     integer(kind=ik)                                :: sh_start, sh_end
@@ -3825,10 +3826,6 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
-    ! grid piarameter
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
 
     ! data size
     iN = data_bounds(2,1) - data_bounds(1,1) + 1
@@ -3869,11 +3866,11 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
             case(19:74)
                 if ( level_diff == -1 ) then
                     ! loop over all data fields
-                    do dF = 1, params%number_data_fields
+                    do dF = 1, NdF
                         ! interpolate data
                         call prediction_3D( hvy_block( data_bounds(1,1):data_bounds(2,1), &
                                                        data_bounds(1,2):data_bounds(2,2), &
-                                                       data_bounds(1,3):data_bounds(2,3), dF, hvy_id ), &
+                                                       data_bounds(1,3):data_bounds(2,3), dF ), &
                         res_pre_data( 1:iN*2-1, 1:jN*2-1, 1:kN*2-1, dF), params%order_predictor)
                     end do
                     ! reset data bounds
@@ -4330,7 +4327,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
                     
                 elseif ( level_diff == 1) then
                     ! loop over all data fields
-                    do dF = 1, params%number_data_fields
+                    do dF = 1, NdF
                         ! first dimension
                         do i = data_bounds(1,1), data_bounds(2,1), 2
                             ! second dimension
@@ -4340,7 +4337,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
                                     ! write restricted data
                                     res_pre_data( (i-data_bounds(1,1))/2+1, (j-data_bounds(1,2))/2+1, (k-data_bounds(1,3))/2+1, dF) &
-                                    = hvy_block( i, j, k, dF, hvy_id )
+                                    = hvy_block( i, j, k, dF )
 
                                 end do
                             end do
@@ -4519,9 +4516,9 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
             case(5,6,7,8)
                 if ( level_diff == -1 ) then
                     ! loop over all data fields
-                    do dF = 1, params%number_data_fields
+                    do dF = 1, NdF
                         ! interpolate data
-                        call prediction_2D( hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), 1, dF, hvy_id ), &
+                        call prediction_2D( hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), 1, dF ), &
                         res_pre_data( 1:iN*2-1, 1:jN*2-1, 1, dF), params%order_predictor)
                     end do
                     ! reset data bounds
@@ -4606,7 +4603,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
                 elseif ( level_diff == 1) then
                     ! loop over all data fields
-                    do dF = 1, params%number_data_fields
+                    do dF = 1, NdF
                         ! first dimension
                         do i = data_bounds(1,1), data_bounds(2,1), 2
                             ! second dimension
@@ -4614,7 +4611,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
                                 ! write restricted data
                                 res_pre_data( (i-data_bounds(1,1))/2+1, (j-data_bounds(1,2))/2+1, 1, dF) &
-                                = hvy_block( i, j, 1, dF, hvy_id )
+                                = hvy_block( i, j, 1, dF )
 
                             end do
                         end do
@@ -4705,9 +4702,9 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
             case(9,10,11,12,13,14,15,16)
                 if ( level_diff == -1 ) then
                     ! loop over all data fields
-                    do dF = 1, params%number_data_fields
+                    do dF = 1, NdF
                         ! interpolate data
-                        call prediction_2D( hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), 1, dF, hvy_id ), &
+                        call prediction_2D( hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), 1, dF ), &
                         res_pre_data( 1:iN*2-1, 1:jN*2-1, 1, dF), params%order_predictor)
                     end do
                     ! reset data bounds
@@ -4892,7 +4889,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
                 elseif ( level_diff == 1 ) then
                     ! loop over all data fields
-                    do dF = 1, params%number_data_fields
+                    do dF = 1, NdF
                         ! first dimension
                         do i = data_bounds(1,1), data_bounds(2,1), 2
                             ! second dimension
@@ -4900,7 +4897,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
 
                                 ! write restricted data
                                 res_pre_data( (i-data_bounds(1,1))/2+1, (j-data_bounds(1,2))/2+1, 1, dF) &
-                                = hvy_block( i, j, 1, dF, hvy_id )
+                                = hvy_block( i, j, 1, dF )
 
                             end do
                         end do

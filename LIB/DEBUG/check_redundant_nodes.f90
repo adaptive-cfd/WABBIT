@@ -403,12 +403,18 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                                     ! but do not MPI_send/receive the data
 
                                     ! fill int/real buffer
+                                    ! note: much better performance do fill the buffers here and not inside a additional subroutine
+                                    ! this is of course worse programing style, but we run faster
+                                    ! ---------------------------------------------------------------------------------------------
                                     buffer_position = int_send_buffer(1, rank+1 )+1
 
-                                    call write_buffers( int_send_buffer(int_pos(rank+1):int_pos(rank+1)+4, rank+1), &
-                                                        real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ), &
-                                                        buffer_position, buffer_size, &
-                                                        rank, data_buffer(1:buffer_size), hvy_id, neighborhood, level_diff )
+                                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer(1:buffer_size)
+
+                                    int_send_buffer( int_pos(rank+1), rank+1 )   = hvy_id
+                                    int_send_buffer( int_pos(rank+1)+1, rank+1 ) = neighborhood
+                                    int_send_buffer( int_pos(rank+1)+2, rank+1 ) = level_diff
+                                    int_send_buffer( int_pos(rank+1)+3, rank+1 ) = buffer_position
+                                    int_send_buffer( int_pos(rank+1)+4, rank+1 ) = buffer_size
 
                                     int_send_buffer(1, rank+1 ) = int_send_buffer(1, rank+1 ) + buffer_size
 
@@ -424,13 +430,20 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                                     ! data has to synchronize in current stage
                                     if (synch) then
+
                                         ! fill int/real buffer
+                                        ! note: much better performance do fill the buffers here and not inside a additional subroutine
+                                        ! this is of course worse programing style, but we run faster
+                                        ! ---------------------------------------------------------------------------------------------
                                         buffer_position = int_send_buffer(1, rank+1 )+1
 
-                                        call write_buffers( int_send_buffer(int_pos(rank+1):int_pos(rank+1)+4, rank+1), &
-                                                            real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ), &
-                                                            buffer_position, buffer_size, &
-                                                            rank, data_buffer(1:buffer_size), hvy_id, neighborhood, level_diff )
+                                        real_send_buffer( buffer_position : buffer_position-1 + buffer_size, rank+1 ) = data_buffer(1:buffer_size)
+
+                                        int_send_buffer( int_pos(rank+1), rank+1 )   = hvy_id
+                                        int_send_buffer( int_pos(rank+1)+1, rank+1 ) = neighborhood
+                                        int_send_buffer( int_pos(rank+1)+2, rank+1 ) = level_diff
+                                        int_send_buffer( int_pos(rank+1)+3, rank+1 ) = buffer_position
+                                        int_send_buffer( int_pos(rank+1)+4, rank+1 ) = buffer_size
 
                                         int_send_buffer(1, rank+1 ) = int_send_buffer(1, rank+1 ) + buffer_size
 
@@ -460,13 +473,20 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
                             if (synch) then
                                 ! active block send data to his neighbor block
+
                                 ! fill int/real buffer
+                                ! note: much better performance do fill the buffers here and not inside a additional subroutine
+                                ! this is of course worse programing style, but we run faster
+                                ! ---------------------------------------------------------------------------------------------
                                 buffer_position = int_send_buffer(1, neighbor_rank+1 )+1
 
-                                call write_buffers( int_send_buffer(int_pos(neighbor_rank+1):int_pos(neighbor_rank+1)+4, neighbor_rank+1), &
-                                                    real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ), &
-                                                    buffer_position, buffer_size, &
-                                                    rank, data_buffer(1:buffer_size), hvy_id, neighborhood, level_diff )
+                                real_send_buffer( buffer_position : buffer_position-1 + buffer_size, neighbor_rank+1 ) = data_buffer(1:buffer_size)
+
+                                int_send_buffer( int_pos(neighbor_rank+1), neighbor_rank+1 )   = hvy_id
+                                int_send_buffer( int_pos(neighbor_rank+1)+1, neighbor_rank+1 ) = neighborhood
+                                int_send_buffer( int_pos(neighbor_rank+1)+2, neighbor_rank+1 ) = level_diff
+                                int_send_buffer( int_pos(neighbor_rank+1)+3, neighbor_rank+1 ) = buffer_position
+                                int_send_buffer( int_pos(neighbor_rank+1)+4, neighbor_rank+1 ) = buffer_size
 
                                 int_send_buffer(1, neighbor_rank+1 ) = int_send_buffer(1, neighbor_rank+1 ) + buffer_size
 
@@ -5775,58 +5795,6 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
     end if
 
 end subroutine set_synch_status
-
-!############################################################################################################
-
-subroutine write_buffers( int_send_buffer, real_send_buffer, buffer_position, buffer_size, neighbor_rank, data_buffer, hvy_id, neighborhood, level_diff )
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
-    implicit none
-
-    !> send buffers, integer and real
-    integer(kind=ik), intent(inout)        :: int_send_buffer(5)
-    real(kind=rk), intent(inout)           :: real_send_buffer(buffer_size)
-
-    ! data buffer size
-    integer(kind=ik), intent(in)           :: buffer_size
-
-    ! id integer
-    integer(kind=ik), intent(in)           :: neighbor_rank
-
-    ! restricted/predicted data buffer
-    real(kind=rk), intent(in)              :: data_buffer(buffer_size)
-
-    ! data buffer intergers, receiver heavy id, neighborhood id, level diffenrence
-    integer(kind=ik), intent(in)           :: hvy_id, neighborhood, level_diff
-
-    ! buffer position
-    integer(kind=ik), intent(in)                       :: buffer_position
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
-
-    ! fill real buffer
-    real_send_buffer = data_buffer
-
-    ! save: neighbor id, neighborhood, level diffenrence, buffer size
-    int_send_buffer( 1 ) = hvy_id
-    int_send_buffer( 2 ) = neighborhood
-    int_send_buffer( 3 ) = level_diff
-    int_send_buffer( 4 ) = buffer_position
-    int_send_buffer( 5 ) = buffer_size
-
-end subroutine write_buffers
 
 !############################################################################################################
 

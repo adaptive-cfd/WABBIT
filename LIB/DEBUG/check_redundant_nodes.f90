@@ -67,7 +67,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     integer(kind=ik)                    :: number_procs
 
     ! loop variables
-    integer(kind=ik)                    :: N, k, dF, neighborhood, invert_neighborhood, neighbor_num, level_diff, l
+    integer(kind=ik)                    :: ix, iy, iz, N, k, dF, neighborhood, invert_neighborhood, neighbor_num, level_diff, l
 
     ! id integers
     integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id
@@ -458,6 +458,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                             end select
 
                         else
+                            ! externer nachbar
                             ! synch status for staging method
                             if ( (data_writing_type == 'staging_old') .or. (data_writing_type == 'staging_new') ) then
                                 ! set synch status
@@ -612,8 +613,19 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                     do k = 1, hvy_n
                         do dF = 1, NdF
 
-                            ! calculate average for all nodes, todo: proof performance?
-                            hvy_block(:, :, :, dF, hvy_active(k)) = hvy_block(:, :, :, dF, hvy_active(k)) / real( hvy_synch(:, :, :, hvy_active(k)) , kind=rk)
+                            ! calculate average for all nodes
+                            do ix = 1, size(hvy_block,1)
+                                do iy = 1, size(hvy_block,2)
+                                    do iz = 1, size(hvy_block,3)
+                                        if ( hvy_synch(ix, iy, iz, hvy_active(k)) > 1 ) then
+
+                                            hvy_block(ix, iy, iz, dF, hvy_active(k)) = hvy_block(ix, iy, iz, dF, hvy_active(k)) &
+                                                                                     / real( hvy_synch(ix, iy, iz, hvy_active(k)) , kind=rk)
+
+                                        end if
+                                    end do
+                                end do
+                            end do
 
                         end do
                     end do

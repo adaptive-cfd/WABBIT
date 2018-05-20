@@ -26,7 +26,7 @@
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
-subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
+subroutine threshold_block( Bs, g, params, lgt_block, hvy_block, hvy_active, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -58,9 +58,9 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     ! detail
     real(kind=rk)                       :: detail
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik), intent(in)                    :: Bs, g
     ! interpolation fields
-    real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
+    real(kind=rk)          :: u1(Bs+2*g,Bs+2*g,Bs+2*g), u2(Bs+2*g,Bs+2*g,Bs+2*g), u3((Bs+1)/2 + g,(Bs+1)/2 + g,(Bs+1)/2 + g)
     ! light data (refinement status column) list for working
     integer(kind=1), allocatable       :: my_refinement_status(:)
 
@@ -81,18 +81,14 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     ! block number
     N = params%number_blocks
 
-    ! grid parameter
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
-
     ! set MPI parameter
     rank         = params%rank
 
-    ! allocate interpolation fields
-    allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
-    allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
-    ! coarsened field is half block size + 1/2
-    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
+!    ! allocate interpolation fields
+!    allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
+!    allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
+!    ! coarsened field is half block size + 1/2
+!    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
 
     allocate( my_refinement_status( hvy_n ) )
 
@@ -136,7 +132,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
                     do i = 1, Bs+2*g
                         do j = 1, Bs+2*g
                             do l = 1, Bs+2*g
-                                detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
+                                !detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
+                                detail = max( detail, abs( (u1(i,j,l)-u2(i,j,l)) ) )
                             end do
                         end do
                     end do
@@ -154,7 +151,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
                         ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
                         do i = 1, Bs+2*g
                             do j = 1, Bs+2*g
-                                detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
+                                !detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
+                                detail = max( detail, abs( (u1(i,j,1)-u2(i,j,1)) ) )
                             end do
                         end do
 
@@ -214,7 +212,8 @@ subroutine threshold_block( params, lgt_block, hvy_block, hvy_active, hvy_n)
     end do
 
     ! clean up
-    deallocate( u1, u2, u3, my_refinement_status )
+    !deallocate( u1, u2, u3, my_refinement_status )
+    deallocate( my_refinement_status )
     deallocate( my_lgt_block_send_buffer, my_lgt_block_receive_buffer )
 
 end subroutine threshold_block

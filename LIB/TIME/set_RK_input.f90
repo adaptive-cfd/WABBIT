@@ -202,11 +202,11 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
 
         case('3D_advection')
             ! first: k_j = RHS(data_field(t) + ..
-            do dF = 1, N_dF
-                do k = 1, hvy_n
-                    hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) )
-                end do
-            end do
+!            do dF = 1, N_dF
+!                do k = 1, hvy_n
+!                    hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) )
+!                end do
+!            end do
             do l = 2, j
                 ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
                 if (abs(rk_coeffs(l)) < 1e-8_rk) then
@@ -218,8 +218,13 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
                             ! new input for computation of k-coefficients
                             ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
                             !(time-dependent rhs, input for time is set in RHS_wrapper)
-                            hvy_block( :, :, :, dF, hvy_active(k)) = hvy_block( :, :, :, dF, hvy_active(k)) &
+!                            hvy_block( :, :, :, dF, hvy_active(k)) = hvy_block( :, :, :, dF, hvy_active(k)) &
+!                                        + dt * rk_coeffs(l) * hvy_work( :, :, :, (dF-1)*5+l, hvy_active(k))
+
+                            hvy_block( :, :, :, dF, hvy_active(k)) = hvy_work( :, :, :, (dF-1)*5+1, hvy_active(k) ) &
                                         + dt * rk_coeffs(l) * hvy_work( :, :, :, (dF-1)*5+l, hvy_active(k))
+
+
                         end do
                     end do
                 end if

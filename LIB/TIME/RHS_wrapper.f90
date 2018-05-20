@@ -210,7 +210,7 @@ subroutine RHS_wrapper(time, dt, params, hvy_work, rk_coeff, j, lgt_block, hvy_a
                 ! loop over all active heavy data blocks
                 do k = 1, hvy_n
                     ! copy ghost nodes to hvy_work
-                    hvy_work( :, :, :, (dF-1)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
+                    !hvy_work( :, :, :, (dF-1)*5+j+1, hvy_active(k) ) = hvy_block(:, :, :, dF, hvy_active(k) )
 
                     ! convert given hvy_id to lgt_id for block spacing routine
                     call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )

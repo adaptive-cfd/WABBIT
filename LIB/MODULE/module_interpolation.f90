@@ -167,9 +167,13 @@ contains
 
         character(len=80), intent(in)                :: order_predictor
 
-        integer(kind=ik) :: i, j, k
+        integer(kind=ik) :: i, j, k, l
         integer(kind=ik) :: ncoarse, nfine
         integer(kind=ik) :: icoarse, ifine
+
+        ! interpolation coefficients
+        ! a: one sided, b: central
+        real(kind=rk) :: a(4), b(2)
 
         ncoarse = size(coarse, 1)
         nfine   = size(fine, 1)
@@ -219,6 +223,16 @@ contains
             end do
 
         elseif ( order_predictor == "multiresolution_4th"  ) then
+
+            ! init coefficients
+            a(1) =  5.0_rk/16.0_rk
+            a(2) =  15.0_rk/16.0_rk
+            a(3) =  -(5.0_rk/16.0_rk)
+            a(4) =  1.0_rk/16.0_rk
+
+            b(1) =  9.0_rk/16.0_rk
+            b(2) =  -1.0_rk/16.0_rk
+
             !-----------------------------------------------------------------------
             ! fourth order interpolation
             !-----------------------------------------------------------------------
@@ -227,31 +241,91 @@ contains
             ! loop over all z-level
             do k = 1, ncoarse
                 ! along x
-                do icoarse = 1, ncoarse ! we travel along the coarse grid
+                do icoarse = 1, ncoarse
+                    ! we travel along the coarse grid
                     ifine  = 2*(icoarse-1)+1
-                    call prediction1D( coarse(:,icoarse,k), fine(:,ifine,2*(k-1)+1) )
+
+                    !call prediction1D( coarse(:,icoarse,k), fine(:,ifine,2*(k-1)+1) )
+
+                    fine( 2, ifine, 2*(k-1)+1  )        = a(1)*coarse(1,icoarse,k) + a(2)*coarse(2,icoarse,k) &
+                                                        + a(3)*coarse(3,icoarse,k) + a(4)*coarse(4,icoarse,k)
+
+                    fine( nfine-1, ifine, 2*(k-1)+1  )  = a(4)*coarse(ncoarse-3,icoarse,k) + a(3)*coarse(ncoarse-2,icoarse,k) &
+                                                        + a(2)*coarse(ncoarse-1,icoarse,k) + a(1)*coarse(ncoarse  ,icoarse,k)
+
+                    do l = 2, ncoarse-2
+                        fine( 2*l, ifine, 2*(k-1)+1 )   = b(1)*coarse(l  ,icoarse,k) + b(1)*coarse(l+1,icoarse,k) &
+                                                        + b(2)*coarse(l-1,icoarse,k) + b(2)*coarse(l+2,icoarse,k)
+                    end do
+
+
                 end do
                 ! along y
-                do icoarse = 1, ncoarse ! we travel along the coarse grid
+                do icoarse = 1, ncoarse
+                    ! we travel along the coarse grid
                     ifine  = 2*(icoarse-1)+1
-                    call prediction1D( coarse(icoarse,:,k), fine(ifine,:,2*(k-1)+1) )
+
+
+                    !call prediction1D( coarse(icoarse,:,k), fine(ifine,:,2*(k-1)+1) )
+
+                    fine( ifine, 2, 2*(k-1)+1  )        = a(1)*coarse(icoarse,1,k) + a(2)*coarse(icoarse,2,k) &
+                                                        + a(3)*coarse(icoarse,3,k) + a(4)*coarse(icoarse,4,k)
+
+                    fine( ifine, nfine-1, 2*(k-1)+1  )  = a(4)*coarse(icoarse,ncoarse-3,k) + a(3)*coarse(icoarse,ncoarse-2,k) &
+                                                        + a(2)*coarse(icoarse,ncoarse-1,k) + a(1)*coarse(icoarse,ncoarse  ,k)
+
+                    do l = 2, ncoarse-2
+                        fine( ifine, 2*l, 2*(k-1)+1 )   = b(1)*coarse(icoarse,l  ,k) + b(1)*coarse(icoarse,l+1,k) &
+                                                        + b(2)*coarse(icoarse,l-1,k) + b(2)*coarse(icoarse,l+2,k)
+                    end do
+
+
                 end do
                 ! between (this is also in x-direction, but we could also do it in y-dir)
-                do i = 2, nfine, 2
-                    call prediction1D( fine(1:nfine:2,i,2*(k-1)+1 ), fine( :, i, 2*(k-1)+1) )
+                do ifine = 2, nfine, 2
+
+
+                    !call prediction1D( fine(1:nfine:2,ifine,2*(k-1)+1 ), fine( :, ifine, 2*(k-1)+1) )
+
+                    fine( 2, ifine, 2*(k-1)+1  )        = a(1)*fine(1, ifine, 2*(k-1)+1) + a(2)*fine(3, ifine, 2*(k-1)+1) &
+                                                        + a(3)*fine(5, ifine, 2*(k-1)+1) + a(4)*fine(7, ifine, 2*(k-1)+1)
+
+                    fine( nfine-1, ifine, 2*(k-1)+1 )   = a(4)*fine(nfine-6, ifine, 2*(k-1)+1) + a(3)*fine(nfine-4, ifine, 2*(k-1)+1) &
+                                                        + a(2)*fine(nfine-2, ifine, 2*(k-1)+1) + a(1)*fine(nfine, ifine, 2*(k-1)+1  )
+
+                    do l = 4, nfine-3, 2
+                        fine( l, ifine, 2*(k-1)+1 )     = b(1)*fine(l-1, ifine, 2*(k-1)+1) + b(1)*fine(l+1, ifine, 2*(k-1)+1) &
+                                                        + b(2)*fine(l-3, ifine, 2*(k-1)+1) + b(2)*fine(l+3, ifine, 2*(k-1)+1)
+                    end do
+
+
                 end do
             end do
 
             ! interpolate z
             do i = 1, nfine
                 do j = 1, nfine
-                    call prediction1D( fine( i, j, 1:nfine:2 ), fine( i, j, : ) )
+
+
+                    !call prediction1D( fine( i, j, 1:nfine:2 ), fine( i, j, : ) )
+
+                    fine( i, j, 2  )        = a(1)*fine(i,j,1) + a(2)*fine(i,j,3) &
+                                            + a(3)*fine(i,j,5) + a(4)*fine(i,j,7)
+
+                    fine( i, j, nfine-1 )   = a(4)*fine(i,j,nfine-6) + a(3)*fine(i,j,nfine-4) &
+                                            + a(2)*fine(i,j,nfine-2) + a(1)*fine(i,j,nfine  )
+
+                    do l = 4, nfine-3, 2
+                        fine( i, j, l )     = b(1)*fine(i,j,l-1) + b(1)*fine(i,j,l+1) &
+                                            + b(2)*fine(i,j,l-3) + b(2)*fine(i,j,l+3)
+                    end do
+
                 end do
             end do
 
         else
              ! error case
-             write(*,*) "ERROR: prediction_2D: wrong method.."
+             write(*,*) "ERROR: prediction_3D: wrong method.."
              stop
         endif
 

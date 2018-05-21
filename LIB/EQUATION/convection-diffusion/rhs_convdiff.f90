@@ -66,6 +66,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
 
     ! Tam & Webb, 4th order optimized (for first derivative)
     a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    ! Standard 4th order central scheme:
+    !a = (/0.0_rk, 1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, 2.0_rk/3.0_rk, -1.0_rk/12.0_rk, 0.0_rk/)
     ! 4th order coefficients for second derivative
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 

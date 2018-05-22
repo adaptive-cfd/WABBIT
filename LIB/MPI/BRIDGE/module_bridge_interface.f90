@@ -149,11 +149,11 @@ integer                              :: n,m
     m        = params%max_treelevel+2
 
     ! send number of active and maximal number of blocks
-    call MPI_send((/lgt_n,n/), 2, MPI_integer, &
+    call MPI_send((/lgt_n/), 1, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld,  ierr )
     ! send list of active blocks
-    call MPI_send(lgt_active, n, MPI_integer, &
+    call MPI_send(lgt_active, lgt_n, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld,  ierr )
     ! send light data
@@ -205,7 +205,7 @@ character(1)                                    :: buf ! Message sent to the flu
 !!          -> send fluid data back to the sender (i.e. particle rank)
 !!    - if \c MPI_TAG is \c end_communication stop waiting for requests
 
-maxpoints=600
+maxpoints=6000
 k=0
 
 allocate(distributedParticles(4,maxpoints))
@@ -561,9 +561,9 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
     ! block index
     integer(kind=ik)                    ::ibx, iby, ibz
 
-    integer(kind=ik), allocatable       ::particle_id(:)
+    integer(kind=ik), allocatable       ::particle_lgt_id(:)
 
-    real(kind=rk),  allocatable         ::u(:),v(:),w(:),rho(:),p(:)
+    real(kind=rk)                      ::u,v,w,rho,p
 
     real(kind=rk), dimension(1:3)       :: x0, dx
 
@@ -577,25 +577,19 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
     !   - preasure
     !   - density
     allocate(u_inter(6,Nr_particle))
-    allocate(u(Nr_particle))
-    allocate(v(Nr_particle))
-    allocate(w(Nr_particle))
-    allocate(p(Nr_particle))
-    allocate(rho(Nr_particle))
-
     !allocate particle ids
-    allocate(particle_id(Nr_particle))
+    allocate(particle_lgt_id(Nr_particle))
 
 
     ! convert position to hvy_id
 
     !write(*,*) "dimensions=",size(hvy_block,1),size(hvy_block,2),size(hvy_block,3),size(hvy_block,4  ),size(hvy_block,5)
     do k=1,Nr_particle
-        particle_id(k)   = position_to_lgt_id(lgt_block,lgt_active,lgt_n,positions(:,k),params)
+        particle_lgt_id(k)   = position_to_lgt_id(lgt_block,lgt_active,lgt_n,positions(:,k),params)
         !! lgt_id
-        lgt_id=particle_id(k)
+        lgt_id=particle_lgt_id(k)
         !! hvy_id
-        particle_id(k)   = particle_id(k)-params%bridge%myWorldRank*params%number_blocks
+        particle_lgt_id(k)   = particle_lgt_id(k)-params%bridge%myWorldRank*params%number_blocks
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         !!! calculate grid point ibx, iby, ibz
         ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%number_ghost_nodes +1
@@ -605,7 +599,9 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
         else
           ibz = 1
         endif
-        ! write(*,'("hvy_id =", i6, " x=", f6.3," [xmin,xmax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(1,k),x0(1), x0(1)+dx(1)*(params%number_block_nodes-1)
+        if ( positions(1,k)>1.0_rk ) then
+          write(*,'("hvy_id =", i6, " x=", f6.3," [xmin,xmax]=[",f6.3,",",f6.3,"]")')particle_lgt_id(k),positions(1,k),x0(1), x0(1)+dx(1)*(params%number_block_nodes-1)
+        end if
         ! remark: the first 3 dimensions of hvy_block project the grid structure into the array
         ! this means:
 
@@ -626,24 +622,39 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
    !     -->
    !    ibx
 
+   ! write(*,*)"ibx =",ibx,"iby =",iby,"ibz =",ibz
+
   !interpolate:
   !> \todo write interpolation
+      rho = hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )**2
+      u   =   hvy_block(ibx, iby, ibz,2, particle_lgt_id(k) ) &
+            / hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )
+      v   =   hvy_block(ibx, iby, ibz,3, particle_lgt_id(k) ) &
+            / hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )
       if (params%threeD_case) then
         if (params%number_data_fields /= 5) then
           call abort(333990,"[bridgefluid] number of data fields is less then 5, Stop")
         else
-        ! write(*,*)"ibx =",ibx,"iby =",iby,"ibz =",ibz
-          u_inter(:,k)   = hvy_block(ibx, iby, ibz,1:params%number_data_fields, particle_id(k) )
+          w   =   hvy_block(ibx, iby, ibz,4, particle_lgt_id(k) ) &
+                / hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )
+          p   =   hvy_block(ibx, iby, ibz,5, particle_lgt_id(k) )
+          u_inter(:,k)   = hvy_block(ibx, iby, ibz,1:params%number_data_fields, particle_lgt_id(k) )
         endif
       else
-          u_inter(1:3,k) = hvy_block(ibx, iby, ibz,1:3, particle_id(k) )
-          u_inter(4,k)   = 0
-          u_inter(5,k)   = hvy_block(ibx, iby, ibz,4, particle_id(k) )
+          w   = 0
+          p   =   hvy_block(ibx, iby, ibz,4, particle_lgt_id(k))
       endif
-          u_inter(6,k)   = positions(4,k)
+
+      ! u_inter is the interpolated data which will be send back to PIG
+      u_inter(1,k)   = rho
+      u_inter(2,k)   = u
+      u_inter(3,k)   = v
+      u_inter(4,k)   = w
+      u_inter(5,k)   = p
+      u_inter(6,k)   = positions(4,k)
           !write(*,'("Nr:",i6,"   rho=",f9.2,"  ux=",f9.2)') int(u_inter(6,k)),u_inter(1,k),u_inter(2,k)
     enddo
-    deallocate(particle_id,u,v,w,p,rho)
+    deallocate(particle_lgt_id)
 
  end subroutine interpolate_data
 

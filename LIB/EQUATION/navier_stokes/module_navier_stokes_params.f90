@@ -188,6 +188,36 @@ contains
 
 
 
+  subroutine init_initial_conditions(params_ns, FILE )
+      implicit none
+      !> pointer to inifile
+      type(inifile) ,intent(inout)        :: FILE
+      !> params structure of navier stokes
+      type(type_params_ns),intent(inout)  :: params_ns
+      ! initial parameters
+      real(kind=rk)                       :: rho_init=1,p_init=1,u_init(3)=0,T_init=1,width
+
+      if (params_ns%mpirank==0) then
+        write(*,*)
+        write(*,*)
+        write(*,*) "PARAMS: initial conditions"
+        write(*,'(" ---------------------------")')
+      endif
+      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%Lx*0.1_rk )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
+      params_ns%initial_density=rho_init
+      params_ns%initial_velocity=u_init
+      params_ns%initial_pressure=p_init
+       params_ns%inicond_width  =width;
+
+    end subroutine init_initial_conditions
+
+
+
 
 subroutine init_other_params(params_ns, FILE )
     implicit none

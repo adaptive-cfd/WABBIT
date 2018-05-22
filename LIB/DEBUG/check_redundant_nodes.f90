@@ -129,7 +129,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         ! 'exclude_redundant', 'include_redundant', 'only_redundant'
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging_old', 'staging_new', 'compare'
-        data_writing_type = 'average'
+        data_writing_type = 'staging_old'
 
     else
         ! nodes test
@@ -5694,6 +5694,110 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
                          (hvy_neighbor( hvy_id, 42) /= -1) .or. & !'__4/645'
                          (hvy_neighbor( hvy_id, 43) /= -1) .or. & !'__5/145'
                          (hvy_neighbor( hvy_id, 44) /= -1) ) then !'__5/645'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '123/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 19 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 27) /= -1) .or. & !'__1/123'
+                         (hvy_neighbor( hvy_id, 31) /= -1) .or. & !'__2/123'
+                         (hvy_neighbor( hvy_id, 35) /= -1) ) then !'__3/123'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '134/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 20 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 28) /= -1) .or. & !'__1/134'
+                         (hvy_neighbor( hvy_id, 37) /= -1) .or. & !'__3/134'
+                         (hvy_neighbor( hvy_id, 39) /= -1) ) then !'__4/134'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '145/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 21 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 29) /= -1) .or. & !'__1/145'
+                         (hvy_neighbor( hvy_id, 41) /= -1) .or. & !'__4/145'
+                         (hvy_neighbor( hvy_id, 43) /= -1) ) then !'__5/145'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '152/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 22 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 30) /= -1) .or. & !'__1/152'
+                         (hvy_neighbor( hvy_id, 33) /= -1) .or. & !'__2/152'
+                         (hvy_neighbor( hvy_id, 45) /= -1) ) then !'__5/152'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '623/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 23 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 32) /= -1) .or. & !'__2/623'
+                         (hvy_neighbor( hvy_id, 36) /= -1) .or. & !'__3/623'
+                         (hvy_neighbor( hvy_id, 47) /= -1) ) then !'__6/623'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '634/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 24 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 38) /= -1) .or. & !'__3/634'
+                         (hvy_neighbor( hvy_id, 40) /= -1) .or. & !'__4/634'
+                         (hvy_neighbor( hvy_id, 48) /= -1) ) then !'__6/634'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '645/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 25 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 42) /= -1) .or. & !'__4/645'
+                         (hvy_neighbor( hvy_id, 44) /= -1) .or. & !'__5/645'
+                         (hvy_neighbor( hvy_id, 49) /= -1) ) then !'__6/645'
+                        synch = .true.
+                        neighbor_synch = .true.
+                    end if
+                end if
+
+                ! '652/___'
+                ! coarser neighbor at edge overwrides nodes from corner neighbor at same level -> need correction
+                ! check corner and face neigborhood, send data again
+                if ( neighborhood == 26 ) then
+                    ! edge neighbor exists
+                    if ( (hvy_neighbor( hvy_id, 34) /= -1) .or. & !'__2/652'
+                         (hvy_neighbor( hvy_id, 46) /= -1) .or. & !'__5/652'
+                         (hvy_neighbor( hvy_id, 50) /= -1) ) then !'__6/652'
                         synch = .true.
                         neighbor_synch = .true.
                     end if

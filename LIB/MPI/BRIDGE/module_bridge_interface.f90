@@ -513,8 +513,8 @@ integer                         :: k
 
 
     enddo
-     write(*,'("[bridgefluid.f90:] No block found for position=", f3.6," STOP!")')position(1)
-     write(*,*),position
+     write(*,'("[bridgefluid.f90:] No block found for position=", f3.6," STOP!")') position(1)
+     write(*,*) position
      call abort(272372)
 end function position_to_lgt_id
 

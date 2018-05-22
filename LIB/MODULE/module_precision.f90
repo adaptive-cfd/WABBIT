@@ -37,7 +37,7 @@ module module_precision
     integer, parameter, public      :: rk=dble_prec
     integer, parameter, public      :: ik=int_prec
 
-    real(kind=rk),parameter, public :: pi  = 4 * atan(1.0_rk)
+    real(kind=rk),parameter, public :: pi  = 4.0_rk * atan(1.0_rk)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -50,7 +50,7 @@ module module_precision
 ! main body
 
 contains
-  
+
    !> \brief initialize global communicator of WABBIT MPI_World
    subroutine set_mpi_comm_global(comm)
       implicit none

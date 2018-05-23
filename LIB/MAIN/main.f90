@@ -318,7 +318,7 @@ program main
 
             my_stop_status = .false.
             ! second: check nodes
-            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, my_stop_status )
+            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, my_stop_status, 0 )
 
             ! third: synchronize stop status
             call MPI_Barrier(MPI_COMM_WORLD, ierr)

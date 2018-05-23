@@ -138,7 +138,7 @@ logical                             :: new_synch_routine
 
 ! synch switch
 ! .true. == synchronize ghost, .false. == compare redundant nodes
-logical                             :: synch_method
+logical                             :: nodes_test
 
 !#######################################
 
@@ -162,8 +162,13 @@ new_synch_routine = .true.
 
 if (new_synch_routine) then
 
-    synch_method = .true.
-    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, synch_method )
+    ! averaging redundant nodes
+    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, &
+    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, nodes_test, 9 )
+
+    ! standard ghost synch
+    call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, hvy_n, &
+    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, nodes_test, 1 )
 
 ! old routine
 else

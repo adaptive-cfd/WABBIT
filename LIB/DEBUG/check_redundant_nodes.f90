@@ -27,7 +27,7 @@
 ! ********************************************************************************************
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status )
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, stop_status, synch_method )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -60,6 +60,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     ! status of nodes check: if true: stops program
     logical, intent(inout)              :: stop_status
+
+    ! synch method
+    integer(kind=ik), intent(in)                   :: synch_method
 
     ! MPI parameter
     integer(kind=ik)                    :: rank
@@ -123,24 +126,41 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     call toc( params, "---synchronize ghost: send data", MPI_wtime()-sub_t0, .true. )
     call toc( params, "---synchronize ghost: write data", MPI_wtime()-sub_t0, .true. )
 
-    ! hack to use subroutine as redundant nodes test and for ghost nodes synchronization
-    if (stop_status) then
-        ! synchronization
-        ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-        data_bounds_type = 'include_redundant'
-        ! 'average', 'simple', 'staging_old', 'staging_new', 'compare'
-        data_writing_type = 'staging_old'
+    ! 'exclude_redundant', 'include_redundant', 'only_redundant'
+    ! 'average', 'simple', 'staging_old', 'staging_new', 'compare'
+    select case(synch_method)
+        ! check redundant nodes
+        case(0)
+            data_bounds_type = 'only_redundant'
+            data_writing_type = 'compare'
+            stop_status = .false.
+            stages = 1
 
-    else
-        ! nodes test
-        ! 'exclude_redundant', 'include_redundant', 'only_redundant'
-        data_bounds_type = 'only_redundant'
-        ! 'average', 'simple', 'staging', 'compare'
-        data_writing_type = 'compare'
-        ! reset status
-        stop_status = .false.
+        ! old staging
+        case(1)
+            data_bounds_type = 'include_redundant'
+            data_writing_type = 'staging_old'
+            stages = 4
 
-    end if
+        ! averaging
+        case(3)
+            data_bounds_type = 'include_redundant'
+            data_writing_type = 'average'
+            stages = 1
+
+        ! avarage redundant nodes
+        case(9)
+            data_bounds_type = 'only_redundant'
+            data_writing_type = 'average'
+            stages = 1
+
+        ! error case
+        case default
+             write(*,'(80("_"))')
+             write(*,*) "ERROR: ghost nodes synchronization method is unknown"
+             stop
+
+    end select
 
     ! grid parameter
     Bs    = params%number_block_nodes
@@ -199,23 +219,6 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         end do
     end if
 
-    ! set number of synch stages
-    if ( data_writing_type == 'staging_old' ) then
-        if ( params%threeD_case ) then
-            ! five stages
-            stages = 5
-        else
-            ! four stages
-            stages = 4
-        end if
-    elseif ( data_writing_type == 'staging_new' ) then
-        ! three stages
-        stages = 3
-    else
-        ! only one stage
-        stages = 1
-    end if
-
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -229,30 +232,15 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
             sub_t0 = MPI_Wtime()
 
             if ( data_writing_type == 'staging_old' ) then
-                if ( params%threeD_case ) then
-                    ! 3D
-                    ! stage 3: coarse to fine, stage 5: correction step
-                    if (synch_stage==3) then
-                        data_bounds_type = 'exclude_redundant'
-                    end if
-                    if (synch_stage==5) then
-                        data_bounds_type = 'include_redundant'
-                    end if
-
-                else
-                    ! 2D
-                    ! stage 3: coarse to fine, stage 4: correction step
-                    if (synch_stage==3) then
-                        data_bounds_type = 'exclude_redundant'
-                    end if
-                    if (synch_stage==4) then
-                        data_bounds_type = 'include_redundant'
-                    end if
-
+                ! stage 3: coarse to fine, stage 4: correction step
+                if (synch_stage==3) then
+                    data_bounds_type = 'exclude_redundant'
+                end if
+                if (synch_stage==4) then
+                    data_bounds_type = 'include_redundant'
                 end if
 
             elseif ( data_writing_type == 'staging_new' ) then
-                ! 2D
                 ! stage 2: coarse to fine, stage 3: level_diff=0
                 if (synch_stage==2) then
                     data_bounds_type = 'exclude_redundant'
@@ -5483,10 +5471,9 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
             ! 3D
             ! set synch stage
             ! stage 1: level +1
-            ! stage 2: level 0 (include)
-            ! stage 3: level 0 (exclude)
-            ! stage 4: level -1
-            ! stage 5: special
+            ! stage 2: level 0
+            ! stage 3: level -1
+            ! stage 4: special
 
             ! stage 1
             if ( (synch_stage == 1) .and. (level_diff == 1) ) then
@@ -5499,37 +5486,23 @@ subroutine set_synch_status( params, synch_stage, synch, neighbor_synch, level_d
 
             ! stage 2
             if ( (synch_stage == 2) .and. (level_diff == 0) ) then
-                if ( lgt_id > neighbor_lgt_id ) then
-                    ! block send data
-                    synch = .true.
-                else
-                    ! neighbor send data
-                    neighbor_synch = .true.
-                end if
-            end if
-
-            ! stage 3
-            if ( (synch_stage == 3) .and. (level_diff == 0) ) then
-                if ( lgt_id < neighbor_lgt_id ) then
-                    ! block send data
-                    synch = .true.
-                else
-                    ! neighbor send data
-                    neighbor_synch = .true.
-                end if
+                ! block send data
+                synch = .true.
+                ! neighbor send data
+                neighbor_synch = .true.
             end if
 
             ! stage 4
-            if ( (synch_stage == 4) .and. (level_diff == -1) ) then
+            if ( (synch_stage == 3) .and. (level_diff == -1) ) then
                 ! block send data
                 synch = .true.
-            elseif ( (synch_stage == 4) .and. (level_diff == 1) ) then
+            elseif ( (synch_stage == 3) .and. (level_diff == 1) ) then
                 ! neighbor send data
                 neighbor_synch = .true.
             end if
 
             ! stage 5
-            if ( (synch_stage == 5) .and. (level_diff == 0) ) then
+            if ( (synch_stage == 4) .and. (level_diff == 0) ) then
 
                 ! '_12/___'
                 ! coarser neighbor at face overwrides nodes from edge neighbor at same level -> need correction

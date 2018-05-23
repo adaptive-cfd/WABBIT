@@ -205,10 +205,11 @@ character(1)                                    :: buf ! Message sent to the flu
 !!          -> send fluid data back to the sender (i.e. particle rank)
 !!    - if \c MPI_TAG is \c end_communication stop waiting for requests
 
-maxpoints=6000
+maxpoints=20000
 k=0
 
 allocate(distributedParticles(4,maxpoints))
+distributedParticles=-99
 allocate(requests(params%bridge%otherWorldSize))
 do
     call MPI_probe(MPI_ANY_SOURCE,MPI_ANY_TAG,params%bridge%otherWorld,status,ierr)
@@ -222,11 +223,20 @@ do
       !  write(*,*) 'send_id:',send_id
         k=k+1
         call MPI_irecv(distributedParticles,4*maxpoints , MPI_double_precision, send_id, &
-                    data_positionDelivery,params%bridge%otherWorld, request,ierr)
+                    data_positionDelivery,params%bridge%otherWorld,request,ierr)
         call MPI_Get_count( status,MPI_double_precision , Ndat , ierr)
+        !this is necessary to make sure that the data is actually writen to the local proc memory
+        call MPI_wait( request, status, ierr)
         ! divide Ndat to get the particle Number
         Ndat=Ndat/4
-       ! write(*,*) "number of positions to interpolate=",Ndat
+
+        !write(*,"('wabbit rank ',i6,' - recieved data from pig rank',i6,' x1=(', f6.3, f6.3')')")  params%Bridge%myWorldRank, &
+        !send_id,  distributedParticles(1:2,1)
+
+        ! write(*,*) "my wabbit rank= ",params%bridge%commonWorldRank
+        ! write(*,*) "number of positions to interpolate=",Ndat
+        ! write(*,*)  "WABBIT x1=" ,distributedParticles(1:2,1)
+        ! write(*,*)  "WABBIT xend=" ,distributedParticles(1:2,Ndat)
          call interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params,distributedParticles(:,1:Ndat),u_inter)
          call MPI_isend(u_inter, 6*Ndat, MPI_double_precision, send_id, data_fieldDelivery, &
                      params%bridge%otherWorld,requests(k),  ierr)
@@ -240,87 +250,20 @@ do
         call MPI_waitall(k, requests, statuses, ierr)
         !write(*,*) "fluidrank",params%bridge%myWorldRank,"processed data request"
         exit
+  !  case ()
     end select
     !=========================================
 enddo
+
+    deallocate(distributedParticles)
+    deallocate(requests)
+
+
 end subroutine serve_data_request
 !===========================================================================
 
 
 
-!===========================================================================
-! subroutine send_params (myBridge, givenParams)
-! !! Exchange of a message between the particle process and a fluid process, according to the content of the message
-! !! Subroutine-declarations
-! type(bridgeMPI)  , intent(in)                :: myBridge           ! type bridge on the particle side
-! type(type_params), intent(in), optional      :: givenParams        ! given structure containing the parameters
-! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! type(type_params)                            :: paramsInit         ! parameter structure effectively used
-! integer                                      :: ierr               ! MPI communication error
-! integer         , dimension(MPI_STATUS_SIZE) :: status             ! MPI communication status
-! integer         , dimension(3,2)             :: discretizationParams ! Number of grid points and processes
-! logical         , dimension(3,2)             :: periodicityParams  ! Periodicity parameters of the domain
-! double precision, dimension(3,2)             :: receivedDomain     ! received domain parameters to transform
-
-!   ! Check if a parameters structure is given
-!   if (present(givenParams)) then                                   ! if a parameters structure is given
-!     paramsInit = givenParams                                       ! associate the effective parameters structure to the given one
-!   else                                                             ! if no parameter structure is given
-!     paramsInit = parameters                                        ! the effective parameters structure if the default one of the module
-!   end if                                                           ! end condition regarding the present of the parameters structure
-
-!   ! Only the root particle process receive the parameters from the root fluid process
-!   if (myBridge%myWorldRank == 0) then                              ! check if the process is the root process
-!     ! - receive the discretization parameters
-!     call MPI_send(discretizationParams, 6, MPI_integer, myBridge%minOtherWorldRank, &
-!                   parameters_delivery, myBridge%commonWorld, status, ierr)
-!     !! - receive the domain parameters
-!     call MPI_recv(receivedDomain, 6, MPI_double_precision, myBridge%minOtherWorldRank, &
-!                   parameters_delivery, myBridge%commonWorld, status, ierr)
-!     !! - receive the coordinate system type parameters (overwrite the one given in the particle parameters)
-!     call MPI_recv(paramsInit%domainCoordinates, 100, MPI_character, myBridge%minOtherWorldRank, &
-!                   parameters_delivery, myBridge%commonWorld, status, ierr)
-!     if (trim(paramsInit%domainCoordinates) == 'cylindrical') &
-!         paramsInit%domainCoordinates = 'cylindrical2Pi'            ! adapt the value according to the implementation
-!     !! - receive the periodicity parameters
-!     call MPI_recv(periodicityParams, 6, MPI_logical, myBridge%minOtherWorldRank, &
-!                   parameters_delivery, myBridge%commonWorld, status, ierr)
-!     !! - receive the stretching parameter
-!     call MPI_recv(stretchingParameter, 1, MPI_double_precision, myBridge%minOtherWorldRank, &
-!                   parameters_delivery, myBridge%commonWorld, status, ierr)
-!   end if                                                           ! end condition regarding the rank
-
-!   ! Broadcast the received parameters to all particle processes
-!   !! - discretization parameters
-!   call MPI_bcast(discretizationParams, 6, MPI_integer, 0, myBridge%myWorld, ierr)
-!   nbGridPointsFluid(:,1) = discretizationParams(:,1)               ! assign the number of grid points in the fluid world
-!   processesFluid(:)      = discretizationParams(:,2)               ! assign the number of processes in the fluid world
-!   nbGridPointsFluid(:,2) = nbGridPointsFluid(:,1) / processesFluid(:) ! compute the number of grid points in each process
-! !   write(*,*) 'Particle side - amount of grid points received: ', nbGridPointsFluid
-!   !! - domain lengths
-!   call MPI_bcast(receivedDomain, 6, MPI_double_precision, 0, myBridge%myWorld, ierr)
-!   !! - coordinate system type
-!   call MPI_bcast(paramsInit%domainCoordinates, 100, MPI_character, 0, myBridge%myWorld, ierr)
-!   !! - Effective Periodicity parameters
-!   call MPI_bcast(periodicityParams, 6, MPI_logical, 0, myBridge%myWorld, ierr)
-!   !! - Streching parameters
-!   call MPI_bcast(stretchingParameter, 1, MPI_double_precision, 0, myBridge%myWorld, ierr)
-
-!   ! Treat the received parameters appropriately
-!   !! Store the domain parameters
-!   paramsInit%domainLength = receivedDomain(:,1)                  ! fluid domain length
-!   paramsInit%domainOrigin = receivedDomain(:,2)                  ! fluid domain origin
-!   !! Coordinate transformation (in case of NSF calculation) (r <-> theta)
-!   paramsInit%domainLength(2) = receivedDomain(1,1)               ! fluid domain length
-!   paramsInit%domainLength(1) = receivedDomain(2,1)               ! fluid domain length
-!   paramsInit%domainOrigin(2) = receivedDomain(1,2)               ! fluid domain origin
-!   paramsInit%domainOrigin(2) = receivedDomain(2,2)               ! fluid domain origin
-!   !! Store the pariodicity parameters
-!   paramsInit%domainEffectivePeriodicity  = periodicityParams(:,1)
-!   paramsInit%domainArtificialPeriodicity = periodicityParams(:,2)
-
-! end subroutine send_params
-!===========================================================================
 
 
 
@@ -481,7 +424,7 @@ integer                         :: d               ! count integer for dimension
 double precision, dimension(3)  :: dx,x0,x1              ! seperation
 integer                         :: k
 !> \detail
-
+position_to_lgt_id=-999999
     do k=1,lgt_n ! loop over all active blocks
 
        call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
@@ -497,7 +440,7 @@ integer                         :: k
        !                         |                           |
        !                    x0(2) -------------------------- x1(2)
 
-       if (min(position(1)-x0(1),position(2)-x0(2))>0 .and. max(position(1)-x1(1),position(2)-x1(2))<0) then
+       if (min(position(1)-x0(1),position(2)-x0(2))>=0 .and. max(position(1)-x1(1),position(2)-x1(2))<=0) then
           if (params%threeD_case) then ! in 3d we have to check the 3. komponent as well
           ! 3D case
               if (position(3)>x0(3) .and. position(3)<x1(3)) then
@@ -513,9 +456,9 @@ integer                         :: k
 
 
     enddo
-     write(*,'("[bridgefluid.f90:] No block found for position=", f3.6," STOP!")') position(1)
+     write(*,'("[bridgefluid.f90:] No block found for position=", f6.3," STOP!")') position(1)
      write(*,*) position
-     call abort(272372)
+     call abort(272372,'STOP!')
 end function position_to_lgt_id
 
 !===========================================================================
@@ -561,7 +504,7 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
     ! block index
     integer(kind=ik)                    ::ibx, iby, ibz
 
-    integer(kind=ik), allocatable       ::particle_lgt_id(:)
+    integer(kind=ik), allocatable       ::particle_id(:)
 
     real(kind=rk)                      ::u,v,w,rho,p
 
@@ -578,18 +521,24 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
     !   - density
     allocate(u_inter(6,Nr_particle))
     !allocate particle ids
-    allocate(particle_lgt_id(Nr_particle))
+    allocate(particle_id(Nr_particle))
 
 
     ! convert position to hvy_id
 
     !write(*,*) "dimensions=",size(hvy_block,1),size(hvy_block,2),size(hvy_block,3),size(hvy_block,4  ),size(hvy_block,5)
     do k=1,Nr_particle
-        particle_lgt_id(k)   = position_to_lgt_id(lgt_block,lgt_active,lgt_n,positions(:,k),params)
+        if ( minval(positions(1:2,k))<1e-10 ) then
+          write(*,*)positions(1:2,k),k
+        endif
+
+        particle_id(k)   = position_to_lgt_id(lgt_block,lgt_active,lgt_n,positions(:,k),params)
         !! lgt_id
-        lgt_id=particle_lgt_id(k)
+        lgt_id=particle_id(k)
+
         !! hvy_id
-        particle_lgt_id(k)   = particle_lgt_id(k)-params%bridge%myWorldRank*params%number_blocks
+        particle_id(k)   = particle_id(k)-params%bridge%myWorldRank*params%number_blocks
+      !  write(*,'("hvy_id=",i6,i6,i6)')particle_id(k),params%bridge%myWorldRank,params%number_blocks
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         !!! calculate grid point ibx, iby, ibz
         ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%number_ghost_nodes +1
@@ -599,9 +548,10 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
         else
           ibz = 1
         endif
-        if ( positions(1,k)>1.0_rk ) then
-          write(*,'("hvy_id =", i6, " x=", f6.3," [xmin,xmax]=[",f6.3,",",f6.3,"]")')particle_lgt_id(k),positions(1,k),x0(1), x0(1)+dx(1)*(params%number_block_nodes-1)
-        end if
+        ! if ( positions(1,k)>1.0_rk .and. params%rank==0 ) then
+        !   write(*,'("hvy_id =", i6, " x=", f6.3," [xmin,xmax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(1,k),x0(1), x0(1)+dx(1)*(params%number_block_nodes-1)
+        !   write(*,'("hvy_id =", i6, " y=", f6.3," [ymin,ymax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(2,k),x0(2), x0(2)+dx(2)*(params%number_block_nodes-1)
+        ! endif
         ! remark: the first 3 dimensions of hvy_block project the grid structure into the array
         ! this means:
 
@@ -626,23 +576,24 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
 
   !interpolate:
   !> \todo write interpolation
-      rho = hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )**2
-      u   =   hvy_block(ibx, iby, ibz,2, particle_lgt_id(k) ) &
-            / hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )
-      v   =   hvy_block(ibx, iby, ibz,3, particle_lgt_id(k) ) &
-            / hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )
+      rho = hvy_block(ibx, iby, ibz,1, particle_id(k) )**2
+
+      u   =   hvy_block(ibx, iby, ibz,2, particle_id(k) ) &
+            / hvy_block(ibx, iby, ibz,1, particle_id(k) )
+      v   =   hvy_block(ibx, iby, ibz,3, particle_id(k) ) &
+            / hvy_block(ibx, iby, ibz,1, particle_id(k) )
       if (params%threeD_case) then
         if (params%number_data_fields /= 5) then
           call abort(333990,"[bridgefluid] number of data fields is less then 5, Stop")
         else
-          w   =   hvy_block(ibx, iby, ibz,4, particle_lgt_id(k) ) &
-                / hvy_block(ibx, iby, ibz,1, particle_lgt_id(k) )
-          p   =   hvy_block(ibx, iby, ibz,5, particle_lgt_id(k) )
-          u_inter(:,k)   = hvy_block(ibx, iby, ibz,1:params%number_data_fields, particle_lgt_id(k) )
+          w   =   hvy_block(ibx, iby, ibz,4, particle_id(k) ) &
+                / hvy_block(ibx, iby, ibz,1, particle_id(k) )
+          p   =   hvy_block(ibx, iby, ibz,5, particle_id(k) )
+          u_inter(:,k)   = hvy_block(ibx, iby, ibz,1:params%number_data_fields, particle_id(k) )
         endif
       else
           w   = 0
-          p   =   hvy_block(ibx, iby, ibz,4, particle_lgt_id(k))
+          p   =   hvy_block(ibx, iby, ibz,4, particle_id(k))
       endif
 
       ! u_inter is the interpolated data which will be send back to PIG
@@ -654,7 +605,7 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
       u_inter(6,k)   = positions(4,k)
           !write(*,'("Nr:",i6,"   rho=",f9.2,"  ux=",f9.2)') int(u_inter(6,k)),u_inter(1,k),u_inter(2,k)
     enddo
-    deallocate(particle_lgt_id)
+    deallocate(particle_id)
 
  end subroutine interpolate_data
 

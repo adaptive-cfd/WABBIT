@@ -469,11 +469,11 @@ contains
 
 
       tmp(1) = params_ns%mean_density
-      call MPI_ALLREDUCE(tmp(1), params_ns%mean_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(1), params_ns%mean_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       tmp(2) = params_ns%mean_pressure
-      call MPI_ALLREDUCE(tmp(2), params_ns%mean_pressure, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(2), params_ns%mean_pressure, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       tmp(3) = area
-      call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
 
 
@@ -716,7 +716,7 @@ contains
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = params_ns%initial_pressure + 1000.0_rk * u( :, :, :, pF)
+        u( :, :, :, pF) = params_ns%initial_pressure !+ 1000.0_rk * u( :, :, :, pF)
         u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
         u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
         ! set Uy

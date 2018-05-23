@@ -197,7 +197,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
 ! variables initialization
 
     if ( params%debug ) then
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        call MPI_Barrier(WABBIT_COMM, ierr)
         ! start time
         sub_t0 = MPI_Wtime()
 
@@ -251,7 +251,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         com_pos  =  0
 
         if ( params%debug ) then
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            call MPI_Barrier(WABBIT_COMM, ierr)
             ! end time
             sub_t1 = MPI_Wtime()
             time_sum = time_sum + (sub_t1 - sub_t0)
@@ -295,7 +295,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         if (n_procs==0) n_procs = 1
 
         if ( params%debug ) then
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            call MPI_Barrier(WABBIT_COMM, ierr)
             ! end time
             sub_t1 = MPI_Wtime()
             ! write time
@@ -328,7 +328,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
             call fill_send_buffer( params, hvy_block, com_lists(:,:,:,synch_stage), com_matrix(rank+1,:,synch_stage), rank, int_send_buffer, real_send_buffer, synch_stage )
 
             if ( params%debug ) then
-                call MPI_Barrier(MPI_COMM_WORLD, ierr)
+                call MPI_Barrier(WABBIT_COMM, ierr)
                 ! end time
                 sub_t1 = MPI_Wtime()
                 ! write time
@@ -359,7 +359,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
         end if
 
         if ( params%debug ) then
-            call MPI_Barrier(MPI_COMM_WORLD, ierr)
+            call MPI_Barrier(WABBIT_COMM, ierr)
             ! end time
             sub_t1 = MPI_Wtime()
             ! write time
@@ -713,7 +713,7 @@ subroutine synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_
     deallocate( com_pos )
 
     if ( params%debug ) then
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        call MPI_Barrier(WABBIT_COMM, ierr)
         ! end time
         sub_t1 = MPI_Wtime()
         time_sum = time_sum + (sub_t1 - sub_t0)

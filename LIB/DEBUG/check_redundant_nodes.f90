@@ -547,7 +547,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     if ( data_writing_type=='compare' ) then
         test2 = stop_status
-        call MPI_Allreduce(test2, stop_status, 1,MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, k )
+        call MPI_Allreduce(test2, stop_status, 1,MPI_LOGICAL, MPI_LOR, WABBIT_COMM, k )
     endif
 
     ! clean up
@@ -2063,10 +2063,10 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
             tag = rank+1+k
 
             ! receive data
-            call MPI_Irecv( int_receive_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( int_receive_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
 
             ! send data
-            call MPI_Isend( int_send_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( int_send_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
 
@@ -2105,13 +2105,13 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
             real_pos = int_receive_buffer(1, k)
 
             ! receive data
-            call MPI_Irecv( real_receive_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( real_receive_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
 
             ! real buffer length
             real_pos = int_send_buffer(1, k)
 
             ! send data
-            call MPI_Isend( real_send_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( real_send_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
 

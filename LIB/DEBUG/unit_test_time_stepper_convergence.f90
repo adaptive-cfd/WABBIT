@@ -178,16 +178,16 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         params_loc%physics_type         = '3D_convection_diffusion'
         ! only one datafield
         params_loc%number_data_fields   = 1
-        ! choose diffusion coefficient and convection velocity
-        if (allocated(params_loc%physics%u0)) then
-            params_loc%physics%nu = 0.0_rk
-            params_loc%physics%u0 = (/1.0_rk, 0.5_rk, 0.25_rk/)
-        else
+                ! choose diffusion coefficient and convection velocity
+        if (.not. allocated(params_loc%physics%u0)) then
             allocate(params_loc%physics%u0(3))
-            allocate(params_loc%physics%nu(1))
-            params_loc%physics%nu = 0.0_rk
-            params_loc%physics%u0 = (/1.0_rk, 0.5_rk, 0.25_rk/)
         end if
+        if (.not. allocated(params_loc%physics%nu)) then
+           allocate(params_loc%physics%nu(1))
+        end if
+        params_loc%physics%nu = 0.0_rk
+        params_loc%physics%u0 = (/1.0_rk, 0.5_rk, 0.25_rk/)
+
     else
         ! 2D:
         params_loc%physics_type         = '2D_convection_diffusion'
@@ -287,7 +287,7 @@ subroutine unit_test_time_stepper_convergence( params, lgt_block, hvy_block, hvy
         !-----------------------------------------------------------------------
         ! time stepper
         !-----------------------------------------------------------------------
-        do l = 1, num_dt(idt)*10
+        do l = 1, num_dt(idt)
             call time_stepper( time, params_loc, lgt_block, hvy_block, hvy_synch, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
         end do
 

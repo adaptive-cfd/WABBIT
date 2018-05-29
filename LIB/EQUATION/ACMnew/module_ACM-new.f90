@@ -235,7 +235,7 @@ contains
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
 
-    do k=neqn,size(params_acm%names,1)
+    do k = neqn, size(params_acm%names,1)
         name = params_acm%names(k)
         select case(name(1:3))
             case('vor')

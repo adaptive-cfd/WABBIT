@@ -254,7 +254,7 @@ program main
         test=.false.
         if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false. )
+             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false., .false. )
         if (rank==0) write(*,*) "Done testing redundant nodes."
     endif
 
@@ -308,7 +308,7 @@ program main
 
             test=.false. ! test
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false.)
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false., .false.)
 
             if (test) then
                 iteration = 99
@@ -353,7 +353,7 @@ program main
             ! one has the +11 status. now: one time, we correct the redunant fuckers, then remove the +11 status.
             go_sync = .true. ! this is the only place where we explicitly call zeroth stage
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, go_sync, .true. )
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, go_sync, .true., .false. )
 
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
@@ -402,7 +402,7 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)

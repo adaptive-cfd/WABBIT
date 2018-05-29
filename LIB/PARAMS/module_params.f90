@@ -66,6 +66,7 @@ module module_params
         character(len=80)                            :: order_predictor=""
         ! order of spatial discretization
         character(len=80)                            :: order_discretization=""
+        character(len=80)                            :: coarsening_indicator="threshold"
         ! boundary condition
         character(len=80)                            :: boundary_cond=""
         ! initial condition

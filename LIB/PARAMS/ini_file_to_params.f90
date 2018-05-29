@@ -91,6 +91,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
     ! use non-uniform mesh correction
     call read_param_mpi(FILE, 'Blocks', 'non_uniform_mesh_correction', params%non_uniform_mesh_correction, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold" )
 
     ! domain size
     call read_param_mpi(FILE, 'DomainSize', 'Lx', params%Lx, 1.0_rk )

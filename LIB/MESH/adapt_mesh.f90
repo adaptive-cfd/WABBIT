@@ -38,10 +38,6 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
      int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
 
 !---------------------------------------------------------------------------------------------
-! modules
-    use module_indicators
-
-!---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
@@ -118,8 +114,10 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
         com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
-        ! calculate detail
-        call coarsening_indicator( params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_active, hvy_n, indicator, iteration)
+        !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
+        !! acts on a single block only
+        call grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
+        hvy_active, hvy_n, indicator, iteration)
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
@@ -206,3 +204,97 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
     call toc( params, "adapt_mesh (...)", t_misc )
     call toc( params, "adapt_mesh (TOTAL)", MPI_wtime()-t1)
 end subroutine adapt_mesh
+
+
+
+
+
+! ============================================================================================
+!> \name coarsening_indicator.f90
+!> \version 0.5
+!> \author engels
+!> \brief Set coarsening status for all active blocks, different methods possible
+!
+!> \details This routine sets the coarsening flag for all blocks. We allow for different
+!! mathematical methods (everywhere / random) currently not very complex, but expected to grow
+!! in the future.
+!! \n
+!! ------------------ \n
+!! Refinement status: \n
+!! ------------------ \n
+!! +1 refine \n
+!! 0 do nothing \n
+!! -1 block wants to refine (ignoring other constraints, such as gradedness) \n
+!! -2 block will refine and be merged with her sisters \n
+!! ------------------ \n
+!! \n
+!! = log ======================================================================================
+!! \n
+!! 29/05/2018 create
+! ********************************************************************************************
+subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
+  hvy_active, hvy_n, indicator, iteration)
+
+  !---------------------------------------------------------------------------------------------
+  ! modules
+    use module_indicators
+
+
+    implicit none
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> light data array
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy work data array - block data.
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:)
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n
+    !> how to choose blocks for refinement
+    character(len=*), intent(in)        :: indicator
+    !> coarsening iteration index. coarsening is done until the grid has reached
+    !! the steady state; therefore, this routine is called several times during the
+    !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
+    integer(kind=ik), intent(in)        :: iteration
+
+
+    ! local variables
+    integer(kind=ik) :: k, Jmax, neq, lgt_id
+    ! local block spacing and origin
+    real(kind=rk) :: dx(1:3), x0(1:3)
+
+    Jmax = params%max_treelevel
+    neq = params%number_data_fields
+
+    ! reset refinement status to "stay" on all blocks
+    do k = 1, lgt_n
+      lgt_block( lgt_active(k), Jmax+2 ) = 0
+    enddo
+
+
+    ! loop over all my blocks
+    do k = 1, hvy_n
+      ! some indicators may depend on the grid (e.g. to compute the vorticity), hence
+      ! we pass the spacing and origin of the block
+      call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
+
+      ! get lgt id of block
+      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+
+      ! evaluate the criterion on this block.
+      call block_coarsening_indicator( params, hvy_block(:,:,:,1:neq,hvy_active(k)), &
+      hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, lgt_block(lgt_id, Jmax+2) )
+    enddo
+
+
+    ! after modifying all refinement statusses, we need to synchronize light data
+    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+
+end subroutine grid_coarsening_indicator

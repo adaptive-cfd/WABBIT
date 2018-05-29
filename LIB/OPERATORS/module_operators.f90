@@ -26,7 +26,7 @@ module module_operators
     ! debug module
     use module_debug
     ! use mesh module, since we want to compute origin/spacing of blocks
-    use module_mesh, only : get_block_spacing_origin
+    ! use module_mesh, only : get_block_spacing_origin
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -41,7 +41,7 @@ module module_operators
 
 contains
 
-    include "volume_integral.f90"
+    ! include "volume_integral.f90"
     include "compute_vorticity.f90"
     include "divergence.f90"
 

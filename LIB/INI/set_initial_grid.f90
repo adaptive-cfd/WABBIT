@@ -77,6 +77,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
   integer(kind=ik) :: lgt_n_old, k, iter
+  logical :: go_sync
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -142,7 +143,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
 
             iter = iter + 1
@@ -198,6 +199,15 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+    ! if the data is read from file, try forcing the redundant nodes to be the same via a single averaging
+    ! sync step. did not solve the problem on IDRIS ada when starting from file.
+    if (params%initial_cond == 'read_from_files') then
+        go_sync = .true.
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
+             hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
+             go_sync, .false., .true. )
+   endif
 
     if (params%rank == 0) then
         write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') lgt_n, &

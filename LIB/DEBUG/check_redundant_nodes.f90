@@ -28,7 +28,7 @@
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
      hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
-     stop_status, stage0 )
+     stop_status, stage0, force_averaging )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -64,7 +64,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
     ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
     ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
-    logical, intent(in):: stage0
+    logical, intent(in):: stage0, force_averaging
 
     ! MPI parameter
     integer(kind=ik)                    :: rank
@@ -124,6 +124,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging', 'compare'
         data_writing_type = 'staging'
+
+        if ( force_averaging ) then
+          data_writing_type='average'
+        endif
 
     else
         ! nodes test

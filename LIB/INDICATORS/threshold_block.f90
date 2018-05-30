@@ -25,7 +25,7 @@
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
-subroutine threshold_block( params, block_data, thresholding_component, refinement_status )
+subroutine threshold_block( params, block_data, thresholding_component, refinement_status, norm )
 
     !---------------------------------------------------------------------------------------------
     ! modules
@@ -44,11 +44,13 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
+    !
+    real(kind=rk), intent(in)           :: norm(1:params%number_data_fields)
 
     ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
     ! detail
-    real(kind=rk)                       :: detail
+    real(kind=rk)                       :: detail(1:params%number_data_fields)
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
     ! interpolation fields
@@ -92,7 +94,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                 do i = 1, Bs+2*g
                     do j = 1, Bs+2*g
                         do l = 1, Bs+2*g
-                            detail = max( detail, abs(u1(i,j,l)-u2(i,j,l)) )
+                            detail(dF) = max( detail(dF), abs(u1(i,j,l)-u2(i,j,l)) / norm(dF) )
                         end do
                     end do
                 end do
@@ -109,7 +111,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                 ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
                 do i = 1, Bs+2*g
                     do j = 1, Bs+2*g
-                        detail = max( detail, abs(u1(i,j,1)-u2(i,j,1)) )
+                        detail(dF) = max( detail(dF), abs(u1(i,j,1)-u2(i,j,1)) / norm(dF) )
                     end do
                 end do
 
@@ -121,7 +123,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1
     ! note gradedness and completeness may prevent it from actually going through with that
-    if (detail < params%eps) then
+    if ( maxval(detail) < params%eps) then
         ! coarsen block, -1
         refinement_status = -1
     end if

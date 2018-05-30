@@ -33,7 +33,7 @@
 !********************************************************************************************
 !> \image html adapt_mesh.svg width=400
 
-subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix, int_send_buffer,&
      int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
 
@@ -41,6 +41,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 ! variables
 
     implicit none
+    real(kind=rk), intent(in)           :: time
     integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
     !> user defined parameter structure
@@ -116,7 +117,7 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
 
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
-        call grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
+        call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
         hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, int_send_buffer, int_receive_buffer, &
         real_send_buffer, real_receive_buffer, hvy_synch)
 
@@ -233,7 +234,7 @@ end subroutine adapt_mesh
 !! \n
 !! 29/05/2018 create
 ! ********************************************************************************************
-subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
+subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
   hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, int_send_buffer, int_receive_buffer, &
   real_send_buffer, real_receive_buffer, hvy_synch)
   !---------------------------------------------------------------------------------------------
@@ -241,6 +242,7 @@ subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lg
     use module_indicators
 
     implicit none
+    real(kind=rk), intent(in)           :: time
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -276,9 +278,11 @@ subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lg
 
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, Bs, g
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, Bs, g, mpierr
     ! local block spacing and origin
-    real(kind=rk) :: dx(1:3), x0(1:3)
+    real(kind=rk) :: dx(1:3), x0(1:3), tmp(1:params%number_data_fields)
+    real(kind=rk) :: norm(1:params%number_data_fields)
+
 
     Jmax = params%max_treelevel
     neq = params%number_data_fields
@@ -316,6 +320,48 @@ subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lg
         com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
     endif
 
+    !> Compute normalization for eps, if desired.
+    !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
+    !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
+    !! the vector of normalization factors for each qty that adaptivity will bebased on (state vector
+    !! or vorticity). We currently use the L_infty norm. I have made bad experience with L_2 norm
+    !! (to be checked...)
+    if (params%eps_normalized .and. params%physics_type=="ACM-new") then
+        norm = 0.0_rk
+        if (params%coarsening_indicator=="threshold-vorticity") then
+            ! loop over my active hvy data
+            do k = 1, hvy_n
+                norm(1) = max(norm(1),  maxval(abs(hvy_work(:, :, :, 1, hvy_active(k)))) )
+            enddo
+        else
+            do k = 1, hvy_n
+                ! call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+                ! call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                ! norm(1) = norm(1) + sum(hvy_block(:,:,:,1,hvy_active(k))**2)*dx(1)*dx(2)
+
+                ! max over ux, uy
+                norm(1) = max(norm(1), maxval(abs(hvy_block(:,:,:,1:2,hvy_active(k)))) )
+                ! pressure
+                norm(3) = max(norm(3), maxval(abs(hvy_block(:,:,:,3,hvy_active(k)))) )
+            enddo
+            ! isotropy: uy=ux
+            norm(2) = norm(1)
+            ! norm(2) = sqrt( norm(1) )
+        endif
+
+        tmp = norm
+        call MPI_ALLREDUCE(tmp, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+    else
+        norm = 1.0_rk
+    endif
+
+    ! during dev is it useful to know what the normalization is, if that is actives
+    if (params%rank == 0 .and. params%eps_normalized) then
+        open(14,file='eps_norm.t',status='unknown',position='append')
+        write (14,'(5(g15.8,1x))') time, norm, params%eps
+        close(14)
+    endif
+
     !> evaluate coarsing criterion on all blocks
     ! loop over all my blocks
     do k = 1, hvy_n
@@ -329,7 +375,8 @@ subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lg
 
         ! evaluate the criterion on this block.
         call block_coarsening_indicator( params, hvy_block(:,:,:,1:neq,hvy_active(k)), &
-        hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, lgt_block(lgt_id, Jmax+2) )
+        hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
+        lgt_block(lgt_id, Jmax+2), norm )
     enddo
 
 

@@ -117,7 +117,8 @@ subroutine adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, l
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
         call grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
-        hvy_active, hvy_n, indicator, iteration)
+        hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, int_send_buffer, int_receive_buffer, &
+        real_send_buffer, real_receive_buffer, hvy_synch)
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
@@ -224,8 +225,8 @@ end subroutine adapt_mesh
 !! ------------------ \n
 !! +1 refine \n
 !! 0 do nothing \n
-!! -1 block wants to refine (ignoring other constraints, such as gradedness) \n
-!! -2 block will refine and be merged with her sisters \n
+!! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
+!! -2 block will coarsen and be merged with her sisters \n
 !! ------------------ \n
 !! \n
 !! = log ======================================================================================
@@ -233,12 +234,11 @@ end subroutine adapt_mesh
 !! 29/05/2018 create
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
-  hvy_active, hvy_n, indicator, iteration)
-
+  hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, int_send_buffer, int_receive_buffer, &
+  real_send_buffer, real_receive_buffer, hvy_synch)
   !---------------------------------------------------------------------------------------------
   ! modules
     use module_indicators
-
 
     implicit none
     !> user defined parameter structure
@@ -263,38 +263,77 @@ subroutine grid_coarsening_indicator( params, lgt_block, hvy_block, hvy_work, lg
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    ! communication lists:
+    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
+    ! communications matrix:
+    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
+    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, Bs, g
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3)
 
     Jmax = params%max_treelevel
     neq = params%number_data_fields
+    Bs = params%number_block_nodes
+    g = params%number_ghost_nodes
 
-    ! reset refinement status to "stay" on all blocks
+    !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n
-      lgt_block( lgt_active(k), Jmax+2 ) = 0
+        lgt_block( lgt_active(k), Jmax+2 ) = 0
     enddo
 
 
+    !> Compute vorticity (if required)
+    !! it is a little unfortunate that we have to compute the vorticity here and not in
+    !! block_coarsening_indicator, where it should be. but after computing it, we have to synch
+    !! its vorticity ghost nodes in order to apply the detail operator to the entire
+    !! vorticity field (incl gost nodes)
+    if (params%coarsening_indicator=="threshold-vorticity") then
+        ! loop over my active hvy data
+        do k = 1, hvy_n
+            ! get lgt id of block
+            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+
+            ! some indicators may depend on the grid (e.g. to compute the vorticity), hence
+            ! we pass the spacing and origin of the block
+            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+            ! actual computation of vorticity on the block
+            call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)), &
+            dx, Bs, g, params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
+        enddo
+
+        ! note here we synch hvy_work (=vorticity) and not hvy_block
+        call sync_ghosts( params, lgt_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    endif
+
+    !> evaluate coarsing criterion on all blocks
     ! loop over all my blocks
     do k = 1, hvy_n
-      ! some indicators may depend on the grid (e.g. to compute the vorticity), hence
-      ! we pass the spacing and origin of the block
-      call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
+        ! get lgt id of block
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
 
-      ! get lgt id of block
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+        ! some indicators may depend on the grid, hence
+        ! we pass the spacing and origin of the block (as we have to compute vorticity
+        ! here, this can actually be omitted.)
+        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      ! evaluate the criterion on this block.
-      call block_coarsening_indicator( params, hvy_block(:,:,:,1:neq,hvy_active(k)), &
-      hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, lgt_block(lgt_id, Jmax+2) )
+        ! evaluate the criterion on this block.
+        call block_coarsening_indicator( params, hvy_block(:,:,:,1:neq,hvy_active(k)), &
+        hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, lgt_block(lgt_id, Jmax+2) )
     enddo
 
 
-    ! after modifying all refinement statusses, we need to synchronize light data
+    !> after modifying all refinement statusses, we need to synchronize light data
     call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
 
 end subroutine grid_coarsening_indicator

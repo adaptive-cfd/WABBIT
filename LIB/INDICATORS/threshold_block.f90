@@ -117,6 +117,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         end if
     end do
 
+
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1
     ! note gradedness and completeness may prevent it from actually going through with that

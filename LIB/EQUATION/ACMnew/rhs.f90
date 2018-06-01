@@ -205,10 +205,12 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 !          forcing(idir) = 0.0_rk
         case('taylor_green')
             if (idir==1) then  
-                do iy = g+1,Bs+g
-                    do ix = g+1,Bs+g
+                do iy = g+1, Bs+g
+                    do ix = g+1, Bs+g
                         x = x0(1) + dble(ix-g-1) * dx(1)
                         y = x0(2) + dble(iy-g-1) * dx(2)
+                        call continue_periodic(x,params_acm%Lx)
+                        call continue_periodic(y,params_acm%Ly)
                         term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
                         forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) *&
                             dcos(y - params_acm%u_mean_set(2)*time) *term_2

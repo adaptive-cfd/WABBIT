@@ -138,7 +138,7 @@ subroutine compute_vorticity_post(help, params)
             params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
         else
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_work(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)),&
+            hvy_block(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)),&
             dx, params%number_block_nodes, params%number_ghost_nodes, &
             params%order_discretization, hvy_work(:,:,:,:,hvy_active(k)))
         end if

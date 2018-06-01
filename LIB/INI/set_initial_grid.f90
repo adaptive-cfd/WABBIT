@@ -101,6 +101,13 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! therefore, there is still a grid-level (=wabbit) parameter "params%initial_cond"
         ! which can be read_from_files or anything else.
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
+        ! create lists of active blocks (light and heavy data)
+        ! update list of sorted nunmerical treecodes, used for finding blocks
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        ! update neighbor relations
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------

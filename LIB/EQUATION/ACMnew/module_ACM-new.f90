@@ -66,6 +66,8 @@ module module_acm_new
     real(kind=rk) :: mean_flow(1:3), mean_p
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
+    ! kinetic energy and enstrophy (both integrals)
+    real(kind=rk) :: e_kin, enstrophy
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -412,7 +414,7 @@ contains
   ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
   ! on individual blocks. This requires one to use the same staging concept as for the RHS.
   !-----------------------------------------------------------------------------
-  subroutine STATISTICS_ACM( time, u, g, x0, dx, stage )
+  subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -422,6 +424,10 @@ contains
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+    ! work data, for mask, vorticity etc. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -441,7 +447,6 @@ contains
     integer(kind=ik) :: Bs, mpierr, ix, iy
     real(kind=rk) :: tmp(1:6)
     real(kind=rk) :: x, y
-    real(kind=rk), allocatable :: mask(:,:)
     real(kind=rk) :: eps_inv
 
     ! compute the size of blocks
@@ -457,6 +462,8 @@ contains
       params_acm%mean_flow = 0.0_rk
       if (params_acm%forcing_type(1) .eq. "taylor_green") params_acm%error = 0.0_rk
       params_acm%force = 0.0_rk
+      params_acm%e_kin = 0.0_rk
+      params_acm%enstrophy = 0.0_rk
 
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -499,19 +506,29 @@ contains
       end if
 
       ! compute force
-      allocate(mask(Bs+2*g, Bs+2*g))
-      call create_mask_2D_NEW(mask, x0, dx, Bs, g)
+      call create_mask_2D_NEW(work(:,:,1,1), x0, dx, Bs, g)
       eps_inv = 1.0_rk / params_acm%C_eta
 
       if (params_acm%dim == 2) then
-        params_acm%force(1) = params_acm%force(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)*mask(g+1:Bs+g-1, g+1:Bs+g-1)*eps_inv)*dx(1)*dx(2)
-        params_acm%force(2) = params_acm%force(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)*mask(g+1:Bs+g-1, g+1:Bs+g-1)*eps_inv)*dx(1)*dx(2)
+        params_acm%force(1) = params_acm%force(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)*work(g+1:Bs+g-1, g+1:Bs+g-1,1,1)*eps_inv)*dx(1)*dx(2)
+        params_acm%force(2) = params_acm%force(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)*work(g+1:Bs+g-1, g+1:Bs+g-1,1,1)*eps_inv)*dx(1)*dx(2)
         params_acm%force(3) = 0.d0
       else
         call abort(6661,"ACM 3D not implemented.")
       endif
 
-      deallocate(mask)
+      if (params_acm%dim == 2) then
+          params_acm%e_kin = params_acm%e_kin + 0.5_rk*sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1:2)**2)*dx(1)*dx(2)
+      else
+          params_acm%e_kin = params_acm%e_kin + 0.5_rk*sum(u(g+1:Bs+g-1,g+1:Bs+g-1,g+1:Bs+g-1, 1:3)**2)*dx(1)*dx(2)*dx(3)
+      end if
+
+      call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+      if (params_acm%dim ==2) then
+          params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs+g-1,g+1:Bs+g-1,1,1)**2)*dx(1)*dx(2)
+      else
+          call abort(6661,"ACM 3D not implemented.")
+      end if
 
     case ("post_stage")
       !-------------------------------------------------------------------------
@@ -530,6 +547,22 @@ contains
       tmp(1:3) = params_acm%force
       call MPI_ALLREDUCE(tmp(1:3), params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
+      tmp(1) = params_acm%e_kin
+      call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      if (params_acm%dim == 2) then
+        params_acm%e_kin = params_acm%e_kin / (params_acm%Lx*params_acm%Ly)
+      else
+        params_acm%e_kin = params_acm%e_kin / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+      endif
+
+      tmp(1)= params_acm%enstrophy
+      call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      if (params_acm%dim == 2) then
+        params_acm%enstrophy = params_acm%enstrophy / (params_acm%Lx*params_acm%Ly)
+      else
+        params_acm%enstrophy = params_acm%enstrophy / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+      endif
+
       if (params_acm%mpirank == 0) then
         ! write mean flow to disk...
         open(14,file='meanflow.t',status='unknown',position='append')
@@ -539,6 +572,16 @@ contains
         ! write forces to disk...
         open(14,file='forces.t',status='unknown',position='append')
         write (14,'(4(es15.8,1x))') time, params_acm%force
+        close(14)
+
+        ! write kinetic energy to disk...
+        open(14,file='e_kin.t',status='unknown',position='append')
+        write (14,'(2(es15.8,1x))') time, params_acm%e_kin
+        close(14)
+
+        ! write enstrophy to disk...
+        open(14,file='enstrophy.t',status='unknown',position='append')
+        write (14,'(2(es15.8,1x))') time, params_acm%enstrophy
         close(14)
       end if
 
@@ -635,10 +678,12 @@ contains
         u(:,:,:,3) = params_acm%u_mean_set(3)
       endif
     case("taylor_green")
-      do iy= g+1,Bs+g
-        do ix= g+1, Bs+g
+      do iy= 1,Bs+2*g
+        do ix= 1, Bs+2*g
           x = x0(1) + dble(ix-g-1)*dx(1)
           y = x0(2) + dble(iy-g-1)*dx(2)
+          call continue_periodic(x,params_acm%Lx)
+          call continue_periodic(y,params_acm%Ly) 
           u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
           u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)
           u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))
@@ -650,6 +695,28 @@ contains
 
   end subroutine INICOND_ACM
 
+  subroutine continue_periodic(x,L)
+      !> position x
+      real(kind=rk), intent(inout)     :: x
+      !> domain length
+      real(kind=rk), intent(in)     :: L
 
+      real(kind=rk)                  :: min_dx
+
+      if ( x>L ) then
+        x=x-L
+      elseif( x<0 ) then
+        ! note it is actually x=L-abs(x) but since x is negative its
+        x=L+x
+      endif
+
+      min_dx = 2.0_rk**(-params_acm%Jmax) * min(params_acm%Lx,params_acm%Ly)&
+                        / real(params_acm%Bs-1, kind=rk)
+      ! u(x=0) should be set equal to u(x=L)
+      if ( abs(x-L)<min_dx*0.5_rk ) then
+        x = 0.0_rk
+      end if
+
+  end subroutine continue_periodic
 
 end module module_acm_new

@@ -1948,22 +1948,22 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         ! stop program
         stop_status = .true.
 
-        write(*,*) "---"
-        do i =  Bs+2*g, 1, -1
-            write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
-        enddo
-        write(*,*) "---"
-        do j = Bs+2*g, 1, -1
-            do i = 1, Bs+2*g
-                if (tmp(i,j)==0.0_rk) then
-                    write(*,'(" null    ")', advance="no")
-                else
-                    write(*,'((es8.1,1x))', advance="no") tmp(i,j)
-                endif
-            enddo
-            write(*,*) " "
-        enddo
-        write(*,*) "---"
+        !write(*,*) "---"
+        !do i =  Bs+2*g, 1, -1
+        !    write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
+        !enddo
+        !write(*,*) "---"
+        !do j = Bs+2*g, 1, -1
+        !    do i = 1, Bs+2*g
+        !        if (tmp(i,j)==0.0_rk) then
+        !            write(*,'(" null    ")', advance="no")
+        !        else
+        !            write(*,'((es8.1,1x))', advance="no") tmp(i,j)
+        !        endif
+        !    enddo
+        !    write(*,*) " "
+        !enddo
+        !write(*,*) "---"
 
         ! mark block by putting a dot in the middle. this way, we can identify all
         ! blocks that have problems. If we set the entire block to 100, then subsequent

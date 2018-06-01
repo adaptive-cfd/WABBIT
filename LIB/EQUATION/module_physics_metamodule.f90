@@ -231,7 +231,7 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx, stage )
+     call STATISTICS_ACM( time, u, g, x0, dx, stage, rhs )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )

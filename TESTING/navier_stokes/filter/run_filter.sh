@@ -49,7 +49,7 @@ filter=$3
 	    #current configname
 	    configname=${p}"_"${times}
 	    #change configname for current filter
-	    cp ${configname}".h5" ${filter}_${configname}".h5"
+	    mv ${configname}".h5" ${filter}_${configname}".h5"
 	    #
 	    echo "changed: " ${configname}".h5 to" ${filter}_${configname}".h5"
 	done

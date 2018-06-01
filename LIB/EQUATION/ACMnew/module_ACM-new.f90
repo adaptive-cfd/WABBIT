@@ -111,8 +111,8 @@ contains
 
 
     ! we still need to know about mpirank and mpisize, occasionally
-    call MPI_COMM_SIZE (MPI_COMM_WORLD, params_acm%mpisize, mpicode)
-    call MPI_COMM_RANK (MPI_COMM_WORLD, params_acm%mpirank, mpicode)
+    call MPI_COMM_SIZE (WABBIT_COMM, params_acm%mpisize, mpicode)
+    call MPI_COMM_RANK (WABBIT_COMM, params_acm%mpirank, mpicode)
 
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
@@ -237,7 +237,7 @@ contains
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
 
-    do k=neqn,size(params_acm%names,1)
+    do k = neqn, size(params_acm%names,1)
         name = params_acm%names(k)
         select case(name(1:3))
             case('vor')
@@ -369,9 +369,9 @@ contains
       ! this stage is called only once, not for each block.
 
       tmp = params_acm%mean_flow
-      call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       tmp2 = params_acm%mean_p
-      call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
       if (params_acm%dim == 2) then
         params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
@@ -537,7 +537,7 @@ contains
       ! this stage is called only once, NOT for each block.
 
       tmp(1:3) = params_acm%mean_flow
-      call MPI_ALLREDUCE(tmp(1:3), params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(1:3), params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       if (params_acm%dim == 2) then
         params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
       else
@@ -545,7 +545,7 @@ contains
       endif
 
       tmp(1:3) = params_acm%force
-      call MPI_ALLREDUCE(tmp(1:3), params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(1:3), params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
       tmp(1) = params_acm%e_kin
       call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -587,7 +587,7 @@ contains
 
       if (params_acm%forcing_type(1) .eq. "taylor_green") then
         tmp = params_acm%error
-        call MPI_REDUCE(tmp, params_acm%error, 6, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD,mpierr)
+        call MPI_REDUCE(tmp, params_acm%error, 6, MPI_DOUBLE_PRECISION, MPI_SUM, 0, WABBIT_COMM,mpierr)
         !params_acm%error(1:3) = params_acm%error(1:3)/params_acm%error(4:6)
         params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%Lx*params_acm%Ly)
 
@@ -597,7 +597,7 @@ contains
           write (15,'(4(es15.8,1x))') time, params_acm%error(1:3)
           close(15)
         end if
-        
+
       end if
     case default
       call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")

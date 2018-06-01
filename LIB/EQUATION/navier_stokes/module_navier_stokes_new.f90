@@ -41,12 +41,7 @@ module module_navier_stokes_new
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  type(type_params_ns),save :: params_ns
-
-
-  ! real(kind=rk)   ,parameter :: rho_init=1.645_rk,p_init=101330.0_rk,u_init=36.4_rk,v0_=0.0_rk,T_init=200!273.15_rk
-  real(kind=rk)       ,save :: rho_init=1_rk,p_init=1.0_rk,T_init=1!273.15_rk
-  real(kind=rk)       ,save :: u_init(3)=(/1.0_rk,1.0_rk,0.0_rk/)
+  real(kind=rk)        ,save:: dx_min
 
 
 contains
@@ -72,7 +67,6 @@ contains
     type(inifile)               :: FILE
     integer(kind=ik)            :: dF
     integer(kind=ik)            :: mpicode,nx_max
-    real(kind=rk)               :: dx_min
 
 
     ! ==================================================================
@@ -105,24 +99,8 @@ contains
     call init_filter(   params_ns%filter, FILE)
     ! init all params for organisation
     call init_other_params(params_ns,     FILE )
-
     ! read in initial conditions
-    if (params_ns%mpirank==0) then
-      write(*,*)
-      write(*,*)
-      write(*,*) "PARAMS: initial conditions"
-      write(*,'(" ---------------------------")')
-    endif
-    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width', params_ns%inicond_width, params_ns%Lx*0.1_rk )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
-    call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
-    params_ns%initial_density=rho_init
-    params_ns%initial_velocity=u_init
-    params_ns%initial_pressure=p_init
-    !
+    call init_initial_conditions(params_ns,file)
 
     if (params_ns%mpirank==0) then
       write(*,*)
@@ -491,11 +469,11 @@ contains
 
 
       tmp(1) = params_ns%mean_density
-      call MPI_ALLREDUCE(tmp(1), params_ns%mean_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(1), params_ns%mean_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       tmp(2) = params_ns%mean_pressure
-      call MPI_ALLREDUCE(tmp(2), params_ns%mean_pressure, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(2), params_ns%mean_pressure, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       tmp(3) = area
-      call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+      call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
 
 
@@ -623,9 +601,11 @@ contains
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     integer(kind=ik)          :: Bs,ix
-    real(kind=rk)             :: x,tmp(1:3),b
+    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3)
 
-
+    p_init    =params_ns%initial_pressure
+    rho_init  =params_ns%initial_density
+    u_init    =params_ns%initial_velocity
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
@@ -673,26 +653,13 @@ contains
       end if
       do ix=g+1, Bs+g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
+         call continue_periodic(x,params_ns%Lx)
          ! left region
          b=0.5_rk*(1-tanh((abs(x-params_ns%Lx*0.75_rk)-params_ns%Lx*0.2_rk)*2*PI/(10*dx(1)) ))
          u( ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
          u(ix, : , :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
          u(ix, : , :, UyF)  = 0.0_rk
          u( ix, :, :, pF)   = p_init-b*(p_init - tmp(3))
-
-
-
-        !  if (x <= params_ns%Lx*0.25_rk .and. x < params_ns%Lx*0.75_rk) then
-        !    u( ix, :, :, rhoF) = dsqrt(rho_init)
-        !    u(ix, : , :, UxF)  = dsqrt(rho_init) * u_init(1)
-        !    u(ix, : , :, UyF)  = 0.0_rk
-        !    u( ix, :, :, pF)   = p_init
-        !  else
-        !    u( ix, :, :, rhoF) = dsqrt(tmp(1))
-        !    u(ix, : , :, UxF)  = dsqrt(tmp(1)) *tmp(2)
-        !    u(ix, : , :, UyF)  = 0.0_rk
-        !    u( ix, :, :, pF)   = tmp(3)
-        !  endif
       end do
 
     case ("sod_shock_tube")
@@ -712,8 +679,9 @@ contains
       ! rho=0.125
       ! p  =0.1
       ! u  =0
-      do ix=1+g, Bs+g
+      do ix=1, Bs+2*g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
+         call continue_periodic(x,params_ns%Lx)
          ! left region
          if (x <= params_ns%Lx*0.5_rk) then
            u( ix, :, :, rhoF) = 1.0_rk
@@ -749,12 +717,10 @@ contains
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
         u( :, :, :, pF) = params_ns%initial_pressure + 1000.0_rk * u( :, :, :, pF)
-        ! set rho
         u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
-        ! set Ux
-        u( :, :, :, UxF) = params_ns%initial_velocity(1)
+        u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
         ! set Uy
-        u( :, :, :, UyF) = params_ns%initial_velocity(2)
+        u( :, :, :, UyF) = params_ns%initial_velocity(2)*sqrt(params_ns%initial_density)
 
         if (size(u,3).ne.1) then
             ! set Uz to zero
@@ -765,6 +731,8 @@ contains
     end select
 
   end subroutine INICOND_NStokes
+
+
 
 
 

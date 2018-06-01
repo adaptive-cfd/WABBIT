@@ -28,7 +28,7 @@
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
      hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
-     stop_status, stage0 )
+     stop_status, stage0, force_averaging )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -64,7 +64,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
     ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
     ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
-    logical, intent(in):: stage0
+    logical, intent(in):: stage0, force_averaging
 
     ! MPI parameter
     integer(kind=ik)                    :: rank
@@ -124,6 +124,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging', 'compare'
         data_writing_type = 'staging'
+
+        if ( force_averaging ) then
+          data_writing_type='average'
+        endif
 
     else
         ! nodes test
@@ -547,7 +551,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
     if ( data_writing_type=='compare' ) then
         test2 = stop_status
-        call MPI_Allreduce(test2, stop_status, 1,MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, k )
+        call MPI_Allreduce(test2, stop_status, 1,MPI_LOGICAL, MPI_LOR, WABBIT_COMM, k )
     endif
 
     ! clean up
@@ -2063,10 +2067,10 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
             tag = rank+1+k
 
             ! receive data
-            call MPI_Irecv( int_receive_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( int_receive_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
 
             ! send data
-            call MPI_Isend( int_send_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( int_send_buffer(1, k), int_length, MPI_INTEGER4, k-1, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
 
@@ -2105,13 +2109,13 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
             real_pos = int_receive_buffer(1, k)
 
             ! receive data
-            call MPI_Irecv( real_receive_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, recv_request(i), ierr)
+            call MPI_Irecv( real_receive_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM, recv_request(i), ierr)
 
             ! real buffer length
             real_pos = int_send_buffer(1, k)
 
             ! send data
-            call MPI_Isend( real_send_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, MPI_COMM_WORLD, send_request(i), ierr)
+            call MPI_Isend( real_send_buffer(1, k), real_pos, MPI_REAL8, k-1, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
 

@@ -57,6 +57,7 @@ module module_params
 
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk
+        logical                                      :: eps_normalized=.false.
         ! minimal level for blocks in data tree
         integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree
@@ -66,6 +67,8 @@ module module_params
         character(len=80)                            :: order_predictor=""
         ! order of spatial discretization
         character(len=80)                            :: order_discretization=""
+        character(len=80)                            :: coarsening_indicator="threshold-state-vector"
+        logical, allocatable                         :: threshold_state_vector_component(:)
         ! boundary condition
         character(len=80)                            :: boundary_cond=""
         ! initial condition

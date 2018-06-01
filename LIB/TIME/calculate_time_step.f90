@@ -98,7 +98,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     ! store local (per process) time step
     dt_tmp = dt
     ! global minimum time step
-    call MPI_Allreduce(dt_tmp, dt, 1, MPI_REAL8, MPI_MIN, MPI_COMM_WORLD, ierr)
+    call MPI_Allreduce(dt_tmp, dt, 1, MPI_REAL8, MPI_MIN, WABBIT_COMM, ierr)
 
     ! --------------------------------------------------------------------------
     ! other constraints (saving, final time, etc.)

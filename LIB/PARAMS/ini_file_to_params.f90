@@ -44,6 +44,7 @@ subroutine ini_file_to_params( params, filename )
     real(kind=rk)                                   :: maxmem
     ! power used for dimensionality (d=2 or d=3)
     integer(kind=ik)                                :: d,i, Nblocks_Jmax
+    real(kind=rk), dimension(:), allocatable        :: tmp
     ! string read from command line call
     character(len=80)                               :: memstring
 
@@ -80,6 +81,7 @@ subroutine ini_file_to_params( params, filename )
     params%number_fields = params%number_data_fields*5
     ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
+    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
     ! read treelevel bounds
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
@@ -91,6 +93,23 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
     ! use non-uniform mesh correction
     call read_param_mpi(FILE, 'Blocks', 'non_uniform_mesh_correction', params%non_uniform_mesh_correction, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+
+    ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
+    ! use? in ACM, it can be good NOT to apply it to the pressure.
+    allocate(tmp(1:params%number_data_fields))
+    allocate(params%threshold_state_vector_component(1:params%number_data_fields))
+    ! as default, use ones (all components used for indicator)
+    tmp = 1.0_rk
+    call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
+    do i = 1, params%number_data_fields
+        if (tmp(i)>0.0_rk) then
+            params%threshold_state_vector_component(i) = .true.
+        else
+            params%threshold_state_vector_component(i) = .false.
+        endif
+    enddo
+    deallocate(tmp)
 
     ! domain size
     call read_param_mpi(FILE, 'DomainSize', 'Lx', params%Lx, 1.0_rk )
@@ -278,6 +297,8 @@ subroutine ini_file_to_params( params, filename )
         open (44, file='blocks_per_mpirank.t', status='replace')
         close(44)
         open (44, file='blocks_per_mpirank_rhs.t', status='replace')
+        close(44)
+        open (44, file='eps_norm.t', status='replace')
         close(44)
     endif
 end subroutine ini_file_to_params

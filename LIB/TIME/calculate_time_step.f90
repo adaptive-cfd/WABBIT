@@ -116,6 +116,14 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
             dt = params%next_write_time - time
         end if
     end if
+    if ( abs(params%tsave_stat-9999999.9_rk)>1e-1_rk ) then
+        ! time step should also fit in statistics output time step size
+        ! criterion: check in time+dt above next output time
+        ! if so: truncate time+dt
+        if ( time+dt > params%next_stats_time .and. time<params%next_stats_time ) then
+            dt = params%next_stats_time - time
+        end if
+    end if
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time
 

@@ -477,6 +477,8 @@ contains
         call abort(6661,"ACM fail: very very large values in state vector.")
       endif
 
+      !-------------------------------------------------------------------------
+      ! compute mean flow for output in statistics
       if (params_acm%dim == 2) then
         params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
         params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
@@ -486,14 +488,17 @@ contains
         params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
       endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
+      !-------------------------------------------------------------------------
+      ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
+      ! we compute the error w.r.t. this solution heres
       if (params_acm%forcing_type(1) .eq. "taylor_green") then
         do iy = g+1,Bs+g
           do ix = g+1, Bs+g
               x = x0(1) + dble(ix-g-1)*dx(1)
               y = x0(2) + dble(iy-g-1)*dx(2)
-              tmp(1) = params_acm%u_mean_set(1)+dsin(x-params_acm%u_mean_set(1)*time)*&
+              tmp(1) = params_acm%u_mean_set(1) + dsin(x-params_acm%u_mean_set(1)*time)*&
                   dcos(y-params_acm%u_mean_set(2)*time)*dcos(time)
-              tmp(2) = params_acm%u_mean_set(2)-dcos(x-params_acm%u_mean_set(1)*time)*&
+              tmp(2) = params_acm%u_mean_set(2) - dcos(x-params_acm%u_mean_set(1)*time)*&
                   dsin(y-params_acm%u_mean_set(2)*time)*dcos(time)
               tmp(3) = 0.25_rk*(dcos(2.0_rk*(x-params_acm%u_mean_set(1)*time)) +&
                   dcos(2.0_rk*(y-params_acm%u_mean_set(2)*time)))*dcos(time)**2
@@ -505,7 +510,10 @@ contains
         params_acm%error = params_acm%error*dx(1)*dx(2)
       end if
 
-      ! compute force
+      !-------------------------------------------------------------------------
+      ! compute fluid force on penalized obstacle. The force can be computed by
+      ! volume integration (which is much easier than surface integration), see
+      ! Angot et al. 1999
       call create_mask_2D_NEW(work(:,:,1,1), x0, dx, Bs, g)
       eps_inv = 1.0_rk / params_acm%C_eta
 
@@ -517,12 +525,16 @@ contains
         call abort(6661,"ACM 3D not implemented.")
       endif
 
+      !-------------------------------------------------------------------------
+      ! compute kinetic energy in the whole domain (including penalized regions)
       if (params_acm%dim == 2) then
           params_acm%e_kin = params_acm%e_kin + 0.5_rk*sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1:2)**2)*dx(1)*dx(2)
       else
           params_acm%e_kin = params_acm%e_kin + 0.5_rk*sum(u(g+1:Bs+g-1,g+1:Bs+g-1,g+1:Bs+g-1, 1:3)**2)*dx(1)*dx(2)*dx(3)
       end if
 
+      !-------------------------------------------------------------------------
+      ! compute enstrophy in the whole domain (including penalized regions)
       call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
       if (params_acm%dim ==2) then
           params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs+g-1,g+1:Bs+g-1,1,1)**2)*dx(1)*dx(2)
@@ -536,6 +548,9 @@ contains
       !-------------------------------------------------------------------------
       ! this stage is called only once, NOT for each block.
 
+
+      !-------------------------------------------------------------------------
+      ! mean flow
       tmp(1:3) = params_acm%mean_flow
       call MPI_ALLREDUCE(tmp(1:3), params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       if (params_acm%dim == 2) then
@@ -544,9 +559,13 @@ contains
         params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
       endif
 
+      !-------------------------------------------------------------------------
+      ! force
       tmp(1:3) = params_acm%force
       call MPI_ALLREDUCE(tmp(1:3), params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
+      !-------------------------------------------------------------------------
+      ! kinetic energy
       tmp(1) = params_acm%e_kin
       call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
       if (params_acm%dim == 2) then
@@ -555,6 +574,8 @@ contains
         params_acm%e_kin = params_acm%e_kin / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
       endif
 
+      !-------------------------------------------------------------------------
+      ! kinetic enstrophy
       tmp(1)= params_acm%enstrophy
       call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
       if (params_acm%dim == 2) then
@@ -563,6 +584,8 @@ contains
         params_acm%enstrophy = params_acm%enstrophy / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
       endif
 
+      !-------------------------------------------------------------------------
+      ! write statistics to ascii files.
       if (params_acm%mpirank == 0) then
         ! write mean flow to disk...
         open(14,file='meanflow.t',status='unknown',position='append')
@@ -683,7 +706,7 @@ contains
           x = x0(1) + dble(ix-g-1)*dx(1)
           y = x0(2) + dble(iy-g-1)*dx(2)
           call continue_periodic(x,params_acm%Lx)
-          call continue_periodic(y,params_acm%Ly) 
+          call continue_periodic(y,params_acm%Ly)
           u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
           u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)
           u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))

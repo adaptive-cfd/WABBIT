@@ -380,9 +380,11 @@ program main
         endif
 
         ! filter
-        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
+        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
+            .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer,&
+            hvy_synch )
 
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
         end if

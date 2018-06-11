@@ -59,13 +59,13 @@ subroutine compare_keys(help, key1, key2)
                 error(i) = dabs( (data2(i)-data1(i)) )
             end if
         enddo
-        !do i = 1, 2
-        !    error_curve(i) = abs( (curves2(i)-curves1(i)) )
-        !end do
+        do i = 1, 2
+            error_curve(i) = abs( (curves2(i)-curves1(i)) )
+        end do
         write (*,'("err(rel) : time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8)') error !, " sfc_hilbert=",i12, " sfc_z=", i12)') error, error_curve
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=",i12, " sfc_z=", i12)') error, error_curve
 
-        if (maxval(error)<1.0e-4) then ! .and. maxval(error_curve)<1.0e-4) then
+        if ((maxval(error)<1.0e-4)) then !.and. maxval(error_curve)<5_ik) then
             ! all cool
             write (*,*) "okay!"
 

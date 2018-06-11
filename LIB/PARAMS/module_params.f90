@@ -115,8 +115,8 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
-        real(kind=rk)    :: tsave_stats=0.0_rk, next_stats_time=0.0_rk
-        integer(kind=ik) :: nsave_stats=0
+        real(kind=rk)    :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
+        integer(kind=ik) :: nsave_stats=99999999_ik
 
         ! -------------------------------------------------------------------------------------
         ! MPI

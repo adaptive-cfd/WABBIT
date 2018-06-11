@@ -46,7 +46,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     !> output is the refinement_status
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(in)           :: norm(1:params%number_data_fields)
+    real(kind=rk), intent(inout)        :: norm(1:params%number_data_fields)
 
     ! local variables
     integer(kind=ik) :: k, Jmax, d, j, hvy_id, Bs, g

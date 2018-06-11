@@ -98,10 +98,6 @@ program main_post
         if (rank==0) then
             call flusi_to_wabbit(help, params)
         end if
-!    case ("--sfc-test")
-!        call keyvalues_sfc(help, params)
-!    case("--squeeze")
-!        call squeeze(help, params)
     case default
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"

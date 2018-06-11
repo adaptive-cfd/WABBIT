@@ -45,7 +45,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(in)           :: norm(1:params%number_data_fields)
+    real(kind=rk), intent(inout)        :: norm(1:params%number_data_fields)
 
     ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
@@ -80,6 +80,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     do dF = 1, params%number_data_fields
         ! is this component of the block used for thresholding or not?
         if (thresholding_component(dF)) then
+            if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk !avoid division by zero
             if ( params%threeD_case ) then
                 ! ********** 3D **********
                 ! copy block data to array u1

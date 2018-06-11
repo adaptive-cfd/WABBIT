@@ -120,7 +120,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
         !---------------------------------------------------------------------------
-        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond, hvy_work, .true.)
 
         !---------------------------------------------------------------------------
         ! grid adaptation
@@ -144,7 +144,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this
             ! corresponds to advancing the solution in time, it's just that here we know the exact
             ! solution (the inicond)
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+                params%initial_cond, hvy_work, .true.)
 
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
@@ -154,7 +155,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
             iter = iter + 1
             if (params%rank == 0) then
-              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') iter, lgt_n, &
+              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') iter, lgt_n, &
               min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
             endif
           enddo
@@ -167,15 +168,25 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
                 lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
             ! set initial condition
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+                params%initial_cond, hvy_work, .true.)
                 
             if (params%rank == 0) then
              write(*,'(" did ",i2," refinement stage (beyond what is required for the &
-                &prescribed precision eps) Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') k, lgt_n, &
+                &prescribed precision eps) Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') k, lgt_n, &
                 min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
              endif
           enddo
         endif
+        ! If we use volume penalization and ACM we first apply the mask to refine 
+        ! the grid properly around it. However, for comparison, we would like to 
+        ! start from an initial condition without a mask (impulsive start).
+        ! This is done here (after the refinements).
+        if (params%physics_type == 'ACM-new') then
+           ! apply inicond for one laste time
+           call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+                params%initial_cond, hvy_work, .false.)
+        end if
     end if
 
     !---------------------------------------------------------------------------
@@ -215,7 +226,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
    endif
 
     if (params%rank == 0) then
-        write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') lgt_n, &
+        write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') lgt_n, &
         min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
       write(*,'("Initial grid and initial condition terminated.")')
     endif

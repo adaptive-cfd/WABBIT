@@ -47,8 +47,8 @@ module module_ns_penalization
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
   character(len=80),                 save        :: mask_geometry!273.15_rk
-  logical           ,                save        :: smooth_mask
-  real(kind=rk)                    , save        :: C_eta_inv,C_sp_inv
+  logical           ,                save        :: smooth_mask, use_sponge
+  real(kind=rk)                    , save        :: C_eta_inv,C_sp_inv,L_sponge
   real(kind=rk),                     save        :: domain_size(3)
   ! radius of domain (Ly/2)
   real(kind=rk),                     save        :: R_domain
@@ -69,6 +69,14 @@ module module_ns_penalization
       real(kind=rk), dimension(2) :: x_cntr
       real(kind=rk)               :: radius
   end type type_cylinder
+
+
+  type :: type_triangle
+      real(kind=rk), dimension(3) :: x_cntr
+      real(kind=rk)               :: base_length
+      real(kind=rk)               :: angle
+      logical                     :: rhombus
+  end type type_triangle
 
   type :: type_shock_params
       real(kind=rk) :: rho_left,u_left,p_left
@@ -121,6 +129,7 @@ module module_ns_penalization
   !------------------------------------------------
   type(type_funnel)   , save :: funnel
   type(type_cylinder) , save :: cyl
+  type(type_triangle) , save :: triangle
   type(type_shock_params) , save :: shock_params
   !------------------------------------------------
 
@@ -130,6 +139,8 @@ include "funnel.f90"
 include "vortex_street.f90"
 include "sod_shock_tube.f90"
 include "simple_shock.f90"
+include "triangle.f90"
+
 
 
 !> \brief reads parameters for mask function from file
@@ -155,7 +166,7 @@ subroutine init_penalization( params,FILE )
 
     if (params%penalization) then
       call read_param_mpi(FILE, 'VPM', 'geometry', params%geometry, "cylinder")
-      call read_param_mpi(FILE, 'Physics', 'C_sp',  params%C_sp, 0.01_rk )
+      call read_param_mpi(FILE, 'Sponge', 'C_sponge',  params%C_sp, 0.01_rk )
       call read_param_mpi(FILE, 'VPM', 'C_eta', params%C_eta, 0.01_rk )
     else
       return
@@ -169,7 +180,7 @@ subroutine init_penalization( params,FILE )
     call read_param_mpi(FILE, 'VPM', 'C_eta', C_eta_inv, 0.01_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Lx', domain_size(1), 1.0_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Ly', domain_size(2), 1.0_rk )
-    call read_param_mpi(FILE, 'Physics', 'C_sp', C_sp_inv, 0.01_rk )
+    call read_param_mpi(FILE,'Sponge', 'C_sponge', C_sp_inv, 0.01_rk )
         ! read adiabatic coefficient
     call read_param_mpi(FILE, 'Navier_Stokes', 'gamma_', gamma_, 0.0_rk )
     ! read specific gas constant
@@ -180,6 +191,9 @@ subroutine init_penalization( params,FILE )
     R_domain =domain_size(2)*0.5_rk
 
     select case(mask_geometry)
+    case ('triangle','rhombus')
+      call init_simple_sponge(params,FILE)
+      call init_triangle(params,FILE)
     case ('simple-shock')
       call init_simple_shock(params,FILE)
     case('sod_shock_tube')
@@ -194,6 +208,61 @@ subroutine init_penalization( params,FILE )
     end select
 
 end subroutine init_penalization
+
+
+
+
+
+!> \brief reads parameters for sponge initializing a sipmle sponge form file
+!> \details The simple sponge starts at x=0 and ends at x=L_sponge
+subroutine init_simple_sponge( params,FILE )
+    use module_navier_stokes_params
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)       :: FILE
+   !> params structure of navier stokes
+    type(type_params_ns),intent(inout)  :: params
+
+     if (params%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: init simple sponge!"
+      write(*,'(" -----------------------------------")')
+    endif
+
+    call read_param_mpi(FILE, 'Sponge', 'use_sponge', use_sponge, .false. )
+
+    if (use_sponge) then
+      call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.0_rk )
+      if ( L_sponge<1e-10 ) then
+        L_sponge=0.1*params%Lx
+      end if
+      call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_eta_inv, 1.0e-2_rk )
+      C_eta_inv=1.0_rk/C_eta_inv
+    else
+      return
+    endif
+
+end subroutine init_simple_sponge
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -216,6 +285,8 @@ subroutine get_mask(mask, x0, dx, Bs, g )
      call draw_sod_shock_tube(mask, x0, dx, Bs, g,'boundary')
     case('vortex_street','cylinder')
       call draw_cylinder(mask, x0, dx, Bs, g )
+    case('rhombus','triangle')
+      call draw_triangle(mask,x0,dx,Bs,g)
     case('funnel')
       call draw_funnel(mask, x0, dx, Bs, g)
     case default
@@ -257,6 +328,8 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
       call add_simple_shock(penalization,x0,dx,Bs,g,phi)
     case('vortex_street','cylinder')
       call add_cylinder(penalization, x0, dx, Bs, g, phi )
+    case('rhombus','triangle')
+      call add_triangle(penalization,x0,dx,Bs,g,phi)
     case('funnel')
       call add_funnel(  penalization, x0, dx, Bs, g, phi )
     case default
@@ -385,6 +458,64 @@ function transition(x,x0,trans_width,val_left,val_rigth)
 
     transition= s * val_rigth + (1-s) * val_left
 end function transition
+
+
+
+
+
+!> \brief creates the mask of a simple sponge
+subroutine simple_sponge(sponge, x0, dx, Bs, g)
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in)                              :: Bs, g
+    !> sponge term for every grid point of this block
+    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)                                             :: x
+    ! loop variables
+    integer(kind=ik)                                          :: ix, iy
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+
+    ! reset sponge array
+    sponge = 0.0_rk
+!---------------------------------------------------------------------------------------------
+! main body
+    if ( use_sponge .eqv. .false. ) then
+      return
+    end if
+
+    do iy=1, Bs+2*g
+       do ix=1, Bs+2*g
+           x = dble(ix-(g+1)) * dx(1) + x0(1)
+           if ((domain_size(1)-x) <= L_sponge) then
+               sponge(ix,iy) = (x-(domain_size(1)-L_sponge))**2
+           elseif (x <= L_sponge) then
+               sponge(ix,iy) = (x-L_sponge)**2
+           else
+               sponge(ix,iy) = 0.0_rk
+           end if
+       end do
+    end do
+
+end subroutine simple_sponge
+
+
+
+
+
+
+
+
+
+
+
 
 
 

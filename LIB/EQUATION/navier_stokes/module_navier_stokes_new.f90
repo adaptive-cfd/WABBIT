@@ -205,7 +205,7 @@ contains
 
         if (params_ns%filter%name=="bogey_shock" .and. params_ns%filter%save_filter_strength) then
             tmp_u=u
-            call filter_block(params_ns%filter, time, tmp_u, Bs, g, x0, dx, work(:,:,:,7:(7+params_ns%number_data_fields)))
+            call filter_block(params_ns%filter, time, tmp_u, Bs, g, x0, dx, work(:,:,:,7:(7+params_ns%N_fields_saved)))
         endif
     else
       call abort(564567,"Error: [module_navier_stokes.f90] 3D case not implemented")

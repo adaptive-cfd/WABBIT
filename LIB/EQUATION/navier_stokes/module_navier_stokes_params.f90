@@ -67,7 +67,7 @@ module module_navier_stokes_params
         character(len=80)                           :: coordinates="cartesian"
         ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
-        ! spatial domain
+        ! spatial domain%number_data_fields
         real(kind=rk)                               :: Lx, Ly, Lz, R_max
         ! number data fields
         integer(kind=ik)                            :: number_data_fields
@@ -104,8 +104,10 @@ module module_navier_stokes_params
         real(kind=rk)                               :: inicond_width
         ! width of initialcond
         real(kind=rk)                               :: initial_density
-        ! width of initialcond
+        ! pressure of initialcond
         real(kind=rk)                               :: initial_pressure
+
+        real(kind=rk)                               :: initial_temp
         ! width of initialcond
         real(kind=rk)                               :: initial_velocity(3)
         ! --------------------------------------------------------------------------------
@@ -212,7 +214,8 @@ contains
       params_ns%initial_density=rho_init
       params_ns%initial_velocity=u_init
       params_ns%initial_pressure=p_init
-       params_ns%inicond_width  =width;
+      params_ns%initial_temp=T_init
+       params_ns%inicond_width  =width
 
     end subroutine init_initial_conditions
 

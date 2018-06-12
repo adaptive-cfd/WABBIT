@@ -716,7 +716,7 @@ contains
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = params_ns%initial_pressure + 1000.0_rk * u( :, :, :, pF)
+        u( :, :, :, pF) = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
         u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
         u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
         ! set Uy

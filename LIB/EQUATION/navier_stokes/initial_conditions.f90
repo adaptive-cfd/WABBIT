@@ -36,7 +36,7 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
     implicit none
     !> actual block data (note this routine acts only on one block)
     real(kind=rk), intent(inout)   :: u(:,:,:)
-    !> spacing and origin of block, domainlength, width of gauss_blob   
+    !> spacing and origin of block, domainlength, width of gauss_blob
     real(kind=rk), intent(in)      :: x0(1:3),dx(1:3),L(1:3),width
     ! grid
     integer(kind=ik),intent(in)    :: Bs, g
@@ -67,7 +67,8 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
           x = dble(ix-(g+1)) * dx(1) + x0(1)
           y = dble(iy-(g+1)) * dx(2) + x0(2)
           ! shift to new gauss blob center
-          call shift_x_y( x, y, L(1),L(2) )
+          call continue_periodic(x,L(1))
+          call continue_periodic(y,L(2))
           ! set actual inicond gauss blob
           u(ix,iy,1) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
         end do
@@ -81,6 +82,10 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
         do iy = g+1,Bs+g
           do iz = g+1,Bs+g
             ! compute x,y coordinates from spacing and origin
+            call continue_periodic(x,L(1))
+            call continue_periodic(y,L(2))
+            call continue_periodic(z,L(3))
+
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             y = dble(iy-(g+1)) * dx(2) + x0(2)
             z = dble(iz-(g+1)) * dx(3) + x0(3)
@@ -95,37 +100,3 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
   endif
 
 end subroutine inicond_gauss_blob
-
-! function to ensure periodicity:
-! shift center of gauss blob to center of computational domain
-! if then point(x,y) outside domain -> set coordinates to (periodic) interior point
-subroutine shift_x_y( x, y, Lx, Ly )
-
-    implicit none
-
-    ! coordinates
-    real(kind=rk), intent(inout)   :: x, y
-    ! domain size
-    real(kind=rk), intent(in)       :: Lx, Ly
-
-    x = x
-    y = y - 0.25_rk
-
-    ! check boundary
-    if ( y < 0.0_rk ) then
-        y = Ly + y
-    end if
-
-    if ( x < 0.0_rk ) then
-        x = Lx + x
-    end if
-
-    if ( y > Ly ) then
-        y = Ly - y
-    end if
-
-    if ( x > Lx ) then
-        x = Lx - x
-    end if
-
-end subroutine shift_x_y

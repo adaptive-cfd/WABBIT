@@ -205,7 +205,7 @@ character(1)                                    :: buf ! Message sent to the flu
 !!          -> send fluid data back to the sender (i.e. particle rank)
 !!    - if \c MPI_TAG is \c end_communication stop waiting for requests
 
-maxpoints=20000
+maxpoints=100000
 k=0
 
 allocate(distributedParticles(4,maxpoints))
@@ -240,6 +240,7 @@ do
          call interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params,distributedParticles(:,1:Ndat),u_inter)
          call MPI_isend(u_inter, 6*Ndat, MPI_double_precision, send_id, data_fieldDelivery, &
                      params%bridge%otherWorld,requests(k),  ierr)
+        if (allocated(u_inter)) deallocate(u_inter)
         ! write(*,*) 'number of particles:',Ndat/4,'positiondata=', distributedParticles(:,1)
     !======= case 2: end communication
     case (end_communication)
@@ -255,7 +256,7 @@ do
     !=========================================
 enddo
 
-    deallocate(distributedParticles)
+      deallocate(distributedParticles)
     deallocate(requests)
 
 
@@ -456,7 +457,7 @@ position_to_lgt_id=-999999
 
 
     enddo
-     write(*,'("[bridgefluid.f90:] No block found for position=", f6.3," STOP!")') position(1)
+     write(*,'("[bridgefluid.f90:] No block found for position= (", f6.3,",",f6.3,") STOP!")') position(1:2)
      write(*,*) position
      call abort(272372,'STOP!')
 end function position_to_lgt_id
@@ -519,7 +520,7 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
     !   - space components of velocity
     !   - preasure
     !   - density
-    allocate(u_inter(6,Nr_particle))
+    if (.not. allocated(u_inter)) allocate(u_inter(6,Nr_particle))
     !allocate particle ids
     allocate(particle_id(Nr_particle))
 

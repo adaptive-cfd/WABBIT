@@ -266,8 +266,6 @@ subroutine init_other_params(params_ns, FILE )
         elseif( x<0 ) then
           ! note it is actually x=L-abs(x) but since x is negative its
           x=L+x
-        else
-          ! do nothing
         endif
 
         min_dx = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly)&

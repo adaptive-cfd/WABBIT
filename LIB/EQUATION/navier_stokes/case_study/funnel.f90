@@ -28,7 +28,7 @@ subroutine init_funnel(FILE)
   funnel%max_inner_diameter   = dmax
   funnel%min_inner_diameter   = dmin
   funnel%wall_thickness       = 0.05*domain_size(1)
-  funnel%length               = domain_size(1)*0.98_rk-funnel%wall_thickness*2.0_rk
+  funnel%length               = domain_size(1)*0.95_rk-funnel%wall_thickness*2.0_rk
   funnel%plates_thickness     = funnel%length/(2.0_rk*funnel%nr_plates)
   funnel%plates_distance      = (funnel%length-funnel%plates_thickness)/(funnel%nr_plates-1)
   funnel%slope                = (dmax - dmin)/((nr_focus_plates-1)*funnel%plates_distance)
@@ -126,10 +126,11 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     ! smooth width in x and y direction
     do iy=1, Bs+2*g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
+       call continue_periodic(y,domain_size(2))
        r = abs(y-domain_size(2)*0.5_rk)
        do ix=1, Bs+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-
+            call continue_periodic(x,domain_size(1))
             rho         = phi(ix,iy,1)**2
             u           = phi(ix,iy,2)/phi(ix,iy,1)
             v           = phi(ix,iy,3)/phi(ix,iy,1)

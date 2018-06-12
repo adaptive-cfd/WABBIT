@@ -29,10 +29,9 @@ module module_indicators
     use module_debug
     ! interpolation routines
     use module_interpolation
-    ! use MPI module, since thrshold_block needs to synch ghosts
-    use module_MPI
-    ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
-    use module_treelib
+    ! we now have an indicator which computes the vorticity, so include the operator module
+    use module_operators
+
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -47,7 +46,7 @@ module module_indicators
 contains
 
   include "refinement_indicator.f90"
-  include "coarsening_indicator.f90"
+  include "block_coarsening_indicator.f90"
   ! threshold the blocks
   include "threshold_block.f90"
 end module module_indicators

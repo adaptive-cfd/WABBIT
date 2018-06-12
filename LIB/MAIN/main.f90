@@ -254,7 +254,7 @@ program main
         test=.false.
         if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false. )
+             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false., .false. )
         if (rank==0) write(*,*) "Done testing redundant nodes."
     endif
 
@@ -271,7 +271,10 @@ program main
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
     else
         ! next write time for reloaded data
-        if (params%write_method .eq. 'fixed_time') params%next_write_time = time + params%next_write_time
+        if (params%write_method .eq. 'fixed_time') then
+            params%next_write_time = time + params%next_write_time
+            params%next_stats_time = time + params%next_stats_time
+        end if
     end if
 
     ! max neighbor num
@@ -305,10 +308,9 @@ program main
             ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
             com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
-
             test=.false. ! test
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false.)
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false., .false.)
 
             if (test) then
                 iteration = 99
@@ -353,7 +355,7 @@ program main
             ! one has the +11 status. now: one time, we correct the redunant fuckers, then remove the +11 status.
             go_sync = .true. ! this is the only place where we explicitly call zeroth stage
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, go_sync, .true. )
+            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, go_sync, .true., .false. )
 
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
@@ -378,9 +380,11 @@ program main
         endif
 
         ! filter
-        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
+        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
+            .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer,&
+            hvy_synch )
 
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
         end if
@@ -401,8 +405,8 @@ program main
         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
+            call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
@@ -418,6 +422,10 @@ program main
             open (77, file='meanflow.t', status='replace')
             close(77)
             open (77, file='forces.t', status='replace')
+            close(77)
+            open (77, file='e_kin.t', status='replace')
+            close(77)
+            open (77, file='enstrophy.t', status='replace')
             close(77)
           endif
 
@@ -474,7 +482,7 @@ program main
     !---------------------------------------------------------------------------
     if (rank==0) write(*,*) "This is the end of the main time loop!"
 
-    ! save end field to disk, only if timestep is not saved allready
+    ! save end field to disk, only if timestep is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &

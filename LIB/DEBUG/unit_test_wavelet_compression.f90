@@ -122,7 +122,7 @@
 !     ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
 !     ! adapt-mesh also performs neighbor and active lists updates. Adapt mesh also contains a
 !     ! loop to coarsen until no more coarsening is possible
-!     call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n , "threshold" )
+!     call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n , "threshold-state-vector" )
 !     if (params%rank == 0) then
 !       write(*,'("Coarsening done. Nblocks=",i6, " Jmax=",i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
 !     endif

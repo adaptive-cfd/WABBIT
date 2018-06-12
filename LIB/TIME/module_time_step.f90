@@ -30,7 +30,6 @@ module module_time_step
     ! use mesh module, since we need to compute dx and origin of blocks
     use module_mesh, only : get_block_spacing_origin, max_active_level
 
-    use module_operators, only: volume_integral
     ! to call RHS routines:
     use module_physics_metamodule, only : RHS_meta, STATISTICS_meta, FILTER_meta
 

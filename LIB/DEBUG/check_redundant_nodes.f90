@@ -28,7 +28,7 @@
 
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
      hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
-     stop_status, stage0 )
+     stop_status, stage0, force_averaging )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -64,7 +64,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
     ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
     ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
-    logical, intent(in):: stage0
+    logical, intent(in):: stage0, force_averaging
 
     ! MPI parameter
     integer(kind=ik)                    :: rank
@@ -124,6 +124,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
         data_bounds_type = 'include_redundant'
         ! 'average', 'simple', 'staging', 'compare'
         data_writing_type = 'staging'
+
+        if ( force_averaging ) then
+          data_writing_type='average'
+        endif
 
     else
         ! nodes test
@@ -1948,22 +1952,22 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         ! stop program
         stop_status = .true.
 
-        ! write(*,*) "---"
-        ! do i =  Bs+2*g, 1, -1
-        !     write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
-        ! enddo
-        ! write(*,*) "---"
-        ! do j = Bs+2*g, 1, -1
-        !     do i = 1, Bs+2*g
-        !         if (tmp(i,j)==0.0_rk) then
-        !             write(*,'(" null    ")', advance="no")
-        !         else
-        !             write(*,'((es8.1,1x))', advance="no") tmp(i,j)
-        !         endif
-        !     enddo
-        !     write(*,*) " "
-        ! enddo
-        ! write(*,*) "---"
+        !write(*,*) "---"
+        !do i =  Bs+2*g, 1, -1
+        !    write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
+        !enddo
+        !write(*,*) "---"
+        !do j = Bs+2*g, 1, -1
+        !    do i = 1, Bs+2*g
+        !        if (tmp(i,j)==0.0_rk) then
+        !            write(*,'(" null    ")', advance="no")
+        !        else
+        !            write(*,'((es8.1,1x))', advance="no") tmp(i,j)
+        !        endif
+        !    enddo
+        !    write(*,*) " "
+        !enddo
+        !write(*,*) "---"
 
         ! mark block by putting a dot in the middle. this way, we can identify all
         ! blocks that have problems. If we set the entire block to 100, then subsequent

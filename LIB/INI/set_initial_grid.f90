@@ -77,6 +77,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
   integer(kind=ik) :: lgt_n_old, k, iter
+  logical :: go_sync
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -101,7 +102,13 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! therefore, there is still a grid-level (=wabbit) parameter "params%initial_cond"
         ! which can be read_from_files or anything else.
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
-
+        ! create lists of active blocks (light and heavy data)
+        ! update list of sorted nunmerical treecodes, used for finding blocks
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        ! update neighbor relations
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------
@@ -113,7 +120,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
         !---------------------------------------------------------------------------
-        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond, hvy_work, .true.)
 
         !---------------------------------------------------------------------------
         ! grid adaptation
@@ -137,40 +144,50 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this
             ! corresponds to advancing the solution in time, it's just that here we know the exact
             ! solution (the inicond)
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+                params%initial_cond, hvy_work, .true.)
 
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
-            call adapt_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, "threshold", com_lists, com_matrix, &
+            call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
             int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
 
             iter = iter + 1
             if (params%rank == 0) then
-              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') iter, lgt_n, &
+              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') iter, lgt_n, &
               min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
             endif
           enddo
         endif
-    end if
-
-    ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
-    ! for example if one does non-adaptive non-equidistant spatial convergence tests
-    if (params%inicond_refinements > 0) then
-      do k = 1, params%inicond_refinements
-        ! refine entire mesh.
-        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
-        ! set initial condition
-        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond)
-
-        if (params%rank == 0) then
-            write(*,'(" did ",i2," refinement stage (beyond what is required for the &
-            &prescribed precision eps) Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') k, lgt_n, &
-            min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
+        ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
+        ! for example if one does non-adaptive non-equidistant spatial convergence tests
+        if (params%inicond_refinements > 0) then
+          do k = 1, params%inicond_refinements
+            ! refine entire mesh.
+            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+                lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+            ! set initial condition
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+                params%initial_cond, hvy_work, .true.)
+                
+            if (params%rank == 0) then
+             write(*,'(" did ",i2," refinement stage (beyond what is required for the &
+                &prescribed precision eps) Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') k, lgt_n, &
+                min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
+             endif
+          enddo
         endif
-      enddo
-    endif
+        ! If we use volume penalization and ACM we first apply the mask to refine 
+        ! the grid properly around it. However, for comparison, we would like to 
+        ! start from an initial condition without a mask (impulsive start).
+        ! This is done here (after the refinements).
+        if (params%physics_type == 'ACM-new') then
+           ! apply inicond for one laste time
+           call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+                params%initial_cond, hvy_work, .false.)
+        end if
+    end if
 
     !---------------------------------------------------------------------------
     ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks
@@ -199,8 +216,17 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
+    ! if the data is read from file, try forcing the redundant nodes to be the same via a single averaging
+    ! sync step. did not solve the problem on IDRIS ada when starting from file.
+    if (params%initial_cond == 'read_from_files') then
+        go_sync = .true.
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
+             hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
+             go_sync, .false., .true. )
+   endif
+
     if (params%rank == 0) then
-        write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmix=",i2, " Jmax=",i2)') lgt_n, &
+        write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') lgt_n, &
         min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
       write(*,'("Initial grid and initial condition terminated.")')
     endif

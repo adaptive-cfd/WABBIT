@@ -10,7 +10,7 @@
 !
 !
 ! ********************************************************************************************
-subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, inicond)
+subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, inicond, hvy_work, adapting)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -23,6 +23,8 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
     integer(kind=ik), intent(inout)      :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
+    !> heavy data array - work data
+    real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)      :: hvy_active(:)
     !> number of heavy and light active blocks
@@ -35,6 +37,8 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
     integer(kind=ik)                     :: hvy_id, lgt_id
     ! origin and spacing of blocks
     real(kind=rk)                        :: x0(1:3), dx(1:3)
+    ! are we still adapting the grid? (for ACM & VPM)
+    logical, intent(in)                  :: adapting
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -58,7 +62,8 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         ! set the initial condition on this block
-        call INICOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), g, x0, dx )
+        call INICOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), g, &
+            x0, dx, hvy_work(:,:,:,:,hvy_id), adapting)
     enddo
 
 end subroutine set_inicond_blocks

@@ -165,13 +165,13 @@ subroutine keyvalues(fname, params, help)
     if (rank == 0) then
         open  (59, file=fname(1:index(fname,'.'))//'key', &
         status = 'replace', action='write', iostat=ioerr)
-        write (59,'(6(es15.8,1x), 3(i10,1x))') time, maxi, mini, meani, squari, qi , &
-        sum_curve(1), sum_curve(2), sum_curve(2)
+        write (59,'(6(es15.8,1x), 2(i10,1x))') time, maxi, mini, meani, squari, qi , &
+        sum_curve(1), sum_curve(2)
         write (*,'(A)') "Result:"
-        write (* ,'(6(A15,1x),3(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
-        "Q-integral", curves(1), curves(2), curves(2)
-        write (* ,'(6(es15.8,1x),3(i12,1x))') time, maxi, mini, meani, squari, qi, &
-        sum_curve(1), sum_curve(2), sum_curve(2)
+        write (* ,'(6(A15,1x),2(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
+        "Q-integral", curves(1), curves(2)
+        write (* ,'(6(es15.8,1x),2(i12,1x))') time, maxi, mini, meani, squari, qi, &
+        sum_curve(1), sum_curve(2)
         write (*,'(A)') "These values can be used to compare two HDF5 files"
         close (59)
     endif

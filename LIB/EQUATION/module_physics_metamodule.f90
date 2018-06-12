@@ -231,7 +231,7 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx, stage )
+     call STATISTICS_ACM( time, u, g, x0, dx, stage, rhs )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
@@ -298,7 +298,7 @@ contains
  !-----------------------------------------------------------------------------
  ! main level wrapper for setting the initial condition on a block
  !-----------------------------------------------------------------------------
- subroutine INICOND_meta( physics, time, u, g, x0, dx )
+ subroutine INICOND_meta( physics, time, u, g, x0, dx, work, adapting)
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -310,6 +310,10 @@ contains
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
+   ! work data. In general a 4D field (3 dims+components)
+   ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+   real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+
    ! as you are allowed to compute the RHS only in the interior of the field
    ! you also need to know where 'interior' starts: so we pass the number of ghost points
    integer, intent(in) :: g
@@ -318,9 +322,12 @@ contains
    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
+   ! are we still adapting the initial grid? (for ACM with VPM)
+   logical, intent(in) :: adapting
+
    select case (physics)
    case ("ACM-new")
-     call INICOND_ACM( time, u, g, x0, dx )
+     call INICOND_ACM( time, u, g, x0, dx, work, adapting)
 
    case ("ConvDiff-new")
      call INICOND_ConvDiff( time, u, g, x0, dx )

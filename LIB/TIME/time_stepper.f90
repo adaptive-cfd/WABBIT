@@ -51,7 +51,7 @@
 ! ********************************************************************************************
 
 subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, com_lists, com_matrix, hvy_synch)
+    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, hvy_synch)
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -80,10 +80,6 @@ integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     integer(kind=ik), intent(in)        :: hvy_n
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
-    ! communication lists:
-    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
-    ! communications matrix:
-    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
     ! loop variables
     integer(kind=ik)                    :: k, j, neq
     ! time step, dx
@@ -111,8 +107,7 @@ integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-    com_matrix, .true., hvy_synch )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
     call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
@@ -140,8 +135,7 @@ integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .false., hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)

@@ -32,6 +32,9 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! variables
 
+    ! I usually find it helpful to use the private keyword by itself initially, which specifies
+    ! that everything within the module is private unless explicitly marked public.
+    PRIVATE
     SAVE
 
     ! send/receive buffer, integer and real
@@ -40,11 +43,9 @@ module module_MPI
     integer(kind=ik), allocatable :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable    :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
+    ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
 
-    ! I usually find it helpful to use the private keyword by itself initially, which specifies
-    ! that everything within the module is private unless explicitly marked public.
-    PRIVATE
 
     ! ! global variables
     ! data_buffer

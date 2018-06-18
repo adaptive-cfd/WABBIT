@@ -15,7 +15,7 @@ subroutine compute_vorticity_post(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid, allocate_com_arrays
+    use module_initialization, only: allocate_grid
     use module_mpi
     use module_operators
 
@@ -40,8 +40,6 @@ subroutine compute_vorticity_post(help, params)
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
-    integer(kind=ik), allocatable      :: com_matrix(:,:,:)
-    integer(kind=ik), allocatable      :: com_lists(:, :, :, :)
 
     !-----------------------------------------------------------------------------------------------------
 
@@ -107,8 +105,7 @@ subroutine compute_vorticity_post(help, params)
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
     lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work, &
     hvy_synch)
-    ! allocate communication arrays
-    call allocate_com_arrays(params, com_lists, com_matrix)
+
     ! read mesh and field
     call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
     call read_field(file_ux, 1, params, hvy_block, hvy_n)
@@ -122,8 +119,7 @@ subroutine compute_vorticity_post(help, params)
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-    com_matrix, .true., hvy_synch )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
     ! calculate vorticity from velocities
     do k=1,hvy_n

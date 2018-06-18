@@ -155,8 +155,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o \
 	set_initial_grid.f90 initial_block_distribution_2D.f90 new_block_heavy.f90 \
 	inicond_vorticity_filaments.f90 initial_block_distribution_3D.f90 create_equidistant_base_mesh.f90 \
-	allocate_grid.f90 reset_grid.f90 \
-	set_inicond_blocks.f90 allocate_com_arrays.f90 get_inicond_from_file.f90
+	allocate_grid.f90 reset_grid.f90 set_inicond_blocks.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\

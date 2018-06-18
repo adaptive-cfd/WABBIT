@@ -127,28 +127,6 @@ program main
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4
     logical                             :: test, go_sync
-    ! allocate com lists and com matrix here
-    ! communication lists:
-    ! dim 1: list elements
-    ! dim 2: columns
-    !                       1   rank of sender process
-    !                       2   rank of receiver process
-    !                       3   sender block heavy data id
-    !                       4   receiver block heavy data id
-    !                       5   sender block neighborhood to receiver (dirs id)
-    !                       6   difference between sender-receiver level
-    ! dim 3: receiver proc rank
-    ! dim 4: synch stage
-    integer(kind=ik), allocatable       :: com_lists(:, :, :, :)
-
-    ! communications matrix:
-    ! count the number of communications between procs
-    ! row/column number encodes process rank + 1
-    ! com matrix pos: position in send buffer
-    ! dim 3: synch stage
-    integer(kind=ik), allocatable       :: com_matrix(:,:,:)
-
-
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data
 !---------------------------------------------------------------------------------------------
@@ -213,8 +191,6 @@ program main
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
-    ! allocate communication arrays
-    call allocate_com_arrays(params, com_lists, com_matrix)
 
     !---------------------------------------------------------------------------
     ! Unit tests
@@ -226,7 +202,7 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, hvy_synch )
+        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_synch )
     endif
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -237,13 +213,12 @@ program main
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, time, iteration, hvy_synch, hvy_work )
+    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_synch, hvy_work )
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk (unless we're reading from file in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -286,8 +261,7 @@ program main
         ! if (params%debug) then
             ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
             ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., hvy_synch )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
             test=.false. ! test
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
             hvy_n, test, .false., .false.)
@@ -324,8 +298,7 @@ program main
             ! that just stayed on Jmax has the status +11.
             ! NOTE: in the sync ghosts wrapper, the 0th stage (where these redundant nodes are corrected) is
             ! completely DISABLED
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., hvy_synch )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
             ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
             call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
@@ -345,8 +318,7 @@ program main
         !***********************************************************************
         t4 = MPI_wtime()
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
-        hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
-        com_matrix, hvy_synch )
+        hvy_active, lgt_active, lgt_n, hvy_n, hvy_synch )
         call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
 
 
@@ -362,8 +334,7 @@ program main
         ! filter
         if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
             .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., hvy_synch )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
         end if
@@ -385,15 +356,14 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, hvy_synch, hvy_work )
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_synch, hvy_work )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
 
         ! statistics
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes for some derived qtys, for sure
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-          com_matrix, .true., hvy_synch )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
           ! TODO make this nicer
           if (iteration==1 .and. rank==0) then
@@ -414,8 +384,7 @@ program main
         ! write data to disk
         if ( it_is_time_to_save_data) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-          com_matrix, .true., hvy_synch )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
           ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
           ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -463,8 +432,7 @@ program main
     ! save end field to disk, only if timestep is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
 
         ! filter before write out
         if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then

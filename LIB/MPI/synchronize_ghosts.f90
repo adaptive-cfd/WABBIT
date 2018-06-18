@@ -57,8 +57,7 @@
 !
 ! ********************************************************************************************
 
-subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-    com_lists, com_matrix, grid_changed, hvy_synch )
+subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
     implicit none
 
     !> user defined parameter structure
@@ -73,13 +72,7 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-    ! grid stay fixed between two synch calls, so use old com_lists and com_matrix
-    logical, intent(in)                 :: grid_changed
     integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
-    ! communication lists:
-    integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
-    ! communications matrix:
-    integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
 
     logical :: sync
     character(len=80) :: method

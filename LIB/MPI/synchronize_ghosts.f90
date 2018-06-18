@@ -57,7 +57,7 @@
 !
 ! ********************************************************************************************
 
-subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     implicit none
 
     !> user defined parameter structure
@@ -72,7 +72,6 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
     logical :: sync
     character(len=80) :: method
@@ -92,7 +91,7 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     case ("--staging")
         ! MSR CODE
         sync = .true.
-        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
         hvy_n, sync, .false., .false. )
     case default
         ! JR version of MSR code above

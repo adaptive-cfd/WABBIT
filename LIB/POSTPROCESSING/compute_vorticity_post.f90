@@ -33,7 +33,6 @@ subroutine compute_vorticity_post(help, params)
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=1), allocatable       :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
     character(len=80)                  :: fname
@@ -103,8 +102,7 @@ subroutine compute_vorticity_post(help, params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work, &
-    hvy_synch)
+    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work)
 
     ! read mesh and field
     call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
@@ -119,7 +117,7 @@ subroutine compute_vorticity_post(help, params)
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
     ! calculate vorticity from velocities
     do k=1,hvy_n

@@ -25,7 +25,7 @@
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_synch )
+    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -34,7 +34,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 ! variables
 
     implicit none
-        integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> user defined parameter structure
     type (type_params), intent(inout)       :: params
     !> light data array
@@ -148,7 +147,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         lgt_sortednumlist, hvy_active, hvy_n, "random" )
         ! random adapt some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_synch, hvy_work )
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )
     end do
 
     if (params%rank == 0) then
@@ -207,7 +206,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

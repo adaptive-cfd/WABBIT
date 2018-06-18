@@ -43,6 +43,10 @@ module module_MPI
     integer(kind=ik), allocatable :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), allocatable    :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
+    ! this array is used only in AVERAGING submodule of (deprecated) MSR ghost nodes.
+    ! TODO: remove, as averaging did not work.
+    integer(kind=1), allocatable :: hvy_synch(:, :, :, :)
+
     ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
 
@@ -114,6 +118,14 @@ subroutine init_ghost_nodes( params )
 
         allocate( real_receive_buffer( buffer_N, params%number_procs) )
         if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_receive_buffer", shape(real_receive_buffer)
+
+        ! synch array, use for ghost nodes synchronization
+        if (params%threeD_case) then
+            allocate( hvy_synch( Bs+2*g, Bs+2*g, Bs+2*g, number_blocks ) )
+        else
+            allocate( hvy_synch( Bs+2*g, Bs+2*g, 1, number_blocks ) )
+        endif
+        if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
 
         if (rank==0) then
             write(*,'("GHOSTS-INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk

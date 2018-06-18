@@ -51,7 +51,7 @@
 ! ********************************************************************************************
 
 subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, hvy_synch)
+    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -59,8 +59,6 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
     !> time varible
     real(kind=rk), intent(inout)        :: time
-
-integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -107,7 +105,7 @@ integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
     ! synchronize ghost nodes
     ! first ghost nodes synchronization, so grid has changed
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     ! ----------------------------------------------------------------------------------------
     ! calculate time step
     call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
@@ -135,7 +133,7 @@ integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
         ! synchronize ghost nodes for new input
         ! further ghost nodes synchronization, fixed grid
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)

@@ -34,15 +34,13 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_synch, hvy_work )
+    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_work )
 
 !---------------------------------------------------------------------------------------------
 ! variables
 
     implicit none
     real(kind=rk), intent(in)           :: time
-    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
-
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -103,12 +101,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
         call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
-        hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_synch)
+        hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
@@ -224,7 +222,7 @@ end subroutine adapt_mesh
 !! 29/05/2018 create
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
-  hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_synch)
+  hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
   !---------------------------------------------------------------------------------------------
   ! modules
     use module_indicators
@@ -255,7 +253,6 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     integer(kind=ik), intent(in)        :: iteration
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
 
     ! local variables
@@ -297,7 +294,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         enddo
 
         ! note here we synch hvy_work (=vorticity) and not hvy_block
-        call sync_ghosts( params, lgt_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
     endif
 
     !> Compute normalization for eps, if desired.

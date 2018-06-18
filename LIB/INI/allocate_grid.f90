@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, simulation, hvy_work, hvy_synch)
+    lgt_sortednumlist, simulation, hvy_work)
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -45,7 +45,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy work array
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
-    integer(kind=1), allocatable, optional, intent(out) :: hvy_synch(:, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -100,10 +99,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
             if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_work", shape(hvy_work)
-
-            ! synch array, use for ghost nodes synchronization
-            allocate( hvy_synch( Bs+2*g, Bs+2*g, Bs+2*g, number_blocks ) )
-            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
         end if
 
         ! 3D: maximal 74 neighbors per block
@@ -120,10 +115,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
             if (rank==0) write(*,'("INIT: Allocated ",A," shape=",5(i9,1x))') "hvy_work", shape(hvy_work)
-
-            ! synch array, use for ghost nodes synchronization
-            allocate( hvy_synch( Bs+2*g, Bs+2*g, 1, number_blocks ) )
-            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
         end if
 
         ! 2D: maximal 16 neighbors per block
@@ -162,12 +153,12 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! note we currently use 8byte per real and integer by default, so all the same bytes per point
         write(*,'("INIT: Measured (true) local (on 1 cpu) memory footprint is ",g15.3,"GB per mpirank")') &
         (dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
-        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
+        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active))/8.0 &
         )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
 
         write(*,'("INIT: Measured (true) TOTAL (on all CPU) memory footprint is ",g15.3,"GB")') &
         ((dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
-        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
+        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active))/8.0 &
         )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)
     end if
 
@@ -178,7 +169,7 @@ end subroutine allocate_grid
 
 
 subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_synch )
+    lgt_sortednumlist, hvy_work )
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -193,7 +184,6 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy work array  )
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
-    integer(kind=1), allocatable, optional, intent(out) :: hvy_synch(:, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -210,7 +200,6 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     if (allocated(hvy_block)) deallocate( hvy_block )
     if (allocated(hvy_work)) deallocate( hvy_work )
-    if (allocated(hvy_synch)) deallocate( hvy_synch )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )
     if (allocated(lgt_sortednumlist)) deallocate( lgt_sortednumlist )

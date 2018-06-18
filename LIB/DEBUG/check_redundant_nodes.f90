@@ -595,10 +595,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)  ! containg the (flow) fields
 
     ! MPI parameter
-    integer(kind=ik)                    :: myrank                            ! TODO: is kind=ik ok??
-    ! number of processes
-    integer(kind=ik)                    :: mpisize                    ! TODO: is kind=ik ok??
-
+    integer(kind=ik)                    :: myrank, mpisize
     ! loop variables
     integer(kind=ik)                    :: N, k, dF, neighborhood, invert_neighborhood, level_diff, l, levelsToSortIn
     integer(kind=ik)                    :: level_diff_indicator ! merged information of level diff and an idicator that we have a historic fien sender
@@ -636,7 +633,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     integer(kind=ik)                :: hvyId_temp   ! just for a  consistency check
     integer(kind=ik)                :: entrySortInRound , currentSortInRound
     integer, parameter              :: exclude_redundant  = 1, include_redundant = 2,   only_redundant = 3
-    integer                         :: bounds_type !, roundCountDebug
+    integer                         :: bounds_type
     character(len=25), dimension(3) :: data_bounds_names  != (/  'exclude_redundant' , 'include_redundant',   'only_redundant'   /)
     logical                         :: senderHistoricFine, recieverHistoricFine, receiverIsCoarser
     logical                         :: receiverIsOnSameLevel, lgtIdSenderIsHigher

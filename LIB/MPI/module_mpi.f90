@@ -1,8 +1,8 @@
 !>\dir
 !> MPI synchronization routines
 
-!> \file 
-!> \brief File of MPI Module 
+!> \file
+!> \brief File of MPI Module
 
 
 !> \brief This module implements all MPI synchronization routines
@@ -11,9 +11,10 @@
 !>          * synchronization of light data
 !>          * creation of rank block rank lists
 !>          * copy, write send and recieve buffers
-!> \version 0.4
-!> \author msr
+!> \version 0.6
+!> \author engels, reiss, msr
 !! 12/01/17 - create
+!! 18/07/2018 - remove all old ghost node routines, build in JR's improved version of MSR's new ghost nodes
 module module_MPI
 
 !---------------------------------------------------------------------------------------------
@@ -40,49 +41,9 @@ module module_MPI
 
 contains
 
-    ! ghost nodes synchronization
     include "synchronize_ghosts.f90"
-
-    ! ghost nodes synchronization
-    include "create_external_com_list.f90"
-
-    ! coyp internal ghost nodes
-    include "copy_ghost_nodes_2D.f90"
-    include "copy_ghost_nodes_3D.f90"
-
-    ! redundant nodes subroutine - use to ensure correct order of ghost nodes synch
-    include "copy_redundant_nodes_2D.f90"
-
-    ! write send buffer
-    include "create_send_buffer_2D.f90"
-    include "create_send_buffer_3D.f90"
-
-    ! write received buffer
-    include "write_receive_buffer_2D.f90"
-    include "write_receive_buffer_3D.f90"
-
-    ! maximal number of communications
-    include "max_com_num.f90"
-
-    ! fill send buffer
-    include "fill_send_buffer.f90"
-
-    ! fill receive buffer
-    include "fill_receive_buffer.f90"
-
-    ! soubroutine for get data with lock/unlock synchronization
-    ! include "RMA_lock_unlock_get_data.f90"
-
-    ! soubroutine to put data with lock/unlock synchronization
-    ! include "RMA_lock_unlock_put_data.f90"
-
-    ! non blocking data transfer
-    include "isend_irecv_data.f90"
-
     include "blocks_per_mpirank.f90"
     include "synchronize_lgt_data.f90"
-
-    ! routine to reset ghost nodes to uniform number (for debuging)
     include "reset_ghost_nodes.f90"
 
 end module module_MPI

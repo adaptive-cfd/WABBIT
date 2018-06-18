@@ -111,6 +111,11 @@ contains
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
       write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max/2, nx_max/2
+      write(*,'("initial speed of sound:", T40, f6.2)') &
+      sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+      write(*,'("Reynolds for Ly:", T40, f12.1)') &
+                params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
+                sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
     endif
 
     ! set global parameters pF,rohF, UxF etc

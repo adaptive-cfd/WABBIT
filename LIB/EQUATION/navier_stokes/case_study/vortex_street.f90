@@ -2,15 +2,13 @@
 subroutine init_vortex_street(FILE)
 
   implicit none
-    
+
  ! character(len=*), intent(in) :: filename
   type(inifile) , intent(inout) :: FILE
-  
 
-  !call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/0.5_rk, 0.5_rk /) )
-  !call read_param_mpi(FILE, 'VPM', 'radius', cyl%radius, 0.5_rk )
-  cyl%x_cntr=(/ 0.2*domain_size(1) , 0.5*domain_size(2) /)  
-  cyl%radius=0.05_rk*min(domain_size(1),domain_size(2))
+
+  call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/ 0.25*domain_size(1) , 0.5*domain_size(2) /) )
+  call read_param_mpi(FILE, 'VPM', 'radius', cyl%radius,0.05_rk*min(domain_size(1),domain_size(2)) )
 
 end subroutine init_vortex_street
 
@@ -55,7 +53,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
            mask(ix,iy) = smoothstep( r - cyl%radius, h)
-           
+
        end do
     end do
 end subroutine draw_cylinder
@@ -74,9 +72,9 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     real(kind=rk), dimension(:,:,:), intent(inout)   :: penalization
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)          :: x0, dx
-    !> statevector 
+    !> statevector
     real(kind=rk), dimension(:,:,:), intent(in)      :: phi
-      !> statevector 
+      !> statevector
     real(kind=rk)                                    :: mask(Bs+2*g,Bs+2*g)
 
     ! auxiliary variables
@@ -86,7 +84,7 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
                                                         u(Bs+2*g,Bs+2*g),v(Bs+2*g,Bs+2*g)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy,n
-    ! outlets and inlets 
+    ! outlets and inlets
     real(kind=rk)                                    :: T0,rho0,u0,p0
 
 !---------------------------------------------------------------------------------------------
@@ -110,7 +108,7 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     u           = phi(:,:,2)/phi(:,:,1)
     v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
-    
+
     ! cylinder
     !---------
     call draw_cylinder(mask, x0, dx, Bs, g )
@@ -181,4 +179,3 @@ subroutine sponge_2D_NEW(sponge, x0, dx, Bs, g)
     end do
 
 end subroutine sponge_2D_NEW
-

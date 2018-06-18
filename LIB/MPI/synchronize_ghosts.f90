@@ -69,6 +69,9 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
+
+!    real(kind=rk), allocatable        :: hvy_block_debug(:, :, :, :, :)   ! only debug!
+
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
@@ -89,12 +92,18 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik)  :: count
     real(kind=rk) :: t0
 
+    !character(len=128)       :: fileNameData = 'hvy_data.dat' !, fileNameDataRestricted = 'hvy_dataRestricted.dat'
+
     t0 = MPI_wtime()
 
+!    allocate( hvy_block_debug( size(hvy_block,1 ), size(hvy_block,2),size(hvy_block,3 ), size(hvy_block,4 ),size(hvy_block,5 )  ) )
+!    hvy_block_debug(:,:,:,:,:) =  hvy_block(:,:,:,:,:) ;
     count = command_argument_count()
     call get_command_argument(count, method)
 
-    if (method=="--old") then
+    select case (method)
+    !if (method=="--old") then
+    case ("--old")
         ! OLD routine
         call synchronize_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
         com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
@@ -102,18 +111,31 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
         write(*,*) "WARNING --old sync'ing is deprecated: we now allow blocks to stay on jmax, which --old cannot allow"
 
-    else
+    case ("--generic_sequence") 
+!        write(*,*) 'sequence!'
+!        call synchronize_ghosts_generic_rules( params, lgt_block, hvy_block_debug, hvy_synch, hvy_neighbor, hvy_active, &
+!        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, .false.   )
+!        call write_real5(hvy_block_debug ,hvy_active, hvy_n     , fileNameDataSimple    )
+
+        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer   )
+
+        !call write_real5(hvy_block ,hvy_active, hvy_n     , fileNameData    )
+
+    case default
+    !else
         ! new routine
         sync = .true.
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync, .false., .false. )
-    endif
+        !     call abort(1212,'unknown data sync method ...say whaaat?')
+    end select
 
     call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )
 ! sync=.false. ! test
 !         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
 !         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync)
-
+!  deallocate( hvy_block_debug )
 end subroutine sync_ghosts
 
 

@@ -17,6 +17,12 @@ fi
 if [ -z "$mpi_command" ]; then
     export mpi_command="nice mpiexec -n ${nprocs}"
 fi
+
+export ghosts="--generic_sequence"
+# export ghosts="--new"
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+sleep 5
+
 fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'
 end_color=$'\033[0m'

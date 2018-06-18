@@ -303,7 +303,7 @@ program main
         ! check redundant nodes
         !***********************************************************************
         t4 = MPI_wtime()
-        if (params%debug) then
+        ! if (params%debug) then
             ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
             ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
@@ -317,7 +317,7 @@ program main
                 call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
                 call abort(111111,"Redundant nodes check failed - stopping.")
             endif
-        endif
+        ! endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
 

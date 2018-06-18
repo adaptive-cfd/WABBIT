@@ -338,6 +338,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
                         call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
                     else
+                        !call abort(1212,'debug, why more than one prossess ?') 
                         ! synch status for staging method
                         synch = .true.
                         if (data_writing_type == 'staging') then
@@ -559,7 +560,911 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
 end subroutine check_redundant_nodes
 
-!############################################################################################################
+
+
+subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)     ! the factor used for averaging, unused currently  
+
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)    ! containing meta (geometry) information 
+    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)  ! containg the (flow) fields 
+
+    ! MPI parameter
+    integer(kind=ik)                    :: rank                            ! TODO: is kind=ik ok?? 
+    ! number of processes
+    integer(kind=ik)                    :: number_procs                    ! TODO: is kind=ik ok??  
+
+    ! loop variables
+    integer(kind=ik)                    :: N, k, dF, neighborhood, invert_neighborhood, neighbor_num, level_diff, l, levelsToSortIn
+    integer(kind=ik)                    :: level_diff_indicator ! merged information of level diff and an idicator that we have a historic fien sender 
+    ! id integers
+    integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id_receiver, sender_hvy_id
+
+    ! type of data bounds
+    ! 'exclude_redundant', 'include_redundant', 'only_redundant'
+    
+    integer(kind=ik), dimension(2,3)    :: data_bounds
+    integer(kind=ik), dimension(2,3)    :: data_bounds_sender
+    integer(kind=ik), dimension(2,3)    :: data_bounds_receiver 
+
+    ! local send buffer, note: max size is (blocksize)*(ghost nodes size + 1)*(number of datafields)
+    ! restricted/predicted data buffer
+    real(kind=rk), allocatable :: data_buffer(:), res_pre_data(:,:,:,:)
+    ! data buffer size
+    integer(kind=ik)                    :: buffer_size, buffer_position
+
+    ! grid parameter
+    integer(kind=ik)                    :: Bs, g, stage_start
+    ! number of datafields
+    integer(kind=ik)                                :: NdF
+
+    ! communications matrix (only 1 line) 
+    ! note: todo: check performance without allocation?
+    ! todo: remove dummy com matrix, needed for old MPI subroutines
+    integer(kind=ik), allocatable     :: com_matrix(:), dummy_matrix(:,:)  !TODO rm dummy matrix 
+
+    ! position in integer buffer, need for every neighboring process
+    integer(kind=ik), allocatable                                :: int_pos(:)
+
+
+!    character(len=128)       :: fileNameData = 'hvy_data.dat', fileNameLoc = 'locations.dat'
+
+    !>
+    integer(kind=ik)                :: hvyId_temp   ! just for a  consistency check 
+    integer(kind=ik)                :: entrySortInRound , currentSortInRound
+    integer, parameter              :: exclude_redundant  = 1, include_redundant = 2,   only_redundant = 3
+    integer                         :: bounds_type !, roundCountDebug 
+    character(len=25), dimension(3) :: data_bounds_names  != (/  'exclude_redundant' , 'include_redundant',   'only_redundant'   /)  
+    logical                         :: senderHistoricFine, recieverHistoricFine, receiverIsCoarser
+    logical                         :: receiverIsOnSameLevel, lgtIdSenderIsHigher
+                 
+    data_bounds_names(1)  =  'exclude_redundant' 
+    data_bounds_names(2)  =  'include_redundant'   
+    data_bounds_names(3)  =  'only_redundant'     
+
+ !---------------------------------------------------------------------------------------------
+! variables initialization
+
+    !data_writing_type = 'simple'   
+
+    !data_bounds_type = 'exclude_redundant'
+!    data_bounds_type = 'include_redundant' ! send all fo now, 
+                                           ! TODO  later drop stuff which is surely not needed ie redunant send to higher level blocks
+                                           ! more rules exist, but might be complicated to implement  
+
+    ! grid parameter
+    Bs    = params%number_block_nodes
+    g     = params%number_ghost_nodes
+    ! number of datafields
+    NdF   = params%number_data_fields
+
+    ! set number of blocks
+    N = params%number_blocks
+
+    ! set MPI parameter
+    rank = params%rank
+    number_procs = params%number_procs
+    !write(*,*) 'mpi, num, rank', number_procs, rank 
+    ! set loop number for 2D/3D case
+    neighbor_num = size(hvy_neighbor, 2)
+
+    ! 2D only!
+    allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
+    com_matrix(number_procs), int_pos(number_procs), dummy_matrix(number_procs, number_procs) ) ! JR: for all other processes? uh, 
+                                                                                                ! hu, there we need to do something better: 
+                                                                                                ! TODO: something better                                                                                                
+
+    ! reset com matrix
+    com_matrix = 0
+    dummy_matrix = 0
+
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+        ! reset integer send buffer position
+        int_pos = 2                               ! TODO JR why 2? , the first filed contains the size of the XXX 
+        ! reset first in send buffer position
+        int_send_buffer( 1, : ) = 0
+        int_send_buffer( 2, : ) = -99
+ 
+ 
+        ! debug check if hvy_active is sorted 
+        if  (hvy_n>1) then
+            hvyId_temp =  hvy_active(1)  
+            do k = 2, hvy_n
+                if  (hvyId_temp> hvy_active(k))  then
+                    call abort(1212,' hvy_active is not sorted as assumed. Panic!')      
+                    
+                end if
+                hvyId_temp = hvy_active(k)       
+            end do 
+        end if     
+        !write (*,*) 'rank', rank
+        ! loop over active heavy data
+        !write(*,*) 'collecting data'
+        do k = 1, hvy_n
+            ! calculate light id
+            sender_hvy_id = hvy_active(k) 
+!             write(*,*)  'sender_hvy_id',  sender_hvy_id
+            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                
+            ! loop over all neighbors
+            do neighborhood = 1, neighbor_num
+                ! neighbor exists
+                if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
+                
+                    !  ----------------------------  determin the core ids and properties of neighbor  ------------------------------
+                    ! todo: check if info availbale when searching neighbor and store it in hvy_neighbor 
+                    ! 0. ids bestimmen
+                    ! neighbor light data id
+                    neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
+                    ! calculate neighbor rank
+                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+                    ! neighbor heavy id
+                    call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_light_id, neighbor_rank, N )
+                    ! calculate the difference between block levels
+                    ! define leveldiff: sender - receiver, so +1 means sender on higher level
+                    ! sender is active block (me)
+                    level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
+
+
+
+                    !  ----------------------------  here decide which values are taken for redundant nodes --------------------------------
+
+                    ! here is the core of the ghost point rules 
+                    ! main criterion: (very fine/historic fine) wins over (fine) wins over (same) wins over (coars)
+                    ! secondary the higer light  id wins 
+
+                    ! comment: the same dominace rules within the ghos nodes are relaized by the sequence of fuilling in the values,
+                    ! first coarse the same then finer, always in the sequence of teh hvy id the redundant nodes within the ghost nodes and maybe in the 
+                    ! redundant nodes are written several time, the ione folling the above rules should win
+
+                    ! the criteria     
+                    senderHistoricFine      = ( lgt_block(           lgt_id, params%max_treelevel+2)==11) 
+                    recieverHistoricFine    = ( lgt_block(neighbor_light_id, params%max_treelevel+2)==11)
+                    receiverIsCoarser       = ( level_diff<0_ik )   
+                    receiverIsOnSameLevel   = ( level_diff.eq.0_ik ) 
+                    lgtIdSenderIsHigher     = ( neighbor_light_id < lgt_id  ) 
+
+                    bounds_type = exclude_redundant    ! initialized, overwritten when needed
+                    entrySortInRound = level_diff + 2   ! has values 1,2,3 ; is  overwritten if sender is historic fine 
+                    
+                    ! here we decide who dominates. would be simple without the historic fine                          
+                    if (senderHistoricFine) then
+                        entrySortInRound = 4    ! this takes care that this data in inserted in the last round, by this historic fine overwrites all
+                        if (recieverHistoricFine) then 
+                            if (lgtIdSenderIsHigher)  then 
+                              ! both are historic fine, include only on light_id 
+                                bounds_type = include_redundant   
+                            end if
+                        else ! receiver not historic fine, no chance, no further checks on refinement level 
+                            bounds_type = include_redundant 
+                        end if                                                                 
+
+                    else  ! sender NOT historic fine, 
+                        
+                        ! what about the oppenend, historic fine?   
+                        if (.not.recieverHistoricFine) then 
+                            ! both not historic fine, do the basic rules  
+                        
+                            ! first rule, overwrite cosarser ghost nodes   
+                            if (receiverIsCoarser)  then ! receiver is coarser 
+                                bounds_type = include_redundant
+                            end if 
+                                
+                            ! secondary rule: on same level decide on light id  
+                            if (receiverIsOnSameLevel.and.lgtIdSenderIsHigher) then 
+                                bounds_type = include_redundant
+                            end if  
+                                                                      
+!                       else ! recieverHistoricFine,   opponend wins, exclude_redundant predefined   
+!                             bounds_type = exclude_redundant 
+                        end if                     
+                    end if  ! else  senderHistoricFine
+
+                    !  ----------------------------  pack describing data and node values to send ---------------------------
+                    
+                    !write(*,*)  lgt_id,'->', neighbor_light_id,':', data_bounds_names(bounds_type), neighborhood, level_diff
+
+                    ! pack multipe information; just to keep old structure, but i save also send data size
+                    ! more information could be included boubdary type, .. but might not be worth the effort
+
+
+  
+                    if ( (rank==neighbor_rank)) then
+                        level_diff_indicator =  4096*sender_hvy_id + 256*bounds_type  +  16*(level_diff+1) + entrySortInRound     
+
+                        if (sender_hvy_id.ne.( level_diff_indicator/4096 ) )  call abort(1212,' wrong sender_hvy_id !') 
+                   
+                        call write_buffers( int_send_buffer, real_send_buffer, 1_ik, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), & 
+                                             hvy_id_receiver, neighborhood, level_diff_indicator )
+                                                                     ! increase int buffer position,  
+                        int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
+                        ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
+                        int_send_buffer( int_pos(neighbor_rank+1)  , neighbor_rank+1 ) = -99                                               
+                        !write(*,*) neighborhood, level_diff, data_bounds_names(bounds_type),  sender_hvy_id
+
+                    
+                    else    
+                        ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
+                        com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
+
+                        level_diff_indicator =    256*bounds_type  +  16*(level_diff+1) + entrySortInRound     
+                    
+
+                        ! 1. ich (aktiver block) ist der sender für seinen nachbarn
+                        ! lese daten und sortiere diese in bufferform
+                        ! wird auch für interne nachbarn gemacht, um gleiche routine für intern/extern zu verwenden
+                        ! um diue lesbarkeit zu erhöhen werden zunächst die datengrenzen bestimmt
+                        ! diese dann benutzt um die daten zu lesen
+                        ! 2D/3D wird bei der datengrenzbestimmung unterschieden, so dass die tatsächliche leseroutine stark vereinfacht ist
+                        ! da die interpolation bei leveldiff -1 erst bei der leseroutine stattfindet, werden als datengrenzen die für die interpolation noitwendigen bereiche angegeben
+                        ! auch für restriction ist der datengrenzenbereich größer, da dann auch hier später erst die restriction stattfindet
+                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_names(bounds_type), 'sender' )
+
+                        ! vor dem schreiben der daten muss ggf interpoliert werden
+                        ! hier werden die datengrenzen ebenfalls angepasst
+                        ! interpolierte daten stehen in einem extra array
+                        ! dessen größe richtet sich nach dem größten möglichen interpolationsgebiet: (Bs+2*g)^3
+                        ! auch die vergröberten daten werden in den interpolationbuffer geschrieben und die datengrenzen angepasst
+                        if ( level_diff == 0 ) then
+                            ! lese nun mit den datengrenzen die daten selbst
+                            ! die gelesenen daten werden als buffervektor umsortiert
+                            ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
+                            ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
+                            call read_hvy_data( params, data_buffer, buffer_size, &
+                            hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
+                        else
+                            ! interpoliere daten
+                            call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_names(bounds_type), hvy_block, hvy_active(k) )
+                            ! lese daten, verwende interpolierte daten
+                            call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
+                                                                                                data_bounds(1,2):data_bounds(2,2), &
+                                                                                                data_bounds(1,3):data_bounds(2,3), &
+                                                                                                :) )
+                        end if
+
+                        ! daten werden jetzt entweder in den speicher geschrieben -> schreiberoutine
+                        ! oder in den send buffer geschrieben
+                        ! schreiberoutine erhält die date grenzen
+                        ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
+                        ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
+                        ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
+                        
+                                                                                                                    
+                        ! debug test it                 
+    !                    if (entrySortInRound.ne.modulo( level_diff_indicator    , 16 )      )    write (*,*) 'error!!!' 
+    !                    if (level_diff.ne.( modulo( level_diff_indicator/16 , 16 ) - 1_rk ) )    write (*,*) 'error!!!'    
+    !                    if (bounds_type.ne.modulo( level_diff_indicator/256, 16 )           )    write (*,*) 'error!!!'
+                                  
+                              
+                        ! active block send data to his neighbor block
+                        ! fill int/real buffer
+                        !write(*,*)  'pos,size, entrySortInRound', int_pos(neighbor_rank+1), buffer_size , level_diff_indicator
+                        call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), & 
+                                             hvy_id_receiver, neighborhood, level_diff_indicator )
+
+                        ! TODO: next two lines should be done within write_buffer routine
+                             
+                        ! increase int buffer position,  
+                        int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
+                        ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
+                        int_send_buffer( int_pos(neighbor_rank+1)  , neighbor_rank+1 ) = -99                                               
+                    end if  ! (rank==neighbor_rank)       
+
+                end if ! neighbor exists  
+            end do ! loop over all possible  neighbors
+        end do ! loop over all heavy active 
+        
+        
+        ! pretend that no communication with myself takes place, in order to skip the
+        ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
+        ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
+        com_matrix(rank+1) = 0
+
+        !***********************************************************************
+        ! transfer part (send/recv)
+        !***********************************************************************
+        ! send/receive data
+        ! note: todo, remove dummy subroutine
+        ! note: new dummy subroutine sets receive buffer position accordingly to process rank
+        ! note: todo: use more than non-blocking send/receive
+        call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
+
+        !***********************************************************************
+        ! Unpack received data in the ghost node layers
+        !***********************************************************************
+        ! sort data in, sequence is important to keep dominace rules within ghost nodes. 
+        ! the redundand nodes owend by tow blocks only should be taken care by bounds_type (include_redundant. exclude_redundant ) 
+!write(*,*) 'sort in'         
+        ! roundCountDebug = 0  
+        do currentSortInRound = 1,4   ! coarse, same, fine, historic fine 
+        !write(*,*) 'currentSortInRound',  currentSortInRound    
+            do k = 1, number_procs        ! by this the light id's are sorted in by corrctly if the data conain it in the right sequence per proc   
+    !            if (k.eq.(rank+1)) then   ! same process
+    !                !TODO direct copy for same process data, on the base of the information collected int_sent_buffer or similar 
+    !                cycle 
+    !            end if 
+                if (k.eq.(rank+1)) then ! process-internal ghost points   
+                        
+                    l = 2  ! first field is size of data 
+                    do while ( int_send_buffer(l, k) /= -99 )
+                    
+                        ! unpack the description of the next data chunk
+                        
+                        !  unpack & evaluate    level_diff_indicator  -----------------------------------
+                                 
+                        ! needed info:  sender_hvy_id    hvy_id_receiver  neighborhood  level_diff  bounds_type entrySortInRound
+
+                         
+                        hvy_id_receiver = int_send_buffer(l, k)
+                        neighborhood = int_send_buffer(l+1, k)
+                        
+                        !  unpack & evaluate    level_diff_indicator  -----------------------------------
+                        level_diff_indicator = int_send_buffer(l+2, k)     ! contains multiple information, unpack it            
+                        entrySortInRound    = modulo( level_diff_indicator    , 16 )
+
+                        ! check if this entry is processed in this round,  otherwise goon to next      
+                        if (entrySortInRound.ne.currentSortInRound )   then 
+                            l = l + 5                                     ! to read the next entry 
+                            cycle !? painfully i had to learn that continue is the wrong command!  ! goon to next entry 
+                        end if 
+                        
+                        level_diff      = modulo( level_diff_indicator/16  , 16 ) - 1_ik    
+                        bounds_type     = modulo( level_diff_indicator/256 , 16 )
+                        sender_hvy_id   =       ( level_diff_indicator/4096 )             
+                        ! ---------------------------    
+                                            
+!                        write(*,*) neighborhood, level_diff, data_bounds_names(bounds_type),  sender_hvy_id
+
+                        ! data bounda for sender and receiver 
+                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_names(bounds_type), 'sender' )
+                        call calc_data_bounds( params, data_bounds_receiver, neighborhood, level_diff,  data_bounds_names(bounds_type) , 'receiver' )
+                        
+                        if ( level_diff == 0 ) then
+                           ! simply copy from sender to receiver  
+                           hvy_block( data_bounds_receiver(1,1):data_bounds_receiver(2,1), & 
+                                      data_bounds_receiver(1,2):data_bounds_receiver(2,2), & 
+                                      data_bounds_receiver(1,3):data_bounds_receiver(2,3), :, hvy_id_receiver ) = & 
+                           hvy_block( data_bounds(1,1):data_bounds(2,1), & 
+                                      data_bounds(1,2):data_bounds(2,2), & 
+                                      data_bounds(1,3):data_bounds(2,3), :, sender_hvy_id)
+
+                        else  ! interpolation or restriction before inserting 
+
+                            call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, & 
+                                                          data_bounds_names(bounds_type), hvy_block, sender_hvy_id )
+                            ! lese daten, verwende interpolierte daten
+                            call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
+                                                                                                data_bounds(1,2):data_bounds(2,2), &
+                                                                                                data_bounds(1,3):data_bounds(2,3), :) )
+                            ! simply write data, 
+                            call write_hvy_data( params, data_buffer, data_bounds_receiver, hvy_block, hvy_id_receiver )
+
+!   VERY surprising to me: this does the same as the two calls above, but is slower. WTF?? Maybe write  
+!   Maybe try to write a copy routine merging the read and write and test again. Different compiler?  
+!                            hvy_block( data_bounds_receiver(1,1):data_bounds_receiver(2,1), & 
+!                                      data_bounds_receiver(1,2):data_bounds_receiver(2,2), & 
+!                                      data_bounds_receiver(1,3):data_bounds_receiver(2,3), :, hvy_id_receiver ) = & 
+!                            res_pre_data( data_bounds(1,1):data_bounds(2,1), & 
+!                                          data_bounds(1,2):data_bounds(2,2), & 
+!                                      data_bounds(1,3):data_bounds(2,3), :)
+ 
+                        end if
+
+                        ! increase buffer postion marker
+                        l = l + 5
+
+                    end do
+                    cycle ! the next part is only for ghost points from other processes                     
+                end if  ! process-internal ghost points
+                
+!                if ( (com_matrix(k) /= 0).or.(k.eq.(rank+1))  ) then
+                if ( (com_matrix(k) /= 0) ) then
+                    
+                    l = 2  ! first field is size of data 
+                    do while ( int_receive_buffer(l, k) /= -99 )
+                    
+                        ! unpack the description of the next data chunk 
+                        hvy_id_receiver = int_receive_buffer(l, k)
+                        neighborhood = int_receive_buffer(l+1, k)
+                        
+                        !  unpack & evaluate    level_diff_indicator  -----------------------------------
+                        level_diff_indicator = int_receive_buffer(l+2, k)     ! contains multiple information, unpack it            
+                        entrySortInRound   = modulo( level_diff_indicator    , 16 )
+
+                        ! check if this entry is processed in this round,  otherwise goon to next      
+                        if (entrySortInRound.ne.currentSortInRound )   then 
+                            l = l + 5                                     ! to read the next entry 
+                            cycle !? painfully i had to learn that continue is the wrong command!  ! goon to next entry 
+                        end if 
+             !           roundCountDebug = roundCountDebug +1   
+  
+                        
+                        level_diff      = modulo( level_diff_indicator/16 , 16 ) - 1_ik    
+                        bounds_type     = modulo( level_diff_indicator/256, 16 )              
+                        ! ---------------------------    
+                                            
+                        buffer_position = int_receive_buffer(l+3, k)
+                        buffer_size = int_receive_buffer(l+4, k)
+                        
+                        !write(*,*)  'pos,size', buffer_position, buffer_size 
+
+                        ! fill the data buffer to sort it in 
+                        data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
+
+                        ! data bounds
+                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff,  data_bounds_names(bounds_type) , 'receiver' )
+
+                        ! simply write data, 
+                        call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id_receiver )
+
+                        ! increase buffer postion marker
+                        l = l + 5
+
+                    end do
+                end if 
+                
+                
+            end do ! number_procs
+            !write(*,*) 'sortInRound',  currentSortInRound, 'roundCount', roundCountDebug
+        end do ! currentSortInRound
+
+    ! clean up
+    deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix ) ! ,hvy_originRefinement , hvy_originPrecedence )
+
+end subroutine synchronize_ghosts_generic_sequence
+
+
+
+
+
+subroutine synchronize_ghosts_generic_sequence_old( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
+     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+
+!---------------------------------------------------------------------------------------------
+! modules
+
+!---------------------------------------------------------------------------------------------
+! variables
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy synch array
+    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)     ! the factor used for averaging, unused currently  
+
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
+
+    ! send/receive buffer, integer and real
+    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)    ! containing meta (geometry) information 
+    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)  ! containg the (flow) fields 
+
+    ! status of nodes check: if true: stops program
+    !logical, intent(inout)              :: stop_status
+    ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
+    ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
+    ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
+    !logical, intent(in):: writeRestricted  !  force_averaging
+
+    ! MPI parameter
+    integer(kind=ik)                    :: rank                            ! TODO: is kind=ik ok?? 
+    ! number of processes
+    integer(kind=ik)                    :: number_procs                    ! TODO: is kind=ik ok??  
+
+    ! loop variables
+    integer(kind=ik)                    :: N, k, dF, neighborhood, invert_neighborhood, neighbor_num, level_diff, l, levelsToSortIn
+    integer(kind=ik)                    :: level_diff_indicator ! merged information of level diff and an idicator that we have a historic fien sender 
+    ! id integers
+    integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id_receiver
+
+    ! type of data bounds
+    ! 'exclude_redundant', 'include_redundant', 'only_redundant'
+    
+    !character(len=25)                   :: data_bounds_type
+    integer(kind=ik), dimension(2,3)    :: data_bounds
+
+    ! local send buffer, note: max size is (blocksize)*(ghost nodes size + 1)*(number of datafields)
+    ! restricted/predicted data buffer
+    real(kind=rk), allocatable :: data_buffer(:), res_pre_data(:,:,:,:)
+    ! data buffer size
+    integer(kind=ik)                    :: buffer_size, buffer_position
+
+    ! grid parameter
+    integer(kind=ik)                    :: Bs, g, stage_start
+    ! number of datafields
+    integer(kind=ik)                                :: NdF
+
+!    ! type of data writing
+!    character(len=25)                   :: data_writing_type
+
+    !integer(kind=ik)                                :: precedence  ! some number which defines the dominant block  
+
+    ! communications matrix (only 1 line) 
+    ! note: todo: check performance without allocation?
+    ! todo: remove dummy com matrix, needed for old MPI subroutines
+    integer(kind=ik), allocatable     :: com_matrix(:), dummy_matrix(:,:)  !TODO rm dummy matrix 
+
+    ! position in integer buffer, need for every neighboring process
+    integer(kind=ik), allocatable                                :: int_pos(:)
+
+    ! synch stage loop variables
+    !integer(kind=ik) :: synch_stage, stages
+    ! synch status
+    ! synch == .true. : active block sends data to neighboring block
+    ! neighbor_synch == .true. : neighbor block send data to active block
+    !logical    :: synch, neighbor_synch, test2
+
+    !integer(kind=ik)                                  :: myRelativeLevel, relativeRefinement
+
+!    character(len=128)       :: fileNameData = 'hvy_data.dat', fileNameLoc = 'locations.dat'
+
+    !>
+    integer(kind=ik)                :: hvyId_temp   ! just for a  consistency check 
+    integer(kind=ik)                :: entrySortInRound , currentSortInRound
+    integer, parameter              :: exclude_redundant  = 1, include_redundant = 2,   only_redundant = 3
+    integer                         :: bounds_type !, roundCountDebug 
+    character(len=25), dimension(3) :: data_bounds_names  != (/  'exclude_redundant' , 'include_redundant',   'only_redundant'   /)  
+    logical                         :: senderHistoricFine, recieverHistoricFine, receiverIsCoarser
+    logical                         :: receiverIsOnSameLevel, lgtIdSenderIsHigher
+                 
+    data_bounds_names(1)  =  'exclude_redundant' 
+    data_bounds_names(2)  =  'include_redundant'   
+    data_bounds_names(3)  =  'only_redundant'     
+
+ !---------------------------------------------------------------------------------------------
+! variables initialization
+
+    !data_writing_type = 'simple'   
+
+    !data_bounds_type = 'exclude_redundant'
+!    data_bounds_type = 'include_redundant' ! send all fo now, 
+                                           ! TODO  later drop stuff which is surely not needed ie redunant send to higher level blocks
+                                           ! more rules exist, but might be complicated to implement  
+
+    ! grid parameter
+    Bs    = params%number_block_nodes
+    g     = params%number_ghost_nodes
+    ! number of datafields
+    NdF   = params%number_data_fields
+
+    ! set number of blocks
+    N = params%number_blocks
+
+    ! set MPI parameter
+    rank = params%rank
+    number_procs = params%number_procs
+    !write(*,*) 'mpi, num, rank', number_procs, rank 
+    ! set loop number for 2D/3D case
+    neighbor_num = size(hvy_neighbor, 2)
+
+    ! 2D only!
+    allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
+    com_matrix(number_procs), int_pos(number_procs), dummy_matrix(number_procs, number_procs) ) ! JR: for all other processes? uh, 
+                                                                                                ! hu, there we need to do something better: 
+                                                                                                ! TODO: something better                                                                                                
+
+    ! reset com matrix
+    com_matrix = 0
+    dummy_matrix = 0
+
+
+!---------------------------------------------------------------------------------------------
+! main body
+
+        ! reset integer send buffer position
+        int_pos = 2                               ! TODO JR why 2? , the first filed contains the size of the XXX 
+        ! reset first in send buffer position
+        int_send_buffer( 1, : ) = 0
+        int_send_buffer( 2, : ) = -99
+ 
+ 
+        ! debug check if hvy_active is sorted 
+        if  (hvy_n>1) then
+            hvyId_temp =  hvy_active(1)  
+            do k = 2, hvy_n
+                if  (hvyId_temp> hvy_active(k))  then
+                    call abort(1212,' hvy_active is not sorted as assumed. Panic!')      
+                    
+                end if
+                hvyId_temp = hvy_active(k)       
+            end do 
+        end if     
+        !write (*,*) 'rank', rank
+        ! loop over active heavy data
+        do k = 1, hvy_n
+            ! calculate light id
+            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                
+            ! loop over all neighbors
+            do neighborhood = 1, neighbor_num
+                ! neighbor exists
+                if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
+
+                    ! 0. ids bestimmen
+                    ! neighbor light data id
+                    neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
+                    ! calculate neighbor rank
+                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+                    ! neighbor heavy id
+                    call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_light_id, neighbor_rank, N )
+                    ! calculate the difference between block levels
+                    ! define leveldiff: sender - receiver, so +1 means sender on higher level
+                    ! sender is active block (me)
+                    level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
+
+
+                    ! here is the core of the ghost point rules 
+                    ! main criterion: (very fine/historic fine) wins over (fine) wins over (same) wins over (coars)
+                    ! secondary the higer light  id wins 
+                    ! the first rule is 
+                    !                        data_bounds_type = 'exclude_redundant'
+
+                    bounds_type = exclude_redundant    ! initialized, overwritten when needed
+                    entrySortInRound = level_diff + 2   ! has values 1,2,3 ; canbe overwritten if sender is histroric fine 
+
+
+                    ! the criteria     
+                    senderHistoricFine      = ( lgt_block(           lgt_id, params%max_treelevel+2)==11) 
+                    recieverHistoricFine    = ( lgt_block(neighbor_light_id, params%max_treelevel+2)==11)
+                    receiverIsCoarser        = ( level_diff<0_ik )   
+                    receiverIsOnSameLevel    = ( level_diff.eq.0_ik ) 
+                    lgtIdSenderIsHigher     = ( neighbor_light_id < lgt_id  ) 
+                    
+                    !write(*,*) 'senderHistoricFine', senderHistoricFine
+                    ! here we decide who dominates. would be simple without the historic fine                          
+                    if (senderHistoricFine) then
+                        entrySortInRound = 4    ! this takes care that this data in inserted in the last round, by this historic fine overwrites all
+                        if (recieverHistoricFine) then 
+                            if (lgtIdSenderIsHigher)  then 
+                              ! both are historic fine, include only on light_id 
+                                bounds_type = include_redundant   
+                            end if
+                        else ! receiver not historic fine, no chance, no further checks on refinement level 
+                            bounds_type = include_redundant 
+                        end if                                                                 
+
+                    else  ! sender NOT historic fine, 
+                        
+                        ! what about the oppenend, historic fine?   
+                        if (.not.recieverHistoricFine) then 
+                            ! both not historic fine, do the basic rules  
+                        
+                            ! first rule, overwrite cosarser ghost nodes   
+                            if (receiverIsCoarser)  then ! receiver is coarser 
+                                bounds_type = include_redundant
+                            end if 
+                                
+                            ! secondary rule: on same level decide on light id  
+                            if (receiverIsOnSameLevel.and.lgtIdSenderIsHigher) then 
+                                bounds_type = include_redundant
+                            end if  
+                                                                      
+!                       else ! recieverHistoricFine,   opponend wins, exclude_redundant predefined   
+!                             bounds_type = exclude_redundant 
+                        end if                     
+                    end if  ! else  senderHistoricFine
+                    
+                    !write(*,*)  lgt_id,'->', neighbor_light_id,':', data_bounds_names(bounds_type), neighborhood, level_diff
+                                                  
+                    ! comment: the same dominace rules within the ghos nodes are relaized by the sequence of fuilling in the values,
+                    ! first coarse the same then finer, always in the sequence of teh hvy id the redundant nodes within the ghost nodes and maybe in the 
+                    ! redundant nodes are written several time, the ione folling the above rules should win
+
+                    ! 1. ich (aktiver block) ist der sender für seinen nachbarn
+                    ! lese daten und sortiere diese in bufferform
+                    ! wird auch für interne nachbarn gemacht, um gleiche routine für intern/extern zu verwenden
+                    ! um diue lesbarkeit zu erhöhen werden zunächst die datengrenzen bestimmt
+                    ! diese dann benutzt um die daten zu lesen
+                    ! 2D/3D wird bei der datengrenzbestimmung unterschieden, so dass die tatsächliche leseroutine stark vereinfacht ist
+                    ! da die interpolation bei leveldiff -1 erst bei der leseroutine stattfindet, werden als datengrenzen die für die interpolation noitwendigen bereiche angegeben
+                    ! auch für restriction ist der datengrenzenbereich größer, da dann auch hier später erst die restriction stattfindet
+                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_names(bounds_type), 'sender' )
+
+                    ! vor dem schreiben der daten muss ggf interpoliert werden
+                    ! hier werden die datengrenzen ebenfalls angepasst
+                    ! interpolierte daten stehen in einem extra array
+                    ! dessen größe richtet sich nach dem größten möglichen interpolationsgebiet: (Bs+2*g)^3
+                    ! auch die vergröberten daten werden in den interpolationbuffer geschrieben und die datengrenzen angepasst
+                    if ( level_diff == 0 ) then
+                        ! lese nun mit den datengrenzen die daten selbst
+                        ! die gelesenen daten werden als buffervektor umsortiert
+                        ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
+                        ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
+                        call read_hvy_data( params, data_buffer, buffer_size, &
+                        hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
+                    else
+                        ! interpoliere daten
+                        call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_names(bounds_type), hvy_block, hvy_active(k) )
+                        ! lese daten, verwende interpolierte daten
+                        call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
+                                                                                            data_bounds(1,2):data_bounds(2,2), &
+                                                                                            data_bounds(1,3):data_bounds(2,3), &
+                                                                                            :) )
+                    end if
+
+                    ! daten werden jetzt entweder in den speicher geschrieben -> schreiberoutine
+                    ! oder in den send buffer geschrieben
+                    ! schreiberoutine erhält die date grenzen
+                    ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
+                    ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
+                    ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
+                    if ( (rank==neighbor_rank)) then
+                        ! no spcial treatment yet 
+                    else ! rank==neighbor_rank, i.e. stuff for other proc starts here
+
+                        ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
+                        com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
+                    
+                    end if  ! (rank==neighbor_rank)       
+                    
+                    level_diff_indicator =  256*bounds_type  +  16*(level_diff+1) + entrySortInRound     ! pack multipe information; just to keep old structure, but i save also send data size
+                                                                                                         ! more information could be included boubdary type, .. but might be not worth the effort
+                                                                                                                
+                    ! debug test it                 
+!                    if (entrySortInRound.ne.modulo( level_diff_indicator    , 16 )      )    write (*,*) 'error!!!' 
+!                    if (level_diff.ne.( modulo( level_diff_indicator/16 , 16 ) - 1_rk ) )    write (*,*) 'error!!!'    
+!                    if (bounds_type.ne.modulo( level_diff_indicator/256, 16 )           )    write (*,*) 'error!!!'
+                              
+                          
+                    ! write it to a buffer for the time beeing, later the extra coping should be avoided by a todo list, evaluated further down                     
+                    ! do not increase com_matrix the mpi is not needed 
+
+                    ! active block send data to his neighbor block
+                    ! fill int/real buffer
+                    !write(*,*)  'pos,size, entrySortInRound', int_pos(neighbor_rank+1), buffer_size , level_diff_indicator
+                    call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), & 
+                                         hvy_id_receiver, neighborhood, level_diff_indicator )
+
+                    ! TODO: next two lines should be done within write_buffer routine
+                         
+                    ! increase int buffer position,  
+                    int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
+                    ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
+                    int_send_buffer( int_pos(neighbor_rank+1)  , neighbor_rank+1 ) = -99                                               
+
+                    !! DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG 
+                    !                    !    data bounds
+                    !                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff,  data_bounds_names(bounds_type) , 'receiver' )
+                    !                    ! simply write data, 
+                    !                    call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id_receiver )
+                    !! DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG  DEBUG 
+                end if ! neighbor exists  
+            end do ! loop over all possible  neighbors
+        end do ! loop over all heavy active 
+        
+        
+        ! pretend that no communication with myself takes place, in order to skip the
+        ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
+        ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
+        com_matrix(rank+1) = 0
+
+        !***********************************************************************
+        ! transfer part (send/recv)
+        !***********************************************************************
+        ! send/receive data
+        ! note: todo, remove dummy subroutine
+        ! note: new dummy subroutine sets receive buffer position accordingly to process rank
+        ! note: todo: use more than non-blocking send/receive
+        call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
+
+        !! TEMPORARY: copy directly for the process internal data  
+        !! TODO remove when direct copy is implemented 
+        int_receive_buffer(:, rank+1 )  = int_send_buffer(:,rank+1)
+        real_receive_buffer(:,rank+1 ) = real_send_buffer(:,rank+1)
+          
+
+
+        !***********************************************************************
+        ! Unpack received data in the ghost node layers
+        !***********************************************************************
+        ! sort data in, sequence is important to keep dominace rules within ghost nodes. 
+        ! the redundand nodes owend by tow blocks only should be taken care by bounds_type (include_redundant. exclude_redundant ) 
+         
+        ! roundCountDebug = 0  
+        do currentSortInRound = 1,4   ! coarse, same, fine, historic fine 
+        !write(*,*) 'currentSortInRound',  currentSortInRound    
+            do k = 1, number_procs        ! by this the light id's are sorted in by corrctly if the data conain it in the right sequence per proc   
+    !            if (k.eq.(rank+1)) then   ! same process
+    !                !TODO direct copy for same process data, on the base of the information collected int_sent_buffer or similar 
+    !                cycle 
+    !            end if 
+                
+                if ( (com_matrix(k) /= 0).or.(k.eq.(rank+1))  ) then
+                    
+                    
+                    l = 2  ! first field is size of data 
+                    do while ( int_receive_buffer(l, k) /= -99 )
+                    
+                        ! unpack the description of the next data chunk 
+                        hvy_id_receiver = int_receive_buffer(l, k)
+                        neighborhood = int_receive_buffer(l+1, k)
+                        
+                        !  unpack & evaluate    level_diff_indicator  -----------------------------------
+                        level_diff_indicator = int_receive_buffer(l+2, k)     ! contains multiple information, unpack it            
+                        entrySortInRound   = modulo( level_diff_indicator    , 16 )
+
+                        ! check if this entry is processed in this round,  otherwise goon to next      
+                        if (entrySortInRound.ne.currentSortInRound )   then 
+                            l = l + 5                                     ! to read the next entry 
+                            cycle !? painfully i had to learn that continue is the wrong command!  ! goon to next entry 
+                        end if 
+             !           roundCountDebug = roundCountDebug +1   
+  
+                        
+                        level_diff      = modulo( level_diff_indicator/16 , 16 ) - 1_ik    
+                        bounds_type     = modulo( level_diff_indicator/256, 16 )              
+                        ! ---------------------------    
+                                            
+                        buffer_position = int_receive_buffer(l+3, k)
+                        buffer_size = int_receive_buffer(l+4, k)
+                        
+                        !write(*,*)  'pos,size', buffer_position, buffer_size 
+
+                        ! fill the data buffer to sort it in 
+                        data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
+
+                        ! data bounds
+                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff,  data_bounds_names(bounds_type) , 'receiver' )
+
+                        ! simply write data, 
+                        call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id_receiver )
+
+                        ! increase buffer postion marker
+                        l = l + 5
+
+                    end do
+                end if 
+                
+                
+            end do ! number_procs
+            !write(*,*) 'sortInRound',  currentSortInRound, 'roundCount', roundCountDebug
+        end do ! currentSortInRound
+
+    ! clean up
+    deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix ) ! ,hvy_originRefinement , hvy_originPrecedence )
+
+end subroutine synchronize_ghosts_generic_sequence_old
+
+
+
 
 subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, sender_or_receiver)
 
@@ -585,7 +1490,7 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
 
     ! data_bounds_type
     character(len=25), intent(in)                   :: data_bounds_type
-    ! sender or reciver
+    ! sender or receiver
     character(len=*), intent(in)                   :: sender_or_receiver
 
     ! grid parameter
@@ -1690,15 +2595,14 @@ subroutine read_hvy_data( params, data_buffer, buffer_counter, hvy_data )
 
 !---------------------------------------------------------------------------------------------
 ! main body
+    ! TODO check loop sequence!! change together with write routine  
 
     ! loop over all data fields
     do dF = 1, params%number_data_fields
-        ! first dimension
-        do i = 1, size(hvy_data, 1)
-            ! second dimension
+        do k = 1, size(hvy_data, 3)
             do j = 1, size(hvy_data, 2)
+                do i = 1, size(hvy_data, 1)
                 ! third dimension, note: for 2D cases kN is allways 1
-                do k = 1, size(hvy_data, 3)
 
                     ! increase buffer size
                     buffer_counter = buffer_counter + 1
@@ -1748,15 +2652,15 @@ subroutine write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
+    
+    ! TODO check loop sequence!!
+    
     ! loop over all data fields
     do dF = 1, params%number_data_fields
-        ! first dimension
-        do i = data_bounds(1,1), data_bounds(2,1)
-            ! second dimension
+        do k = data_bounds(1,3), data_bounds(2,3)
             do j = data_bounds(1,2), data_bounds(2,2)
+                do i = data_bounds(1,1), data_bounds(2,1)
                 ! third dimension, note: for 2D cases kN is allways 1
-                do k = data_bounds(1,3), data_bounds(2,3)
 
                     ! write data buffer
                     hvy_block( i, j, k, dF, hvy_id ) = data_buffer( buffer_i )
@@ -1769,6 +2673,65 @@ subroutine write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
 
 end subroutine write_hvy_data
 
+!############################################################################################################
+           
+!subroutine write_hvy_data_restricted( params, data_buffer, data_bounds, hvy_block, hvy_originRefinement , hvy_originPrecedence ,  hvy_id , relativeRefinement , precedence)
+
+!!---------------------------------------------------------------------------------------------
+!! modules
+!!---------------------------------------------------------------------------------------------
+!! variables
+!    implicit none
+
+!    !> user defined parameter structure
+!    type (type_params), intent(in)              :: params
+!    !> data buffer
+!    real(kind=rk), intent(in)                   :: data_buffer(:)
+!    !> data_bounds
+!    integer(kind=ik), intent(in)                :: data_bounds(2,3)
+!    !> heavy data array - block data
+!    real(kind=rk), intent(inout)                :: hvy_block(:, :, :, :, :)
+!    integer(kind=1), intent(inout)             :: hvy_originRefinement(:, :, :,  :) !to store the two dominace criterion for comparission, first the relative refinement  
+!    integer(kind=2), intent(inout)             :: hvy_originPrecedence(:, :, :,  :) ! further some not yet decided dominace criterion 
+!    !> hvy id
+!    integer(kind=ik), intent(in)                :: hvy_id
+!    integer(kind=ik), intent(in)                :: relativeRefinement , precedence    ! two criterion to check which value wins 
+!    ! loop variable
+!    integer(kind=ik)                            :: i, j, k, dF, buffer_i
+!    integer(kind=1)                             :: relativeRefinementShort 
+!!---------------------------------------------------------------------------------------------
+!! interfaces
+
+!!---------------------------------------------------------------------------------------------
+!! variables initialization
+
+!    buffer_i = 1
+
+!!---------------------------------------------------------------------------------------------
+!! main body
+!    ! TODO check loop sequence!! change  together with 
+!    relativeRefinementShort = int( relativeRefinement, 1 ) 
+!    ! loop over all data fields
+!    do dF = 1, params%number_data_fields
+!        ! first dimension
+!        do i = data_bounds(1,1), data_bounds(2,1)
+!            ! second dimension
+!            do j = data_bounds(1,2), data_bounds(2,2)
+!                ! third dimension, note: for 2D cases kN is allways 1
+!                do k = data_bounds(1,3), data_bounds(2,3)
+!                    if (hvy_originRefinement( i, j, k,  hvy_id )<relativeRefinementShort)   Then ! it is finer
+!                        hvy_originRefinement( i, j, k,  hvy_id ) =  relativeRefinementShort                       
+!                        ! write data buffer
+!                        hvy_block( i, j, k, dF, hvy_id ) = data_buffer( buffer_i )
+!                    end if
+!                    buffer_i = buffer_i + 1
+
+!                end do
+!            end do
+!        end do
+!    end do
+
+!end subroutine write_hvy_data_restricted
 !############################################################################################################
 
 subroutine add_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_synch, hvy_id )
@@ -1952,22 +2915,22 @@ subroutine compare_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id
         ! stop program
         stop_status = .true.
 
-        !write(*,*) "---"
-        !do i =  Bs+2*g, 1, -1
-        !    write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
-        !enddo
-        !write(*,*) "---"
-        !do j = Bs+2*g, 1, -1
-        !    do i = 1, Bs+2*g
-        !        if (tmp(i,j)==0.0_rk) then
-        !            write(*,'(" null    ")', advance="no")
-        !        else
-        !            write(*,'((es8.1,1x))', advance="no") tmp(i,j)
-        !        endif
-        !    enddo
-        !    write(*,*) " "
-        !enddo
-        !write(*,*) "---"
+        ! write(*,*) "---"
+        ! do i =  Bs+2*g, 1, -1
+        !     write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
+        ! enddo
+        ! write(*,*) "---"
+        ! do j = Bs+2*g, 1, -1
+        !     do i = 1, Bs+2*g
+        !         if (tmp(i,j)==0.0_rk) then
+        !             write(*,'(" null    ")', advance="no")
+        !         else
+        !             write(*,'((es8.1,1x))', advance="no") tmp(i,j)
+        !         endif
+        !     enddo
+        !     write(*,*) " "
+        ! enddo
+        ! write(*,*) "---"
 
         ! mark block by putting a dot in the middle. this way, we can identify all
         ! blocks that have problems. If we set the entire block to 100, then subsequent
@@ -2553,3 +3516,442 @@ subroutine calc_invert_neighborhood( params, neighborhood, invert_neighborhood )
 end subroutine calc_invert_neighborhood
 
 !############################################################################################################
+
+
+
+
+!############################################################################################################
+subroutine write_real5(data_block,hvy_active, hvy_n, fileName )  
+    
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+   !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
+
+    real(kind=rk), intent(in)       :: data_block(:, :, :, :, :)
+    character(len=128), intent(in)  :: fileName
+    integer                         :: i,j,k,l,m  
+    
+    open(unit=11, file= fileName, form='unformatted', status='replace',access='stream')
+
+    !write(*,*) size(data_block,1), size(data_block,2), size(data_block,3), size(data_block,4), hvy_n
+
+    write(11) size(data_block,1), size(data_block,2), size(data_block,3), size(data_block,4), hvy_n
+!   write(*,*) 'max', maxval(data_block) 
+!   write(*,*) 'min',     minval(data_block) 
+   !write(*,*) 'real5'
+   do m = 1, hvy_n
+    !write(*,*) 'max val ', m,hvy_active(m) , maxval(data_block(:,:,:,:, hvy_active(m)) )      
+        ! loop sequence not very quick, but i prefere this sequence 
+        do i =1,size(data_block,1)
+            do j =1,size(data_block,2)
+                do k =1,size(data_block,3)
+                    do l =1,size(data_block,4)
+                        
+                            write(11) i,j,k,l, m , data_block(i, j, k, l, hvy_active(m) )
+                         !write(*,*) i,j,k,l, m , data_block(i, j, k, l, hvy_active(m) )
+                    end do  
+                end do  
+            end do  
+        end do  
+       
+    end do 
+        
+    close(11) 
+end subroutine
+!############################################################################################################
+
+!subroutine writeLocations(params ,lgt_block, hvy_active, hvy_n, fileName  ) 
+!    type (type_params), intent(in)      :: params
+   
+!    !> list of active blocks (heavy data)
+!    integer(kind=ik), intent(in)        :: hvy_active(:)
+!   !> number of active blocks (heavy data)
+!    integer(kind=ik), intent(in)        :: hvy_n
+    
+!    !> light data array
+!    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+
+!    character(len=128), intent(in)  :: fileName
+
+!    integer(kind=ik)                             :: k, ix, iy, iz , level, lgt_id 
+    
+!    open(unit=11, file=fileName, form='unformatted', status='replace',access='stream')
+
+!    do k = 1, hvy_n
+!            ! calculate light id
+!            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks  )     
+!            level = lgt_block( lgt_id, params%max_treelevel+1 )
+
+!            ! compute its coordinates in ijk space
+!            call decoding( lgt_block( lgt_id, 1:level ), ix,iy,iz, level)
+!            write(11)  k, hvy_active(k),  ix,iy,iz, level
+!    end do 
+!    close(11)
+!end subroutine
+
+!subroutine synchronize_ghosts_generic_rules( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
+!     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
+!     writeRestricted  )
+
+!!---------------------------------------------------------------------------------------------
+!! modules
+
+!!---------------------------------------------------------------------------------------------
+!! variables
+
+!    implicit none
+
+!    !> user defined parameter structure
+!    type (type_params), intent(in)      :: params
+!    !> light data array
+!    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+!    !> heavy data array - block data
+!    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+!    !> heavy synch array
+!    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)     ! the factor used for averaging, unused currently  
+
+!    !> heavy data array - neighbor data
+!    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+
+!    !> list of active blocks (heavy data)
+!    integer(kind=ik), intent(in)        :: hvy_active(:)
+!    !> number of active blocks (heavy data)
+!    integer(kind=ik), intent(in)        :: hvy_n
+
+!    ! send/receive buffer, integer and real
+!    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)    ! containing meta (geometry) information 
+!    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)  ! containg the (flow) fields 
+
+!    ! status of nodes check: if true: stops program
+!    !logical, intent(inout)              :: stop_status
+!    ! stage0: correct blocks that are on the same level, but have a different history. one is on Jmax from
+!    ! before, one has just gotten to Jmax via interpolation. In those cases, the former block has the status +11
+!    ! which indicates that its redundant nodes must overwrite the ones on the other block (which has been interpolated)
+!    logical, intent(in):: writeRestricted  !  force_averaging
+
+!    ! MPI parameter
+!    integer(kind=ik)                    :: rank                            ! TODO: is kind=ik ok?? 
+!    ! number of processes
+!    integer(kind=ik)                    :: number_procs                    ! TODO: is kind=ik ok??  
+
+!    ! loop variables
+!    integer(kind=ik)                    :: N, k, dF, neighborhood, invert_neighborhood, neighbor_num, level_diff, l
+
+!    ! id integers
+!    integer(kind=ik)                    :: lgt_id, neighbor_light_id, neighbor_rank, hvy_id
+
+!    ! type of data bounds
+!    ! 'exclude_redundant', 'include_redundant', 'only_redundant'
+!    character(len=25)                   :: data_bounds_type
+!    integer(kind=ik), dimension(2,3)    :: data_bounds
+
+!    ! local send buffer, note: max size is (blocksize)*(ghost nodes size + 1)*(number of datafields)
+!    ! restricted/predicted data buffer
+!    real(kind=rk), allocatable :: data_buffer(:), res_pre_data(:,:,:,:)
+!    ! data buffer size
+!    integer(kind=ik)                        :: buffer_size, buffer_position
+
+!    ! grid parameter
+!    integer(kind=ik)                                :: Bs, g, stage_start
+!    ! number of datafields
+!    integer(kind=ik)                                :: NdF
+
+!!    ! type of data writing
+!!    character(len=25)                   :: data_writing_type
+
+!    integer(kind=ik)                                :: precedence  ! some number which defines the dominant block  
+
+!    ! communications matrix (only 1 line)
+!    ! note: todo: check performance without allocation?
+!    ! todo: remove dummy com matrix, needed for old MPI subroutines
+!    integer(kind=ik), allocatable     :: com_matrix(:), dummy_matrix(:,:)
+
+!    ! position in integer buffer, need for every neighboring process
+!    integer(kind=ik), allocatable                                :: int_pos(:)
+
+!    ! synch stage loop variables
+!    integer(kind=ik) :: synch_stage, stages
+!    ! synch status
+!    ! synch == .true. : active block sends data to neighboring block
+!    ! neighbor_synch == .true. : neighbor block send data to active block
+!    logical    :: synch, neighbor_synch, test2
+
+
+!    integer(kind=1)   , allocatable                   :: hvy_originRefinement(:, :, :, :)    ! encodes the level of the origin of the (conditional) ghost points
+!                                                                     !  -1 other is lower, 0 equal, +1 higher (finer), 
+!                                                                     !  +2 finer and was fine before (happens as)      
+                                                                     
+!    integer(kind=2)   , allocatable                   :: hvy_originPrecedence (:, :, :, :)    ! to store some number which defines the dominant block, i.e. position on sfc to annoy  tommy
+!    ! in the criterion is the mpi rank this restricts the processes to ~32.000
+!    ! TODO check if space is big enough, depedning on criterion  
+
+!    integer(kind=ik)                                  :: myRelativeLevel, relativeRefinement
+
+!    character(len=128)       :: fileNameData = 'hvy_data.dat', fileNameLoc = 'locations.dat'
+
+!!---------------------------------------------------------------------------------------------
+!! interfaces
+
+! !---------------------------------------------------------------------------------------------
+!! variables initialization
+
+!    !data_writing_type = 'simple'   
+
+!    !data_bounds_type = 'exclude_redundant'
+!    data_bounds_type = 'include_redundant' ! send all fo now, 
+!                                           ! TODO  later drop stuff which is surely not needed ie redunant send to higher level blocks
+!                                           ! more rules exist, but might be complicated to implement  
+
+!    ! grid parameter
+!    Bs    = params%number_block_nodes
+!    g     = params%number_ghost_nodes
+!    ! number of datafields
+!    NdF   = params%number_data_fields
+
+!    ! set number of blocks
+!    N = params%number_blocks
+
+!    ! set MPI parameter
+!    rank = params%rank
+!    number_procs = params%number_procs
+!    !write(*,*) 'mpi, num, rank', number_procs, rank 
+!    ! set loop number for 2D/3D case
+!    neighbor_num = size(hvy_neighbor, 2)
+
+!    ! 2D only!
+!    allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
+!    com_matrix(number_procs), int_pos(number_procs), dummy_matrix(number_procs, number_procs) ) ! JR: for all other processes? uh, 
+!                                                                                                ! hu, there we need to do something better: 
+!                                                                                                ! TODO: something better
+!    allocate( hvy_originRefinement(Bs+2*g,Bs+2*g,Bs+2*g,  N  ) )                                                                                               
+!    allocate( hvy_originPrecedence(Bs+2*g,Bs+2*g,Bs+2*g,  N  ) )                                                                                               
+                                                                                                
+
+!    ! reset com matrix
+!    com_matrix = 0
+!    dummy_matrix = 0
+
+
+!!---------------------------------------------------------------------------------------------
+!! main body
+
+
+
+!        ! reset integer send buffer position
+!        int_pos = 2                               ! TODO JR why 2? , the first filed contains the size of the XXX 
+!        ! reset first in send buffer position
+!        int_send_buffer( 1, : ) = 0
+!        int_send_buffer( 2, : ) = -99
+!!subroutine write_real5(data_block,hvy_active, hvy_n, fileName )  
+
+!        !call write_real5(hvy_block ,hvy_active, hvy_n     , fileNameData    ) 
+!!        call writeLocations(params ,lgt_block , hvy_active, hvy_n, fileNameLoc   )
+        
+!!        call abort(1212,'debug') 
+        
+!!         write(*,*) 'in func'        
+
+!        !! --------------------   reset bookkeeping fields, currently hvy_originRefinement hvy_originPrecedence --------------------------------------! 
+!        do k = 1, hvy_n
+!            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+!                    !write(*,*) 'max val ', k,hvy_active(k), maxval(hvy_block(:,:,:,:, hvy_active(k)) )      
+!            myRelativeLevel = 0    ! the refinement level of this block relative to itself is zero. 
+!            ! however, if it was fine before refinment, ie when reaching Jmax it has to win against parvenus, so it is set to 2     
+!            ! not there is no value +1, because no finer blocks exist by construction 
+!            if ( lgt_block(lgt_id, params%max_treelevel+2)==11) then  ! some flag, that the block was fine and not refined, happens when reaching J_max 
+!                myRelativeLevel  = 2 
+!            end if
+
+!            ! reset book keeping fields
+!            ! TODO remove extra writing 
+!            hvy_originRefinement(:, :, :, hvy_active(k)) = -10  ! outer can be overwritten by all other  
+!              ! inner points are on level 0 by definition, only condition overwrite 
+!            if ( params%threeD_case ) then
+!                hvy_originRefinement( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, hvy_active(k)) = int(myRelativeLevel,1)
+!            else
+!                hvy_originRefinement( g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)) = int(myRelativeLevel,1)
+!            end if
+
+!            hvy_originPrecedence(:, :, :, hvy_active(k)) =  -1  ! overwritten by all (unused currently), TODO distinguish inner, outer    
+
+!        end do 
+        
+!        !! --------------------   reset bookkeeping fields, currently hvy_originRefinement hvy_originPrecedence --------------------------------------!
+
+ 
+
+!        ! loop over active heavy data
+!        do k = 1, hvy_n
+!            ! calculate light id
+!            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+                
+!            ! loop over all neighbors
+!            do neighborhood = 1, neighbor_num
+!                ! neighbor exists
+!                if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
+
+!                    ! 0. ids bestimmen
+!                    ! neighbor light data id
+!                    neighbor_light_id = hvy_neighbor( hvy_active(k), neighborhood )
+!                    ! calculate neighbor rank
+!                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_light_id, N )
+!                    ! neighbor heavy id
+!                    call lgt_id_to_hvy_id( hvy_id, neighbor_light_id, neighbor_rank, N )
+!                    ! calculate the difference between block levels
+!                    ! define leveldiff: sender - receiver, so +1 means sender on higher level
+!                    ! sender is active block (me)
+!                    level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_light_id, params%max_treelevel+1 )
+
+
+!                    ! 1. ich (aktiver block) ist der sender für seinen nachbarn
+!                    ! lese daten und sortiere diese in bufferform
+!                    ! wird auch für interne nachbarn gemacht, um gleiche routine für intern/extern zu verwenden
+!                    ! um diue lesbarkeit zu erhöhen werden zunächst die datengrenzen bestimmt
+!                    ! diese dann benutzt um die daten zu lesen
+!                    ! 2D/3D wird bei der datengrenzbestimmung unterschieden, so dass die tatsächliche leseroutine stark vereinfacht ist
+!                    ! da die interpolation bei leveldiff -1 erst bei der leseroutine stattfindet, werden als datengrenzen die für die interpolation noitwendigen bereiche angegeben
+!                    ! auch für restriction ist der datengrenzenbereich größer, da dann auch hier später erst die restriction stattfindet
+!                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'sender' )
+
+!                    ! vor dem schreiben der daten muss ggf interpoliert werden
+!                    ! hier werden die datengrenzen ebenfalls angepasst
+!                    ! interpolierte daten stehen in einem extra array
+!                    ! dessen größe richtet sich nach dem größten möglichen interpolationsgebiet: (Bs+2*g)^3
+!                    ! auch die vergröberten daten werden in den interpolationbuffer geschrieben und die datengrenzen angepasst
+!                    if ( level_diff == 0 ) then
+!                        ! lese nun mit den datengrenzen die daten selbst
+!                        ! die gelesenen daten werden als buffervektor umsortiert
+!                        ! so können diese danach entweder in den buffer geschrieben werden oder an die schreiberoutine weitergegeben werden
+!                        ! in die lese routine werden nur die relevanten Daten (data bounds) übergeben
+!                        call read_hvy_data( params, data_buffer, buffer_size, &
+!                        hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
+!                    else
+!                        ! interpoliere daten
+!                        call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k) )
+!                        ! lese daten, verwende interpolierte daten
+!                        call read_hvy_data( params, data_buffer, buffer_size, res_pre_data( data_bounds(1,1):data_bounds(2,1), &
+!                                                                                            data_bounds(1,2):data_bounds(2,2), &
+!                                                                                            data_bounds(1,3):data_bounds(2,3), &
+!                                                                                            :) )
+
+!                    end if
+
+!                    ! daten werden jetzt entweder in den speicher geschrieben -> schreiberoutine
+!                    ! oder in den send buffer geschrieben
+!                    ! schreiberoutine erhält die date grenzen
+!                    ! diese werden vorher durch erneuten calc data bounds aufruf berechnet
+!                    ! achtung: die nachbarschaftsbeziehung wird hier wie eine interner Kopieren ausgewertet
+!                    ! invertierung der nachbarschaftsbeziehung findet beim füllen des sendbuffer statt
+!                    if ( (rank==neighbor_rank)) then
+!                        ! internal neighbor and direct writing method: copy the ghost nodes as soon as possible, without passing
+!                        ! via the buffers first.
+!                        ! data bounds
+!                        call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+!                        ! simply write data. No care
+                        
+!                        !!!!!! HERE !!!!!!
+!                        relativeRefinement = level_diff ; 
+                                       
+!                        if ( lgt_block(neighbor_light_id, params%max_treelevel+2)==11) then  ! some flag, that the block was fine and not refined, happens when reaching J_max 
+!                            relativeRefinement = 2 
+!                        end if
+                         
+!                        precedence = 0 
+!                        if (writeRestricted) then 
+!                            call write_hvy_data_restricted( params, data_buffer, data_bounds, hvy_block, hvy_originRefinement , hvy_originPrecedence ,  hvy_id , relativeRefinement, precedence)
+!                        else   
+!                            call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+!                        end if  
+!                    else
+!                       call abort(1212,'debug: no ,mpi yet') 
+!                        ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
+!                        com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
+
+!                        ! active block send data to his neighbor block
+!                        ! fill int/real buffer
+!                        call write_buffers( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank, data_buffer, int_pos(neighbor_rank+1), hvy_id, neighborhood, level_diff )
+
+!                        ! increase int buffer position
+!                        int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
+
+!                        ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
+!                        int_send_buffer( int_pos(neighbor_rank+1)  , neighbor_rank+1 ) = -99
+
+!                    end if
+
+!                end if
+!            end do
+!        end do
+        
+        
+!        ! pretend that no communication with myself takes place, in order to skip the
+!        ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
+!        ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
+!        com_matrix(rank+1) = 0
+
+!        !***********************************************************************
+!        ! transfer part (send/recv)
+!        !***********************************************************************
+!        ! send/receive data
+!        ! note: todo, remove dummy subroutine
+!        ! note: new dummy subroutine sets receive buffer position accordingly to process rank
+!        ! note: todo: use more than non-blocking send/receive
+!        call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, com_matrix  )
+
+
+!        !***********************************************************************
+!        ! Unpack received data in the ghost node layers
+!        !***********************************************************************
+!        ! Daten einsortieren
+!        ! für simple, average, compare: einfach die buffer einsortieren, Reihenfolge ist egal
+!        ! staging: erneuter loop über alle blöcke und nachbarschaften, wenn daten notwendig, werden diese in den buffern gesucht
+!            ! sortiere den real buffer ein
+!            ! loop over all procs
+!        do k = 1, number_procs
+!            if ( com_matrix(k) /= 0 ) then
+!                     call abort(1212,'debug: no ,mpi yet') 
+!                ! neighboring proc
+!                ! first element in int buffer is real buffer size
+!                l = 2
+!                ! -99 marks end of data
+!                do while ( int_receive_buffer(l, k) /= -99 )
+
+!                    ! hvy id
+!                    hvy_id = int_receive_buffer(l, k)
+!                    ! neighborhood
+!                    neighborhood = int_receive_buffer(l+1, k)
+!                    ! level diff
+!                    level_diff = int_receive_buffer(l+2, k)
+!                    ! buffer position
+!                    buffer_position = int_receive_buffer(l+3, k)
+!                    ! buffer size
+!                    buffer_size = int_receive_buffer(l+4, k)
+
+!                    ! data buffer
+!                    data_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
+
+!                    ! data bounds
+!                    call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
+!                    ! write data, hängt vom jeweiligen Fall ab
+!                    ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
+!                    ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
+!                    ! staging: wende staging konzept an
+!                    ! compare: vergleiche werte mit vorhandenen werten (nur für redundante knoten sinnvoll, als check routine)
+!                   call abort(1212,'unknown data sync method ...say whaaat?') 
+!                    ! simply write data
+!                    call write_hvy_data( params, data_buffer, data_bounds, hvy_block, hvy_id )
+
+!                    ! increase buffer postion marker
+!                    l = l + 5
+
+!                end do
+!            end if
+!        end do
+
+
+!    ! clean up
+!    deallocate( data_buffer, res_pre_data, com_matrix, int_pos, dummy_matrix ,hvy_originRefinement , hvy_originPrecedence )
+
+!end subroutine synchronize_ghosts_generic_rules
+

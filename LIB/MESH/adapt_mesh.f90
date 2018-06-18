@@ -34,8 +34,7 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix, int_send_buffer,&
-     int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
+    lgt_sortednumlist, hvy_active, hvy_n, indicator, com_lists, com_matrix, hvy_synch, hvy_work )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -70,10 +69,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
     ! communications matrix:
     integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
     ! loop variables
     integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors
     ! cpu time variables for running time calculation
@@ -113,13 +108,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, .true., hvy_synch )
 
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
         call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
-        hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, int_send_buffer, int_receive_buffer, &
-        real_send_buffer, real_receive_buffer, hvy_synch)
+        hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, hvy_synch)
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
@@ -235,8 +229,7 @@ end subroutine adapt_mesh
 !! 29/05/2018 create
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
-  hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, int_send_buffer, int_receive_buffer, &
-  real_send_buffer, real_receive_buffer, hvy_synch)
+  hvy_active, hvy_n, indicator, iteration, hvy_neighbor, com_lists, com_matrix, hvy_synch)
   !---------------------------------------------------------------------------------------------
   ! modules
     use module_indicators
@@ -271,9 +264,6 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
     ! communications matrix:
     integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
     integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
 
 
@@ -317,7 +307,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
 
         ! note here we synch hvy_work (=vorticity) and not hvy_block
         call sync_ghosts( params, lgt_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, .true., hvy_synch )
     endif
 
     !> Compute normalization for eps, if desired.

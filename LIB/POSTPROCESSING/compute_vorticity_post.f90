@@ -36,8 +36,6 @@ subroutine compute_vorticity_post(help, params)
     integer(kind=1), allocatable       :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    integer(kind=ik), allocatable      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable         :: real_send_buffer(:,:), real_receive_buffer(:,:)
     character(len=80)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
@@ -108,7 +106,7 @@ subroutine compute_vorticity_post(help, params)
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
     lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work, &
-    hvy_synch, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+    hvy_synch)
     ! allocate communication arrays
     call allocate_com_arrays(params, com_lists, com_matrix)
     ! read mesh and field
@@ -125,7 +123,7 @@ subroutine compute_vorticity_post(help, params)
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-    com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    com_matrix, .true., hvy_synch )
 
     ! calculate vorticity from velocities
     do k=1,hvy_n

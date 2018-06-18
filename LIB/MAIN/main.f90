@@ -148,11 +148,7 @@ program main
     ! dim 3: synch stage
     integer(kind=ik), allocatable       :: com_matrix(:,:,:)
 
-    ! send/receive buffer, integer and real
-    ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
-    ! large numbers of processes and blocks per process
-    integer(kind=ik), allocatable       :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable          :: real_send_buffer(:,:), real_receive_buffer(:,:)
+
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data
 !---------------------------------------------------------------------------------------------
@@ -211,9 +207,8 @@ program main
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename )
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, &
-        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch)
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
@@ -231,8 +226,7 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
-        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, hvy_synch )
     endif
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -243,14 +237,13 @@ program main
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, int_send_buffer, &
-    int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch, hvy_work )
+    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, time, iteration, hvy_synch, hvy_work )
 
     if (params%initial_cond /= "read_from_files") then
         ! save initial condition to disk (unless we're reading from file in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, .true., hvy_synch )
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -294,10 +287,10 @@ program main
             ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
             ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            com_matrix, .true., hvy_synch )
             test=.false. ! test
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false., .false.)
+            hvy_n, test, .false., .false.)
 
             if (test) then
                 iteration = 99
@@ -332,7 +325,7 @@ program main
             ! NOTE: in the sync ghosts wrapper, the 0th stage (where these redundant nodes are corrected) is
             ! completely DISABLED
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            com_matrix, .true., hvy_synch )
 
             ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
             call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
@@ -342,7 +335,7 @@ program main
             ! one has the +11 status. now: one time, we correct the redunant fuckers, then remove the +11 status.
             go_sync = .true. ! this is the only place where we explicitly call zeroth stage
             call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-            hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, go_sync, .true., .false. )
+            hvy_n, go_sync, .true., .false. )
 
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
@@ -353,7 +346,7 @@ program main
         t4 = MPI_wtime()
         call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
         hvy_active, lgt_active, lgt_n, hvy_n, com_lists(1:hvy_n*max_neighbors,:,:,:), &
-        com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, hvy_synch )
         call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
 
 
@@ -370,8 +363,7 @@ program main
         if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
             .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer,&
-            hvy_synch )
+            com_matrix, .true., hvy_synch )
 
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
         end if
@@ -393,8 +385,7 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, hvy_synch, hvy_work )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
 
@@ -402,7 +393,7 @@ program main
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes for some derived qtys, for sure
           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-          com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+          com_matrix, .true., hvy_synch )
 
           ! TODO make this nicer
           if (iteration==1 .and. rank==0) then
@@ -424,7 +415,7 @@ program main
         if ( it_is_time_to_save_data) then
           ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-          com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+          com_matrix, .true., hvy_synch )
 
           ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
           ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
@@ -473,7 +464,7 @@ program main
     if ( abs(output_time-time) > 1e-10_rk ) then
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, .true., hvy_synch )
 
         ! filter before write out
         if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
@@ -544,8 +535,7 @@ program main
     end if
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch, &
-        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch )
 
     ! computing time output on screen
     call cpu_time(t1)

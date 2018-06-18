@@ -30,8 +30,7 @@
 !
 ! ********************************************************************************************
 subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, simulation, hvy_work, hvy_synch, int_send_buffer, int_receive_buffer, &
-    real_send_buffer, real_receive_buffer)
+    lgt_sortednumlist, simulation, hvy_work, hvy_synch)
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -57,11 +56,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
     integer(kind=ik)                                    :: Bs, g, N_dF, number_blocks,&
-                                                      rank, number_procs, buffer_N, buffer_N_int
-
-    !> send/receive buffer, integer and real
-    integer(kind=ik), allocatable, optional, intent(out) :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable, optional, intent(out)    :: real_send_buffer(:,:), real_receive_buffer(:,:)
+                                                      rank, number_procs
     !> do we have to allocate everything?
     logical, intent(in)                                  :: simulation
     integer(kind=ik)                                     :: rk_steps
@@ -79,18 +74,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     N_dF            = params%number_data_fields
     number_procs    = params%number_procs
 
-    ! synchronize buffer length
-    ! assume: all blocks are used, all blocks have external neighbors,
-    ! max neighbor number: 2D = 12, 3D = 56
-    ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
-    ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
-    if ( params%threeD_case ) then
-        buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * N_dF
-        buffer_N_int = number_blocks * 56 * 3
-    else
-        buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * N_dF
-        buffer_N_int = number_blocks * 12 * 3
-    end if
 
     !---------------------------------------------------------------------------------------------
     ! main body
@@ -155,20 +138,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
     if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_sortednumlist", shape(lgt_sortednumlist)
 
-    if (simulation) then
-        ! allocate synch buffer
-        allocate( int_send_buffer( buffer_N_int, number_procs) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "int_send_buffer", shape(int_send_buffer)
-
-        allocate( int_receive_buffer( buffer_N_int, number_procs) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "int_receive_buffer", shape(int_receive_buffer)
-
-        allocate( real_send_buffer( buffer_N, number_procs) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "real_send_buffer", shape(real_send_buffer)
-
-        allocate( real_receive_buffer( buffer_N, number_procs) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "real_receive_buffer", shape(real_receive_buffer)
-    end if
     ! reset data:
     ! all blocks are inactive, reset treecode
     lgt_block(:, 1:params%max_treelevel) = -1
@@ -176,15 +145,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     lgt_block(:, params%max_treelevel+1) = -1
     ! set refinement to 0
     lgt_block(:, params%max_treelevel+2) = 0
-
-
-    ! ! reset data
-    ! hvy_block = 9.99e99_rk
-    ! if (simulation) then
-    !     hvy_work = 9.99e99_rk
-    !     hvy_synch = -99
-    ! end if
-    ! hvy_neighbor = -1
 
     ! allocate active list
     allocate( lgt_active( size(lgt_block, 1) ) )
@@ -198,23 +158,18 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
         write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
-        write(*,'("INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
-        write(*,'("INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
 
         ! note we currently use 8byte per real and integer by default, so all the same bytes per point
         write(*,'("INIT: Measured (true) local (on 1 cpu) memory footprint is ",g15.3,"GB per mpirank")') &
         (dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
         + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
-        + dble(size(real_send_buffer)) + dble(size(real_receive_buffer)) + dble(size(int_send_buffer)) &
-        + dble(size(int_receive_buffer)))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+        )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
 
         write(*,'("INIT: Measured (true) TOTAL (on all CPU) memory footprint is ",g15.3,"GB")') &
         ((dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
         + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active)) + dble(size(hvy_synch))/8.0 &
-        + dble(size(real_send_buffer)) + dble(size(real_receive_buffer)) + dble(size(int_send_buffer)) &
-        + dble(size(int_receive_buffer)))*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)
+        )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)
     end if
-
 
 end subroutine allocate_grid
 
@@ -223,8 +178,7 @@ end subroutine allocate_grid
 
 
 subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_synch, int_send_buffer, &
-    int_receive_buffer, real_send_buffer, real_receive_buffer)
+    lgt_sortednumlist, hvy_work, hvy_synch )
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -248,9 +202,6 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     integer(kind=ik), allocatable, intent(out)          :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
-    !> send/receive buffer, integer and real
-    integer(kind=ik), allocatable, optional, intent(out) :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable, optional, intent(out)    :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     if (params%rank == 0) then
         write(*,'(80("-"))')
@@ -263,10 +214,6 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )
     if (allocated(lgt_sortednumlist)) deallocate( lgt_sortednumlist )
-    if (allocated(int_send_buffer)) deallocate( int_send_buffer )
-    if (allocated(int_receive_buffer)) deallocate( int_receive_buffer )
-    if (allocated(real_send_buffer)) deallocate( real_send_buffer )
-    if (allocated(real_receive_buffer)) deallocate( real_receive_buffer )
     if (allocated(lgt_active)) deallocate( lgt_active )
     if (allocated(hvy_active)) deallocate( hvy_active )
 

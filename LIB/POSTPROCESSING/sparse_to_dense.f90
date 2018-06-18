@@ -35,8 +35,6 @@ subroutine sparse_to_dense(help, params)
     integer(kind=1), allocatable            :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable              :: real_send_buffer(:,:), real_receive_buffer(:,:)
     integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length, dim
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
@@ -132,8 +130,7 @@ subroutine sparse_to_dense(help, params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, int_send_buffer,&
-        int_receive_buffer, real_send_buffer, real_receive_buffer)
+        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch)
 
     ! allocate communication arrays
     call allocate_com_arrays(params, com_lists, com_matrix)
@@ -161,7 +158,7 @@ subroutine sparse_to_dense(help, params)
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-    com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    com_matrix, .true., hvy_synch )
 
     ! refine/coarse to attain desired level, respectively
     !coarsen
@@ -203,7 +200,7 @@ subroutine sparse_to_dense(help, params)
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, .true., hvy_synch )
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
@@ -222,6 +219,5 @@ subroutine sparse_to_dense(help, params)
     end if
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch, &
-        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch)
 end subroutine sparse_to_dense

@@ -58,8 +58,7 @@
 ! ********************************************************************************************
 
 subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-    com_lists, com_matrix, grid_changed, int_send_buffer, int_receive_buffer, real_send_buffer, &
-    real_receive_buffer, hvy_synch )
+    com_lists, com_matrix, grid_changed, hvy_synch )
     implicit none
 
     !> user defined parameter structure
@@ -81,14 +80,15 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik), intent(inout)     :: com_lists(:, :, :, :)
     ! communications matrix:
     integer(kind=ik), intent(inout)     :: com_matrix(:,:,:)
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
-    
+
     logical :: sync
     character(len=80) :: method
     integer(kind=ik) :: count
     real(kind=rk) :: t0
+
+    if (.not. ghost_nodes_module_ready) then
+        call init_ghost_nodes( params )
+    endif
 
     t0 = MPI_wtime()
 
@@ -100,11 +100,10 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
         ! MSR CODE
         sync = .true.
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync, .false., .false. )
+        hvy_n, sync, .false., .false. )
     case default
         ! JR version of MSR code above
-        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
+        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     end select
 
     call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )

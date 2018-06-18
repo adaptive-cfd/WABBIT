@@ -25,8 +25,7 @@
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, hvy_synch )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -52,16 +51,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
-
     ! communication lists:
     integer(kind=ik), intent(inout)         :: com_lists(:, :, :, :)
-
     ! communications matrix:
     integer(kind=ik), intent(inout)         :: com_matrix(:,:,:)
-
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
@@ -160,7 +153,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! random adapt some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, &
-        com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
+        com_matrix, hvy_synch, hvy_work )
     end do
 
     if (params%rank == 0) then
@@ -220,7 +213,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        com_matrix, .true., hvy_synch )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

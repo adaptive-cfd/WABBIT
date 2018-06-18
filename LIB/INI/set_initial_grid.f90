@@ -31,8 +31,7 @@
 ! ********************************************************************************************
 
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, &
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch, hvy_work)
+    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, time, iteration, hvy_synch, hvy_work)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -58,17 +57,10 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   integer(kind=ik), intent(inout)      :: hvy_n, lgt_n
   !> sorted list of numerical treecodes, used for block finding
   integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:)
-
   !> communication lists:
   integer(kind=ik), intent(inout)      :: com_lists(:, :, :, :)
-
   !> communications matrix:
   integer(kind=ik), intent(inout)      :: com_matrix(:,:,:)
-
-  !> send/receive buffer, integer and real
-  integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-  real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
   !> time loop variables
   real(kind=rk), intent(inout)         :: time
   integer(kind=ik), intent(inout)      :: iteration
@@ -107,7 +99,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+            com_matrix, .true., hvy_synch )
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------
@@ -149,8 +141,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, hvy_synch, hvy_work )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -218,7 +209,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
     ! it is a safety issue. Better simply keep it.
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-    com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    com_matrix, .true., hvy_synch )
 
     ! footer...and done!
     if (params%rank == 0) then

@@ -1,5 +1,5 @@
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-     hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
+     hvy_active, hvy_n, &
      stop_status, stage0, force_averaging )
 
 !---------------------------------------------------------------------------------------------
@@ -18,18 +18,12 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy synch array
     integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
-
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! status of nodes check: if true: stops program
     logical, intent(inout)              :: stop_status
@@ -88,6 +82,10 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
 
  !---------------------------------------------------------------------------------------------
 ! variables initialization
+
+    if (.not. ghost_nodes_module_ready) then
+        call init_ghost_nodes( params )
+    endif
 
     ! hack to use subroutine as redundant nodes test and for ghost nodes synchronization
     if (stop_status) then
@@ -530,8 +528,7 @@ end subroutine check_redundant_nodes
 
 
 
-subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor,&
-    hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
     implicit none
 
@@ -547,9 +544,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)     :: int_send_buffer(:,:), int_receive_buffer(:,:)    ! containing meta (geometry) information
-    real(kind=rk), intent(inout)        :: real_send_buffer(:,:), real_receive_buffer(:,:)  ! containg the (flow) fields
 
     ! MPI parameter
     integer(kind=ik)   :: myrank, mpisize, irank
@@ -596,8 +590,13 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     data_bounds_names(2)  =  'include_redundant'
     data_bounds_names(3)  =  'only_redundant   '
 
+
     !---------------------------------------------------------------------------------------------
     ! variables initialization
+    if (.not. ghost_nodes_module_ready) then
+        call init_ghost_nodes( params )
+    endif
+
 
     !data_writing_type = 'simple'
 

@@ -104,16 +104,8 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     select case (method)
 
     case ("--generic_sequence")
-!        write(*,*) 'sequence!'
-!        call synchronize_ghosts_generic_rules( params, lgt_block, hvy_block_debug, hvy_synch, hvy_neighbor, hvy_active, &
-!        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, .false.   )
-!        call write_real5(hvy_block_debug ,hvy_active, hvy_n     , fileNameDataSimple    )
-
-        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer   )
-
-        !call write_real5(hvy_block ,hvy_active, hvy_n     , fileNameData    )
-
+        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     case default
         ! new routine
         sync = .true.

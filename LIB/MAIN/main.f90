@@ -240,27 +240,13 @@ program main
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------
-    ! On all blocks, set the initial condition
+    ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, com_lists, com_matrix, int_send_buffer, &
     int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch, hvy_work )
 
-    ! Perform a first test of the redundant nodes right after setting the initial condition.
-    ! For most cases, the initial condition is set on all points, including ghost nodes. Therefore,
-    ! this test should work even without ghost nodes sync'ing first. If it doesn't then maybe we did
-    ! not set inicond on ghost nodes for this case.
-    ! it is to test the test redundant nodes routine.
-    if (params%debug) then
-        test=.false.
-        if (rank==0) write(*,*) "Testing redundant nodes on initial condition.."
-        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-             hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, test, .false., .false. )
-        if (rank==0) write(*,*) "Done testing redundant nodes."
-    endif
-
-
     if (params%initial_cond /= "read_from_files") then
-        ! save initial condition to disk
+        ! save initial condition to disk (unless we're reading from file in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
         com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )

@@ -102,7 +102,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_n
     integer(kind=ik), allocatable     :: com_matrix(:), dummy_matrix(:,:)
 
     ! position in integer buffer, need for every neighboring process
-    integer(kind=ik), allocatable                                :: int_pos(:)
+    integer(kind=ik), allocatable :: int_pos(:)
 
     ! synch stage loop variables
     integer(kind=ik) :: synch_stage, stages
@@ -643,7 +643,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     data_bounds_names(1)  =  'exclude_redundant'
     data_bounds_names(2)  =  'include_redundant'
-    data_bounds_names(3)  =  'only_redundant'
+    data_bounds_names(3)  =  'only_redundant   '
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
@@ -664,7 +664,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     ! 2D only!
     allocate( data_buffer( (Bs+g)*(g+1)*NdF ), res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, NdF), &
-    com_matrix(mpisize), int_pos(mpisize) ) ! JR: for all other processes? uh,
+    com_matrix(mpisize), int_pos(mpisize) )
+    ! JR: for all other processes? uh,
     ! hu, there we need to do something better:
     ! TODO: something better
 
@@ -687,7 +688,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         do k = 2, hvy_n
             if  (hvyId_temp> hvy_active(k))  then
                 call abort(1212,' hvy_active is not sorted as assumed. Panic!')
-
             end if
             hvyId_temp = hvy_active(k)
         end do
@@ -785,14 +785,12 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     int_pos(neighbor_rank+1) = int_pos(neighbor_rank+1) + 5
                     ! markiere das aktuelle ende des buffers, falls weitere elemente dazu kommen, wird die -99 wieder überschrieben
                     int_send_buffer( int_pos(neighbor_rank+1)  , neighbor_rank+1 ) = -99
-                    !write(*,*) neighborhood, level_diff, data_bounds_names(bounds_type),  sender_hvy_id
-
 
                 else
                     ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
                     com_matrix(neighbor_rank+1) = com_matrix(neighbor_rank+1) + 1
 
-                    level_diff_indicator =    256*bounds_type  +  16*(level_diff+1) + entrySortInRound
+                    level_diff_indicator = 256*bounds_type  +  16*(level_diff+1) + entrySortInRound
 
 
                     ! 1. ich (aktiver block) ist der sender für seinen nachbarn

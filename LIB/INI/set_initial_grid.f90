@@ -77,7 +77,6 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
   integer(kind=ik) :: lgt_n_old, k, iter
-  logical :: go_sync
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -170,7 +169,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! set initial condition
             call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
                 params%initial_cond, hvy_work, .true.)
-                
+
             if (params%rank == 0) then
              write(*,'(" did ",i2," refinement stage (beyond what is required for the &
                 &prescribed precision eps) Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') k, lgt_n, &
@@ -178,8 +177,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
              endif
           enddo
         endif
-        ! If we use volume penalization and ACM we first apply the mask to refine 
-        ! the grid properly around it. However, for comparison, we would like to 
+        ! If we use volume penalization and ACM we first apply the mask to refine
+        ! the grid properly around it. However, for comparison, we would like to
         ! start from an initial condition without a mask (impulsive start).
         ! This is done here (after the refinements).
         if (params%physics_type == 'ACM-new') then
@@ -216,18 +215,15 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    ! if the data is read from file, try forcing the redundant nodes to be the same via a single averaging
-    ! sync step. did not solve the problem on IDRIS ada when starting from file.
-    if (params%initial_cond == 'read_from_files') then
-        go_sync = .true.
-        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-             hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
-             go_sync, .false., .true. )
-   endif
+    ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
+    ! it is a safety issue. Better simply keep it.
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
+    com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
 
+    ! footer...and done!
     if (params%rank == 0) then
         write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') lgt_n, &
         min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
-      write(*,'("Initial grid and initial condition terminated.")')
+        write(*,'("Initial grid and initial condition terminated.")')
     endif
 end subroutine set_initial_grid

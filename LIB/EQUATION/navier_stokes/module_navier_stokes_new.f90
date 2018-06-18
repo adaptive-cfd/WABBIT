@@ -176,7 +176,7 @@ contains
 
     !
     ! compute vorticity
-    allocate(tmp_u(size(u,1),size(u,2),size(u,3),3))
+    allocate(tmp_u(size(u,1),size(u,2),size(u,3),4))
 
     if (size(u,3)==1) then
           ! ---------------------------------

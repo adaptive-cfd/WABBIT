@@ -28,10 +28,25 @@ module module_MPI
     ! interpolation routines
     use module_interpolation
 
+    implicit none
 !---------------------------------------------------------------------------------------------
 ! variables
 
-    implicit none
+
+    ! I usually find it helpful to use the private keyword by itself initially, which specifies
+    ! that everything within the module is private unless explicitly marked public.
+    PRIVATE
+
+    ! ! global variables
+    ! data_buffer
+    ! res_pre_data
+    ! com_matrix
+    ! int_pos
+    ! data_bounds_names
+
+    PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
+    PUBLIC :: check_redundant_nodes, synchronize_ghosts_generic_sequence
+
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -45,5 +60,6 @@ contains
     include "blocks_per_mpirank.f90"
     include "synchronize_lgt_data.f90"
     include "reset_ghost_nodes.f90"
+    include "check_redundant_nodes.f90"
 
 end module module_MPI

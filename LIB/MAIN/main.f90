@@ -27,6 +27,7 @@ program main
 ! modules
 
     use mpi
+    use module_MPI
     ! global parameters
     use module_params
     ! debug module

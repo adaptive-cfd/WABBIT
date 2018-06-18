@@ -86,10 +86,6 @@ contains
     ! use this to initalize the memory for debugging:
     include "allocate_init_debugging.f90"
 
-    ! check all redundant nodes
-    include "check_redundant_nodes.f90"
-
-
     ! For a given NAME, increase the function call counter by one and store the
     ! elapsed time in the global arrays.
     subroutine toc( params, name, t_elapsed_this, call_counter )

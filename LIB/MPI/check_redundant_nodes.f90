@@ -1,31 +1,3 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name check_redundant_nodes.f90
-!> \version 0.5
-!> \author msr
-!
-!> \brief check all redundant nodes, if there is a difference between nodes: stop
-!> wabbit and write current state to file
-!>
-!> subroutine structure:
-!> ---------------------
-!>
-!
-!>
-!! input:    - params, light and heavy data \n
-!! output:   - heavy data array
-!!
-!> \details
-!! = log ======================================================================================
-!! \n
-!! 09/05/17 - create
-!! 13/03/18 - add check for redundant ghost nodes, rework subroutine structure
-!
-! ********************************************************************************************
-
 subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
      hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
      stop_status, stage0, force_averaging )

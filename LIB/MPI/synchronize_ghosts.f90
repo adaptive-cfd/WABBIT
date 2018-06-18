@@ -69,9 +69,6 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
-
-!    real(kind=rk), allocatable        :: hvy_block_debug(:, :, :, :, :)   ! only debug!
-
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
@@ -87,37 +84,28 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     ! send/receive buffer, integer and real
     integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
     real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    
     logical :: sync
     character(len=80) :: method
-    integer(kind=ik)  :: count
+    integer(kind=ik) :: count
     real(kind=rk) :: t0
-
-    !character(len=128)       :: fileNameData = 'hvy_data.dat' !, fileNameDataRestricted = 'hvy_dataRestricted.dat'
 
     t0 = MPI_wtime()
 
-!    allocate( hvy_block_debug( size(hvy_block,1 ), size(hvy_block,2),size(hvy_block,3 ), size(hvy_block,4 ),size(hvy_block,5 )  ) )
-!    hvy_block_debug(:,:,:,:,:) =  hvy_block(:,:,:,:,:) ;
     count = command_argument_count()
     call get_command_argument(count, method)
 
     select case (method)
-
-    case ("--generic_sequence")
-        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
-        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
-    case default
-        ! new routine
+    case ("--staging")
+        ! MSR CODE
         sync = .true.
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync, .false., .false. )
-        !     call abort(1212,'unknown data sync method ...say whaaat?')
+    case default
+        ! JR version of MSR code above
+        call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
+        hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer )
     end select
 
     call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )
-
-! sync=.false. ! test
-!         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor, hvy_active, &
-!         hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, sync)
-!  deallocate( hvy_block_debug )
 end subroutine sync_ghosts

@@ -21,7 +21,11 @@ fi
 export ghosts="--generic_sequence"
 # export ghosts="--new"
 echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
-sleep 5
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
 
 fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'

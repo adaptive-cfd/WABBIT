@@ -30,10 +30,7 @@ module module_MPI
 
     ! TODO TODO TODO TODO TODO TODO
     ! dynamical buffers
-    ! merge 3d stuff
     ! check if one-sided interpolation can be avoided using two stages
-
-    ! as well as calc_invert_neighborhood (parameter array)
     ! TODO TODO TODO TODO TODO TODO
 
     implicit none
@@ -53,40 +50,42 @@ module module_MPI
 
     ! this array is used only in AVERAGING submodule of (deprecated) MSR ghost nodes.
     ! TODO: remove, as averaging did not work.
-    integer(kind=1), allocatable :: hvy_synch(:, :, :, :)
+    integer(kind=1), allocatable  :: hvy_synch(:, :, :, :)
 
     ! an array to count how many messages we send to the other mpiranks
     integer(kind=ik), allocatable :: communication_counter(:), int_pos(:)
     ! internally, we flatten the ghost nodes layers to a line. this is stored in
     ! this buffer (NOTE max size is (blocksize)*(ghost nodes size + 1)*(number of datafields))
-    real(kind=rk), allocatable :: line_buffer(:)
+    real(kind=rk), allocatable    :: line_buffer(:)
     ! restricted/predicted data buffer
-    real(kind=rk), allocatable :: res_pre_data(:,:,:,:)
+    real(kind=rk), allocatable    :: res_pre_data(:,:,:,:)
 
     ! it is faster to use named consts than strings, although strings are nicer to read
-    integer(kind=ik), PARAMETER :: exclude_redundant = 1_ik, include_redundant = 2_ik, only_redundant = 3_ik
+    integer(kind=ik), PARAMETER   :: exclude_redundant = 1_ik, include_redundant = 2_ik, only_redundant = 3_ik
 
     ! we set up a table that gives us directly the inverse neighbor relations.
     ! it is filled (once) in init_ghost_nodes
     integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
 
-    ! data_bounds -> ijkghosts and global, ijkghosts([start,end],[dir],[neighborhood],[leveldiff],[dim],[data_bounds_type],[sender,recv])
-    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 2:3, 1:3, 1:2) :: ijkghosts
+    ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
+    ! once in a large, module-global array (which is faster than computing it every time with tons
+    ! of IF-THEN clauses).
+    ! This arrays indices are:
+    ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [dim (2,3)], [data_bounds_type], [sender/receiver/up-downsampled])
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 2:3, 1:3, 1:3) :: ijkGhosts
 
     ! it is useful to keep a named constant for the dimensionality here (we use
     ! it to access e.g. two/three D arrays in inverse_neighbor)
     integer(kind=ik) :: dim = 2_ik
 
     ! we use this flag to call the allocation routine only once.
-    logical :: ghost_nodes_module_ready = .false.
+    logical          :: ghost_nodes_module_ready = .false.
 
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
     PUBLIC :: check_redundant_nodes, synchronize_ghosts_generic_sequence
-
-
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -103,6 +102,8 @@ contains
 
 
 
+!! initialize ghost nodes module. allocate buffers and create data bounds array,
+!! which we use to rapidly identify a ghost nodes layer
 subroutine init_ghost_nodes( params )
     implicit none
     !> user defined parameter structure
@@ -112,7 +113,7 @@ subroutine init_ghost_nodes( params )
     integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idim, idata_bounds_type
     integer(kind=ik) :: data_bounds(2,3)
 
-
+    ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then
         number_blocks   = params%number_blocks
         Bs              = params%number_block_nodes
@@ -126,17 +127,28 @@ subroutine init_ghost_nodes( params )
         ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
         ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
         if ( params%threeD_case ) then
+
             buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 56 * 3
+            ! how many possible neighbor relations are there?
             Nneighbor = 74
+            ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
             dim = 3_ik
+
         else
+
             buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 12 * 3
+            ! how many possible neighbor relations are there?
             Nneighbor = 16
+            ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
             dim = 2_ik
+
         end if
 
+        !-----------------------------------------------------------------------
+        ! allocate auxiliary memory
+        !-----------------------------------------------------------------------
         ! allocate synch buffer
         allocate( int_send_buffer( buffer_N_int, params%number_procs) )
         if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_send_buffer", shape(int_send_buffer)
@@ -170,18 +182,27 @@ subroutine init_ghost_nodes( params )
         allocate( line_buffer( (Bs+g)*(g+1)*Neqn ) )
         allocate( res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
 
-        ! set up
-        ! data_bounds -> ijkghosts and global, ijkghosts([start,end],[dir],[ineighbor],[leveldiff],[idim],[idata_bounds_type],[isendrecv])
-        ! integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 2:3, 1:3, 1:2) :: ijkghosts
+        !-----------------------------------------------------------------------
+        ! set up constant arrays
+        !-----------------------------------------------------------------------
+        ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
+        ! once in a large, module-global array (which is faster than computing it every time with tons
+        ! of IF-THEN clauses).
+        ! This arrays indices are:
+        ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [idim], [idata_bounds_type], [isendrecv])
+
         do ineighbor = 1, Nneighbor
             do leveldiff = -1, 1
                 do idim = 2, 3
                     do idata_bounds_type = 1, 3
-                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, "sender")
-                        ijkghosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 1) = data_bounds
+                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'sender')
+                        ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 1) = data_bounds
 
-                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, "receiver")
-                        ijkghosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 2) = data_bounds
+                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'receiver')
+                        ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 2) = data_bounds
+
+                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'restricted-predicted')
+                        ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 3) = data_bounds
                     enddo
                 enddo
             enddo

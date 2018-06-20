@@ -53,9 +53,11 @@ subroutine compare_keys(help, key1, key2)
 
         ! errors:
         do i = 1, 6
-            if (dabs(data2(i))>=1.0e-7_rk) then
+            if (dabs(data2(i))>=1.0e-5_rk) then
+                ! relative error
                 error(i) = dabs( (data2(i)-data1(i)) / data2(i) )
             else
+                ! absolute error
                 error(i) = dabs( (data2(i)-data1(i)) )
             end if
         enddo

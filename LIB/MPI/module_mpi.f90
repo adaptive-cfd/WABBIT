@@ -42,6 +42,13 @@ module module_MPI
     PRIVATE
     SAVE
 
+    ! Just because we have MPISIZE ranks does not mean that everybody talks to everybody.
+    ! While this CAN happen, it is much more likely that an MPIRANK talks only to a limited number of
+    ! "friends". This is a direct consequence of the space-filling curves. Therefore, we do not allocate
+    ! buffer for all MPSIZE ranks, but only for N_FRIENDS. If the number happens to be too small, we increase
+    ! it dynamically (via deallocate / reallocate)
+    integer(kind=ik) :: N_friends, N_friends_used
+
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process
@@ -52,8 +59,9 @@ module module_MPI
     ! TODO: remove, as averaging did not work.
     integer(kind=1), allocatable  :: hvy_synch(:, :, :, :)
 
-    ! an array to count how many messages we send to the other mpiranks
-    integer(kind=ik), allocatable :: communication_counter(:), int_pos(:)
+    ! an array to count how many messages we send to the other mpiranks. NOTE: the
+    ! arrays communication_counter(:), int_pos(:) have the size N_friends
+    integer(kind=ik), allocatable :: communication_counter(:), int_pos(:), mpirank2friend(:), friend2mpirank(:)
     ! internally, we flatten the ghost nodes layers to a line. this is stored in
     ! this buffer (NOTE max size is (blocksize)*(ghost nodes size + 1)*(number of datafields))
     real(kind=rk), allocatable    :: line_buffer(:)
@@ -101,6 +109,94 @@ contains
     include "restrict_predict_data.f90"
 
 
+! Just because we have MPISIZE ranks does not mean that everybody talks to everybody.
+! While this CAN happen, it is much more likely that an MPIRANK talks only to a limited number of
+! "friends". This is a direct consequence of the space-filling curves. Therefore, we do not allocate
+! buffer for all MPSIZE ranks, but only for N_FRIENDS. If the number happens to be too small, we increase
+! it dynamically (via deallocate / reallocate)
+subroutine reallocate_buffers(params)
+    implicit none
+    type (type_params), intent(in) :: params
+    integer(kind=ik), allocatable :: int_buffer_tmp(:,:)
+    real(kind=rk), allocatable    :: real_buffer_tmp(:,:)
+    integer(kind=ik), allocatable :: communication_counter_tmp(:), int_pos_tmp(:), mpirank2friend_tmp(:), friend2mpirank_tmp(:)
+
+    write(*,'("GHOSTS-runtime: rank=",i5," is changing buffer size to N_friends=",i4)') params%rank, N_friends
+
+    allocate( int_buffer_tmp( size(int_send_buffer,1), size(int_send_buffer,2)) )
+        int_buffer_tmp = int_send_buffer
+        deallocate(int_send_buffer)
+        allocate( int_send_buffer(size(int_buffer_tmp,1), N_friends) )
+        int_send_buffer(:, 1:size(int_buffer_tmp,2) ) = int_buffer_tmp
+
+        int_buffer_tmp = int_receive_buffer
+        deallocate(int_receive_buffer)
+        allocate( int_receive_buffer(size(int_buffer_tmp,1), N_friends) )
+        int_receive_buffer(:, 1:size(int_buffer_tmp,2) ) = int_buffer_tmp
+
+        ! new appended buffer requires initialization (see main routine for doc)
+        int_send_buffer( 1, N_friends ) = 0
+        int_send_buffer( 2, N_friends ) = -99
+    deallocate(int_buffer_tmp)
+
+    allocate( real_buffer_tmp( size(real_send_buffer,1), size(real_send_buffer,2)) )
+        ! very slow...
+        real_buffer_tmp = real_send_buffer
+        deallocate(real_send_buffer)
+        allocate( real_send_buffer(size(real_buffer_tmp,1), N_friends) )
+        real_send_buffer(:, 1:size(real_buffer_tmp,2) ) = real_buffer_tmp
+
+        ! very slow...
+        real_buffer_tmp = real_receive_buffer
+        deallocate(real_receive_buffer)
+        allocate( real_receive_buffer(size(real_buffer_tmp,1), N_friends) )
+        real_receive_buffer(:, 1:size(real_buffer_tmp,2) ) = real_buffer_tmp
+    deallocate(real_buffer_tmp)
+
+
+    allocate( communication_counter_tmp(size(communication_counter)) )
+    communication_counter_tmp = communication_counter
+    deallocate(communication_counter)
+    allocate( communication_counter(1:N_friends) )
+    communication_counter(1:size(communication_counter_tmp)) = communication_counter_tmp
+    deallocate( communication_counter_tmp )
+    communication_counter( N_friends ) = 0
+
+
+    allocate( int_pos_tmp(size(int_pos)) )
+    int_pos_tmp = int_pos
+    deallocate(int_pos)
+    allocate( int_pos(1:N_friends) )
+    int_pos(1:size(int_pos_tmp)) = int_pos_tmp
+    deallocate( int_pos_tmp )
+    ! new appended buffer requires initialization
+    int_pos(N_friends) = 2
+
+
+    allocate( friend2mpirank_tmp(size(friend2mpirank)) )
+    friend2mpirank_tmp = friend2mpirank
+    deallocate(friend2mpirank)
+    allocate( friend2mpirank(1:N_friends) )
+    friend2mpirank(1:size(friend2mpirank_tmp)) = friend2mpirank_tmp
+    deallocate( friend2mpirank_tmp )
+
+    if (params%rank==0) then
+        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
+            params%rank, "real_receive_buffer", shape(real_receive_buffer)
+        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
+            params%rank, "real_send_buffer", shape(real_send_buffer)
+        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
+            params%rank, "int_send_buffer", shape(int_send_buffer)
+        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
+            params%rank, "int_receive_buffer", shape(int_receive_buffer)
+        write(*,'("GHOSTS-runtime: Real buffer size is",g15.3," GB ")') &
+            params%rank, 2.0_rk*size(real_send_buffer)/8.0e9_rk
+        write(*,'("GHOSTS-runtime: Int  buffer size is",g15.3," GB ")') &
+            params%rank, 2.0_rk*size(int_send_buffer)/8.0e9_rk
+    endif
+
+end subroutine
+
 
 !! initialize ghost nodes module. allocate buffers and create data bounds array,
 !! which we use to rapidly identify a ghost nodes layer
@@ -134,6 +230,9 @@ subroutine init_ghost_nodes( params )
             Nneighbor = 74
             ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
             dim = 3_ik
+            ! set default number of "friends", that is mpiranks we exchange data with.
+            ! not their number can be increased if necessary
+            N_friends = min( params%number_procs, 2 )
 
         else
 
@@ -143,6 +242,9 @@ subroutine init_ghost_nodes( params )
             Nneighbor = 16
             ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
             dim = 2_ik
+            ! set default number of "friends", that is mpiranks we exchange data with.
+            ! not their number can be increased if necessary
+            N_friends = params%number_procs+1 !min( params%number_procs, 10 )
 
         end if
 
@@ -150,17 +252,11 @@ subroutine init_ghost_nodes( params )
         ! allocate auxiliary memory
         !-----------------------------------------------------------------------
         ! allocate synch buffer
-        allocate( int_send_buffer( buffer_N_int, params%number_procs) )
-        if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_send_buffer", shape(int_send_buffer)
+        allocate( int_send_buffer( 1:buffer_N_int, 1:N_friends) )
+        allocate( int_receive_buffer( 1:buffer_N_int, 1:N_friends) )
+        allocate( real_send_buffer( 1:buffer_N, 1:N_friends) )
+        allocate( real_receive_buffer( 1:buffer_N, 1:N_friends) )
 
-        allocate( int_receive_buffer( buffer_N_int, params%number_procs) )
-        if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_receive_buffer", shape(int_receive_buffer)
-
-        allocate( real_send_buffer( buffer_N, params%number_procs) )
-        if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_send_buffer", shape(real_send_buffer)
-
-        allocate( real_receive_buffer( buffer_N, params%number_procs) )
-        if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_receive_buffer", shape(real_receive_buffer)
 
         ! synch array, use for ghost nodes synchronization
         if (params%threeD_case) then
@@ -168,16 +264,24 @@ subroutine init_ghost_nodes( params )
         else
             allocate( hvy_synch( Bs+2*g, Bs+2*g, 1, number_blocks ) )
         endif
-        if (rank==0) write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
 
         if (rank==0) then
-            write(*,'("GHOSTS-INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
-            write(*,'("GHOSTS-INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+            write(*,'("GHOSTS-INIT: initial N_friends=",i4)') N_friends
+            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
+            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_receive_buffer", shape(real_receive_buffer)
+            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_send_buffer", shape(real_send_buffer)
+            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_send_buffer", shape(int_send_buffer)
+            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_receive_buffer", shape(int_receive_buffer)
+            write(*,'("GHOSTS-INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)/8.0e9_rk
+            write(*,'("GHOSTS-INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)/8.0e9_rk
         endif
 
         ! this is a list of communications with all other procs
-        allocate( communication_counter(1:params%number_procs) )
-        allocate( int_pos(1:params%number_procs) )
+        allocate( communication_counter(1:N_friends) )
+        allocate( int_pos(1:N_friends) )
+        ! this is the list friend <-> mpirank
+        allocate( mpirank2friend(1:params%number_procs) )
+        allocate( friend2mpirank(1:N_friends) )
 
         allocate( line_buffer( (Bs+g)*(g+1)*Neqn ) )
         allocate( res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )

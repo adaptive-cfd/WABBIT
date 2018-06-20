@@ -104,7 +104,6 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 ! main body
 
     ! synchronize ghost nodes
-    ! first ghost nodes synchronization, so grid has changed
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     ! ----------------------------------------------------------------------------------------
     ! calculate time step

@@ -78,21 +78,23 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     integer(kind=ik) :: count
     real(kind=rk) :: t0
 
-    if (.not. ghost_nodes_module_ready) then
-        call init_ghost_nodes( params )
-    endif
-
     t0 = MPI_wtime()
 
     count = command_argument_count()
     call get_command_argument(count, method)
+
+    ! on the first call, the buffers for gost node sync'ing need to be allocated
+    if (.not. ghost_nodes_module_ready) then
+        call init_ghost_nodes( params )
+        if (params%rank==0) write(*,'("GHOSTS-INIT: Method is: ",A)') trim(adjustl(method))
+    endif
 
     select case (method)
     case ("--staging")
         ! MSR CODE
         sync = .true.
         call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
-        hvy_n, sync, .false., .false. )
+        hvy_n, sync, .true., .false. )
     case default
         ! JR version of MSR code above
         call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )

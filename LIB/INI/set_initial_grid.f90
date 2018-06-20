@@ -144,6 +144,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             endif
           enddo
         endif
+
+        !-----------------------------------------------------------------------
         ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
         ! for example if one does non-adaptive non-equidistant spatial convergence tests
         if (params%inicond_refinements > 0) then
@@ -162,6 +164,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
              endif
           enddo
         endif
+
+        !-----------------------------------------------------------------------
         ! If we use volume penalization and ACM we first apply the mask to refine
         ! the grid properly around it. However, for comparison, we would like to
         ! start from an initial condition without a mask (impulsive start).

@@ -78,6 +78,7 @@ contains
 
     ! adapt the mesh
     include "adapt_mesh.f90"
+    include "grid_coarsening_indicator.f90"
 
     ! gradedness check
     include "ensure_gradedness.f90"

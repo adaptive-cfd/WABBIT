@@ -4,16 +4,21 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/acm/acm_cyl/"
-params=${dir}"acm_test.ini"
+dir="./TESTING/conv/blob_convection_equi/"
+params=${dir}"blob-convection-equi.ini"
 happy=0
 sad=0
-echo "testing artificial compressibility"
+echo "testing equidistant blob convection"
 
 # list of prefixes the test generates
-prefixes=(Ux Uy p mask vor)
-# list of possible times (no need to actually have them)
-times=(000000000000 000000002000)
+prefixes=(phi)
+# list of possible times
+times=(000000000000
+000000250000
+000000500000
+000000750000
+000001000000
+000001250000)
 
 # run actual test
 ${mpi_command} ./wabbit 2D ${params} --memory=2GB ${ghosts}

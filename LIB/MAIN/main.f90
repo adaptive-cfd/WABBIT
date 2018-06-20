@@ -286,24 +286,12 @@ program main
         t4 = MPI_wtime()
         if ( params%adapt_mesh ) then
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
-            ! including the ghost nodes). Note that at this point, the issue with maxlevel, thus the fact that
-            ! some blocks have the +11 status, is not relevant yet. It becomes relevant only after refining, when
-            ! two neighboring blocks on the same level have different redundant nodes. in that case, the block
-            ! that just stayed on Jmax has the status +11.
-            ! NOTE: in the sync ghosts wrapper, the 0th stage (where these redundant nodes are corrected) is
-            ! completely DISABLED
+            ! including the ghost nodes)
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
             ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
             call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
-
-            ! now the refinement is done and we still have +11 status. now we have blocks on the same level and
-            ! one has the +11 status. now: one time, we correct the redunant fuckers, then remove the +11 status.
-            go_sync = .true. ! this is the only place where we explicitly call zeroth stage
-            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
-            hvy_n, go_sync, .true., .false. )
-
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
 

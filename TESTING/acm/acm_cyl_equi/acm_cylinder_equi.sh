@@ -4,16 +4,16 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/acm/acm_cyl/"
-params=${dir}"acm_test_zcurve.ini"
+dir="./TESTING/acm/acm_cyl_equi/"
+params=${dir}"acm_test.ini"
 happy=0
 sad=0
 echo "testing artificial compressibility"
 
 # list of prefixes the test generates
-prefixes=(Ux Uy p mask vor)
+prefixes=(Ux Uy p mask vor div)
 # list of possible times (no need to actually have them)
-times=(000000000000 000000002000)
+times=(000000000000 000000050000 000000100000)
 
 # run actual test
 ${mpi_command} ./wabbit 2D ${params} --memory=2GB ${ghosts}
@@ -37,10 +37,10 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ${mpi_command} ./wabbit-post 2D --keyvalues ${file}
+        ./wabbit-post 2D --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
-            ${mpi_command} ./wabbit-post 2D --compare-keys $keyfile $reffile
+            ./wabbit-post 2D --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
               echo -e " :) Happy, this looks ok!" $keyfile $reffile

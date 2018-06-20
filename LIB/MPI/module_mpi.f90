@@ -119,7 +119,8 @@ subroutine reallocate_buffers(params)
     type (type_params), intent(in) :: params
     integer(kind=ik), allocatable :: int_buffer_tmp(:,:)
     real(kind=rk), allocatable    :: real_buffer_tmp(:,:)
-    integer(kind=ik), allocatable :: communication_counter_tmp(:), int_pos_tmp(:), mpirank2friend_tmp(:), friend2mpirank_tmp(:)
+    integer(kind=ik), allocatable :: communication_counter_tmp(:), int_pos_tmp(:), &
+    mpirank2friend_tmp(:), friend2mpirank_tmp(:)
 
     write(*,'("GHOSTS-runtime: rank=",i5," is changing buffer size to N_friends=",i4)') params%rank, N_friends
 
@@ -180,21 +181,6 @@ subroutine reallocate_buffers(params)
     friend2mpirank(1:size(friend2mpirank_tmp)) = friend2mpirank_tmp
     deallocate( friend2mpirank_tmp )
 
-    if (params%rank==0) then
-        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
-            params%rank, "real_receive_buffer", shape(real_receive_buffer)
-        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
-            params%rank, "real_send_buffer", shape(real_send_buffer)
-        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
-            params%rank, "int_send_buffer", shape(int_send_buffer)
-        write(*,'("GHOSTS-runtime: rank=",i5," Allocated ",A," shape=",7(i9,1x))') &
-            params%rank, "int_receive_buffer", shape(int_receive_buffer)
-        write(*,'("GHOSTS-runtime: Real buffer size is",g15.3," GB ")') &
-            params%rank, 2.0_rk*size(real_send_buffer)/8.0e9_rk
-        write(*,'("GHOSTS-runtime: Int  buffer size is",g15.3," GB ")') &
-            params%rank, 2.0_rk*size(int_send_buffer)/8.0e9_rk
-    endif
-
 end subroutine
 
 
@@ -231,8 +217,8 @@ subroutine init_ghost_nodes( params )
             ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
             dim = 3_ik
             ! set default number of "friends", that is mpiranks we exchange data with.
-            ! not their number can be increased if necessary
-            N_friends = min( params%number_procs, 2 )
+            ! NOTE: their number can be increased if necessary
+            N_friends = min( params%number_procs, 20 )
 
         else
 
@@ -243,8 +229,8 @@ subroutine init_ghost_nodes( params )
             ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
             dim = 2_ik
             ! set default number of "friends", that is mpiranks we exchange data with.
-            ! not their number can be increased if necessary
-            N_friends = params%number_procs+1 !min( params%number_procs, 10 )
+            ! NOTE: their number can be increased if necessary
+            N_friends = min( params%number_procs, 10 )
 
         end if
 
@@ -267,13 +253,26 @@ subroutine init_ghost_nodes( params )
 
         if (rank==0) then
             write(*,'("GHOSTS-INIT: initial N_friends=",i4)') N_friends
-            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_synch", shape(hvy_synch)
-            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_receive_buffer", shape(real_receive_buffer)
-            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "real_send_buffer", shape(real_send_buffer)
-            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_send_buffer", shape(int_send_buffer)
-            write(*,'("GHOSTS-INIT: Allocated ",A," shape=",7(i9,1x))') "int_receive_buffer", shape(int_receive_buffer)
-            write(*,'("GHOSTS-INIT: Real buffer size is",g15.3," GB ")') 2.0_rk*size(real_send_buffer)/8.0e9_rk
-            write(*,'("GHOSTS-INIT: Int  buffer size is",g15.3," GB ")') 2.0_rk*size(int_send_buffer)/8.0e9_rk
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+             "hvy_synch", shape(hvy_synch)
+
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+             "real_receive_buffer", shape(real_receive_buffer)
+
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+             "real_send_buffer", shape(real_send_buffer)
+
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+             "int_send_buffer", shape(int_send_buffer)
+
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+             "int_receive_buffer", shape(int_receive_buffer)
+
+            write(*,'("GHOSTS-INIT: on each mpirank, Real buffer size is",g15.3," GB ")') &
+             2.0_rk*size(real_send_buffer)/8.0e9_rk
+
+            write(*,'("GHOSTS-INIT: on each mpirank, Int  buffer size is",g15.3," GB ")') &
+             2.0_rk*size(int_send_buffer)/8.0e9_rk
         endif
 
         ! this is a list of communications with all other procs

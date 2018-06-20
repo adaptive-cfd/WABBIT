@@ -156,7 +156,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active))/8.0 &
         )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
 
-        write(*,'("INIT: Measured (true) TOTAL (on all CPU) memory footprint is ",g15.3,"GB")') &
+        write(*,'("INIT-GLOBAL: Measured (true) TOTAL (on all CPU) memory footprint is ",g15.3,"GB")') &
         ((dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
         + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active))/8.0 &
         )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)

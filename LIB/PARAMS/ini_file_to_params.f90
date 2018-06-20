@@ -41,7 +41,8 @@ subroutine ini_file_to_params( params, filename )
     ! inifile structure
     type(inifile)                                   :: FILE
     ! maximum memory available on all cpus
-    real(kind=rk)                                   :: maxmem
+    real(kind=rk)                                   :: maxmem, byte_int=4.0_rk, &
+    byte_real=8.0_rk, Ncpu, Nfriend, Bs, g, max_neighbors, Nrk4, Neqn,Jmax
     ! power used for dimensionality (d=2 or d=3)
     integer(kind=ik)                                :: d,i, Nblocks_Jmax
     real(kind=rk), dimension(:), allocatable        :: tmp
@@ -245,30 +246,32 @@ subroutine ini_file_to_params( params, filename )
             maxmem = maxmem * 1000.0 * 1000.0 * 1000.0 ! in bytes
             if ( params%threeD_case ) then
                 d = 3
+                max_neighbors = 56.0
             else
+                max_neighbors = 12.0
                 d = 2
             endif
 
-            params%number_blocks = ceiling( maxmem /( 8.0 * params%number_procs*(6*params%number_data_fields+1)*(params%number_block_nodes+2*params%number_ghost_nodes)**d )  )
+            Ncpu = real(params%number_procs)
+            Neqn = real(params%number_data_fields)
+            Bs = real(params%number_block_nodes)
+            g = real(params%number_ghost_nodes)
+            ! we assume sort of a worst-case scenario and assume 20 friends.
+            ! in 2D that is too much (11 in practice), in 3d we dont know yet
+            Nfriend = min(Ncpu, 20.0)
+            Jmax = real(params%max_treelevel)
+            Nrk4 = real(size(params%butcher_tableau, 1)+1)
 
-            ! note in the above formula, many arrays allocated in allocate_grid are missing
-            ! this even though you want 1.0Gb in total, you end up with about 4Gb. So here
-            ! divide by that empirical factor and reserve a proper formula for future work
-            params%number_blocks = params%number_blocks / 4
+            params%number_blocks = ceiling( 0.90*maxmem/( Ncpu*2.0*max_neighbors*3.0*Nfriend*byte_int &
+            + 2.0*max_neighbors*(Bs+g+1.0)*((g+1.)**(d-1))*Neqn*Nfriend*byte_real &
+            + (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real &
+            + max_neighbors*byte_int &
+            + Ncpu*(Jmax+2.0+2.0+1.0)*byte_int ) )
+
             if (params%rank==0) write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-
-            ! this is the number of blocks the code can allocate for the given memory.
-            ! However, if the maximum number of blocks on maxlevel is smaller, then we
-            ! allocate only that. Note the security factor of 2
-            ! Nblocks_Jmax = 2 * (2**d) * (2**params%max_treelevel)
-            ! Nblocks_Jmax = ceiling( dble(Nblocks_Jmax) / dble(params%number_procs) )
-            ! params%number_blocks = min( Nblocks_Jmax, params%number_blocks)
-            !
-            ! if (params%rank==0) write(*,'("INIT: on Jmax, we would have ",i8," blocks per rank")') Nblocks_Jmax
             if (params%rank==0) write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
         endif
     end do
-
 
     ! clean up
     if (params%rank==0) write(*,'("INIT: cleaning ini file")')

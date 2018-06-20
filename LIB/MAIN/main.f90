@@ -182,7 +182,8 @@ program main
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
         hvy_active, lgt_sortednumlist, .true., hvy_work)
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
 

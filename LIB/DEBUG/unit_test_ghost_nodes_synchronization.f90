@@ -130,24 +130,24 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     allocate( coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ) )
 
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-    lgt_block = -1
-    lgt_active = -1; lgt_N = 0
-    hvy_active = -1; hvy_N = 0
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
+    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
         ! refine some blocks
         call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "random" )
+             lgt_sortednumlist, hvy_active, hvy_n, "random" )
         ! random adapt some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )
+             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )
     end do
 
     if (params%rank == 0) then

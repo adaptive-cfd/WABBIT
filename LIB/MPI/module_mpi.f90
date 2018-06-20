@@ -282,7 +282,7 @@ subroutine init_ghost_nodes( params )
         allocate( mpirank2friend(1:params%number_procs) )
         allocate( friend2mpirank(1:N_friends) )
 
-        allocate( line_buffer( (Bs+g)*(g+1)*Neqn ) )
+        allocate( line_buffer( Neqn*(Bs+2*g)**(dim) ) )
         allocate( res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
 
         !-----------------------------------------------------------------------

@@ -29,7 +29,8 @@
 !! 25/01/17 - switch to 3D, v0.5
 !
 ! ********************************************************************************************
-subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, verbosity )
+subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n,&
+     hvy_active, hvy_n, lgt_sortednumlist, verbosity )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -69,8 +70,7 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
 ! main body
 
     if ( (params%rank == 0) .and. verbosity ) then
-      write(*,'(80("_"))')
-      write(*,'(A)') "RESET: resetting grid to empty (deactivate all blocks)."
+      write(*,'(A)') "RESET-GRID: resetting grid to empty (deactivate all blocks)."
     endif
 
     ! reset data:
@@ -94,6 +94,7 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     ! set number of active blocks to maximum number, to reset everything
     lgt_n = size(lgt_active,1)
     hvy_n = size(hvy_active,1)
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
+         hvy_n, lgt_sortednumlist, .true. )
 
 end subroutine reset_grid

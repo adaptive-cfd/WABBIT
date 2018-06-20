@@ -468,9 +468,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
 
                                     ! set parameter
                                     ! level diff, read from buffer because calculated level_diff is not sender-receiver
-                                    level_diff = int_receive_buffer(l+2, mpirank2friend(neighbor_rank+1))
+                                    level_diff      = int_receive_buffer(l+2, mpirank2friend(neighbor_rank+1))
                                     buffer_position = int_receive_buffer(l+3, mpirank2friend(neighbor_rank+1))
-                                    buffer_size = int_receive_buffer(l+4, mpirank2friend(neighbor_rank+1))
+                                    buffer_size     = int_receive_buffer(l+4, mpirank2friend(neighbor_rank+1))
                                     line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, mpirank2friend(neighbor_rank+1) )
 
                                     ! data bounds

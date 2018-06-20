@@ -271,6 +271,9 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
             virt_code(4)    = 3
             virt_list_id(4) = 48
 
+        case default
+            call abort(636300, "well you mustnt")
+
     end select
 
     ! calculate treecode for neighbor on same level
@@ -292,6 +295,7 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
         if ( exists ) then
             ! neigbor is one level down
             ! save list_id2
+            if (list_id2<0) write(*,*) "ERROR", list_id, list_id2, dir, "..", lgt_block(lgt_id, :)
             hvy_neighbor( heavy_id, list_id2 ) = neighbor_light_id
 
         elseif ( .not.(exists) ) then

@@ -1068,7 +1068,7 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
     buffer_i = 1
 
     ! set error threshold
-    eps = 1e-12_rk
+    eps = 1e-14_rk
 
     ! reset error norm
     error_norm = 0.0_rk

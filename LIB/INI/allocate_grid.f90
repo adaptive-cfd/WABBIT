@@ -59,6 +59,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> do we have to allocate everything?
     logical, intent(in)                                  :: simulation
     integer(kind=ik)                                     :: rk_steps
+    real(kind=rk)                                        :: effective_memory
 
     !---------------------------------------------------------------------------------------------
     ! interfaces
@@ -150,16 +151,16 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
         write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
 
-        ! note we currently use 8byte per real and integer by default, so all the same bytes per point
-        write(*,'("INIT: Measured (true) local (on 1 cpu) memory footprint is ",g15.3,"GB per mpirank")') &
-        (dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
-        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active))/8.0 &
-        )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk
+        effective_memory = (dble(size(hvy_block)+size(hvy_work)) + & ! real data
+        dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
+        )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk ! in GB
 
-        write(*,'("INIT-GLOBAL: Measured (true) TOTAL (on all CPU) memory footprint is ",g15.3,"GB")') &
-        ((dble(size(hvy_block)) + dble(size(hvy_work)) + dble(size(lgt_block)) + dble(size(lgt_sortednumlist)) &
-        + dble(size(hvy_neighbor)) + dble(size(lgt_active)) + dble(size(hvy_active))/8.0 &
-        )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk)*dble(params%number_procs)
+        ! note we currently use 8byte per real and integer by default, so all the same bytes per point
+        write(*,'("INIT: Measured (true) local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB per mpirank")') &
+        effective_memory
+
+        write(*,'("INIT-GLOBAL: Measured (true) TOTAL (on all CPU) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB")') &
+        effective_memory*dble(params%number_procs)
     end if
 
 end subroutine allocate_grid

@@ -264,14 +264,24 @@ subroutine ini_file_to_params( params, filename )
 
             maxmem = 0.90 * maxmem / Ncpu
 
-            params%number_blocks = ceiling( maxmem/( 2.0*max_neighbors*3.0*Nfriend*byte_int &
-            + 2.0*max_neighbors*(Bs+g+1.0)*((g+1.)**(d-1))*Neqn*Nfriend*byte_real &
-            + (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real &
-            + max_neighbors*byte_int &
-            + Ncpu*(Jmax+2.0+2.0+1.0)*byte_int ) )
+            if ( d == 2 ) then
+                ! in 2d, we try to be precise and take all fat arrays into account. this worked well
+                params%number_blocks = ceiling( maxmem/( 2.0*max_neighbors*3.0*Nfriend*byte_int &
+                + 2.0*max_neighbors*(Bs+g+1.0)*((g+1.)**(d-1))*Neqn*Nfriend*byte_real &
+                + (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real &
+                + max_neighbors*byte_int &
+                + Ncpu*(Jmax+2.0+2.0+1.0)*byte_int ) )
+            else
+                ! in 3d, use a simpler formula which takes only hvy and lgt data into account.
+                ! the buffers are negligible in front of it. I still do not understand it fully. 21/06/2018
+                params%number_blocks = ceiling( maxmem/( (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real + Ncpu*(Jmax+2.0+2.0+1.0)*byte_int ) )
+            endif
 
-            if (params%rank==0) write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-            if (params%rank==0) write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
+            if (params%rank==0) then
+                write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
+                write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
+                params%number_blocks*params%number_procs
+            endif
         endif
     end do
 

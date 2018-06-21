@@ -65,6 +65,9 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
         call init_ghost_nodes( params )
     endif
 
+    ! if this mpirank has no active blocks, it has nothing to do here.
+    if (hvy_n == 0) return
+
     ! hack to use subroutine as redundant nodes test and for ghost nodes synchronization
     if (stop_status) then
         ! synchronization
@@ -561,6 +564,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         call init_ghost_nodes( params )
     endif
 
+    ! if this mpirank has no active blocks, it has nothing to do here.
+    if (hvy_n == 0) return
+
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
     NdF   = params%number_data_fields
@@ -639,7 +645,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 ! the criteria
                 senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel+2)==11 )
                 recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel+2)==11 )
-                receiverIsCoarser       = ( level_diff<0_ik )
+                receiverIsCoarser       = ( level_diff>0_ik )
                 receiverIsOnSameLevel   = ( level_diff==0_ik )
                 lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
 
@@ -1088,12 +1094,12 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
 ! main body
     ! loop over all data fields
     do dF = 1, params%number_data_fields
-        ! first dimension
-        do i = data_bounds(1,1), data_bounds(2,1)
+        ! third dimension, note: for 2D cases k is always 1
+        do k = data_bounds(1,3), data_bounds(2,3)
             ! second dimension
             do j = data_bounds(1,2), data_bounds(2,2)
-                ! third dimension, note: for 2D cases k is always 1
-                do k = data_bounds(1,3), data_bounds(2,3)
+                ! first dimension
+                do i = data_bounds(1,1), data_bounds(2,1)
 
                     if (level_diff/=-1) then
                         ! on the same level, the comparison just takes all points, no odd/even downsampling required.
@@ -1113,7 +1119,10 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
                         !   - new method, averaging, no error found (makes sense: okay)
                         if (oddeven==0) then
                             ! even number of ghost nodes
-                            if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)/=0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0))) then
+                            ! if ( ((data_bounds(2,1)-data_bounds(1,1) == 0).and.(mod(j,2)/=0)) &
+                            ! .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0)) &
+                            ! .or. ((data_bounds(2,3)-data_bounds(1,3) == 0).and.(mod(k,2)/=0)) ) then
+                             if ( (mod(i,2)/=0) .and. (mod(j,2)/=0) .and. (mod(k,2)/=0) ) then
                                 error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
                                 tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i ))
                                 tmp2(i,j) = 7.7_rk
@@ -1133,6 +1142,44 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
             end do
         end do
     end do
+
+    ! do dF = 1, params%number_data_fields
+    !     ! first dimension
+    !     do i = data_bounds(1,1), data_bounds(2,1)
+    !         ! second dimension
+    !         do j = data_bounds(1,2), data_bounds(2,2)
+    !             ! third dimension, note: for 2D cases kN is allways 1
+    !             do k = data_bounds(1,3), data_bounds(2,3)
+    !
+    !                 if (level_diff/=-1) then
+    !                     ! pointwise error norm
+    !                     error_norm = max(error_norm, dabs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
+    !
+    !                 else
+    !                     ! if the level diff is -1, I compare with interpolated (upsampled) data. that means every EVEN
+    !                     ! point is the result of interpolation, and not truely redundant.
+    !                     ! Note this routine ALWAYS just compares the redundant nodes, so it will mostly be called
+    !                     ! with a line of points (i.e. one dimension is length one)
+    !                     ! \todo: check if number of ghost nodes is odd or even
+    !                     !
+    !                     ! This routine has been tested:
+    !                     !   - old method (working version): no error found (okay)
+    !                     !   - old method, non_uniform_mesh_correction=0; in params file -> plenty of errors (okay)
+    !                     !   - old method, sync stage 4 deactivated: finds all occurances of "3finer blocks on corner problem" (okay)
+    !                     !   - new method, averaging, no error found (makes sense: okay)
+    !                     if ( (mod(i,2)/=0) .and. (mod(j,2)/=0) .and. (mod(k,2)/=0) ) then
+    !                         ! pointwise error norm
+    !                         error_norm = max(error_norm, dabs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
+    !
+    !                     end if
+    !
+    !                 end if
+    !                 buffer_i = buffer_i + 1
+    !
+    !             end do
+    !         end do
+    !     end do
+    ! end do
 
     if (error_norm > eps)  then
         write(*,'("ERROR: difference in redundant nodes ",es12.4," level_diff=",i2, " hvy_id=",i8, " rank=",i5 )') &
@@ -1162,7 +1209,7 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
         ! blocks that have problems. If we set the entire block to 100, then subsequent
         ! synchronizations fail because of that. If we set just a point in the middle, it
         ! is far away from the boundary and thus does not affect other sync steps.
-        hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, size(hvy_block,3)/2, :, hvy_id ) = 100.0_rk
+        ! hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, size(hvy_block,3)/2, :, hvy_id ) = 100.0_rk
     end if
 
     deallocate(tmp, tmp2)

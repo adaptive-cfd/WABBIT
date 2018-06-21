@@ -105,8 +105,12 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
     case default
         ! JR version of MSR code above
         call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-        
+
     end select
 
+    ! testing?
+    ! sync=.false. ! test
+    ! call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
+    ! hvy_n, sync, .false., .false.)
     call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )
 end subroutine sync_ghosts

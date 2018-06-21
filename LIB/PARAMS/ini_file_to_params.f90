@@ -262,7 +262,9 @@ subroutine ini_file_to_params( params, filename )
             Jmax = real(params%max_treelevel)
             Nrk4 = real(size(params%butcher_tableau, 1)+1)
 
-            params%number_blocks = ceiling( 0.90*maxmem/( Ncpu*2.0*max_neighbors*3.0*Nfriend*byte_int &
+            maxmem = 0.90 * maxmem / Ncpu
+
+            params%number_blocks = ceiling( maxmem/( 2.0*max_neighbors*3.0*Nfriend*byte_int &
             + 2.0*max_neighbors*(Bs+g+1.0)*((g+1.)**(d-1))*Neqn*Nfriend*byte_real &
             + (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real &
             + max_neighbors*byte_int &

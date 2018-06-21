@@ -79,8 +79,8 @@ module module_MPI
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [dim (2,3)], [data_bounds_type], [sender/receiver/up-downsampled])
-    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 2:3, 1:3, 1:3) :: ijkGhosts
+    ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [data_bounds_type], [sender/receiver/up-downsampled])
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3, 1:3) :: ijkGhosts
 
     ! it is useful to keep a named constant for the dimensionality here (we use
     ! it to access e.g. two/three D arrays in inverse_neighbor)
@@ -93,7 +93,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: check_redundant_nodes, synchronize_ghosts_generic_sequence
+    PUBLIC :: check_redundant_nodes, synchronize_ghosts_generic_sequence, init_ghost_nodes
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -193,7 +193,7 @@ subroutine init_ghost_nodes( params )
     ! local variables
     integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, number_procs, rank
     integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idim, idata_bounds_type
-    integer(kind=ik) :: data_bounds(2,3)
+    integer(kind=ik) :: data_bounds(2,3), j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
 
     ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then
@@ -209,24 +209,26 @@ subroutine init_ghost_nodes( params )
         ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
         ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
         if ( params%threeD_case ) then
+            !---3d---3d---
 
             buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 56 * 3
             ! how many possible neighbor relations are there?
             Nneighbor = 74
-            ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
+            ! space dimensions: used in the static arrays as index
             dim = 3_ik
             ! set default number of "friends", that is mpiranks we exchange data with.
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 20 )
 
         else
+            !---2d---2d---
 
             buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 12 * 3
             ! how many possible neighbor relations are there?
             Nneighbor = 16
-            ! space dimensions: used in the static arrays as index (this way, we have one variable for 2d and 3d)
+            ! space dimensions: used in the static arrays as index
             dim = 2_ik
             ! set default number of "friends", that is mpiranks we exchange data with.
             ! NOTE: their number can be increased if necessary
@@ -292,21 +294,79 @@ subroutine init_ghost_nodes( params )
         ! once in a large, module-global array (which is faster than computing it every time with tons
         ! of IF-THEN clauses).
         ! This arrays indices are:
-        ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [idim], [idata_bounds_type], [isendrecv])
+        ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [idata_bounds_type], [isendrecv])
 
+        ijkGhosts = -1
         do ineighbor = 1, Nneighbor
             do leveldiff = -1, 1
-                do idim = 2, 3
-                    do idata_bounds_type = 1, 3
-                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'sender')
-                        ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 1) = data_bounds
+                do idata_bounds_type = 1, 3
+                    call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'sender')
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 1) = data_bounds
 
-                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'receiver')
-                        ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 2) = data_bounds
+                    call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'receiver')
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 2) = data_bounds
 
-                        call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'restricted-predicted')
-                        ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idim, idata_bounds_type, 3) = data_bounds
-                    enddo
+                    call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'restricted-predicted')
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 3) = data_bounds
+
+                    !---------TESTING-------------------------------------------
+                    if (leveldiff==0) then
+                        rx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 2)
+                        rx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 2)
+                        ry0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 2)
+                        ry1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 2)
+                        rz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 2)
+                        rz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 2)
+
+                        sx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 1)
+                        sx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 1)
+                        sy0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 1)
+                        sy1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 1)
+                        sz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 1)
+                        sz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 1)
+                        if ((sx1-sx0+1.ne.rx1-rx0+1).or.(sy1-sy0+1.ne.ry1-ry0+1).or.(sz1-sz0+1.ne.rz1-rz0+1)) then
+                            write(*,*) "leveldiff", leveldiff, "bounds-type", idata_bounds_type, "neighhborhood:", ineighbor, "dim=", dim
+
+                            write(*,'("send ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') sx0, sx1, sx1-sx0+1, &
+                            sy0, sy1, sy1-sy0+1, sz0, sz1, sz1-sz0+1
+                            write(*,'("recv ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') rx0, rx1, rx1-rx0+1, &
+                            ry0, ry1, ry1-ry0+1, rz0, rz1, rz1-rz0+1
+
+                            call abort(66271, "Preflight: array bounds mismatch during ghost copy on same level.")
+                        endif
+                    else
+                        rx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 2)
+                        rx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 2)
+                        ry0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 2)
+                        ry1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 2)
+                        rz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 2)
+                        rz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 2)
+
+                        sx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 3)
+                        sx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 3)
+                        sy0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 3)
+                        sy1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 3)
+                        sz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 3)
+                        sz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 3)
+
+                        ! there is neighborhoods that do not make sense: in this case, all indices
+                        ! are set to 1. we skip those. An example would be a face neighbor in 3D on the same level (code 1)
+                        ! which is never restricted/predicted
+                        if (sx0/=1 .and. sx1/=1 .and. sy0/=1 .and. sy1/=1 .and. sz0/=1 .and. sz1/=1 ) then
+                            if ((sx1-sx0+1.ne.rx1-rx0+1).or.(sy1-sy0+1.ne.ry1-ry0+1).or.(sz1-sz0+1.ne.rz1-rz0+1)) then
+                                write(*,*) "leveldiff", leveldiff, "bounds-type", idata_bounds_type, "neighhborhood:", ineighbor, "dim=", dim
+
+                                write(*,'("send ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') sx0, sx1, sx1-sx0+1, &
+                                sy0, sy1, sy1-sy0+1, sz0, sz1, sz1-sz0+1
+                                write(*,'("recv ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') rx0, rx1, rx1-rx0+1, &
+                                ry0, ry1, ry1-ry0+1, rz0, rz1, rz1-rz0+1
+
+                                call abort(66272, "Preflight: array bounds mismatch during ghost copy on different level.")
+                            endif
+                        endif
+
+                    endif
+
                 enddo
             enddo
         enddo

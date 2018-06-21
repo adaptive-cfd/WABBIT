@@ -45,7 +45,8 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
         sh_end = -g
     end if
 
-    ! reset data bounds
+    ! set 1 and not -1 (or anything else), because 2D bounds ignore 3rd dimension
+    ! and thus cyclce from 1:1
     data_bounds = 1
 
 !---------------------------------------------------------------------------------------------
@@ -197,7 +198,7 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     ! '_25/___'
                     case(16)
                         data_bounds(1,1) = g+1+sh_start
-                        data_bounds(2,1) = Bs+1+g+sh_end
+                        data_bounds(2,1) = g+1+g+sh_end
                         data_bounds(1,2) = g+1+sh_start
                         data_bounds(2,2) = g+1+g+sh_end
                         data_bounds(1,3) = g+1
@@ -215,7 +216,7 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     ! '_45/___'
                     case(18)
                         data_bounds(1,1) = g+1+sh_start
-                        data_bounds(2,1) = Bs+1+g+sh_end
+                        data_bounds(2,1) = g+1+g+sh_end
                         data_bounds(1,2) = Bs-sh_end
                         data_bounds(2,2) = Bs+g-sh_start
                         data_bounds(1,3) = g+1
@@ -3441,6 +3442,8 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                 endif
             end if
 
+        case default
+            call abort(06602338, "Calc-data-bounds: this is an unknown string.")
     end select
 
 end subroutine calc_data_bounds

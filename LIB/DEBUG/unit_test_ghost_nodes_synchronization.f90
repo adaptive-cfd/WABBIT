@@ -142,9 +142,12 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
+        if (params%rank==0) write(*,'("UNIT TEST: iteration ",i1," of random grid generation")') l
+
         ! refine some blocks
         call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
              lgt_sortednumlist, hvy_active, hvy_n, "random" )
+
         ! random adapt some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
              lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )

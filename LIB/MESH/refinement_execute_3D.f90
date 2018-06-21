@@ -72,7 +72,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     N = params%number_blocks
     ! set MPI parameter
-    rank         = params%rank
+    rank = params%rank
     ! grid parameter
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
@@ -122,10 +122,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 0
             ! new level + 1
@@ -143,10 +142,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 1
             ! new level + 1
@@ -164,10 +162,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 2
             ! new level + 1
@@ -185,10 +182,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 3
             ! new level + 1
@@ -206,10 +202,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 4
             ! new level + 1
@@ -227,10 +222,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 5
             ! new level + 1
@@ -248,10 +242,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
             call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
-
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 6
             ! new level + 1
@@ -268,11 +261,11 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! eigth new block
             ! write data on current heavy id
             free_heavy_id = hvy_active(k)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call hvy_id_to_lgt_id( lgt_free_id, free_heavy_id, rank, N )
 
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
             ! new treecode one level up - "1" block
             lgt_block( lgt_free_id, level+1 )                = 7
             ! new level + 1

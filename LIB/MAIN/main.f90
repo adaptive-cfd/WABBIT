@@ -186,7 +186,9 @@ program main
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
-
+    ! The ghost nodes will cal their own setup on the first call, but for cleaner output
+    ! we can also just do it now.
+    call init_ghost_nodes( params )
     !---------------------------------------------------------------------------
     ! Unit tests
     !---------------------------------------------------------------------------

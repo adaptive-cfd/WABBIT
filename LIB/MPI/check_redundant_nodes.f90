@@ -241,7 +241,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                     ! da die interpolation bei leveldiff -1 erst bei der leseroutine stattfindet, werden als datengrenzen die für die interpolation noitwendigen bereiche angegeben
                     ! auch für restriction ist der datengrenzenbereich größer, da dann auch hier später erst die restriction stattfindet
                     !!!!!!!!!!! call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'sender' )
-                    data_bounds = ijkGhosts(:,:, neighborhood, level_diff, dim, data_bounds_type, 1)
+                    data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, 1)
 
                     ! vor dem schreiben der daten muss ggf interpoliert werden
                     ! hier werden die datengrenzen ebenfalls angepasst
@@ -259,7 +259,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                         ! interpoliere daten
                         call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k))
 
-                        data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, dim, data_bounds_type, 3)
+                        data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, data_bounds_type, 3)
                         ! lese daten, verwende interpolierte daten
                         call GhostLayer2Line( params, line_buffer, buffer_size, res_pre_data( data_bounds2(1,1):data_bounds2(2,1), &
                                               data_bounds2(1,2):data_bounds2(2,2), data_bounds2(1,3):data_bounds2(2,3),:) )
@@ -295,7 +295,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                         ! via the buffers first.
                         ! data bounds
                         !!!!!!!!!!!!!!call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
-                        data_bounds = ijkGhosts(:,:, neighborhood, level_diff, dim, data_bounds_type, 2)
+                        data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, 2)
                         ! simply write data. No care
                         call Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id )
 
@@ -379,7 +379,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
 
                         ! data bounds
                         !!!!!call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
-                        data_bounds = ijkGhosts(:,:, neighborhood, level_diff, dim, data_bounds_type, 2)
+                        data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, 2)
                         ! write data, hängt vom jeweiligen Fall ab
                         ! average: schreibe daten, merke Anzahl der geschriebenen Daten, Durchschnitt nach dem Einsortieren des receive buffers berechnet
                         ! simple: schreibe ghost nodes einfach in den speicher (zum Testen?!)
@@ -475,7 +475,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
 
                                     ! data bounds
                                     !!!!!!!!!!!call calc_data_bounds( params, data_bounds, invert_neighborhood, level_diff, data_bounds_type, 'receiver' )
-                                    data_bounds = ijkGhosts(:,:, invert_neighborhood, level_diff, dim, data_bounds_type, 2)
+                                    data_bounds = ijkGhosts(:,:, invert_neighborhood, level_diff, data_bounds_type, 2)
 
                                     ! write data
                                     call Line2GhostLayer( params, line_buffer(1:buffer_size), data_bounds, hvy_block, hvy_active(k) )
@@ -706,7 +706,10 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     level_diff_indicator =  4096*sender_hvy_id + 256*bounds_type + 16*(level_diff+1) + entrySortInRound
 
                     ! the packing has limitations: if the numbers are too large, it might fail, so check here. TODO
-                    if (sender_hvy_id.ne.( level_diff_indicator/4096 ) )  call abort(1212,' wrong sender_hvy_id !')
+                    if (sender_hvy_id.ne.( level_diff_indicator/4096 ) )           call abort(1212,'Packing went wrong: wrong sender_hvy_id !')
+                    if (modulo( level_diff_indicator/16  , 16 ) .ne. level_diff+1) call abort(1213,'Packing went wrong: wrong leveldiff !')
+                    if (modulo( level_diff_indicator/256 , 16 ) .ne. bounds_type)  call abort(1214,'Packing went wrong: wrong boundstype !')
+                    if (modulo( level_diff_indicator, 16 ) .ne. entrySortInRound)  call abort(1215,'Packing went wrong: wrong entrySortInRound !')
 
                     ! the chunk of data is added to the MPI buffers (preparation for sending)
                     call AppendLineToBuffer( int_send_buffer, real_send_buffer, 0, id_Friend, line_buffer, &
@@ -721,25 +724,25 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     level_diff_indicator = 256*bounds_type + 16*(level_diff+1) + entrySortInRound
 
                     ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                    ! They depend on the neighbor-relation, level difference, data dimensionality (dim) and the bounds type.
+                    ! They depend on the neighbor-relation, level difference and the bounds type.
                     ! The last index is 1-sender 2-receiver 3-restricted/predicted.
                     if ( level_diff == 0 ) then
                         ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
                         ! we will send to our neighbor mpirank
                         call GhostLayer2Line( params, line_buffer, buffer_size, &
-                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, dim, bounds_type, 1):ijkGhosts(2,1, neighborhood, level_diff, dim, bounds_type, 1), &
-                                   ijkGhosts(1,2, neighborhood, level_diff, dim, bounds_type, 1):ijkGhosts(2,2, neighborhood, level_diff, dim, bounds_type, 1), &
-                                   ijkGhosts(1,3, neighborhood, level_diff, dim, bounds_type, 1):ijkGhosts(2,3, neighborhood, level_diff, dim, bounds_type, 1), &
+                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, bounds_type, 1):ijkGhosts(2,1, neighborhood, level_diff, bounds_type, 1), &
+                                   ijkGhosts(1,2, neighborhood, level_diff, bounds_type, 1):ijkGhosts(2,2, neighborhood, level_diff, bounds_type, 1), &
+                                   ijkGhosts(1,3, neighborhood, level_diff, bounds_type, 1):ijkGhosts(2,3, neighborhood, level_diff, bounds_type, 1), &
                                    :, hvy_active(k)) )
                     else
                         ! up/downsample data first, then flatten to 1D buffer
-                        call restrict_predict_data( params, res_pre_data, ijkGhosts(:,:, neighborhood, level_diff, dim, bounds_type, 1), &
+                        call restrict_predict_data( params, res_pre_data, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 1), &
                         neighborhood, level_diff, bounds_type, hvy_block, hvy_active(k) )
 
                         call GhostLayer2Line( params, line_buffer, buffer_size, &
-                        res_pre_data( ijkGhosts(1,1, neighborhood, level_diff, dim, bounds_type, 3):ijkGhosts(2,1, neighborhood, level_diff, dim, bounds_type, 3), &
-                                      ijkGhosts(1,2, neighborhood, level_diff, dim, bounds_type, 3):ijkGhosts(2,2, neighborhood, level_diff, dim, bounds_type, 3), &
-                                      ijkGhosts(1,3, neighborhood, level_diff, dim, bounds_type, 3):ijkGhosts(2,3, neighborhood, level_diff, dim, bounds_type, 3), &
+                        res_pre_data( ijkGhosts(1,1, neighborhood, level_diff, bounds_type, 3):ijkGhosts(2,1, neighborhood, level_diff, bounds_type, 3), &
+                                      ijkGhosts(1,2, neighborhood, level_diff, bounds_type, 3):ijkGhosts(2,2, neighborhood, level_diff, bounds_type, 3), &
+                                      ijkGhosts(1,3, neighborhood, level_diff, bounds_type, 3):ijkGhosts(2,3, neighborhood, level_diff, bounds_type, 3), &
                         :) )
                     end if
 
@@ -810,29 +813,29 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     if ( level_diff == 0 ) then
                         ! simply copy from sender block to receiver block (NOTE: both are on the same MPIRANK)
                         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                        ! They depend on the neighbor-relation, level difference, data dimensionality (dim) and the bounds type.
+                        ! They depend on the neighbor-relation, level difference, and the bounds type.
                         ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, dim, bounds_type, 2):ijkGhosts(2,1, neighborhood, level_diff, dim, bounds_type, 2), &
-                                   ijkGhosts(1,2, neighborhood, level_diff, dim, bounds_type, 2):ijkGhosts(2,2, neighborhood, level_diff, dim, bounds_type, 2), &
-                                   ijkGhosts(1,3, neighborhood, level_diff, dim, bounds_type, 2):ijkGhosts(2,3, neighborhood, level_diff, dim, bounds_type, 2), :, hvy_id_receiver ) = &
-                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, dim, bounds_type, 1):ijkGhosts(2,1, neighborhood, level_diff, dim, bounds_type, 1), &
-                                   ijkGhosts(1,2, neighborhood, level_diff, dim, bounds_type, 1):ijkGhosts(2,2, neighborhood, level_diff, dim, bounds_type, 1), &
-                                   ijkGhosts(1,3, neighborhood, level_diff, dim, bounds_type, 1):ijkGhosts(2,3, neighborhood, level_diff, dim, bounds_type, 1), :, sender_hvy_id)
+                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, bounds_type, 2):ijkGhosts(2,1, neighborhood, level_diff, bounds_type, 2), &
+                                   ijkGhosts(1,2, neighborhood, level_diff, bounds_type, 2):ijkGhosts(2,2, neighborhood, level_diff, bounds_type, 2), &
+                                   ijkGhosts(1,3, neighborhood, level_diff, bounds_type, 2):ijkGhosts(2,3, neighborhood, level_diff, bounds_type, 2), :, hvy_id_receiver ) = &
+                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, bounds_type, 1):ijkGhosts(2,1, neighborhood, level_diff, bounds_type, 1), &
+                                   ijkGhosts(1,2, neighborhood, level_diff, bounds_type, 1):ijkGhosts(2,2, neighborhood, level_diff, bounds_type, 1), &
+                                   ijkGhosts(1,3, neighborhood, level_diff, bounds_type, 1):ijkGhosts(2,3, neighborhood, level_diff, bounds_type, 1), :, sender_hvy_id)
 
                     else  ! interpolation or restriction before inserting
-                        call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, dim, bounds_type, 1), neighborhood, level_diff, &
+                        call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, bounds_type, 1), neighborhood, level_diff, &
                         bounds_type, hvy_block, sender_hvy_id )
 
                         ! copy interpolated / restricted data to ghost nodes layer
                         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                        ! They depend on the neighbor-relation, level difference, data dimensionality (dim) and the bounds type.
+                        ! They depend on the neighbor-relation, level difference and the bounds type.
                         ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, dim, bounds_type, 2):ijkGhosts(2,1, neighborhood, level_diff, dim, bounds_type, 2), &
-                                   ijkGhosts(1,2, neighborhood, level_diff, dim, bounds_type, 2):ijkGhosts(2,2, neighborhood, level_diff, dim, bounds_type, 2), &
-                                   ijkGhosts(1,3, neighborhood, level_diff, dim, bounds_type, 2):ijkGhosts(2,3, neighborhood, level_diff, dim, bounds_type, 2), :, hvy_id_receiver ) = &
-                        res_pre_data( ijkGhosts(1,1, neighborhood, level_diff, dim, bounds_type, 3):ijkGhosts(2,1, neighborhood, level_diff, dim, bounds_type, 3), &
-                                      ijkGhosts(1,2, neighborhood, level_diff, dim, bounds_type, 3):ijkGhosts(2,2, neighborhood, level_diff, dim, bounds_type, 3), &
-                                      ijkGhosts(1,3, neighborhood, level_diff, dim, bounds_type, 3):ijkGhosts(2,3, neighborhood, level_diff, dim, bounds_type, 3), :)
+                        hvy_block( ijkGhosts(1,1, neighborhood, level_diff, bounds_type, 2):ijkGhosts(2,1, neighborhood, level_diff, bounds_type, 2), &
+                                   ijkGhosts(1,2, neighborhood, level_diff, bounds_type, 2):ijkGhosts(2,2, neighborhood, level_diff, bounds_type, 2), &
+                                   ijkGhosts(1,3, neighborhood, level_diff, bounds_type, 2):ijkGhosts(2,3, neighborhood, level_diff, bounds_type, 2), :, hvy_id_receiver ) = &
+                        res_pre_data( ijkGhosts(1,1, neighborhood, level_diff, bounds_type, 3):ijkGhosts(2,1, neighborhood, level_diff, bounds_type, 3), &
+                                      ijkGhosts(1,2, neighborhood, level_diff, bounds_type, 3):ijkGhosts(2,2, neighborhood, level_diff, bounds_type, 3), &
+                                      ijkGhosts(1,3, neighborhood, level_diff, bounds_type, 3):ijkGhosts(2,3, neighborhood, level_diff, bounds_type, 3), :)
                     end if
 
                     ! increase buffer postion marker
@@ -871,9 +874,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                         line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, id_Friend )
 
                         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                        ! They depend on the neighbor-relation, level difference, data dimensionality (dim) and the bounds type.
+                        ! They depend on the neighbor-relation, level difference and the bounds type.
                         ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                        call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, dim, bounds_type, 2), hvy_block, hvy_id_receiver )
+                        call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 2), hvy_block, hvy_id_receiver )
 
                         ! increase buffer postion marker
                         l = l + 5
@@ -893,11 +896,11 @@ subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
     !> user defined parameter structure
     type (type_params), intent(in)   :: params
     !> data buffer
-    real(kind=rk), intent(out)       :: line_buffer(:)
+    real(kind=rk), intent(inout)     :: line_buffer(:)
     ! buffer size
     integer(kind=ik), intent(out)    :: buffer_counter
     !> heavy block data, all data fields
-    real(kind=rk), intent(in)        :: hvy_data(:, :, :, :)
+    real(kind=rk), intent(inout)     :: hvy_data(:, :, :, :)
 
     ! loop variable
     integer(kind=ik) :: i, j, k, dF
@@ -928,9 +931,9 @@ subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id 
     !> user defined parameter structure
     type (type_params), intent(in)  :: params
     !> data buffer
-    real(kind=rk), intent(in)       :: line_buffer(:)
+    real(kind=rk), intent(inout)    :: line_buffer(:)
     !> data_bounds
-    integer(kind=ik), intent(in)    :: data_bounds(2,3)
+    integer(kind=ik), intent(inout) :: data_bounds(2,3)
     !> heavy data array - block data
     real(kind=rk), intent(inout)    :: hvy_block(:, :, :, :, :)
     !> hvy id
@@ -970,13 +973,13 @@ subroutine add_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_synch,
     !> user defined parameter structure
     type (type_params), intent(in)                  :: params
     !> data buffer
-    real(kind=rk), intent(in)                 :: line_buffer(:)
+    real(kind=rk), intent(inout)                    :: line_buffer(:)
     !> data_bounds
-    integer(kind=ik), intent(in)                 :: data_bounds(2,3)
+    integer(kind=ik), intent(inout)                 :: data_bounds(2,3)
     !> heavy data array - block data
-    real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> heavy synch array
-    integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
+    integer(kind=1), intent(inout)                  :: hvy_synch(:, :, :, :)
     !> hvy id
     integer(kind=ik), intent(in)                    :: hvy_id
 
@@ -1035,11 +1038,11 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
     !> user defined parameter structure
     type (type_params), intent(in)                  :: params
     !> data buffer
-    real(kind=rk), intent(in)                 :: line_buffer(:)
+    real(kind=rk), intent(inout)                    :: line_buffer(:)
     !> data_bounds
-    integer(kind=ik), intent(in)                 :: data_bounds(2,3)
+    integer(kind=ik), intent(inout)                 :: data_bounds(2,3)
     !> heavy data array - block data
-    real(kind=rk), intent(inout)                       :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> hvy id
     integer(kind=ik), intent(in)                    :: hvy_id, level_diff, my_ref
     ! status of nodes check: if true: stops program
@@ -1159,7 +1162,7 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
         ! blocks that have problems. If we set the entire block to 100, then subsequent
         ! synchronizations fail because of that. If we set just a point in the middle, it
         ! is far away from the boundary and thus does not affect other sync steps.
-        hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, :, :, hvy_id ) = 100.0_rk
+        hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, size(hvy_block,3)/2, :, hvy_id ) = 100.0_rk
     end if
 
     deallocate(tmp, tmp2)
@@ -1186,7 +1189,7 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     real(kind=rk), intent(inout)          :: real_send_buffer(:,:)
     real(kind=rk), intent(inout)          :: real_receive_buffer(:,:)
 
-    integer(kind=ik), intent(inout)        :: communication_counter(:)
+    integer(kind=ik), intent(inout)       :: communication_counter(:)
 
     ! process rank
     integer(kind=ik)                    :: rank
@@ -1441,7 +1444,7 @@ subroutine AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, i
     ! id integer
     integer(kind=ik), intent(in)           :: id_Friend
     ! restricted/predicted data buffer
-    real(kind=rk), intent(in)              :: line_buffer(:)
+    real(kind=rk), intent(inout)           :: line_buffer(:)
     ! data buffer intergers, receiver heavy id, neighborhood id, level difference
     integer(kind=ik), intent(in)           :: hvy_id, neighborhood, level_diff
 

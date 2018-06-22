@@ -1,7 +1,7 @@
 !> \dir
 !> \brief Implementation of 3d/2d Convection Diffusion Equations
 ! ********************************************************************************************
-!> \file 
+!> \file
 !> \brief Module for 2D/3D convdiff physics
 ! ********************************************************************************************
 !! \brief Module for 2D/3D convdiff physics
@@ -49,6 +49,7 @@ module module_convdiff_new
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_paramsb), save :: params_convdiff
+
 
 
 
@@ -168,8 +169,14 @@ contains
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
 
-    if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
-        call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1 )
+    if (params_convdiff%dim == 2) then
+        if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
+            call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1 )
+        endif
+    elseif (params_convdiff%dim == 3) then
+        if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+3 ) then
+            call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,2:4), 1 )
+        endif
     endif
 
   end subroutine
@@ -323,7 +330,8 @@ contains
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
 
-    real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:2)
+    ! TODO: make this global and allocatable
+    real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3)
     integer(kind=ik) :: i, ix, iy
     real(kind=rk) :: x,y,unorm
 
@@ -331,9 +339,13 @@ contains
 
 
     do i = 1, params_convdiff%N_scalars
-      call create_velocity_field_2d( time, g, Bs, dx, x0, u0, i )
-
-      unorm = maxval( u0(:,:,1)*u0(:,:,1) + u0(:,:,2)*u0(:,:,2) )
+        if (params_convdiff%dim == 2) then
+            call create_velocity_field_2d( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
+            unorm = maxval( u0(:,:,1,1)*u0(:,:,1,1) + u0(:,:,1,2)*u0(:,:,1,2) )
+        else
+            call create_velocity_field_3d( time, g, Bs, dx, x0, u0, i )
+            unorm = maxval( u0(:,:,:,1)*u0(:,:,:,1) + u0(:,:,:,2)*u0(:,:,:,2) + u0(:,:,:,3)*u0(:,:,:,3) )
+        endif
 
       if ( unorm < 1.0e-5_rk) then
         ! if the value of u is very small, which may happen if it is time dependent
@@ -390,62 +402,66 @@ contains
           u(:,:,:,i) = 0.0_rk
 
       case ("cyclogenesis")
-          do ix = 1, Bs+2*g
-              do iy = 1, Bs+2*g
-                  ! compute x,y coordinates from spacing and origin
-                  x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                  y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+          if (params_convdiff%dim==2) then
+              do ix = 1, Bs+2*g
+                  do iy = 1, Bs+2*g
+                      ! compute x,y coordinates from spacing and origin
+                      x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                      y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-                  u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i) )
+                      u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i) )
+                  end do
               end do
-          end do
+          else
+              call abort(66273,"this inicond is 2d only..")
+          endif
 
       case("blob")
           if (params_convdiff%dim==2) then
-            ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
-            do ix = 1, Bs+2*g
+              ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
               do iy = 1, Bs+2*g
-                ! compute x,y coordinates from spacing and origin
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+                  do ix = 1, Bs+2*g
+                      ! compute x,y coordinates from spacing and origin
+                      x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                      y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-                if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
-                if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
+                      if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
+                      if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
 
-                if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
-                if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
+                      if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
+                      if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
 
-                ! set actual inicond gauss blob
-                u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
+                      ! set actual inicond gauss blob
+                      u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
+                  end do
               end do
-            end do
-        else
-            ! create gauss pulse
-            do ix = 1, Bs+2*g
-              do iy = 1, Bs+2*g
-                  do iz = 1, Bs+2*g
-                    ! compute x,y coordinates from spacing and origin
-                    x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                    y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-                    z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
+          else
+              ! create gauss pulse
+              do iz = 1, Bs+2*g
+                  do iy = 1, Bs+2*g
+                      do ix = 1, Bs+2*g
+                          ! compute x,y coordinates from spacing and origin
+                          x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                          y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+                          z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
 
-                    if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
-                    if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
+                          if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
+                          if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
 
-                    if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
-                    if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
+                          if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
+                          if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
 
-                    if (z<-params_convdiff%Lz/2.0) z = z + params_convdiff%Lz
-                    if (z>params_convdiff%Lz/2.0) z = z - params_convdiff%Lz
+                          if (z<-params_convdiff%Lz/2.0) z = z + params_convdiff%Lz
+                          if (z>params_convdiff%Lz/2.0) z = z - params_convdiff%Lz
 
-                    ! set actual inicond gauss blob
-                    u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
-                end do
+                          ! set actual inicond gauss blob
+                          u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
+                      end do
+                  end do
               end do
-            end do
-        end if
+          end if
       case default
-        call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
+          call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
       end select
 
 

@@ -31,15 +31,13 @@
 ! ********************************************************************************************
 
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, com_lists, com_matrix, &
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, time, iteration, hvy_synch, hvy_work)
+    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_work)
 
   !---------------------------------------------------------------------------------------------
   ! variables
 
   implicit none
 
-  integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
   !> user defined parameter structure
   type (type_params), intent(inout)    :: params
   !> light data array
@@ -58,17 +56,6 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   integer(kind=ik), intent(inout)      :: hvy_n, lgt_n
   !> sorted list of numerical treecodes, used for block finding
   integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:)
-
-  !> communication lists:
-  integer(kind=ik), intent(inout)      :: com_lists(:, :, :, :)
-
-  !> communications matrix:
-  integer(kind=ik), intent(inout)      :: com_matrix(:,:,:)
-
-  !> send/receive buffer, integer and real
-  integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-  real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
-
   !> time loop variables
   real(kind=rk), intent(inout)         :: time
   integer(kind=ik), intent(inout)      :: iteration
@@ -77,7 +64,6 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   !> are performed and the mesh is refined to gurantee the error eps
   logical, intent(in) :: adapt
   integer(kind=ik) :: lgt_n_old, k, iter
-  logical :: go_sync
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -107,8 +93,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-            com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------
@@ -150,8 +135,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, com_lists, com_matrix, &
-            int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator,  hvy_work )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -160,6 +144,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             endif
           enddo
         endif
+
+        !-----------------------------------------------------------------------
         ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
         ! for example if one does non-adaptive non-equidistant spatial convergence tests
         if (params%inicond_refinements > 0) then
@@ -170,7 +156,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! set initial condition
             call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
                 params%initial_cond, hvy_work, .true.)
-                
+
             if (params%rank == 0) then
              write(*,'(" did ",i2," refinement stage (beyond what is required for the &
                 &prescribed precision eps) Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') k, lgt_n, &
@@ -178,8 +164,10 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
              endif
           enddo
         endif
-        ! If we use volume penalization and ACM we first apply the mask to refine 
-        ! the grid properly around it. However, for comparison, we would like to 
+
+        !-----------------------------------------------------------------------
+        ! If we use volume penalization and ACM we first apply the mask to refine
+        ! the grid properly around it. However, for comparison, we would like to
         ! start from an initial condition without a mask (impulsive start).
         ! This is done here (after the refinements).
         if (params%physics_type == 'ACM-new') then
@@ -216,18 +204,14 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    ! if the data is read from file, try forcing the redundant nodes to be the same via a single averaging
-    ! sync step. did not solve the problem on IDRIS ada when starting from file.
-    if (params%initial_cond == 'read_from_files') then
-        go_sync = .true.
-        call check_redundant_nodes( params, lgt_block, hvy_block, hvy_synch, hvy_neighbor,&
-             hvy_active, hvy_n, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, &
-             go_sync, .false., .true. )
-   endif
+    ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
+    ! it is a safety issue. Better simply keep it.
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
+    ! footer...and done!
     if (params%rank == 0) then
         write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') lgt_n, &
         min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
-      write(*,'("Initial grid and initial condition terminated.")')
+        write(*,'("Initial grid and initial condition terminated.")')
     endif
 end subroutine set_initial_grid

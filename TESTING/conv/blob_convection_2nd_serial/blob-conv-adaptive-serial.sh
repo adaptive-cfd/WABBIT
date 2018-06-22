@@ -17,7 +17,7 @@ times=(000000000000
 000000050000)
 
 # run actual test
-./wabbit 2D ${params} --memory=2GB
+./wabbit 2D ${params} --memory=2.0GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"
@@ -38,10 +38,10 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ${mpi_command} ./wabbit-post 2D --keyvalues ${file}
+        ./wabbit-post 2D --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
-            ${mpi_command} ./wabbit-post 2D --compare-keys $keyfile $reffile
+            ./wabbit-post 2D --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
               echo -e " :) Happy, this looks ok!" $keyfile $reffile

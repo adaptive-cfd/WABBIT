@@ -37,7 +37,7 @@ filter=$3
 
 	./${test_dir}/replace_ini_value.sh  ${params} Discretization filter_type ${filter}
 	# run actual test
-	${mpi_command} ./wabbit 2D ${params} --memory=2GB
+	${mpi_command} ./wabbit 2D ${params} --memory=2GB ${ghosts}
 
 	echo " "
 	echo " "

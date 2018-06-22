@@ -92,8 +92,8 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
           ref_chance = 0.25_rk
           ! random refinement can set at most this many blocks to refine (avoid errors
           ! sue to insufficient memory) (since we already have lgt_n blocks we can set the status
-          ! at most for Nmax-lgt_n blocks, whcih genrate ech 2**d new blocks)
-          max_blocks = (size(lgt_block,1)-lgt_n-10) / 2**d
+          ! at most for Nmax-lgt_n blocks, which genrate each 2**d new blocks)
+          max_blocks = ((size(lgt_block,1)-lgt_n-10) / 2**d) / 2
           ! set random seed
           call init_random_seed()
           ! unset all refinement flags

@@ -37,6 +37,9 @@ module module_indicators
 
     implicit none
 
+    ! interpolation fields
+    real(kind=rk), SAVE, PRIVATE, allocatable :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 

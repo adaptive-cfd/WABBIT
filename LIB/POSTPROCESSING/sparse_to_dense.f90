@@ -15,7 +15,7 @@ subroutine sparse_to_dense(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid, allocate_com_arrays, deallocate_grid
+    use module_initialization, only: allocate_grid, deallocate_grid
     use module_mpi
 
     implicit none
@@ -32,18 +32,13 @@ subroutine sparse_to_dense(help, params)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=1), allocatable            :: hvy_synch(:, :, :, :)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik), allocatable           :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable              :: real_send_buffer(:,:), real_receive_buffer(:,:)
     integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length, dim
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik), allocatable           :: com_matrix(:,:,:)
-    integer(kind=ik), allocatable           :: com_lists(:, :, :, :)
     integer(kind=ik)                        :: treecode_size, number_dense_blocks
 !-----------------------------------------------------------------------------------------------------
 
@@ -132,11 +127,8 @@ subroutine sparse_to_dense(help, params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_synch, int_send_buffer,&
-        int_receive_buffer, real_send_buffer, real_receive_buffer)
+        hvy_active, lgt_sortednumlist, .true., hvy_work)
 
-    ! allocate communication arrays
-    call allocate_com_arrays(params, com_lists, com_matrix)
     ! read field
     call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
     call read_field(file_in, 1, params, hvy_block, hvy_n)
@@ -160,8 +152,7 @@ subroutine sparse_to_dense(help, params)
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active,&
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-    com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
     ! refine/coarse to attain desired level, respectively
     !coarsen
@@ -202,8 +193,7 @@ subroutine sparse_to_dense(help, params)
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
@@ -222,6 +212,5 @@ subroutine sparse_to_dense(help, params)
     end if
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_synch, &
-        int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer)
+        hvy_active, lgt_sortednumlist, hvy_work)
 end subroutine sparse_to_dense

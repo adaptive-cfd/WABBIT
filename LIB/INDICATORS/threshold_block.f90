@@ -136,10 +136,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         refinement_status = -1
     end if
 
-
-    ! clean up
-    deallocate( u1, u2, u3 )
-
     ! timings
     call toc( params, "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )
 end subroutine threshold_block

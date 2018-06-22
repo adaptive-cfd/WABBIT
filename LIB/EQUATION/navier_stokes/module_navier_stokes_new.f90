@@ -41,7 +41,7 @@ module module_navier_stokes_new
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  real(kind=rk)        ,save:: dx_min
+  real(kind=rk)        ,save:: dx_min,machspeed
 
 
 contains
@@ -102,6 +102,9 @@ contains
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
 
+    machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)/&
+    sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+
     if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
@@ -110,9 +113,13 @@ contains
       dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
-      write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max/2, nx_max/2
+      write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
       write(*,'("initial speed of sound:", T40, f6.2)') &
       sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+
+
+      write(*,'("initial Machnumber:", T40, f6.2)') machspeed
+
       write(*,'("Reynolds for Ly:", T40, f12.1)') &
                 params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
                 sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
@@ -606,7 +613,7 @@ contains
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     integer(kind=ik)          :: Bs,ix
-    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3)
+    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3),mach
 
     p_init    =params_ns%initial_pressure
     rho_init  =params_ns%initial_density
@@ -647,20 +654,27 @@ contains
           ! set Uz to zero
           u( :, :, :, UzF) = 0.0_rk
       endif
-    case ("simple-shock")
+    case ("standing-shock","moving-shock")
       ! chooses values such that shock should not move
       ! in space according to initial conditions
-
-      call shockVals(rho_init,u_init(1),p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
+      if ( params_ns%inicond == "standing-shock" ) then
+        call shockVals(rho_init,u_init(1)*0.5_rk,p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
+      else
+        write(*,*)machspeed, u_init(1)
+        call moving_shockVals(rho_init,u_init(1),p_init, &
+                             tmp(1),tmp(2),tmp(3),params_ns%gamma_,machspeed)
+        params_ns%initial_velocity(1)=u_init(1)
+      end if
       ! check for usefull inital values
       if ( tmp(1)<0 .or. tmp(3)<0 ) then
+        write(*,*) "rho_right=",tmp(1), "p_right=",tmp(3)
         call abort(3572,"ERROR [module_navier_stokes_new.f90]: initial values are insufficient for simple-shock")
       end if
       do ix=g+1, Bs+g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
          call continue_periodic(x,params_ns%Lx)
          ! left region
-         b=0.5_rk*(1-tanh((abs(x-params_ns%Lx*0.75_rk)-params_ns%Lx*0.2_rk)*2*PI/(10*dx(1)) ))
+         b=0.5_rk*(1-tanh((abs(x-params_ns%Lx*0.5_rk)-params_ns%Lx*0.35_rk)*2*PI/(10*dx(1)) ))
          u( ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
          u(ix, : , :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
          u(ix, : , :, UyF)  = 0.0_rk
@@ -906,6 +920,35 @@ subroutine convert2format(phi_in,format_in,phi_out,format_out)
 end subroutine convert2format
 
 
+
+!> \brief reft and right shock values for 1D shock moving with mach to the right
+!> \detail This function converts with the Rankine-Hugoniot Conditions
+!>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
+!>  \f$\rho_R,u_R,p_R\f$ and \f$\u_L\f$ .
+!> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
+!> author F.Toro
+subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)
+    implicit none
+    !> one side of the shock (density, pressure)
+    real(kind=rk), intent(in)      ::rhoL,pL
+    !> shock speed
+    real(kind=rk), intent(in)      :: mach
+    !> speed on
+    real(kind=rk), intent(inout)      :: uL
+    !> other side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(out)      ::rhoR,uR,pR
+    !> heat capacity ratio
+    real(kind=rk), intent(in)      ::gamma
+
+    real(kind=rk)                ::c_R
+
+
+     uR    =   0
+     rhoR  =   ((gamma-1)*mach**2+2)/((gamma+1)*mach**2)*rhoL
+     pR    = (gamma+1)/(2*gamma*mach**2-gamma+1)*pL
+     c_R   = sqrt(gamma*pR/rhoR)
+     uL    = (1-rhoR/rhoL)*mach*c_R
+end subroutine moving_shockVals
 
 
 

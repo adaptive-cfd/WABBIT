@@ -177,7 +177,6 @@ subroutine init_penalization( params,FILE )
     ! -----------------------------------------------------------------------------
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', mask_geometry, "cylinder")
-    call read_param_mpi(FILE, 'VPM', 'C_eta', C_eta_inv, 0.01_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Lx', domain_size(1), 1.0_rk )
     call read_param_mpi(FILE, 'DomainSize', 'Ly', domain_size(2), 1.0_rk )
     call read_param_mpi(FILE,'Sponge', 'C_sponge', C_sp_inv, 0.01_rk )
@@ -186,7 +185,7 @@ subroutine init_penalization( params,FILE )
     ! read specific gas constant
     call read_param_mpi(FILE, 'Navier_Stokes', 'Rs', Rs, 0.0_rk )
 
-    C_eta_inv=1.0_rk/C_eta_inv
+    C_eta_inv=1.0_rk/params%C_eta
     C_sp_inv =1.0_rk/C_sp_inv
     R_domain =domain_size(2)*0.5_rk
 
@@ -194,11 +193,12 @@ subroutine init_penalization( params,FILE )
     case ('triangle','rhombus')
       call init_simple_sponge(params,FILE)
       call init_triangle(params,FILE)
-    case ('simple-shock')
+    case ('moving-shock')
       call init_simple_shock(params,FILE)
     case('sod_shock_tube')
       ! nothing to do
     case ('vortex_street','cylinder')
+      call init_simple_sponge(params,FILE)
       call init_vortex_street(FILE)
     case ('funnel')
       call init_funnel(FILE)
@@ -233,12 +233,12 @@ subroutine init_simple_sponge( params,FILE )
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', use_sponge, .false. )
 
     if (use_sponge) then
-      call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.0_rk )
+      call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.1_rk )
       if ( L_sponge<1e-10 ) then
         L_sponge=0.1*params%Lx
       end if
-      call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_eta_inv, 1.0e-2_rk )
-      C_eta_inv=1.0_rk/C_eta_inv
+      call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_sp_inv, 1.0e-2_rk )
+      C_sp_inv=1.0_rk/C_sp_inv
     else
       return
     endif
@@ -281,7 +281,7 @@ subroutine get_mask(mask, x0, dx, Bs, g )
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     select case(mask_geometry)
-    case('simple-shock','sod_shock_tube')
+    case('moving-shock','sod_shock_tube')
      call draw_sod_shock_tube(mask, x0, dx, Bs, g,'boundary')
     case('vortex_street','cylinder')
       call draw_cylinder(mask, x0, dx, Bs, g )
@@ -324,7 +324,7 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
     select case(mask_geometry)
     case('sod_shock_tube')
       call add_sod_shock_tube(penalization, x0, dx, Bs, g, phi )
-    case('simple-shock')
+    case('moving-shock')
       call add_simple_shock(penalization,x0,dx,Bs,g,phi)
     case('vortex_street','cylinder')
       call add_cylinder(penalization, x0, dx, Bs, g, phi )
@@ -348,8 +348,6 @@ subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
     rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( :, :,3)
     ! p component (preasure/energy)
     rhs(:,:,4)=rhs(:,:,4) -                   penalization( :, :,4)
-
-    !rhs(:,:,4)=rhs(:,:,4) - (gamma_-1)       *penalization( :, :,4)
 
 end subroutine add_constraints
 !==========================================================================
@@ -491,18 +489,23 @@ subroutine simple_sponge(sponge, x0, dx, Bs, g)
       return
     end if
 
-    do iy=1, Bs+2*g
-       do ix=1, Bs+2*g
-           x = dble(ix-(g+1)) * dx(1) + x0(1)
-           if ((domain_size(1)-x) <= L_sponge) then
-               sponge(ix,iy) = (x-(domain_size(1)-L_sponge))**2
-           elseif (x <= L_sponge) then
-               sponge(ix,iy) = (x-L_sponge)**2
-           else
-               sponge(ix,iy) = 0.0_rk
-           end if
+
+        do ix=1, Bs+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            do iy=1, Bs+2*g
+
+            sponge(ix,iy)=soft_bump2(x,(domain_size(1)-L_sponge),L_sponge,1.5*min(dx(1),dx(2)))
+
+
+    !        if ((domain_size(1)-x) <= L_sponge) then
+    !            sponge(ix,iy) = (x-(domain_size(1)-L_sponge))**2
+    !        elseif (x <= L_sponge) then
+    !            sponge(ix,iy) = (x-L_sponge)**2
+    !        else
+    !            sponge(ix,iy) = 0.0_rk
+    !        end if
        end do
-    end do
+     end do
 
 end subroutine simple_sponge
 

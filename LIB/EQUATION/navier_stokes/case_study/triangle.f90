@@ -1,4 +1,4 @@
-!> \brief reads parameters for mask function from file
+ !> \brief reads parameters for mask function from file
 subroutine init_triangle(params,FILE)
 
   implicit none
@@ -72,7 +72,7 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
 
 
     ! parameter for smoothing function (width)
-    h = 5.0_rk*max(dx(1), dx(2))
+    h = 1.5_rk*max(dx(1), dx(2))
 
     do ix=1, Bs+2*g
         x = dble(ix-(g+1)) * dx(1) + x0(1)

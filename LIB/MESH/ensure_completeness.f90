@@ -48,7 +48,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
     ! loop variables
     integer(kind=ik)                    :: k, l, N_sisters, status
     ! sister ids
-    integer(kind=ik), allocatable       :: id(:)
+    integer(kind=ik)                    :: id(1:8)
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -62,8 +62,6 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
     else
       N_sisters = 4
     end if
-    ! allocate the array which will hold the light ids of the sisters
-    allocate( id(1:N_sisters) )
     id = -1
 
 !---------------------------------------------------------------------------------------------
@@ -77,11 +75,11 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
             ! find sister IDs of the block we're looking at. If a sister is not found, -1
             ! is returned in the array id
             ! NOTE: the array "id" also contains the block itself
-            call find_sisters( params, lgt_active(k), id, lgt_block, lgt_n, lgt_sortednumlist )
+            call find_sisters( params, lgt_active(k), id(1:N_sisters), lgt_block, lgt_n, lgt_sortednumlist )
 
             ! if all sisters exists, then the array should not contain values smaller
             ! zero (-1 would mean not found)
-            if ( minval(id) > 0 ) then
+            if ( minval(id(1:N_sisters)) > 0 ) then
 
                 ! now loop over all sisters, check if they also want to coarsen and have status -1
                 ! only if all sisters agree to coarsen, they can all be merged into their mother block.
@@ -102,7 +100,6 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
         end if
     end do
 
-    deallocate( id )
 
     ! NOTE: this routine runs redundantly on all procs - they all do the same. That means
     ! by consequence that the light data here does not have to be synchronized.

@@ -42,9 +42,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: k, maxtl
+    integer(kind=ik)                    :: k, maxtl, N
     ! list of block ids, proc ranks
-    integer(kind=ik), allocatable       :: light_ids(:)
+    integer(kind=ik)                    :: light_ids(1:8)
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank
 
@@ -55,9 +55,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     maxtL = params%max_treelevel
 
     if (params%threeD_case) then
-      allocate( light_ids(1:8) )
+      N = 8
     else
-      allocate( light_ids(1:4) )
+      N = 4
     endif
 
 !---------------------------------------------------------------------------------------------
@@ -80,19 +80,18 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
           ! find all sisters (including the block in question, so four blocks)
           ! their light IDs are in "light_ids" and ordered by their last treecode-digit
-          call find_sisters( params, lgt_active(k), light_ids, lgt_block, lgt_n, lgt_sortednumlist )
+          call find_sisters( params, lgt_active(k), light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist )
 
           ! gather all four sisters on the process "datarank". The light_ids are updated in the routine
           ! and they are still in the same order (0,1,2,3)-sister. It is just that they are now on one CPU
-          call gather_blocks_on_proc( params, hvy_block, lgt_block, data_rank, light_ids )
+          call gather_blocks_on_proc( params, hvy_block, lgt_block, data_rank, light_ids(1:N) )
 
           ! merge the four blocks into one new block. Merging is done in two steps,
           ! first for light data (which all CPUS do redundantly, so light data is kept synched)
           ! Then only the responsible rank will perform the heavy data merging.
-          call merge_blocks( params, hvy_block, lgt_block, light_ids )
+          call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N) )
         endif
     end do
 
-    deallocate( light_ids )
 
 end subroutine coarse_mesh

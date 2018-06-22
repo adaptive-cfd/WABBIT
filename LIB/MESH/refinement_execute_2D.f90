@@ -56,7 +56,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
     ! data fields for interpolation
-    real(kind=rk), allocatable          :: new_data(:,:,:), data_predict_coarse(:,:), data_predict_fine(:,:)
+    real(kind=rk), allocatable, save    :: new_data(:,:,:), data_predict_coarse(:,:), data_predict_fine(:,:)
     ! free light/heavy data id
     integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
     ! treecode varaible
@@ -82,12 +82,12 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! NOTE: the predictor for the refinement acts on the extended blocks i.e. it
     ! includes the ghost nodes layer. Therefore, you MUST call sync_ghosts before this routine.
     ! The datafield for prediction is one level up, i.e. it contains Bs+g + (Bs+2g-1) points
-    allocate( data_predict_fine( 2*(Bs+2*g)-1, 2*(Bs+2*g)-1 ) )
+    if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs+2*g)-1, 2*(Bs+2*g)-1 ) )
     ! the coarse field has the same size as the block.
-    allocate( data_predict_coarse(Bs+2*g, Bs+2*g) )
+    if (.not. allocated(data_predict_coarse)) allocate( data_predict_coarse(Bs+2*g, Bs+2*g) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-    allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields) )
+    if (.not. allocated(new_data)) allocate( new_data(2*Bs-1, 2*Bs-1, params%number_data_fields) )
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -209,10 +209,5 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
     ! synchronize light data
     call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
-
-    ! clean up
-    deallocate( data_predict_fine )
-    deallocate( data_predict_coarse )
-    deallocate( new_data )
 
 end subroutine refinement_execute_2D

@@ -64,7 +64,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     logical                             :: grid_changed
 
     ! refinement status change, send/receive buffer, use 8bit integers
-    integer(kind=1), allocatable        :: refine_change( : ), my_refine_change( : )
+    integer(kind=1), allocatable, save  :: refine_change( : ), my_refine_change( : )
 
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
@@ -77,7 +77,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 ! variables initialization
 
     ! allocate buffers, uses number of light data as maximum number for array length
-    allocate( refine_change(lgt_n), my_refine_change(lgt_n) )
+    if (.not.allocated(refine_change)) allocate( refine_change(size(lgt_block)) )
+    if (.not.allocated(my_refine_change)) allocate( my_refine_change(size(lgt_block)) )
 
     N = params%number_blocks
     max_treelevel = params%max_treelevel
@@ -110,8 +111,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
         ! -------------------------------------------------------------------------------------
         ! first: every proc loop over the light data and calculate the refinement status change
-        my_refine_change = -99
-        refine_change = -99
+        my_refine_change(1:lgt_n) = -99
+        refine_change(1:lgt_n) = -99
 
         do k = 1, lgt_n
 
@@ -221,7 +222,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! (remove coarsen states, force refinement through neighbors). None of the procs had to
         ! touch the neighboring blocks, there can be no MPI conflicts.
         ! So we can simply snynchronize and know what changes have to be made
-        call MPI_Allreduce(my_refine_change, refine_change, lgt_n, MPI_INTEGER1, MPI_MAX, WABBIT_COMM, ierr)
+        call MPI_Allreduce(my_refine_change(1:lgt_n), refine_change(1:lgt_n), lgt_n, MPI_INTEGER1, MPI_MAX, WABBIT_COMM, ierr)
 
         ! -------------------------------------------------------------------------------------
         ! third: change light data and set grid_changed status
@@ -243,8 +244,5 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         if (counter == 10) call abort("ERROR: unable to build a graded mesh")
 
     end do ! end do of repeat procedure until grid_changed==.false.
-
-    ! clean up
-    deallocate( refine_change, my_refine_change )
 
 end subroutine ensure_gradedness

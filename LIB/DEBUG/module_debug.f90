@@ -65,30 +65,14 @@ contains
     ! check ghost nodes
     include "check_ghost_nodes.f90"
 
-    ! check future mesh gradedness
-    include "write_future_mesh_lvl.f90"
-
     ! write time measurements
     include "write_debug_times.f90"
 
     ! write block distribution
     include "write_block_distribution.f90"
 
-    ! write communciations list
-    include "write_com_list.f90"
-
-    ! com matrix
-    include "write_com_matrix.f90"
-
-    ! position com matrix
-    include "write_com_matrix_pos.f90"
-
     ! use this to initalize the memory for debugging:
     include "allocate_init_debugging.f90"
-
-    ! check all redundant nodes
-    include "check_redundant_nodes.f90"
-
 
     ! For a given NAME, increase the function call counter by one and store the
     ! elapsed time in the global arrays.

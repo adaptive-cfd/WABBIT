@@ -49,7 +49,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
     ! loop variables
     integer(kind=ik)                    :: i
     ! treecode variable
-    integer(kind=ik), allocatable       :: all_treecodes(:,:)
+    integer(kind=ik), allocatable, save :: all_treecodes(:,:)
     ! block level
     integer(kind=ik)                    :: N_sisters
     integer(kind=ik)                    :: mother_level, my_level
@@ -70,7 +70,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   endif
 
   ! allocate an array for all treecodes (including all 4/8 sisters)
-  allocate( all_treecodes(1:N_sisters,1:params%max_treelevel) )
+  if (.not.allocated(all_treecodes)) allocate( all_treecodes(1:N_sisters,1:params%max_treelevel) )
   ! initialize array as -1, since we do not use all of it, possibly (if we do not happen to
   ! be on the highest level)
   all_treecodes = -1
@@ -103,9 +103,5 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
       call abort("for some reason, find sisters seems to find an inactive block... lists updated?")
     endif
   end do
-
-
-
-  deallocate( all_treecodes )
 
 end subroutine find_sisters

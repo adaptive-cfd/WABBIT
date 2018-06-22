@@ -69,7 +69,10 @@ ln -s $curdir/../wabbit
 ln -s $curdir/../wabbit-post
 ln -s $curdir/create_ref_files.sh
 
-$mpi ./wabbit 2D $inifile --memory=2.25GB
+echo "GHOST NODES ARE: " --generic_sequence
+sleep 5
+
+$mpi ./wabbit 2D $inifile --memory=2.25GB --generic_sequence
 
 ./create_ref_files.sh
 

@@ -53,8 +53,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     real(kind=rk)                       :: detail(1:params%number_data_fields)
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
-    ! interpolation fields
-    real(kind=rk), allocatable          :: u1(:,:,:), u2(:,:,:), u3(:,:,:)
+
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0
 
@@ -67,11 +66,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
 
-    ! allocate interpolation fields
-    allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
-    allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
-    ! coarsened field is half block size + 1/2
-    allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
 
     ! reset detail
     detail = 0.0_rk
@@ -80,9 +74,16 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     do dF = 1, params%number_data_fields
         ! is this component of the block used for thresholding or not?
         if (thresholding_component(dF)) then
-            if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk !avoid division by zero
+            if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
+
             if ( params%threeD_case ) then
                 ! ********** 3D **********
+                ! allocate interpolation fields
+                if (.not.allocated(u1)) allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
+                if (.not.allocated(u2)) allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
+                ! coarsened field is half block size + 1/2
+                if (.not.allocated(u3)) allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
+
                 ! copy block data to array u1
                 u1(:,:,:) = block_data( :, :, :, dF )
                 ! now, coarsen array u1 (restriction)
@@ -101,6 +102,12 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                 end do
             else
                 ! ********** 2D **********
+                ! allocate interpolation fields
+                if (.not.allocated(u1)) allocate( u1( 1:Bs+2*g, 1:Bs+2*g, 1 ) )
+                if (.not.allocated(u2)) allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1 ) )
+                ! coarsened field is half block size + 1/2
+                if (.not.allocated(u3)) allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1) )
+
                 ! copy block data to array u1
                 u1(:,:,1) = block_data( :, :, 1, dF )
                 ! now, coarsen array u1 (restriction)
@@ -128,10 +135,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         ! coarsen block, -1
         refinement_status = -1
     end if
-
-
-    ! clean up
-    deallocate( u1, u2, u3 )
 
     ! timings
     call toc( params, "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )

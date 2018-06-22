@@ -38,23 +38,25 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     !> we should communicate only that, of course, to save time
     logical, intent(in) :: refinement_status_only
 
-    ! kind=1 integer copy of light data, which will only hold my data
-    integer(kind=1), allocatable :: my_lgt_block(:, :)
-    !
-    integer(kind=ik), allocatable :: proc_lgt_num(:), my_proc_lgt_num(:)
-    !
+    ! local variables
     integer(kind=ik) :: mpisize, mpirank, N, lgt_start, lgt_end, lgt_id, ierr, &
     buffer_size, lgt_num, buffer_start, k, R
     ! send/receive buffer for data synchronization
-    integer(kind=1), allocatable        :: my_lgt_block_send_buffer(:,:), my_lgt_block_recv_buffer(:,:)
+    integer(kind=1), allocatable, save      :: my_lgt_block_send_buffer(:,:), my_lgt_block_recv_buffer(:,:)
+    ! kind=1 integer copy of light data, which will only hold my data
+    integer(kind=1), allocatable, save      :: my_lgt_block(:, :)
+    integer(kind=ik), allocatable, save     :: proc_lgt_num(:), my_proc_lgt_num(:)
 
     mpirank = params%rank
     mpisize = params%number_procs
     N = params%number_blocks
     R = params%max_treelevel+2
 
-    allocate( proc_lgt_num(1:mpisize), my_proc_lgt_num(1:mpisize) )
-    allocate( my_lgt_block( size(lgt_block,1), size(lgt_block,2)) )
+    if (.not.allocated(proc_lgt_num)) allocate( proc_lgt_num(1:mpisize) )
+    if (.not.allocated(my_proc_lgt_num)) allocate( my_proc_lgt_num(1:mpisize) )
+    if (.not.allocated(my_lgt_block)) allocate( my_lgt_block( size(lgt_block,1), size(lgt_block,2)) )
+    if (.not.allocated(my_lgt_block_send_buffer)) allocate( my_lgt_block_send_buffer( size(lgt_block,1), size(lgt_block,2) ) )
+    if (.not.allocated(my_lgt_block_recv_buffer)) allocate( my_lgt_block_recv_buffer( size(lgt_block,1), size(lgt_block,2) ) )
 
     ! ==========================================================================
     ! view on lgt_block on one mpirank:
@@ -97,9 +99,9 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     buffer_size = sum(proc_lgt_num)
 
 
-    ! now we can allocate send/receive buffer arrays
-    allocate( my_lgt_block_send_buffer( buffer_size, size(lgt_block,2) ) )
-    allocate( my_lgt_block_recv_buffer( buffer_size, size(lgt_block,2) ) )
+    ! ! now we can allocate send/receive buffer arrays
+    ! allocate( my_lgt_block_send_buffer( 1:buffer_size, size(lgt_block,2) ) )
+    ! allocate( my_lgt_block_recv_buffer( buffer_size, size(lgt_block,2) ) )
 
     ! ==========================================================================
     ! The data in my_lgt_block:
@@ -123,15 +125,15 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
 
     ! fill the buffer
     buffer_start = sum(proc_lgt_num(1:mpirank))
-    my_lgt_block_send_buffer = 0
+    my_lgt_block_send_buffer(1:buffer_size,:) = 0
     my_lgt_block_send_buffer( buffer_start+1 : buffer_start+lgt_num, : ) = my_lgt_block( lgt_start:lgt_end, :)
 
     ! synchronize the buffer
     if (refinement_status_only) then
-        call MPI_Allreduce(my_lgt_block_send_buffer(:,R), my_lgt_block_recv_buffer(:,R),&
+        call MPI_Allreduce(my_lgt_block_send_buffer(1:buffer_size,R), my_lgt_block_recv_buffer(1:buffer_size,R),&
         buffer_size, MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
     else
-        call MPI_Allreduce(my_lgt_block_send_buffer, my_lgt_block_recv_buffer, buffer_size*size(lgt_block,2), &
+        call MPI_Allreduce(my_lgt_block_send_buffer(1:buffer_size,:), my_lgt_block_recv_buffer(1:buffer_size,:), buffer_size*size(lgt_block,2), &
         MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
     endif
 
@@ -167,6 +169,4 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
             endif
         end if
     end do
-
-    deallocate(proc_lgt_num, my_proc_lgt_num, my_lgt_block, my_lgt_block_send_buffer, my_lgt_block_recv_buffer)
 end subroutine

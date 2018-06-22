@@ -25,8 +25,7 @@
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, com_lists, com_matrix, &
-    int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -35,7 +34,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 ! variables
 
     implicit none
-        integer(kind=1), intent(inout)      :: hvy_synch(:, :, :, :)
     !> user defined parameter structure
     type (type_params), intent(inout)       :: params
     !> light data array
@@ -52,16 +50,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
-
-    ! communication lists:
-    integer(kind=ik), intent(inout)         :: com_lists(:, :, :, :)
-
-    ! communications matrix:
-    integer(kind=ik), intent(inout)         :: com_matrix(:,:,:)
-
-    ! send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)      :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)         :: real_send_buffer(:,:), real_receive_buffer(:,:)
 
     ! number of active blocks (heavy data)
     integer(kind=ik)                        :: hvy_n
@@ -142,25 +130,27 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     allocate( coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ) )
 
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-    lgt_block = -1
-    lgt_active = -1; lgt_N = 0
-    hvy_active = -1; hvy_N = 0
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
+    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
 
     !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, 5
+        if (params%rank==0) write(*,'("UNIT TEST: iteration ",i1," of random grid generation")') l
+
         ! refine some blocks
         call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "random" )
+             lgt_sortednumlist, hvy_active, hvy_n, "random" )
+
         ! random adapt some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", com_lists, &
-        com_matrix, int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch, hvy_work )
+             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )
     end do
 
     if (params%rank == 0) then
@@ -219,8 +209,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, com_lists, &
-        com_matrix, .true., int_send_buffer, int_receive_buffer, real_send_buffer, real_receive_buffer, hvy_synch )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

@@ -17,6 +17,16 @@ fi
 if [ -z "$mpi_command" ]; then
     export mpi_command="nice mpiexec -n ${nprocs}"
 fi
+
+export ghosts="--generic_sequence"
+# export ghosts="--staging"
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+echo "ATTENTION GHOST NODE METHOD IS:" ${ghosts}
+
 fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'
 end_color=$'\033[0m'
@@ -24,6 +34,7 @@ end_color=$'\033[0m'
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=("---convection---"
+       "TESTING/conv/blob_convection_equi/blob-convection-equi.sh"
        "TESTING/conv/blob_convection_2nd_serial/blob-conv-adaptive-serial.sh"
        "TESTING/conv/blob_convection/blob-convection-adaptive.sh"
        "TESTING/conv/blob_convection_2nd/blob-convection-adaptive-2nd.sh"
@@ -32,8 +43,10 @@ tests=("---convection---"
        "TESTING/navier_stokes/pressure_blob/pressure_blob.sh"
        "TESTING/navier_stokes/filter/filter_test.sh"
        "---acm---"
-       "TESTING/acm/acm_cyl/acm_cylinder.sh"
-       "TESTING/acm/acm_cyl/acm_cylinder_zcurve.sh"
+       "TESTING/acm/acm_cyl_equi/acm_cylinder_equi.sh"
+       "TESTING/acm/acm_cyl_nonequi/acm_cylinder_nonequi.sh"
+       "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"
+       "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh"
        )
 
 happy_sum=0

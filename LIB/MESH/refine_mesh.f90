@@ -65,8 +65,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     character(len=*), intent(in)           :: indicator
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                           :: t0
-    integer(kind=ik)                        :: k
+    real(kind=rk)                          :: t0
+    integer(kind=ik)                       :: k
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -108,9 +108,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     !! active blocks so other routines can loop just over these active blocks
     !! and do not have to ensure that the active list is up-to-date
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
+         hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+         lgt_sortednumlist, hvy_active, hvy_n )
 
     !> At this point the refinement is done. Since not all blocks are refined, namely only those
     !! that were not on Jmax, Now, the distribution of blocks may no longer
@@ -119,9 +121,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     hvy_active, hvy_n, hvy_work )
 
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
+         hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+         lgt_sortednumlist, hvy_active, hvy_n )
 
 !---------------------------------------------------------------------------------------------
 ! End of routine

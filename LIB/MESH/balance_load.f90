@@ -53,7 +53,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
 
-    integer(kind=ik), allocatable       :: buffer_light( : )
+    integer(kind=ik), allocatable, save :: buffer_light( : )
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
@@ -65,7 +65,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! MPI status
     integer                             :: status(MPI_status_size)
     ! block distribution lists
-    integer(kind=ik), allocatable       :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
+    integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
     ! loop variables
     integer(kind=ik)                    :: k, N, l, com_i, com_N, heavy_id, sfc_id, neq
     ! size of data array
@@ -75,7 +75,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0
     ! space filling curve list
-    integer(kind=ik), allocatable       :: sfc_com_list(:,:), sfc_sorted_list(:,:)
+    integer(kind=ik), allocatable, save :: sfc_com_list(:,:), sfc_sorted_list(:,:)
     ! hilbert code
     integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
     ! communicator
@@ -99,17 +99,18 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     number_procs = params%number_procs
     WABBIT_COMM  = params%WABBIT_COMM
     ! allocate block to proc lists
-    allocate( opt_dist_list(1:number_procs), dist_list(1:number_procs))
+    if (.not.allocated(opt_dist_list)) allocate( opt_dist_list(1:number_procs))
+    if (.not.allocated(dist_list)) allocate( dist_list(1:number_procs))
     ! allocate sfc com list, maximal number of communications is when every proc wants to send all of his blocks
     ! NOTE: it is not necessary or wise to reset this array (it is large!)
-    allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
+    if (.not.allocated(sfc_com_list)) allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
 
     ! allocate space filling curve list, number of elements is the number of active blocks
     ! and for each block, we store the space-filling-curve-index and the lgt ID
-    allocate( sfc_sorted_list( lgt_n, 2) )
+    if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( size(lgt_block,1), 2) )
 
     ! allocate buffer arrays
-    allocate( buffer_light( params%number_blocks ) )
+    if (.not.allocated(buffer_light)) allocate( buffer_light( params%number_blocks ) )
 
     ! number of blocks
     N = params%number_blocks
@@ -489,13 +490,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             call abort(1882, "ERROR: block distribution scheme is unknown")
 
     end select
-
-    ! clean up
-    deallocate( opt_dist_list )
-    deallocate( dist_list )
-    deallocate( sfc_com_list )
-    deallocate( buffer_light )
-    deallocate( sfc_sorted_list )
 
     ! timing
     call toc( params, "balance_load", MPI_wtime()-t0 )

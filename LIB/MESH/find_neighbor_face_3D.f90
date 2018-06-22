@@ -125,7 +125,8 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
             list_id    = 1
 
-            ! id2 for cases with neighbor one level down
+            ! If the neighbor is coarser, then we have only one possible block, but
+            ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 4) then
                 list_id2 = 30
             elseif ( lgt_block(lgt_id, level) == 5) then
@@ -150,7 +151,8 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
             list_id    = 2
 
-            ! id2 for cases with neighbor one level down
+            ! If the neighbor is coarser, then we have only one possible block, but
+            ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 0) then
                 list_id2 = 34
             elseif ( lgt_block(lgt_id, level) == 2) then
@@ -175,7 +177,8 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
             list_id    = 3
 
-            ! id2 for cases with neighbor one level down
+            ! If the neighbor is coarser, then we have only one possible block, but
+            ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 2) then
                 list_id2 = 36
             elseif ( lgt_block(lgt_id, level) == 3) then
@@ -200,7 +203,8 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
             list_id    = 4
 
-            ! id2 for cases with neighbor one level down
+            ! If the neighbor is coarser, then we have only one possible block, but
+            ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 1) then
                 list_id2 = 42
             elseif ( lgt_block(lgt_id, level) == 3) then
@@ -225,7 +229,8 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
             list_id    = 5
 
-            ! id2 for cases with neighbor one level down
+            ! If the neighbor is coarser, then we have only one possible block, but
+            ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 0) then
                 list_id2 = 46
             elseif ( lgt_block(lgt_id, level) == 1) then
@@ -250,7 +255,8 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
             list_id    = 6
 
-            ! id2 for cases with neighbor one level down
+            ! If the neighbor is coarser, then we have only one possible block, but
+            ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 0) then
                 list_id2 = 50
             elseif ( lgt_block(lgt_id, level) == 1) then
@@ -271,6 +277,9 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
             virt_code(4)    = 3
             virt_list_id(4) = 48
 
+        case default
+            call abort(636300, "well you mustnt")
+
     end select
 
     ! calculate treecode for neighbor on same level
@@ -285,12 +294,15 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
     else
 
-        ! neighbor could be one level down
+        ! We did not find the neighbor on the same level, and now check on coarser levels.
+        ! Depending on my own treecode, I know what neigbor I am looking for, and I just set
+        ! the last index to -1 = I go one level down (coarser)
         neighbor( level ) = -1
+
         ! proof existence of neighbor block
         call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
         if ( exists ) then
-            ! neigbor is one level down
+            if (list_id2<0) write(*,*) "ERROR", list_id, list_id2, dir, "..", lgt_block(lgt_id, :)
             ! save list_id2
             hvy_neighbor( heavy_id, list_id2 ) = neighbor_light_id
 

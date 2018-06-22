@@ -105,12 +105,13 @@ contains
     machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)/&
     sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
+    dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
+
     if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
       write(*,*) "Additional Information"
       write(*,'(" -----------------------")')
-      dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
       write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
@@ -188,7 +189,7 @@ contains
 
     !
     ! compute vorticity
-    allocate(tmp_u(size(u,1),size(u,2),size(u,3),4))
+    allocate(tmp_u(size(u,1),size(u,2),size(u,3),3))
 
     if (size(u,3)==1) then
           ! ---------------------------------
@@ -660,7 +661,6 @@ contains
       if ( params_ns%inicond == "standing-shock" ) then
         call shockVals(rho_init,u_init(1)*0.5_rk,p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
       else
-        write(*,*)machspeed, u_init(1)
         call moving_shockVals(rho_init,u_init(1),p_init, &
                              tmp(1),tmp(2),tmp(3),params_ns%gamma_,machspeed)
         params_ns%initial_velocity(1)=u_init(1)

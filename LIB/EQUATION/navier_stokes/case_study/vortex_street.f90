@@ -8,7 +8,8 @@ subroutine init_vortex_street(FILE)
 
 
   call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/ 0.25*domain_size(1) , 0.5*domain_size(2) /) )
-  call read_param_mpi(FILE, 'VPM', 'radius', cyl%radius,0.05_rk*min(domain_size(1),domain_size(2)) )
+  call read_param_mpi(FILE, 'VPM', 'length', cyl%radius,0.05_rk*min(domain_size(1),domain_size(2)) )
+  cyl%radius=cyl%radius*0.5_rk
 
 end subroutine init_vortex_street
 
@@ -96,10 +97,10 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     penalization = 0.0_rk
 
 
-    T0      = 200.0_rk
-    rho0    = 1.645_rk
-    p0      = 101330.0_rk
-    u0      = 62.0_rk
+        T0      = params_ns%initial_temp
+        rho0    = params_ns%initial_density
+        p0      =  params_ns%initial_pressure
+        u0      =  params_ns%initial_velocity(1)
 
     ! parameter for smoothing function (width)
     h       = 1.5_rk*max(dx(1), dx(2))
@@ -123,7 +124,7 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
 
     ! sponge
     !--------
-    call sponge_2D_NEW(mask, x0, dx, Bs, g)
+    call simple_sponge(mask, x0, dx, Bs, g)
 
 
     penalization(:,:,1)= penalization(:,:,1) + C_sp_inv*mask * ( rho - rho0 )
@@ -136,46 +137,3 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
 
 
 end subroutine add_cylinder
-
-
-
-
-subroutine sponge_2D_NEW(sponge, x0, dx, Bs, g)
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
-    !> sponge term for every grid point of this block
-    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-
-    ! auxiliary variables
-    real(kind=rk)                                             :: x, ddx
-    ! loop variables
-    integer(kind=ik)                                          :: ix, iy
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    ! reset sponge array
-    sponge = 0.0_rk
-!---------------------------------------------------------------------------------------------
-! main body
-    ddx = 0.1_rk*domain_size(1)
-
-    do iy=1, Bs+2*g
-       do ix=1, Bs+2*g
-           x = dble(ix-(g+1)) * dx(1) + x0(1)
-           if ((domain_size(1)-x) <= ddx) then
-               sponge(ix,iy) = (x-(domain_size(1)-ddx))**2
-           elseif (x <= ddx) then
-               sponge(ix,iy) = (x-ddx)**2
-           else
-               sponge(ix,iy) = 0.0_rk
-           end if
-       end do
-    end do
-
-end subroutine sponge_2D_NEW

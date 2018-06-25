@@ -65,6 +65,17 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
     call abort("You try to merge blocks on different ranks, but you must call gather_ranks before.")
   endif
 
+  do i = 1, size(lgt_blocks_to_merge)
+      if (lgt_block(lgt_blocks_to_merge(i),level) /= i-1) then
+          call abort(647483," You try to merge blocks which do not belong together")
+      endif
+      do i1 = 1, level-1
+          if (lgt_block(lgt_blocks_to_merge(i),i1) /= lgt_block(lgt_blocks_to_merge(1),i1)) then
+              call abort(647483," You try to merge blocks which do not belong together")
+          endif
+      enddo
+  enddo
+
 
 !---------------------------------------------------------------------------------------------
 ! main body

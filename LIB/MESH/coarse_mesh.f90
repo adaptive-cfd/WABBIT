@@ -70,11 +70,10 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
       ! coarsened, (and thus given the -1) but they are still in active block list
       ! so: check again if this block is REALLY active (the active list is updated later)
       !
-      ! SECOND condition: block wants to coarsen, definetly, i.e. it has the status -2. Note -1
-      ! is just a temporary state and four blocks, all -1, are given the -2 state
-      ! is ensure_completeness finds all four. So that means, by extension, we previously
-      ! searched all 4 sister blocks, and we found them all.
-      if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+2) == -2) then
+      ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
+      ! ensure_gradedness removes the -1 flag if not all sister blocks share it (NOTE: Before 06/2018, we
+      ! used a second status: -2 to mark blocks that can *really* be coarsened)
+      if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+2) == -1) then
           ! Check which CPU holds this block. The CPU will also hold the merged, new block
           call lgt_id_to_proc_rank( data_rank, lgt_active(k), params%number_blocks )
 

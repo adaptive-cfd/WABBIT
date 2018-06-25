@@ -18,7 +18,7 @@ module module_ini_files_parser_mpi
 !!!!!!!!
 contains
 !!!!!!!!
-  
+
 
 
   !-----------------------------------------------------------------------------
@@ -48,6 +48,29 @@ contains
     call MPI_BCAST(array,nlines*ncols,MPI_DOUBLE_PRECISION,0,WABBIT_COMM,mpicode)
   end subroutine read_array_from_ascii_file_mpi
 
+  subroutine read_intarray_from_ascii_file_mpi(file, array, n_header)
+    implicit none
+    character(len=*), intent(in) :: file
+    integer, intent(in) :: n_header
+    integer(kind=ik), intent(inout) :: array (1:,1:)
+    integer :: nlines, ncols, mpicode, mpirank
+
+    ! check if communicator is set
+    if (WABBIT_COMM==-1) then
+      call abort(3567632,"Error[module_ini_files_parser_mpi.f90]: Communicator not set")
+    endif
+    ! fetch my process id
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+    nlines = size(array,1)
+    ncols = size(array,2)
+
+    ! only root reads from file...
+    if (mpirank==0) call read_intarray_from_ascii_file(file, array, n_header)
+    ! ... then broadcast
+    call MPI_BCAST(array,nlines*ncols,MPI_INTEGER4,0,WABBIT_COMM,mpicode)
+end subroutine read_intarray_from_ascii_file_mpi
+
 
   !-----------------------------------------------------------------------------
   ! count the number of lines in an ascii file, skip n_header lines
@@ -68,6 +91,26 @@ contains
     call MPI_BCAST(num_lines,1,MPI_INTEGER,0,WABBIT_COMM,mpicode)
   end subroutine count_lines_in_ascii_file_mpi
 
+
+
+  !-----------------------------------------------------------------------------
+  ! count the number of columns in an ascii file, skip n_header lines
+  !-----------------------------------------------------------------------------
+    subroutine count_cols_in_ascii_file_mpi(file, num_cols, n_header)
+      implicit none
+      character(len=*), intent(in) :: file
+      integer, intent(out) :: num_cols
+      integer, intent(in) :: n_header
+      integer :: mpicode, mpirank
+
+      ! fetch my process id
+      call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+
+      ! only root reads from file...
+      if (mpirank==0) call count_cols_in_ascii_file(file, num_cols, n_header)
+      ! ... then broadcast
+      call MPI_BCAST(num_cols,1,MPI_INTEGER,0,MPI_COMM_WORLD,mpicode)
+    end subroutine count_cols_in_ascii_file_mpi
 
   !-------------------------------------------------------------------------------
   ! clean a previously read ini file, deallocate its string array, and reset
@@ -103,7 +146,7 @@ contains
     if (WABBIT_COMM==-1) then
       call abort(3567632,"Error[module_ini_files_parser_mpi.f90]: Communicator not set")
     endif
-    
+
     ! fetch my process id
     call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 

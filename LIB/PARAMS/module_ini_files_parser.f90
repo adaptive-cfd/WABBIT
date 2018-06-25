@@ -103,6 +103,47 @@ contains
     write(*,'(80("-"))')
   end subroutine read_array_from_ascii_file
 
+  subroutine read_intarray_from_ascii_file(file, array, n_header)
+    implicit none
+    character(len=*), intent(in) :: file
+    integer, intent(in) :: n_header
+    integer(kind=ik), intent(inout) :: array (1:,1:)
+    integer :: nlines, ncols, i, io_error
+    character(len=maxcolumns) :: dummy
+    character(len=16) :: fmt
+    character(len=3) :: ncols_str
+
+
+    nlines = size(array,1)
+    ncols = size(array,2)
+
+    write(*,'(80("-"))')
+    write(*,'("INFO: reading ",i5," lines with ",i3," colums from ",A)') nlines, ncols, file
+
+    ! set up format string
+    write(ncols_str,'(i3.3)') ncols
+    fmt = '('//ncols_str//'(es12.4,1x))'
+
+    io_error = 0
+    i = 0
+
+    open(unit=14,file=trim(adjustl(file)),action='read',status='old')
+    do while (io_error==0)
+      ! read a line from file
+      read (14,'(A)',iostat=io_error) dummy
+      i = i + 1
+      ! if we're past the header AND the read worked (i.e. not end of file)
+      if (i > n_header .and. io_error==0) then
+        read(dummy,*) array(i-n_header,:)
+!        write(*,fmt) array(i-n_header,:)
+      endif
+    enddo
+    close (14)
+
+    write(*,'("Done reading.")')
+    write(*,'(80("-"))')
+end subroutine read_intarray_from_ascii_file
+
 
   !-----------------------------------------------------------------------------
   ! count the number of lines in an ascii file, skip n_header lines
@@ -130,6 +171,38 @@ contains
   end subroutine count_lines_in_ascii_file
 
 
+  !-----------------------------------------------------------------------------
+  ! count the number of columns in an ascii file, skip n_header lines
+  ! --> MPI wrapper in the MPI parser module
+  !-----------------------------------------------------------------------------
+    subroutine count_cols_in_ascii_file(file, num_cols, n_header)
+      implicit none
+      character(len=*), intent(in) :: file
+      integer, intent(out) :: num_cols
+      integer, intent(in) :: n_header
+      integer :: io_error, i
+      character(len=maxcolumns) :: dummy
+
+      ! count the lines
+      io_error = 0
+      i = 0
+
+      open(unit=14,file=trim(adjustl(file)),action='read',status='old')
+      do while (io_error==0)
+        read (14,'(A)',iostat=io_error) dummy
+        if (io_error==0 .and. i>n_header) exit
+        i=i+1
+      enddo
+      close (14)
+
+      num_cols = 1
+      do i = 1, len_trim(adjustl(dummy))
+        ! count elements in the line by counting the separating spaces
+        if ( dummy(i:i) == " " ) then
+          num_cols = num_cols + 1
+        end if
+      enddo
+    end subroutine count_cols_in_ascii_file
 
   !-------------------------------------------------------------------------------
   ! clean a previously read ini file, deallocate its string array, and reset

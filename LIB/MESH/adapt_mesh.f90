@@ -56,7 +56,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
@@ -116,21 +116,14 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         call toc( params, "adapt_mesh (min/max)", MPI_Wtime()-t0 )
 
 
-        !> (c) unmark blocks that cannot be coarsened due to gradedness
+        !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
         ! CPU timing (only in debug mode)
         call toc( params, "adapt_mesh (gradedness)", MPI_Wtime()-t0 )
 
 
-        !> (d) ensure completeness
-        t0 = MPI_Wtime()
-        call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
-        ! CPU timing (only in debug mode)
-        call toc( params, "adapt_mesh (completeness)", MPI_Wtime()-t0 )
-
-
-        !> (e) adapt the mesh, i.e. actually merge blocks
+        !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
         ! CPU timing (only in debug mode)

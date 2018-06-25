@@ -41,7 +41,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! max treelevel
     integer(kind=ik)                    :: max_treelevel
@@ -88,14 +88,28 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
                   status = max( status, lgt_block(id(l), max_treelevel+2) )
                 end do
 
-                ! if all agree, the status is -1, and we can indeed coarsen, set +2
+                ! if all agree and share the status -1, then we can indeed coarsen, keep -1 status
                 if ( status == -1 ) then
-                  do l = 1, N_sisters
-                    lgt_block( id(l), max_treelevel+2 )  = -2
-                  end do
+                    do l = 1, N_sisters
+                        lgt_block( id(l), max_treelevel+2 )  = -1
+                    end do
+                else
+                    ! We found all sister blocks, but they do not all share the -1 status: none
+                    ! of them can be coarsened, remove the status.
+                    do l = 1, N_sisters
+                        lgt_block( id(l), max_treelevel+2 )  = 0
+                    end do
                 end if
             else
-              call abort("find_sisters: we did not find all sister blocks! (grid error!)")
+                ! We did not even find all sisters, that means a part of the four blocks is already
+                ! refined. Therefore, they cannot be coarsened in any case, and we remove the coarsen
+                ! flag
+                do l = 1, N_sisters
+                    ! change status only for the existing sisters
+                    if (id(l)>0) then
+                        lgt_block( id(l), max_treelevel+2 )  = 0
+                    endif
+                end do
             end if
         end if
     end do

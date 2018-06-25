@@ -78,6 +78,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   my_level = lgt_block( lgt_my_id, params%max_treelevel+1 )
 
   lgt_sisters_id = -1
+  
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -87,21 +88,16 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
 
 
   do i = 1, N_sisters
-    ! if N=3 or N=8 we skip the block in question
-    if ( i-1 /= lgt_block( lgt_my_id, my_level ) .or. N_sisters==4 .or. N_sisters==8) then
-      ! copy the identical mother level
-      all_treecodes(i,1:mother_level) = lgt_block( lgt_my_id, 1:mother_level )
-      ! the last index is (0..3) or (0..7)
-      all_treecodes(i,mother_level+1) = i-1
-      ! look for the sisters in the list of blocks (light data), store their ID if found
-      ! (-1 otherwise)
-      call does_block_exist( all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
-    end if
-
-    ! security check:
-    if ( lgt_block(lgt_sisters_id(i),1) < 0 .or. lgt_block(lgt_sisters_id(i),1) > 7) then
-      call abort("for some reason, find sisters seems to find an inactive block... lists updated?")
-    endif
-  end do
+      ! if N=3 or N=8 we skip the block in question
+      if ( i-1 /= lgt_block( lgt_my_id, my_level ) .or. N_sisters==4 .or. N_sisters==8) then
+          ! copy the identical mother level
+          all_treecodes(i,1:mother_level) = lgt_block( lgt_my_id, 1:mother_level )
+          ! the last index is (0..3) or (0..7)
+          all_treecodes(i,mother_level+1) = i-1
+          ! look for the sisters in the list of blocks (light data), store their ID if found
+          ! (-1 otherwise)
+          call does_block_exist( all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
+      end if
+  enddo
 
 end subroutine find_sisters

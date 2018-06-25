@@ -90,7 +90,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     !! no way gradedness can be damaged, so we skip the call in this case. However,
     !! in all other indicators, this step is very important.
     if ( indicator /= "everywhere") then
-      call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n )
+      call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
     endif
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up

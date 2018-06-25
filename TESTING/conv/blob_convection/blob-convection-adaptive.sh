@@ -42,10 +42,10 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ./wabbit-post 2D --keyvalues ${file}
+        ${mpi_serial} ./wabbit-post 2D --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
-            ./wabbit-post 2D --compare-keys $keyfile $reffile
+            ${mpi_serial} ./wabbit-post 2D --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
               echo -e " :) Happy, this looks ok!" $keyfile $reffile

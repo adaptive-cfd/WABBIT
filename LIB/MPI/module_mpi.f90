@@ -66,7 +66,7 @@ module module_MPI
     ! this buffer (NOTE max size is (blocksize)*(ghost nodes size + 1)*(number of datafields))
     real(kind=rk), allocatable    :: line_buffer(:)
     ! restricted/predicted data buffer
-    real(kind=rk), allocatable    :: res_pre_data(:,:,:,:)
+    real(kind=rk), allocatable    :: res_pre_data(:,:,:,:), tmp_block(:,:,:,:)
 
     ! it is faster to use named consts than strings, although strings are nicer to read
     integer(kind=ik), PARAMETER   :: exclude_redundant = 1_ik, include_redundant = 2_ik, only_redundant = 3_ik
@@ -75,9 +75,11 @@ module module_MPI
     ! it is filled (once) in init_ghost_nodes
     integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
 
-
-
+    ! these arrays are used in the compare_hvy_data routines for the ghost nodes origin test. They allow
+    ! much nicer handling of errors. Only allocated in the "check_unique_origin" routine (i.e. unused in production)
     real(kind=rk), allocatable :: hvy_block_test_err(:,:,:,:,:)
+    real(kind=rk), allocatable :: hvy_block_test_val(:,:,:,:,:)
+    real(kind=rk), allocatable :: hvy_block_test_interpref(:,:,:,:,:)
 
 
     ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
@@ -189,6 +191,39 @@ subroutine reallocate_buffers(params)
 end subroutine
 
 
+!! The friends concept avoids to reserve memory so that all procs can talk to all
+!! other procs. There is a simple, unique, invertible relation between mpirank and
+!! Friend ID established here. If a proc wants to add a Friend and the pre-allocated
+!! array is full, then the buffers are increased. Note this process is not for free
+!! but rather time consuming. Best is not to use the functionality, by allocating enough
+!! Friends at the start.
+subroutine get_friend_id_for_mpirank( params, neighbor_rank, id_Friend )
+    implicit none
+    type (type_params), intent(in) :: params
+    integer(kind=ik), intent(in) :: neighbor_rank
+    integer(kind=ik), intent(out) :: id_Friend
+
+    ! did we already add this proc to the friends list?
+    if (mpirank2friend(neighbor_rank+1) < 0) then
+        ! no, we didn't
+        if (N_friends_used < N_friends) then ! some free friends-slots left?
+            N_friends_used = N_friends_used +1
+            mpirank2friend(neighbor_rank+1) = N_friends_used ! one-based
+            friend2mpirank(N_friends_used) = neighbor_rank+1 ! one-based
+        else
+            ! no space left for friends, re-allocate
+            N_friends = N_friends + 1
+            N_friends_used = N_friends
+            call reallocate_buffers(params)
+            mpirank2friend(neighbor_rank+1) = N_friends_used ! one-based
+            friend2mpirank(N_friends_used) = neighbor_rank+1 ! one-based
+        endif
+    endif
+    id_Friend = mpirank2friend(neighbor_rank+1)
+end subroutine
+
+
+
 !! initialize ghost nodes module. allocate buffers and create data bounds array,
 !! which we use to rapidly identify a ghost nodes layer
 subroutine init_ghost_nodes( params )
@@ -226,6 +261,8 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 20 )
 
+            allocate( res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
+            allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
         else
             !---2d---2d---
 
@@ -239,6 +276,8 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 10 )
 
+            allocate( res_pre_data( Bs+2*g, Bs+2*g, 1, Neqn) )
+            allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
 
         !-----------------------------------------------------------------------
@@ -290,7 +329,6 @@ subroutine init_ghost_nodes( params )
         allocate( friend2mpirank(1:N_friends) )
 
         allocate( line_buffer( Neqn*(Bs+2*g)**(dim) ) )
-        allocate( res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
 
         !-----------------------------------------------------------------------
         ! set up constant arrays

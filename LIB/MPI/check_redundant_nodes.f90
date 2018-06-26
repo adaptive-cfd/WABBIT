@@ -83,7 +83,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
     else
         ! nodes test
         ! exclude_redundant, include_redundant, only_redundant
-        data_bounds_type = only_redundant
+        data_bounds_type = include_redundant
         ! 'average', 'simple', 'staging', 'compare'
         data_writing_type = 'compare'
         ! reset status
@@ -646,6 +646,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel+2)==11 )
                 recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel+2)==11 )
                 receiverIsCoarser       = ( level_diff>0_ik )
+!                receiverIsCoarser       = ( level_diff<0_ik )
                 receiverIsOnSameLevel   = ( level_diff==0_ik )
                 lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
 
@@ -896,6 +897,189 @@ end subroutine synchronize_ghosts_generic_sequence
 
 !############################################################################################################
 
+subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+
+    implicit none
+
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n
+
+    ! status of the check
+    logical                             :: testOriginFlag
+    integer(kind=ik)                    :: hvy_id_k, iteration , lgt_id
+
+    integer(kind=ik)                    :: i1, i2, iStep, j1, j2, jStep, k1, k2, kStep  , i,j,k, boundaryIndex
+    integer(kind=ik)                    :: Bs, g    , levelLocal , levelOrigin , lastRedundantOrigin
+
+    integer(kind=ik)                    :: redundantOriginLgtId, local_hvy_id, localLightId, spaceDirections
+    logical                             :: shouldDominate , originHistoricFine, localHistoricFine , originLghtIdHigher
+
+    character(len=128)                  :: fileNameOrigin
+
+    real(kind=rk), allocatable, save    :: hvy_block_test(:, :, :, :, :)
+
+    !---------------------------------------------------------------------------
+    ! Unique origin test.
+    ! The idea is to fill each block on the grid with its (unique) light ID. Then
+    ! we synchronize the ghost nodes, and use the "check_redundant_nodes" routine
+    ! to verify that indeed on all blocks, we find the same value in the redundant
+    ! nodes. Earlier tests tried comparing the function values themselves but this
+    ! proved more difficult
+    !---------------------------------------------------------------------------
+
+    if (.not. allocated(hvy_block_test)) then
+        allocate( hvy_block_test (size(hvy_block,1),size(hvy_block,2),size(hvy_block,3),size(hvy_block,4),size(hvy_block,5) ) ) !its just a test, so not most time efficient..
+
+        ! this array is global within the MODULE scope
+        allocate(hvy_block_test_err(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3),size(hvy_block,4),size(hvy_block,5) ) )
+        hvy_block_test_err = 0.0
+    endif
+
+    ! Fill all blocks with their light ID, for all components and dimensions.
+    ! fill all blocks, not just active ones, just to be sure
+    do hvy_id_k = 1, size( hvy_block, 5)
+        call hvy_id_to_lgt_id(lgt_id, hvy_id_k, params%rank, params%number_blocks)
+        hvy_block_test(:, :, :, :, hvy_id_k)  =  real(lgt_id, kind=rk)
+    end do
+
+    call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active, hvy_n )
+
+    testOriginFlag = .false.
+    ! TODO check also for ghost nodes, all should have same origin
+    call check_redundant_nodes( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active, hvy_n, testOriginFlag, .false., .false.)
+
+    if (testOriginFlag ) then
+
+        ! filename is XXX.rank.dat
+        call write_real5( hvy_block_test, hvy_active, hvy_n, "hvy_block_test", params%rank )
+        call write_real5( hvy_block_test_err, hvy_active, hvy_n, "hvy_block_test_err", params%rank )
+
+        call MPI_barrier(WABBIT_COMM, i1)
+
+        iteration = 999
+         ! saving could be nice, but not all needed info available
+!        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+       call abort(111111,"Same origin of redundant nodes check failed - stopping.")
+        write(*,*)  "Same origin of redundant nodes check failed"
+    endif
+
+    ! ------------------------   check if dominace rules are fulfilled locally, globaly
+    ! ------------------------   should follow by uniqueness of origin
+
+
+    ! grid parameter
+    Bs    = params%number_block_nodes
+    g     = params%number_ghost_nodes
+
+    if (params%threeD_case ) then
+        spaceDirections = 3
+    else
+        spaceDirections = 2
+    end if
+
+    do hvy_id_k = 1, hvy_n
+        ! calculate light id
+        local_hvy_id =  hvy_active(hvy_id_k)
+        call hvy_id_to_lgt_id(localLightId, local_hvy_id  , params%rank , params%number_blocks )
+
+        do boundaryIndex =1,spaceDirections !
+            i1      = g + 1
+            i2      = g + Bs
+            iStep   = 1
+
+            j1      = g + 1
+            j2      = g + Bs
+            jStep   = 1
+
+            if (params%threeD_case ) then
+                k1      = g+1
+                k2      = g+ Bs
+                kStep   = 1 !Bs -1
+
+            else
+                k1      = 1
+                k2      = 1
+                kStep   = 1
+            end if
+
+            select case (boundaryIndex)
+                case (1)
+                    iStep = Bs -1 ! by this i takes the values g+1 and   g+Bs which is the redundant nodes, j, k run ov the full surface
+                case (2)
+                    jStep = Bs -1  ! dito for j ,  in principle same
+                case (3)
+                    kStep = Bs -1  ! dito for k ,  in principle same
+            end select
+
+            ! loop over all redundant nodes
+            localHistoricFine   = (lgt_block( localLightId , params%max_treelevel+2)==11 )
+            levelLocal          =  lgt_block( localLightId  , params%max_treelevel+1 )
+
+!                level_diff =  - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
+
+            ! TBD: sequence important for speed?
+            do i= i1,i2,iStep
+                do j = j1,j2,jStep
+                    do k = k1,k2,kStep
+
+                        redundantOriginLgtId    = int( hvy_block_test(i,j,k,1, local_hvy_id ) +0.001 , ik )  ! checking only first field, other should be the same
+                                                                                         ! am i too optimistic?
+                        levelOrigin             = lgt_block( redundantOriginLgtId, params%max_treelevel+1 )
+
+                        originLghtIdHigher      = ( redundantOriginLgtId.gt.localLightId            )
+
+                        if (.not.(redundantOriginLgtId.eq.localLightId) ) then  ! the block owns the redundant nodes, that's locally ok
+                            if ( .not.(redundantOriginLgtId.eq.lastRedundantOrigin) )  then ! in many cases we get the same id over and over again..
+
+                                originHistoricFine  =  (lgt_block( redundantOriginLgtId  , params%max_treelevel+2)==11 )
+                                levelOrigin         = lgt_block( redundantOriginLgtId  , params%max_treelevel+1 )
+
+                                ! do the check, it should only be there if it dominates the current block
+                                shouldDominate = .false. ! overwritten if domination is found by one of the following conditions
+                                ! is it finer? , no chekc for historic fine, since if the other is coarser, it cannot be his. fine .
+                                if (levelLocal<  levelOrigin )  shouldDominate = .true.
+                                ! it is historic fine but i am not
+                                if (  originHistoricFine.and.(.not.localHistoricFine)) shouldDominate = .true.
+                                ! both historic fine, other has higher lgt id
+                                if  ( (originHistoricFine.and.localHistoricFine).and.originLghtIdHigher ) shouldDominate = .true.
+                                ! none historic fine, both on same level, check if light id is higher
+                                if (    (.not.originHistoricFine).and.(.not.localHistoricFine )&
+                                   .and.( levelLocal.eq.levelOrigin)&
+                                   .and.(originLghtIdHigher)            )     shouldDominate = .true.
+
+                                ! TODO fill test in
+                                if (.not.shouldDominate) then
+                                    ! report error
+                                    write (*,*) 'rank',  params%rank , 'hvy_id',  local_hvy_id, 'lgt_id', localLightId, 'level', levelLocal,'hF',localHistoricFine ,'i,j,k',i,j,k, &
+                                                ' has origin ', redundantOriginLgtId , 'levelOrigin',  levelOrigin   , 'hF',   originHistoricFine
+                                                 !,originHistoricFine, localHistoricFine , originLghtIdHigher
+                                    write (fileNameOrigin, "(A6,I3.3,A4)") 'origin', params%rank ,'.dat'
+                                    call write_real5(hvy_block_test, hvy_active, hvy_n, fileNameOrigin, params%rank  ) ! dubug output with ghost nodes
+                                    call abort(44567 ,"should not dominate, who wrote this bloody code, and this useless error message? - stopping.")
+                                end if
+                                ! ----------
+                                lastRedundantOrigin =   redundantOriginLgtId
+                            end if
+                        end if
+                    end do  ! k
+                end do ! j
+            end do ! i
+
+        end do ! bundary index
+    end do  ! active block
+
+end subroutine check_unique_origin
+
 subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
     implicit none
 
@@ -1061,23 +1245,19 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
     ! error threshold
     real(kind=rk)                                   :: eps
 
+
     ! error norm
     real(kind=rk)       :: error_norm
-    real(kind=rk), allocatable :: tmp(:,:), tmp2(:,:)
 
     Bs = params%number_block_nodes
     g = params%number_ghost_nodes
-
-    allocate( tmp(1:Bs+2*g,1:Bs+2*g), tmp2(1:Bs+2*g,1:Bs+2*g))
-    tmp = 0.0_rk
-    tmp2 = 0.0_rk
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     buffer_i = 1
 
     ! set error threshold
-    eps = 1e-14_rk
+    eps = 1e-10_rk
 
     ! reset error norm
     error_norm = 0.0_rk
@@ -1101,41 +1281,39 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
                 ! first dimension
                 do i = data_bounds(1,1), data_bounds(2,1)
 
-                    if (level_diff/=-1) then
-                        ! on the same level, the comparison just takes all points, no odd/even downsampling required.
+                    ! if (level_diff /= -1) then
+                        ! on the same or coarser level, the comparison just takes all points, no odd/even downsampling required.
                         error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
-                        tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i ))
-                        tmp2(i,j) = 7.7_rk
-                    else
-                        ! if the level diff is -1, I compare with interpolated (upsampled) data. that means every EVEN
-                        ! point is the result of interpolation, and not truely redundant.
-                        ! Note this routine ALWAYS just compares the redundant nodes, so it will mostly be called
-                        ! with a line of points (i.e. one dimension is length one)
-                        !
-                        ! This routine has been tested:
-                        !   - old method (working version): no error found (okay)
-                        !   - old method, non_uniform_mesh_correction=0; in params file -> plenty of errors (okay)
-                        !   - old method, sync stage 4 deactivated: finds all occurances of "3finer blocks on corner problem" (okay)
-                        !   - new method, averaging, no error found (makes sense: okay)
-                        if (oddeven==0) then
-                            ! even number of ghost nodes
-                            ! if ( ((data_bounds(2,1)-data_bounds(1,1) == 0).and.(mod(j,2)/=0)) &
-                            ! .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0)) &
-                            ! .or. ((data_bounds(2,3)-data_bounds(1,3) == 0).and.(mod(k,2)/=0)) ) then
-                             if ( (mod(i,2)/=0) .and. (mod(j,2)/=0) .and. (mod(k,2)/=0) ) then
-                                error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
-                                tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i ))
-                                tmp2(i,j) = 7.7_rk
-                            endif
-                        else
-                            ! odd number of ghost nodes
-                            if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)==0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)==0))) then
-                                error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
-                                tmp(i,j) = abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i ))
-                                tmp2(i,j) = 7.7_rk
-                            endif
-                        endif
-                    endif
+                        hvy_block_test_err( i, j, k, dF, hvy_id ) = abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i ))
+!                     else
+!                         ! if the level diff is -1, I compare with interpolated (upsampled) data. that means every EVEN
+!                         ! point is the result of interpolation, and not truely redundant.
+!                         ! Note this routine ALWAYS just compares the redundant nodes, so it will mostly be called
+!                         ! with a line of points (i.e. one dimension is length one)
+!                         !
+!                         ! This routine has been tested:
+!                         !   - old method (working version): no error found (okay)
+!                         !   - old method, non_uniform_mesh_correction=0; in params file -> plenty of errors (okay)
+!                         !   - old method, sync stage 4 deactivated: finds all occurances of "3finer blocks on corner problem" (okay)
+!                         !   - new method, averaging, no error found (makes sense: okay)
+!                         if (oddeven==0) then
+!                             ! even number of ghost nodes
+!                             ! if ( ((data_bounds(2,1)-data_bounds(1,1) == 0).and.(mod(j,2)/=0)) &
+!                             ! .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)/=0)) &
+!                             ! .or. ((data_bounds(2,3)-data_bounds(1,3) == 0).and.(mod(k,2)/=0)) ) then
+!                              if ( (mod(i,2)/=0) .and. (mod(j,2)/=0) .and. (mod(k,2)/=0) ) then
+!                                 error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
+! write(*,*) hvy_block( i, j, k, dF, hvy_id )
+! if ( real(nint(hvy_block( i, j, k, dF, hvy_id ),kind=rk))-hvy_block( i, j, k, dF, hvy_id )>0.1_rk ) write(*,*) "maybe??"
+!
+!                             endif
+!                         else
+!                             ! odd number of ghost nodes
+!                             if (((data_bounds(2,1)- data_bounds(1,1) == 0).and.(mod(j,2)==0)) .or. ((data_bounds(2,2)-data_bounds(1,2) == 0).and.(mod(i,2)==0))) then
+!                                 error_norm = max(error_norm, abs(hvy_block( i, j, k, dF, hvy_id ) - line_buffer( buffer_i )))
+!                             endif
+!                         endif
+                    ! endif
                     buffer_i = buffer_i + 1
 
                 end do
@@ -1182,15 +1360,20 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
     ! end do
 
     if (error_norm > eps)  then
-        write(*,'("ERROR: difference in redundant nodes ",es12.4," level_diff=",i2, " hvy_id=",i8, " rank=",i5 )') &
-        error_norm, level_diff, hvy_id, params%rank
+        write(*,'("ERROR: difference in redundant nodes ",es12.4," level_diff=",i2, " hvy_id=",i6,1x,i6," rank=",i5 )') &
+        error_norm, level_diff, nint(hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, 1, 1, hvy_id )), hvy_id, params%rank
+
         write(*,*) "refinement status", my_ref, "tc=", tc
         ! stop program
         stop_status = .true.
 
         ! write(*,*) "---"
         ! do i =  Bs+2*g, 1, -1
-        !     write(*,'(70(es8.1,1x))') hvy_block(:,i,1,1,hvy_id)
+        !     write(*,'(70(i3,1x))') nint(tmp(:,i, hvy_id))
+        ! enddo
+        ! write(*,*) "---"
+        ! do i =  Bs+2*g, 1, -1
+        !     write(*,'(70(i3,1x))') nint(tmp2(:,i, hvy_id))
         ! enddo
         ! write(*,*) "---"
         ! do j = Bs+2*g, 1, -1
@@ -1212,7 +1395,6 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
         ! hvy_block( size(hvy_block,1)/2, size(hvy_block,2)/2, size(hvy_block,3)/2, :, hvy_id ) = 100.0_rk
     end if
 
-    deallocate(tmp, tmp2)
 end subroutine compare_hvy_data
 
 !############################################################################################################
@@ -1524,19 +1706,57 @@ subroutine AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, i
 end subroutine AppendLineToBuffer
 
 !############################################################################################################
-subroutine write_real5(data_block,hvy_active, hvy_n, fileName )
+subroutine write_real5(data_block,hvy_active, hvy_n, fileName, rank )
+    ! dump all data including ghost nodes for debugging, eg with matlab:
+
+!    function   [data ] =  read(fileName)
+
+!    fid=fopen(fileName, 'rb');        % Open the file.
+!    [dataSize, count ] =fread(fid, 5, 'int32') ;
+!    data = zeros(dataSize') ;
+
+!    allVals = zeros(prod(dataSize),1) ;
+!    allInd  = zeros(prod(dataSize),5)  ;
+
+!    lineNum = 0 ;
+!    while(1)
+!     [coord, countC ] =fread(fid, 5, 'int32');
+!     [val, countV ] =fread(fid, 1, 'float64') ;
+
+!     if (countC*countV == 0 )
+!         disp('all')
+!         disp ( countC)
+!         disp ( countV)
+!         if (prod(dataSize) ~= lineNum)
+!             fclose(fid) ;
+!             error('wrong linenumberm better check it')
+!         end
+!         %!disp(lineNum)
+!         break
+!     end
+!     lineNum = lineNum + 1 ;
+!     allVals(lineNum)  = val ;
+!     allInd(lineNum,:)   = coord';
+
+!      data(coord(1), coord(2) , coord(3), coord(4),coord(5))   = val ;
+!    end
+!    fclose(fid) ;
+!    end
 
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)        :: hvy_n, rank
 
     real(kind=rk), intent(in)       :: data_block(:, :, :, :, :)
-    character(len=128), intent(in)  :: fileName
+    character(len=*), intent(in)  :: fileName
+    character(len=3) :: rankname
     integer                         :: i,j,k,l,m
 
-    open(unit=11, file= fileName, form='unformatted', status='replace',access='stream')
+write(rankname,'(i3.3)') rank
+    open(unit=11, file= fileName//'.'//rankname//'.dat', form='unformatted', status='replace',access='stream')
 
+    write(*,*) "dumping hvy_n=", hvy_n, "rank=", rank
     !write(*,*) size(data_block,1), size(data_block,2), size(data_block,3), size(data_block,4), hvy_n
 
     write(11) size(data_block,1), size(data_block,2), size(data_block,3), size(data_block,4), hvy_n

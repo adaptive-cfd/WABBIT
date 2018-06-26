@@ -75,6 +75,11 @@ module module_MPI
     ! it is filled (once) in init_ghost_nodes
     integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
 
+
+
+    real(kind=rk), allocatable :: hvy_block_test_err(:,:,:,:,:)
+
+
     ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
@@ -93,7 +98,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: check_redundant_nodes, synchronize_ghosts_generic_sequence, init_ghost_nodes
+    PUBLIC :: check_redundant_nodes, synchronize_ghosts_generic_sequence, init_ghost_nodes, check_unique_origin
 
 !---------------------------------------------------------------------------------------------
 ! main body

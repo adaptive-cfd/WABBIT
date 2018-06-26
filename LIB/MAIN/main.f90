@@ -259,10 +259,12 @@ program main
             ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
             ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-            
-            test=.false. ! test
-            call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
-            hvy_n, test, .false., .false.)
+
+            ! test=.false. ! test
+            ! call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
+            ! hvy_n, test, .false., .false.)
+
+            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
 
             if (test) then
                 iteration = 99
@@ -385,7 +387,7 @@ program main
         ! by what has been done in the last time step, then we flush the current timing to disk.
         call timing_next_timestep( params, iteration )
 
-	    ! it is useful to save the number of blocks per rank into a log file.
+        ! it is useful to save the number of blocks per rank into a log file.
         call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
 
         t2 = MPI_wtime() - t2

@@ -234,6 +234,7 @@ subroutine init_ghost_nodes( params )
     integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, number_procs, rank
     integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idim, idata_bounds_type
     integer(kind=ik) :: data_bounds(2,3), j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
+    integer(kind=ik) :: i, k
 
     ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then
@@ -352,6 +353,8 @@ subroutine init_ghost_nodes( params )
                     call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'restricted-predicted')
                     ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 3) = data_bounds
 
+
+
                     !---------TESTING-------------------------------------------
                     if (leveldiff==0) then
                         rx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 2)
@@ -413,6 +416,24 @@ subroutine init_ghost_nodes( params )
                 enddo
             enddo
         enddo
+
+        if (params%rank==0) Then
+            open(16,file='ghost_bounds.dat',status='replace')
+            do ineighbor = 1, Nneighbor
+                do leveldiff = -1, 1
+                    do idata_bounds_type = 1, 3
+                        do i = 1, 2
+                            do j = 1, 3
+                                do k = 1, 3
+                                    write(16,'(i3)') ijkGhosts(i, j, ineighbor, leveldiff, idata_bounds_type, k)
+                                enddo
+                            enddo
+                        enddo
+                    enddo
+                enddo
+            enddo
+            close(16)
+        endif
 
         ! set up table with inverse neighbor relations
         inverse_neighbor = -1

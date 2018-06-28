@@ -67,7 +67,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
 
     ! the (module-global) communication_counter is the number of neighboring relations
     ! this rank has with all other ranks (it is thus an array of number_procs)
-    communication_counter(1:N_friends) = 0_ik
+    communication_counter(1:N_friends, 1) = 0_ik
     ! the friends-relation is updated in every call to this routine.
     ! in the beginning all slots are free
     N_friends_used = 0
@@ -83,10 +83,10 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! ATTENTION: if you change something here, recall to do the same in reallocate_buffers
     ! new, freshly allocated "friends" slots require consistent initialization
     ! reset integer send buffer position
-    int_pos = 2
+    int_pos(:,1) = 2
     ! reset first in send buffer position
-    int_send_buffer( 1, : ) = 0
-    int_send_buffer( 2, : ) = -99
+    int_send_buffer( 1, :, 1 ) = 0
+    int_send_buffer( 2, :, 1 ) = -99
 
 
     do k = 1, hvy_n
@@ -128,11 +128,11 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 call get_friend_id_for_mpirank( params, neighbor_rank, id_Friend )
 
                 ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
-                communication_counter(id_Friend) = communication_counter(id_Friend) + 1
+                communication_counter(id_Friend, 1) = communication_counter(id_Friend, 1) + 1
                 ! active block send data to its neighbor block
                 ! fill int/real buffer
                 call AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, id_Friend, line_buffer, &
-                hvy_id, neighborhood, level_diff )
+                hvy_id, neighborhood, level_diff, 1 )
 
             end if
         end do
@@ -144,19 +144,20 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! pretend that no communication with myself takes place, in order to skip the
     ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
     ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
-    communication_counter( mpirank2friend(myrank+1) ) = 0
+    communication_counter( mpirank2friend(myrank+1), 1 ) = 0
 
     ! send/receive data
-    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, communication_counter  )
+    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, &
+    communication_counter, 1 )
 
     ! copy internal buffer (BAD! Performance penalty!)
-    int_receive_buffer( 1:int_pos(mpirank2friend(myrank+1)), mpirank2friend(myrank+1) ) = &
-    int_send_buffer( 1:int_pos(mpirank2friend(myrank+1)), mpirank2friend(myrank+1) )
-    real_receive_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1)), mpirank2friend(myrank+1) ) = &
-    real_send_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1)), mpirank2friend(myrank+1) )
+    int_receive_buffer( 1:int_pos(mpirank2friend(myrank+1),1), mpirank2friend(myrank+1), 1 ) = &
+    int_send_buffer( 1:int_pos(mpirank2friend(myrank+1),1), mpirank2friend(myrank+1), 1 )
+    real_receive_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1),1), mpirank2friend(myrank+1), 1 ) = &
+    real_send_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1),1), mpirank2friend(myrank+1), 1 )
 
     ! change communication_counter, equired to trigger buffer unpacking in last step
-    communication_counter(mpirank2friend(myrank+1)) = 1
+    communication_counter(mpirank2friend(myrank+1),1) = 1
 
     !***********************************************************************
     ! Unpack received data and compare with ghost nodes data
@@ -164,18 +165,18 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! sortiere den real buffer ein
     ! loop over all friends
     do k = 1, N_friends_used
-        if ( communication_counter(k) /= 0 ) then
+        if ( communication_counter(k,1) /= 0 ) then
             ! first element in int buffer is real buffer size
             l = 2
             ! -99 marks end of data
-            do while ( int_receive_buffer(l, k) /= -99 )
+            do while ( int_receive_buffer(l, k, 1) /= -99 )
 
-                hvy_id          = int_receive_buffer(l, k)
-                neighborhood    = int_receive_buffer(l+1, k)
-                level_diff      = int_receive_buffer(l+2, k)
-                buffer_position = int_receive_buffer(l+3, k)
-                buffer_size     = int_receive_buffer(l+4, k)
-                line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
+                hvy_id          = int_receive_buffer(l, k,1)
+                neighborhood    = int_receive_buffer(l+1, k,1)
+                level_diff      = int_receive_buffer(l+2, k,1)
+                buffer_position = int_receive_buffer(l+3, k,1)
+                buffer_size     = int_receive_buffer(l+4, k,1)
+                line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k, 1 )
 
                 ! data bounds (2-recv)
                 data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, 2)
@@ -271,12 +272,18 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     ! stage 1: only finer blocks send to their coarser neighbors
     ! stage 2: all other relations
+
+
+
     do istage = 1, 2
 ! write(*,*) "STAGE", istage
 
+
+
+
     ! the (module-global) communication_counter is the number of neighboring relations
     ! this rank has with all other ranks (it is thus an array of mpisize)
-    communication_counter(1:N_friends) = 0_ik
+    communication_counter(1:N_friends, istage) = 0_ik
     ! the friends-relation is updated in every call to this routine.
     ! in the beginning all slots are free
     N_friends_used = 0
@@ -289,10 +296,10 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! ATTENTION: if you change something here, recall to do the same in reallocate_buffers
     ! new, freshly allocated "friends" slots require consistent initialization
     ! reset integer send buffer position
-    int_pos = 2       ! TODO JR why 2? , the first filed contains the size of the XXX
+    int_pos(:, istage) = 2       ! TODO JR why 2? , the first filed contains the size of the XXX
     ! reset first in send buffer position
-    int_send_buffer( 1, : ) = 0
-    int_send_buffer( 2, : ) = -99
+    int_send_buffer( 1 ,: ,istage) = 0
+    int_send_buffer( 2 ,: ,istage) = -99
 
     ! loop over active heavy data. NOTE: hvy_id has a linear correspondance to lgt_id,
     ! i.e.g the ordering in hvy_id and lgt_id is the same. this is very important for the
@@ -318,13 +325,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
                 ! define level difference: sender - receiver, so +1 means sender on higher level
                 level_diff = lgt_block( sender_lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
-                !
-                ! if ( istage == 1) Then
-                !
-                !     if (level_diff /= +1 ) cycle
-                ! else
-                !     if (level_diff == +1 ) cycle
-                ! endif
 
 
                 !  ----------------------------  here decide which values are taken for redundant nodes --------------------------------
@@ -340,6 +340,27 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                      lgt_block, sender_lgt_id, neighbor_lgt_id )
 
                 call get_friend_id_for_mpirank( params, neighbor_rank, id_Friend )
+
+                ! if ( istage == 1 ) then
+                !     if ( level_diff == -1 ) Then
+                !         ! this block just receives data in this neighborhood relation, but does not send anything
+                !         communication_counter(id_Friend, istage) = communication_counter(id_Friend, istage) + 1
+                !         cycle
+                !     endif
+                ! else
+                !     ! in stage two leveldiff +1 and 0 are already done
+                !     if ( level_diff == 0 ) cycle
+                !     if ( level_diff == +1 ) Then
+                !         ! this block just receives data in this neighborhood relation, but does not send anything
+                !         communication_counter(id_Friend, istage) = communication_counter(id_Friend, istage) + 1
+                !         cycle
+                !     endif
+                ! endif
+
+!               Stage I: send the data for entrySortInRound= 2,3,4 and effectively do the rounds 2,3,4
+!                        afterwards, the ghost nodes on coarser block, including the redundant nodes, should be fine
+!               Stage II: send the data for entrySortInRound = 1 (interpolation) and do the complete sort in again 1,2,3,4
+!                         the data for rouns 2,3,4 is not changed, so it is taken from the buffer for the first stage.
 
                 !----------------------------  pack describing data and node values to send ---------------------------
                 if ( myrank == neighbor_rank ) then
@@ -359,7 +380,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! but do not copy the heavy data to te corresponding buffer. In that sense, we only "recall" what
                     ! parameters (level_diff, entrySortInRound etc) the neighboring relation has.
                     call AppendLineToBuffer( int_send_buffer, real_send_buffer, 0, id_Friend, line_buffer, &
-                    hvy_id_receiver, neighborhood, level_diff_indicator )
+                    hvy_id_receiver, neighborhood, level_diff_indicator, istage )
 
                 else
                     !-----------------------------------------------------------
@@ -367,7 +388,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     !-----------------------------------------------------------
                     ! count the number of communications with this fried. from that number, the
                     ! integer buffer length can be computed while MPI exchanging data
-                    communication_counter(id_Friend) = communication_counter(id_Friend) + 1
+                    communication_counter(id_Friend, istage) = communication_counter(id_Friend, istage) + 1
 
                     ! pack multipe information into one number
                     level_diff_indicator = 256*bounds_type + 16*(level_diff+1) + entrySortInRound
@@ -401,7 +422,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
                     ! the chunk of data is added to the MPI buffers (preparation for sending)
                     call AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, id_Friend, line_buffer, &
-                    hvy_id_receiver, neighborhood, level_diff_indicator )
+                    hvy_id_receiver, neighborhood, level_diff_indicator, istage )
 
                 end if ! (myrank==neighbor_rank)
 
@@ -413,7 +434,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     !***********************************************************************
     ! transfer part (send/recv)
     !***********************************************************************
-    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, communication_counter )
+    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, &
+    communication_counter, istage )
 
 
     !***********************************************************************
@@ -435,14 +457,14 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     if (istage == 1) Then
         entrySortInRound_start = 1
-        entrySortInRound_end = 1
+        entrySortInRound_end = 3
 
-        rounds = (/3, 0, 0, 0/)
+        rounds = (/2, 3, 4, 0/) !234
     else
         entrySortInRound_start = 1
         entrySortInRound_end = 4
 
-        rounds = (/1, 2, 4, 0/)
+        rounds = (/1, 2, 3, 4/) ! 1 schikt 1234 sortiet
     endif
 
     ! do currentSortInRound = entrySortInRound_start,  entrySortInRound_end ! coarse, same, fine, historic fine
@@ -465,14 +487,14 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 ! process-internal ghost points (direct copy)
                 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                 l = 2  ! first field is size of data
-                do while ( int_send_buffer(l, id_Friend) /= -99 )
+                do while ( int_send_buffer(l, id_Friend, istage) /= -99 )
                     ! unpack the description of the next data chunk
                     ! required info:  sender_hvy_id, hvy_id_receiver, neighborhood, level_diff, bounds_type, entrySortInRound
-                    hvy_id_receiver = int_send_buffer(l, id_Friend)
-                    neighborhood = int_send_buffer(l+1, id_Friend)
+                    hvy_id_receiver = int_send_buffer(l, id_Friend, istage)
+                    neighborhood = int_send_buffer(l+1, id_Friend, istage)
 
                     ! unpack & evaluate level_diff_indicator (contains multiple information, unpack it)
-                    level_diff_indicator = int_send_buffer(l+2, id_Friend)
+                    level_diff_indicator = int_send_buffer(l+2, id_Friend, istage)
                     entrySortInRound = modulo( level_diff_indicator, 16 )
 
                     ! check if this entry is processed in this round, otherwise cycle to next
@@ -525,8 +547,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                         endif
 
                     else  ! interpolation or restriction before inserting
-                        call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, INCLUDE_REDUNDANT, 1), neighborhood, level_diff, &
-                        bounds_type, hvy_block, sender_hvy_id )
+
+                        call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, INCLUDE_REDUNDANT, 1), &
+                        neighborhood, level_diff, bounds_type, hvy_block, sender_hvy_id )
 
                         ! copy interpolated / restricted data to ghost nodes layer
                         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
@@ -575,15 +598,15 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 ! process-external ghost points (copy from buffer)
                 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                 ! did I recv something from this rank?
-                if ( (communication_counter(id_Friend) /= 0) ) then
+                if ( (communication_counter(id_Friend, istage) /= 0) ) then
                     l = 2  ! first field is size of data
-                    do while ( int_receive_buffer(l, id_Friend) /= -99 )
+                    do while ( int_receive_buffer(l, id_Friend, istage) /= -99 )
                         ! unpack the description of the next data chunk
-                        hvy_id_receiver = int_receive_buffer(l, id_Friend)
-                        neighborhood = int_receive_buffer(l+1, id_Friend)
+                        hvy_id_receiver = int_receive_buffer(l, id_Friend, istage)
+                        neighborhood = int_receive_buffer(l+1, id_Friend, istage)
 
                         ! unpack & evaluate level_diff_indicator (contains multiple information, unpack it)
-                        level_diff_indicator = int_receive_buffer(l+2, id_Friend)
+                        level_diff_indicator = int_receive_buffer(l+2, id_Friend, istage)
                         entrySortInRound = modulo( level_diff_indicator, 16 )
 
                         ! check if this entry is processed in this round, otherwise cycle to next
@@ -594,11 +617,11 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
                         level_diff  = modulo( level_diff_indicator/16 , 16 ) - 1_ik
                         bounds_type = modulo( level_diff_indicator/256, 16 )
-                        buffer_position = int_receive_buffer(l+3, id_Friend)
-                        buffer_size     = int_receive_buffer(l+4, id_Friend)
+                        buffer_position = int_receive_buffer(l+3, id_Friend, istage)
+                        buffer_size     = int_receive_buffer(l+4, id_Friend, istage)
 
                         ! copy data to line buffer. we now need to extract this to the ghost nodes layer (2D/3D)
-                        line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, id_Friend )
+                        line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, id_Friend, istage )
 
                         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
                         ! They depend on the neighbor-relation, level difference and the bounds type.
@@ -1198,7 +1221,8 @@ end subroutine compare_hvy_data
 
 !############################################################################################################
 
-subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, communication_counter )
+subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer,&
+     communication_counter, istage )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -1212,12 +1236,13 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     type (type_params), intent(in)      :: params
 
     !> send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)       :: int_send_buffer(:,:)
-    integer(kind=ik), intent(inout)       :: int_receive_buffer(:,:)
-    real(kind=rk), intent(inout)          :: real_send_buffer(:,:)
-    real(kind=rk), intent(inout)          :: real_receive_buffer(:,:)
+    integer(kind=ik), intent(inout)       :: int_send_buffer(:,:,:)
+    integer(kind=ik), intent(inout)       :: int_receive_buffer(:,:,:)
+    real(kind=rk), intent(inout)          :: real_send_buffer(:,:,:)
+    real(kind=rk), intent(inout)          :: real_receive_buffer(:,:,:)
 
-    integer(kind=ik), intent(inout)       :: communication_counter(:)
+    integer(kind=ik), intent(inout)       :: communication_counter(:,:)
+    integer(kind=ik), intent(in) :: istage
 
     ! process rank
     integer(kind=ik)                    :: rank
@@ -1265,23 +1290,23 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     ! loop over com matrix
     do k = 1, N_friends_used
         ! communication between proc rank and proc k-1
-        if ( communication_counter(k) > 0 ) then
+        if ( communication_counter(k, istage) > 0 ) then
             mpirank_partner = friend2mpirank(k)-1 ! zero based
 
             ! length of integer buffer
-            int_length = 5*communication_counter(k) + 3
+            int_length = 5*communication_counter(k, istage) + 3
 
             ! increase communication counter
             i = i + 1
 
             ! send data
             tag = rank
-            call MPI_Isend( int_send_buffer(1, k), int_length, MPI_INTEGER4, &
+            call MPI_Isend( int_send_buffer(1, k, istage), int_length, MPI_INTEGER4, &
                  mpirank_partner, tag, WABBIT_COMM, send_request(i), ierr)
 
             ! receive data
             tag = mpirank_partner
-            call MPI_Irecv( int_receive_buffer(1, k), int_length, MPI_INTEGER4, &
+            call MPI_Irecv( int_receive_buffer(1, k, istage), int_length, MPI_INTEGER4, &
                  mpirank_partner, tag, WABBIT_COMM, recv_request(i), ierr)
         end if
 
@@ -1307,7 +1332,7 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     ! loop over corresponding com matrix line
     do k = 1, N_friends_used
         ! communication between proc rank and proc k-1
-        if ( communication_counter(k) > 0 ) then
+        if ( communication_counter(k, istage) > 0 ) then
             mpirank_partner = friend2mpirank(k)-1 ! zero based
 
             ! increase communication counter
@@ -1315,20 +1340,20 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
 
             ! real buffer length is stored as the first entry in the integer buffer,
             ! hence we know how much data we'll receive
-            length_realBuffer = int_receive_buffer(1, k)
+            length_realBuffer = int_receive_buffer(1, k, istage)
 
             ! receive data
             tag = 1000*(friend2mpirank(k)-1)
-            call MPI_Irecv( real_receive_buffer(1:length_realBuffer, k), length_realBuffer, MPI_REAL8, &
+            call MPI_Irecv( real_receive_buffer(1:length_realBuffer, k, istage), length_realBuffer, MPI_REAL8, &
             mpirank_partner, MPI_ANY_TAG, WABBIT_COMM, recv_request(i), ierr)
 
             ! real buffer length is stored as the first entry in the integer buffer,
             ! hence we know how much data we'll receive
-            length_realBuffer = int_send_buffer(1, k)
+            length_realBuffer = int_send_buffer(1, k, istage)
 
             ! send data
             tag = 1000*rank
-            call MPI_Isend( real_send_buffer(1:length_realBuffer, k), length_realBuffer, MPI_REAL8, &
+            call MPI_Isend( real_send_buffer(1:length_realBuffer, k, istage), length_realBuffer, MPI_REAL8, &
             mpirank_partner, tag, WABBIT_COMM, send_request(i), ierr)
 
         end if
@@ -1467,15 +1492,15 @@ end subroutine set_synch_status
 !############################################################################################################
 
 subroutine AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, id_Friend, line_buffer, &
-    hvy_id, neighborhood, level_diff )
+    hvy_id, neighborhood, level_diff, istage )
 
     implicit none
 
     !> send buffers, integer and real
-    integer(kind=ik), intent(inout)        :: int_send_buffer(:,:)
-    real(kind=rk), intent(inout)           :: real_send_buffer(:,:)
+    integer(kind=ik), intent(inout)        :: int_send_buffer(:,:,:)
+    real(kind=rk), intent(inout)           :: real_send_buffer(:,:,:)
     ! data buffer size
-    integer(kind=ik), intent(in)           :: buffer_size
+    integer(kind=ik), intent(in)           :: buffer_size, istage
     ! id integer
     integer(kind=ik), intent(in)           :: id_Friend
     ! restricted/predicted data buffer
@@ -1488,27 +1513,27 @@ subroutine AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, i
 
     ! fill real buffer
     ! position in real buffer is stored in int buffer
-    buffer_position = int_send_buffer( 1, id_Friend ) + 1
+    buffer_position = int_send_buffer( 1, id_Friend, istage ) + 1
 
     ! real data
     if (buffer_size>0) then
-        real_send_buffer( buffer_position : buffer_position-1 + buffer_size, id_Friend ) = line_buffer(1:buffer_size)
+        real_send_buffer( buffer_position : buffer_position-1 + buffer_size, id_Friend, istage  ) = line_buffer(1:buffer_size)
     endif
 
     ! fill int buffer
     ! sum size of single buffers on first element
-    int_send_buffer(1  , id_Friend ) = int_send_buffer(1  , id_Friend ) + buffer_size
+    int_send_buffer(1  , id_Friend, istage ) = int_send_buffer(1  , id_Friend, istage ) + buffer_size
 
     ! save: neighbor id, neighborhood, level difference, buffer size
-    int_send_buffer( int_pos(id_Friend),   id_Friend ) = hvy_id
-    int_send_buffer( int_pos(id_Friend)+1, id_Friend ) = neighborhood
-    int_send_buffer( int_pos(id_Friend)+2, id_Friend ) = level_diff
-    int_send_buffer( int_pos(id_Friend)+3, id_Friend ) = buffer_position
-    int_send_buffer( int_pos(id_Friend)+4, id_Friend ) = buffer_size
+    int_send_buffer( int_pos(id_Friend, istage),   id_Friend, istage ) = hvy_id
+    int_send_buffer( int_pos(id_Friend, istage)+1, id_Friend, istage ) = neighborhood
+    int_send_buffer( int_pos(id_Friend, istage)+2, id_Friend, istage ) = level_diff
+    int_send_buffer( int_pos(id_Friend, istage)+3, id_Friend, istage ) = buffer_position
+    int_send_buffer( int_pos(id_Friend, istage)+4, id_Friend, istage ) = buffer_size
     ! mark end of buffer with -99, will be overwritten by next element if it is nt the last one
-    int_send_buffer( int_pos(id_Friend)+5, id_Friend ) = -99
+    int_send_buffer( int_pos(id_Friend, istage)+5, id_Friend, istage ) = -99
 
-    int_pos(id_Friend) = int_pos(id_Friend) +5
+    int_pos(id_Friend, istage) = int_pos(id_Friend, istage) +5
 end subroutine AppendLineToBuffer
 
 !############################################################################################################
@@ -1698,7 +1723,7 @@ write(*,*) "warning you re calling the old routine. captain."
 
     ! the (module-global) communication_counter is the number of neighboring relations
     ! this rank has with all other ranks (it is thus an array of number_procs)
-    communication_counter(1:N_friends) = 0_ik
+    communication_counter(1:N_friends, 1) = 0_ik
     ! the friends-relation is updated in every call to this routine.
     ! in the beginning all slots are free
     N_friends_used = 0
@@ -1764,10 +1789,10 @@ write(*,*) "warning you re calling the old routine. captain."
         ! ATTENTION: if you change something here, recall to do the same in reallocate_buffers
         ! new, freshly allocated "friends" slots require consistent initialization
         ! reset integer send buffer position
-        int_pos = 2
+        int_pos(:,1) = 2
         ! reset first in send buffer position
-        int_send_buffer( 1, : ) = 0
-        int_send_buffer( 2, : ) = -99
+        int_send_buffer( 1, :, 1 ) = 0
+        int_send_buffer( 2, :, 1 ) = -99
 
         ! loop over active heavy data
         if (data_writing_type=="average") then
@@ -1871,19 +1896,19 @@ write(*,*) "warning you re calling the old routine. captain."
                             neighborhood, lgt_block(lgt_id,params%max_treelevel+2), lgt_block(neighbor_lgt_id,params%max_treelevel+2)  )
                         end if
                         ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
-                        communication_counter(id_Friend) = communication_counter(id_Friend) + 1
+                        communication_counter(id_Friend, 1) = communication_counter(id_Friend,1) + 1
 
                         if (synch) then
                             ! active block send data to his neighbor block
                             ! fill int/real buffer
                             call AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, id_Friend, line_buffer, &
-                            hvy_id, neighborhood, level_diff )
+                            hvy_id, neighborhood, level_diff, 1 )
                         else
                             ! neighbor block send data to active block
                             ! write -1 to int_send buffer, placeholder
-                            int_send_buffer( int_pos(id_Friend) : int_pos(id_Friend)+4  , id_Friend ) = -1
+                            int_send_buffer( int_pos(id_Friend, 1) : int_pos(id_Friend, 1)+4  , id_Friend, 1 ) = -1
                             ! increase int buffer position
-                            int_pos(id_Friend) = int_pos(id_Friend) + 5
+                            int_pos(id_Friend, 1) = int_pos(id_Friend, 1) + 5
                         end if
 
                     end if
@@ -1895,7 +1920,7 @@ write(*,*) "warning you re calling the old routine. captain."
         ! pretend that no communication with myself takes place, in order to skip the
         ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
         ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
-        communication_counter( mpirank2friend(myrank+1) ) = 0
+        communication_counter( mpirank2friend(myrank+1), 1 ) = 0
 
         !***********************************************************************
         ! transfer part (send/recv)
@@ -1904,17 +1929,18 @@ write(*,*) "warning you re calling the old routine. captain."
         ! note: todo, remove dummy subroutine
         ! note: new dummy subroutine sets receive buffer position accordingly to process rank
         ! note: todo: use more than non-blocking send/receive
-        call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, communication_counter  )
+        call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, &
+        communication_counter, 1)
 
         ! fill receive buffer for internal neighbors for averaging writing type
         if ( (data_writing_type == 'average') .or. (data_writing_type == 'compare') .or. (data_writing_type == 'staging') ) then
             ! fill receive buffer
-            int_receive_buffer( 1:int_pos(mpirank2friend(myrank+1))  , mpirank2friend(myrank+1) ) = &
-                int_send_buffer( 1:int_pos(mpirank2friend(myrank+1))  , mpirank2friend(myrank+1) )
-            real_receive_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1)), mpirank2friend(myrank+1) ) = &
-                real_send_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1)), mpirank2friend(myrank+1) )
+            int_receive_buffer( 1:int_pos(mpirank2friend(myrank+1),1)  , mpirank2friend(myrank+1), 1 ) = &
+                int_send_buffer( 1:int_pos(mpirank2friend(myrank+1),1)  , mpirank2friend(myrank+1), 1 )
+            real_receive_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1),1), mpirank2friend(myrank+1), 1 ) = &
+                real_send_buffer( 1:int_receive_buffer(1,mpirank2friend(myrank+1),1), mpirank2friend(myrank+1), 1 )
             ! change communication_counter, equired to trigger buffer unpacking in last step
-            communication_counter(mpirank2friend(myrank+1)) = 1
+            communication_counter(mpirank2friend(myrank+1), 1) = 1
         end if
 
         !***********************************************************************
@@ -1927,19 +1953,19 @@ write(*,*) "warning you re calling the old routine. captain."
             ! sortiere den real buffer ein
             ! loop over all procs
             do k = 1, N_friends_used
-                if ( communication_counter(k) /= 0 ) then
+                if ( communication_counter(k, 1) /= 0 ) then
                     ! neighboring proc
                     ! first element in int buffer is real buffer size
                     l = 2
                     ! -99 marks end of data
-                    do while ( int_receive_buffer(l, k) /= -99 )
+                    do while ( int_receive_buffer(l, k, 1) /= -99 )
 
-                        hvy_id          = int_receive_buffer(l, k)
-                        neighborhood    = int_receive_buffer(l+1, k)
-                        level_diff      = int_receive_buffer(l+2, k)
-                        buffer_position = int_receive_buffer(l+3, k)
-                        buffer_size     = int_receive_buffer(l+4, k)
-                        line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k )
+                        hvy_id          = int_receive_buffer(l, k, 1)
+                        neighborhood    = int_receive_buffer(l+1, k, 1)
+                        level_diff      = int_receive_buffer(l+2, k, 1)
+                        buffer_position = int_receive_buffer(l+3, k, 1)
+                        buffer_size     = int_receive_buffer(l+4, k, 1)
+                        line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k, 1 )
 
                         ! data bounds
                         !!!!!call calc_data_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, 'receiver' )
@@ -2024,18 +2050,18 @@ write(*,*) "warning you re calling the old routine. captain."
 
                             ! -99 marks end of data
                             test2 = .false.
-                            do while ( int_receive_buffer(l, mpirank2friend(neighbor_rank+1)) /= -99 )
+                            do while ( int_receive_buffer(l, mpirank2friend(neighbor_rank+1), 1) /= -99 )
 
                                 ! proof heavy id and neighborhood id
-                                if (  (int_receive_buffer( l,   mpirank2friend(neighbor_rank+1) ) == hvy_active(k) ) &
-                                .and. (int_receive_buffer( l+1, mpirank2friend(neighbor_rank+1) ) == invert_neighborhood) ) then
+                                if (  (int_receive_buffer( l,   mpirank2friend(neighbor_rank+1), 1 ) == hvy_active(k) ) &
+                                .and. (int_receive_buffer( l+1, mpirank2friend(neighbor_rank+1), 1 ) == invert_neighborhood) ) then
 
                                     ! set parameter
                                     ! level diff, read from buffer because calculated level_diff is not sender-receiver
-                                    level_diff      = int_receive_buffer(l+2, mpirank2friend(neighbor_rank+1))
-                                    buffer_position = int_receive_buffer(l+3, mpirank2friend(neighbor_rank+1))
-                                    buffer_size     = int_receive_buffer(l+4, mpirank2friend(neighbor_rank+1))
-                                    line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, mpirank2friend(neighbor_rank+1) )
+                                    level_diff      = int_receive_buffer(l+2, mpirank2friend(neighbor_rank+1), 1)
+                                    buffer_position = int_receive_buffer(l+3, mpirank2friend(neighbor_rank+1), 1)
+                                    buffer_size     = int_receive_buffer(l+4, mpirank2friend(neighbor_rank+1), 1)
+                                    line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, mpirank2friend(neighbor_rank+1), 1 )
 
                                     ! data bounds
                                     !!!!!!!!!!!call calc_data_bounds( params, data_bounds, invert_neighborhood, level_diff, data_bounds_type, 'receiver' )

@@ -28,11 +28,6 @@ module module_MPI
     ! interpolation routines
     use module_interpolation
 
-    ! TODO TODO TODO TODO TODO TODO
-    ! dynamical buffers
-    ! check if one-sided interpolation can be avoided using two stages
-    ! TODO TODO TODO TODO TODO TODO
-
     implicit none
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -40,6 +35,8 @@ module module_MPI
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
     ! that everything within the module is private unless explicitly marked public.
     PRIVATE
+
+    ! everything is save by default
     SAVE
 
     ! Just because we have MPISIZE ranks does not mean that everybody talks to everybody.
@@ -49,11 +46,16 @@ module module_MPI
     ! it dynamically (via deallocate / reallocate)
     integer(kind=ik) :: N_friends, N_friends_used
 
+    ! We require two stages: first, we fill all ghost nodes which are simple copy,
+    ! then in the second stage we can use interpolation and fill the remaining ones.
+    ! In order not to send ALL data in both stages, we allocate one buffer for each stage.
+    integer(kind=ik) :: Nstages = 2
+
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
-    ! large numbers of processes and blocks per process
-    integer(kind=ik), allocatable :: int_send_buffer(:,:), int_receive_buffer(:,:)
-    real(kind=rk), allocatable    :: real_send_buffer(:,:), real_receive_buffer(:,:)
+    ! large numbers of processes and blocks per process, when allocating on every call to the routine
+    integer(kind=ik), allocatable :: int_send_buffer(:,:,:), int_receive_buffer(:,:,:)
+    real(kind=rk), allocatable    :: real_send_buffer(:,:,:), real_receive_buffer(:,:,:)
 
     ! this array is used only in AVERAGING submodule of (deprecated) MSR ghost nodes.
     ! TODO: remove, as averaging did not work.
@@ -61,10 +63,12 @@ module module_MPI
 
     ! an array to count how many messages we send to the other mpiranks. NOTE: the
     ! arrays communication_counter(:), int_pos(:) have the size N_friends
-    integer(kind=ik), allocatable :: communication_counter(:), int_pos(:), mpirank2friend(:), friend2mpirank(:)
+    integer(kind=ik), allocatable :: communication_counter(:,:), int_pos(:,:), mpirank2friend(:), friend2mpirank(:)
+
     ! internally, we flatten the ghost nodes layers to a line. this is stored in
     ! this buffer (NOTE max size is (blocksize)*(ghost nodes size + 1)*(number of datafields))
     real(kind=rk), allocatable    :: line_buffer(:)
+
     ! restricted/predicted data buffer
     real(kind=rk), allocatable    :: res_pre_data(:,:,:,:), tmp_block(:,:,:,:)
 
@@ -124,61 +128,61 @@ contains
 subroutine reallocate_buffers(params)
     implicit none
     type (type_params), intent(in) :: params
-    integer(kind=ik), allocatable :: int_buffer_tmp(:,:)
-    real(kind=rk), allocatable    :: real_buffer_tmp(:,:)
-    integer(kind=ik), allocatable :: communication_counter_tmp(:), int_pos_tmp(:), &
+    integer(kind=ik), allocatable :: int_buffer_tmp(:,:,:)
+    real(kind=rk), allocatable    :: real_buffer_tmp(:,:,:)
+    integer(kind=ik), allocatable :: communication_counter_tmp(:,:), int_pos_tmp(:,:), &
     mpirank2friend_tmp(:), friend2mpirank_tmp(:)
 
     write(*,'("GHOSTS-runtime: rank=",i5," is changing buffer size to N_friends=",i4)') params%rank, N_friends
 
-    allocate( int_buffer_tmp( size(int_send_buffer,1), size(int_send_buffer,2)) )
+    allocate( int_buffer_tmp( size(int_send_buffer,1), size(int_send_buffer,2), 1:Nstages) )
         int_buffer_tmp = int_send_buffer
         deallocate(int_send_buffer)
-        allocate( int_send_buffer(size(int_buffer_tmp,1), N_friends) )
-        int_send_buffer(:, 1:size(int_buffer_tmp,2) ) = int_buffer_tmp
+        allocate( int_send_buffer(size(int_buffer_tmp,1), N_friends, 1:Nstages) )
+        int_send_buffer(:, 1:size(int_buffer_tmp,2), : ) = int_buffer_tmp
 
         int_buffer_tmp = int_receive_buffer
         deallocate(int_receive_buffer)
-        allocate( int_receive_buffer(size(int_buffer_tmp,1), N_friends) )
-        int_receive_buffer(:, 1:size(int_buffer_tmp,2) ) = int_buffer_tmp
+        allocate( int_receive_buffer(size(int_buffer_tmp,1), N_friends, 1:Nstages) )
+        int_receive_buffer(:, 1:size(int_buffer_tmp,2), : ) = int_buffer_tmp
 
         ! new appended buffer requires initialization (see main routine for doc)
-        int_send_buffer( 1, N_friends ) = 0
-        int_send_buffer( 2, N_friends ) = -99
+        int_send_buffer( 1, N_friends, : ) = 0
+        int_send_buffer( 2, N_friends, : ) = -99
     deallocate(int_buffer_tmp)
 
-    allocate( real_buffer_tmp( size(real_send_buffer,1), size(real_send_buffer,2)) )
+    allocate( real_buffer_tmp( size(real_send_buffer,1), size(real_send_buffer,2), 1:Nstages) )
         ! very slow...
         real_buffer_tmp = real_send_buffer
         deallocate(real_send_buffer)
-        allocate( real_send_buffer(size(real_buffer_tmp,1), N_friends) )
-        real_send_buffer(:, 1:size(real_buffer_tmp,2) ) = real_buffer_tmp
+        allocate( real_send_buffer(size(real_buffer_tmp,1), N_friends, 1:Nstages) )
+        real_send_buffer(:, 1:size(real_buffer_tmp,2), : ) = real_buffer_tmp
 
         ! very slow...
         real_buffer_tmp = real_receive_buffer
         deallocate(real_receive_buffer)
-        allocate( real_receive_buffer(size(real_buffer_tmp,1), N_friends) )
-        real_receive_buffer(:, 1:size(real_buffer_tmp,2) ) = real_buffer_tmp
+        allocate( real_receive_buffer(size(real_buffer_tmp,1), N_friends, 1:Nstages) )
+        real_receive_buffer(:, 1:size(real_buffer_tmp,2), : ) = real_buffer_tmp
     deallocate(real_buffer_tmp)
 
 
-    allocate( communication_counter_tmp(size(communication_counter)) )
+    allocate( communication_counter_tmp(size(communication_counter), 1:Nstages) )
     communication_counter_tmp = communication_counter
     deallocate(communication_counter)
-    allocate( communication_counter(1:N_friends) )
-    communication_counter(1:size(communication_counter_tmp)) = communication_counter_tmp
+    allocate( communication_counter(1:N_friends, 1:Nstages) )
+    communication_counter(1:size(communication_counter_tmp), :) = communication_counter_tmp
     deallocate( communication_counter_tmp )
-    communication_counter( N_friends ) = 0
+    communication_counter( N_friends, : ) = 0
 
 
-    allocate( int_pos_tmp(size(int_pos)) )
+    allocate( int_pos_tmp(size(int_pos), 1:Nstages) )
     int_pos_tmp = int_pos
     deallocate(int_pos)
-    allocate( int_pos(1:N_friends) )
-    int_pos(1:size(int_pos_tmp)) = int_pos_tmp
+    allocate( int_pos(1:N_friends, 1:Nstages) )
+    int_pos(1:size(int_pos_tmp),:) = int_pos_tmp
     deallocate( int_pos_tmp )
     ! new appended buffer requires initialization
-    int_pos(N_friends) = 2
+    int_pos(N_friends, 1:Nstages) = 2
 
 
     allocate( friend2mpirank_tmp(size(friend2mpirank)) )
@@ -285,10 +289,10 @@ subroutine init_ghost_nodes( params )
         ! allocate auxiliary memory
         !-----------------------------------------------------------------------
         ! allocate synch buffer
-        allocate( int_send_buffer( 1:buffer_N_int, 1:N_friends) )
-        allocate( int_receive_buffer( 1:buffer_N_int, 1:N_friends) )
-        allocate( real_send_buffer( 1:buffer_N, 1:N_friends) )
-        allocate( real_receive_buffer( 1:buffer_N, 1:N_friends) )
+        allocate( int_send_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages) )
+        allocate( int_receive_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages) )
+        allocate( real_send_buffer( 1:buffer_N, 1:N_friends, 1:Nstages) )
+        allocate( real_receive_buffer( 1:buffer_N, 1:N_friends, 1:Nstages) )
 
 
         ! synch array, use for ghost nodes synchronization
@@ -323,8 +327,8 @@ subroutine init_ghost_nodes( params )
         endif
 
         ! this is a list of communications with all other procs
-        allocate( communication_counter(1:N_friends) )
-        allocate( int_pos(1:N_friends) )
+        allocate( communication_counter(1:N_friends, 1:Nstages) )
+        allocate( int_pos(1:N_friends, 1:Nstages) )
         ! this is the list friend <-> mpirank
         allocate( mpirank2friend(1:params%number_procs) )
         allocate( friend2mpirank(1:N_friends) )

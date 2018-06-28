@@ -229,16 +229,15 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     integer(kind=ik)  :: buffer_size, buffer_position, data_bounds(1:2,1:3)
 
     integer(kind=ik)  :: hvyId_temp   ! just for a  consistency check
-    integer(kind=ik)  :: entrySortInRound , currentSortInRound
+    integer(kind=ik)  :: entrySortInRound , currentSortInRound, entrySortInRound_start, entrySortInRound_end, iround
     integer(kind=ik)  :: ijk1(2,3), ijk2(2,3)
 
     ! Note each mpirank usually communicates only with a subset of all existing mpiranks.
     ! such a patner is called "friend"
     integer(kind=ik)  :: id_Friend
 
-    integer :: bounds_type
-    logical :: senderHistoricFine, recieverHistoricFine, receiverIsCoarser
-    logical :: receiverIsOnSameLevel, lgtIdSenderIsHigher
+    integer :: bounds_type, istage, rounds(1:4)
+
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -259,6 +258,22 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     myrank  = params%rank
     mpisize = params%number_procs
 
+    ! debug check if hvy_active is sorted
+    if (hvy_n>1) then
+        hvyId_temp =  hvy_active(1)
+        do k = 2, hvy_n
+            if  (hvyId_temp> hvy_active(k))  then
+                call abort(1212,' hvy_active is not sorted as assumed. Panic!')
+            end if
+            hvyId_temp = hvy_active(k)
+        end do
+    end if
+
+    ! stage 1: only finer blocks send to their coarser neighbors
+    ! stage 2: all other relations
+    do istage = 1, 2
+! write(*,*) "STAGE", istage
+
     ! the (module-global) communication_counter is the number of neighboring relations
     ! this rank has with all other ranks (it is thus an array of mpisize)
     communication_counter(1:N_friends) = 0_ik
@@ -278,19 +293,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! reset first in send buffer position
     int_send_buffer( 1, : ) = 0
     int_send_buffer( 2, : ) = -99
-
-
-    ! debug check if hvy_active is sorted
-    if (hvy_n>1) then
-        hvyId_temp =  hvy_active(1)
-        do k = 2, hvy_n
-            if  (hvyId_temp> hvy_active(k))  then
-                call abort(1212,' hvy_active is not sorted as assumed. Panic!')
-            end if
-            hvyId_temp = hvy_active(k)
-        end do
-    end if
-
 
     ! loop over active heavy data. NOTE: hvy_id has a linear correspondance to lgt_id,
     ! i.e.g the ordering in hvy_id and lgt_id is the same. this is very important for the
@@ -316,6 +318,14 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
                 ! define level difference: sender - receiver, so +1 means sender on higher level
                 level_diff = lgt_block( sender_lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
+                !
+                ! if ( istage == 1) Then
+                !
+                !     if (level_diff /= +1 ) cycle
+                ! else
+                !     if (level_diff == +1 ) cycle
+                ! endif
+
 
                 !  ----------------------------  here decide which values are taken for redundant nodes --------------------------------
 
@@ -326,53 +336,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 ! comment: the same dominance rules within the ghos nodes are realized by the sequence of filling in the values,
                 ! first coarse then same then finer, always in the sequence of the hvy id the redundant nodes within the ghost nodes and maybe in the
                 ! redundant nodes are written several time, the one folling the above rules should win
-
-                ! the criteria
-                senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel+2)==11 )
-                recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel+2)==11 )
-                receiverIsCoarser       = ( level_diff>0_ik )
-!                receiverIsCoarser       = ( level_diff<0_ik )
-                receiverIsOnSameLevel   = ( level_diff==0_ik )
-                lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
-
-                bounds_type = exclude_redundant  ! default value, may be changed below
-                ! in what round in the extraction process will this neighborhood be unpacked?
-                entrySortInRound = level_diff + 2  ! now has values 1,2,3 ; is overwritten with 4 if sender is historic fine
-
-                ! here we decide who dominates. would be simple without the historic fine
-                if (senderHistoricFine) then
-                    ! the 4th unpack round is the last one, so setting 4 ensures that historic fine always wins
-                    entrySortInRound = 4
-                    if (recieverHistoricFine) then
-                        if (lgtIdSenderIsHigher)  then
-                            ! both are historic fine, the redundant nodes are overwritten using secondary criterion
-                            bounds_type = include_redundant
-                        end if
-                    else
-                        ! receiver not historic fine, so sender always sends redundant nodes, no further
-                        ! checks on refinement level are required
-                        bounds_type = include_redundant
-                    end if
-
-                else  ! sender NOT historic fine,
-
-                    ! what about the neighbor/receiver, historic fine?
-                    if ( .not. recieverHistoricFine) then
-                        ! neither one is historic fine, so just do the basic rules
-
-                        ! first rule, overwrite cosarser ghost nodes
-                        if (receiverIsCoarser)  then ! receiver is coarser
-                            bounds_type = include_redundant
-                        end if
-
-                        ! secondary rule: on same level decide using light id
-                        if (receiverIsOnSameLevel.and.lgtIdSenderIsHigher) then
-                            bounds_type = include_redundant
-                        end if
-                    end if
-                end if  ! else  senderHistoricFine
-
-
+                call set_bounds_according_to_ghost_dominance_rules( params, bounds_type, entrySortInRound, &
+                     lgt_block, sender_lgt_id, neighbor_lgt_id )
 
                 call get_friend_id_for_mpirank( params, neighbor_rank, id_Friend )
 
@@ -407,12 +372,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! pack multipe information into one number
                     level_diff_indicator = 256*bounds_type + 16*(level_diff+1) + entrySortInRound
 
-                    ! HACK HACK HACK HACK HACK
                     ! we always send INCLUDE_REDUNDANT, but possibly sort in EXCLUDE_REDUNDANT
                     ! (if thats in "bounds_type" which is packed above into "level_diff_indicator")
-                    bounds_type = include_redundant
-                    ! HACK HACK HACK HACK HACK
-
+                    bounds_type = INCLUDE_REDUNDANT
 
                     ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
                     ! They depend on the neighbor-relation, level difference and the bounds type.
@@ -451,10 +413,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     !***********************************************************************
     ! transfer part (send/recv)
     !***********************************************************************
-    ! send/receive data
-    ! note: todo, remove dummy subroutine
-    ! note: new dummy subroutine sets receive buffer position accordingly to process myrank
-    ! note: todo: use more than non-blocking send/receive
     call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, communication_counter )
 
 
@@ -463,7 +421,33 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     !***********************************************************************
     ! sort data in, ordering is important to keep dominance rules within ghost nodes.
     ! the redundand nodes owend by two blocks only should be taken care by bounds_type (include_redundant. exclude_redundant )
-    do currentSortInRound = 1, 4 ! coarse, same, fine, historic fine
+    ! if (istage == 1) Then
+    !     entrySortInRound_start = 1
+    !     entrySortInRound_end = 1
+    !
+    !     rounds = (/3, 0, 0, 0/)
+    ! else
+    !     entrySortInRound_start = 1
+    !     entrySortInRound_end = 4
+    !
+    !     rounds = (/1, 2, 3, 4/)
+    ! endif
+
+    if (istage == 1) Then
+        entrySortInRound_start = 1
+        entrySortInRound_end = 1
+
+        rounds = (/3, 0, 0, 0/)
+    else
+        entrySortInRound_start = 1
+        entrySortInRound_end = 4
+
+        rounds = (/1, 2, 4, 0/)
+    endif
+
+    ! do currentSortInRound = entrySortInRound_start,  entrySortInRound_end ! coarse, same, fine, historic fine
+    do iround = entrySortInRound_start,  entrySortInRound_end ! coarse, same, fine, historic fine
+        currentSortInRound = rounds(iround)
         ! why now looping over mpiranks and not friends? The reason is the secondary rule,
         ! according to which the larger lgt_id wins. this works only if I treat the blocks
         ! in INCREASING lgt_id ordering. The lgt_id ordering is the same as MPIRANK ordering.
@@ -549,6 +533,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                         ! They depend on the neighbor-relation, level difference and the bounds type.
                         ! The last index is 1-sender 2-receiver 3-restricted/predicted.
                         if (bounds_type == EXCLUDE_REDUNDANT) then
+                            ! step (a) into a temporary block, extract the ONLY_REDUNDANT part
+                            ! step (b) patch the entire INCLUDE_REDUNDANT into the block
+                            ! step (c) put the data from step (a) back into the block.
                             ! ------- step (a) -------
                             ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, 2)
 
@@ -647,7 +634,79 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
             end if  ! process-internal or external ghost points
         end do ! mpisize
     end do ! currentSortInRound
+
+    end do ! loop over stages 1,2
 end subroutine synchronize_ghosts_generic_sequence
+
+!############################################################################################################
+
+
+subroutine set_bounds_according_to_ghost_dominance_rules( params, bounds_type, entrySortInRound, &
+    lgt_block, sender_lgt_id, neighbor_lgt_id )
+    implicit none
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> output of this function
+    integer(kind=ik), intent(out)       :: bounds_type, entrySortInRound
+    !> light data array
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    integer(kind=ik), intent(in)        :: sender_lgt_id, neighbor_lgt_id
+
+    integer(kind=ik)                    :: level_diff
+    logical :: senderHistoricFine, recieverHistoricFine, receiverIsCoarser
+    logical :: receiverIsOnSameLevel, lgtIdSenderIsHigher
+
+    ! define level difference: sender - receiver, so +1 means sender on higher level
+    level_diff = lgt_block( sender_lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
+
+    ! the criteria
+    senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel+2)==11 )
+    recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel+2)==11 )
+    receiverIsCoarser       = ( level_diff>0_ik )
+    receiverIsOnSameLevel   = ( level_diff==0_ik )
+    lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
+
+    bounds_type = EXCLUDE_REDUNDANT  ! default value, may be changed below
+    ! in what round in the extraction process will this neighborhood be unpacked?
+    entrySortInRound = level_diff + 2  ! now has values 1,2,3 ; is overwritten with 4 if sender is historic fine
+
+! if (entrySortInRound == 2) entrySortInRound=1
+
+    ! here we decide who dominates. would be simple without the historic fine
+    if (senderHistoricFine) then
+        ! the 4th unpack round is the last one, so setting 4 ensures that historic fine always wins
+        entrySortInRound = 4
+        if (recieverHistoricFine) then
+            if (lgtIdSenderIsHigher)  then
+                ! both are historic fine, the redundant nodes are overwritten using secondary criterion
+                bounds_type = INCLUDE_REDUNDANT
+            end if
+        else
+            ! receiver not historic fine, so sender always sends redundant nodes, no further
+            ! checks on refinement level are required
+            bounds_type = INCLUDE_REDUNDANT
+        end if
+
+    else  ! sender NOT historic fine,
+
+        ! what about the neighbor/receiver, historic fine?
+        if ( .not. recieverHistoricFine) then
+            ! neither one is historic fine, so just do the basic rules
+
+            ! first rule, overwrite cosarser ghost nodes
+            if (receiverIsCoarser)  then ! receiver is coarser
+                bounds_type = INCLUDE_REDUNDANT
+            end if
+
+            ! secondary rule: on same level decide using light id
+            if (receiverIsOnSameLevel.and.lgtIdSenderIsHigher) then
+                bounds_type = INCLUDE_REDUNDANT
+            end if
+        end if
+    end if  ! else  senderHistoricFine
+
+end subroutine
+
 
 !############################################################################################################
 
@@ -1176,13 +1235,20 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     integer(kind=ik)                    :: length_realBuffer, int_length, mpirank_partner
 
     ! loop variable
-    integer(kind=ik)                    :: k, i
+    integer(kind=ik)                    :: k, i, ifriend
 
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
     rank = params%rank
+
+    ! do ifriend = 1,4
+    !     write(*,*) rank, " freund:",ifriend, "is rank", &
+    !     friend2mpirank(ifriend)-1, "messages:", communication_counter(ifriend)
+    ! enddo
+    ! call MPI_barrier(WABBIT_COMM, k)
+
 
 !---------------------------------------------------------------------------------------------
 ! main body

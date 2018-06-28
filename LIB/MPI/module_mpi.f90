@@ -235,8 +235,8 @@ subroutine init_ghost_nodes( params )
     !> user defined parameter structure
     type (type_params), intent(in) :: params
     ! local variables
-    integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, number_procs, rank
-    integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idim, idata_bounds_type
+    integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, rank
+    integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idata_bounds_type
     integer(kind=ik) :: data_bounds(2,3), j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
     integer(kind=ik) :: i, k
 

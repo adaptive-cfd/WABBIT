@@ -26,7 +26,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! MPI parameter
     integer(kind=ik)                    :: myrank
     ! loop variables
-    integer(kind=ik)                    :: N, k, l, dF, neighborhood, neighbor_num, level_diff
+    integer(kind=ik)                    :: N, k, l, neighborhood, neighbor_num, level_diff
     ! id integers
     integer(kind=ik)                    :: lgt_id, neighbor_lgt_id, neighbor_rank, hvy_id
     ! type of data bounds
@@ -115,7 +115,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                     ! different level
                     !-----------------------------------------------------------
                     ! interpoliere daten
-                    call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k))
+                    call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, hvy_block, hvy_active(k))
 
                     ! 3: restrict-predict
                     data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, data_bounds_type, 3)
@@ -220,18 +220,13 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! grid parameter
     integer(kind=ik)   :: Bs, g, NdF
     ! loop variables
-    integer(kind=ik)   :: N, k, dF, neighborhood, invert_neighborhood, level_diff, l, levelsToSortIn
-    ! merged information of level diff and an indicator that we have a historic finer sender
-    integer(kind=ik)   :: level_diff_indicator
+    integer(kind=ik)   :: N, k, neighborhood, level_diff
     ! id integers
     integer(kind=ik)   :: neighbor_lgt_id, neighbor_rank, hvy_id_receiver
     integer(kind=ik)   :: sender_hvy_id, sender_lgt_id
-    ! data buffer size
-    integer(kind=ik)  :: buffer_size, buffer_position, data_bounds(1:2,1:3)
 
     integer(kind=ik)  :: hvyId_temp   ! just for a  consistency check
     integer(kind=ik)  :: entrySortInRound , currentSortInRound, entrySortInRound_end, iround
-    integer(kind=ik)  :: ijk1(2,3), ijk2(2,3)
 
     ! Note each mpirank usually communicates only with a subset of all existing mpiranks.
     ! such a patner is called "friend"
@@ -587,7 +582,7 @@ subroutine send_prepare_external_neighbor( params, id_Friend, istage, hvy_block,
     else
         ! up/downsample data first, then flatten to 1D buffer
         call restrict_predict_data( params, res_pre_data, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 1), &
-        neighborhood, level_diff, bounds_type, hvy_block, sender_hvy_id )
+        neighborhood, level_diff, hvy_block, sender_hvy_id )
 
         ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 3)
 
@@ -616,8 +611,8 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, id_Fri
     integer(kind=ik), intent(inout) :: communication_counter(:,:)
 
     integer(kind=ik) :: l, hvy_id_receiver, neighborhood, level_diff_indicator, entrySortInRound
-    integer(kind=ik) :: sender_hvy_id, level_diff, bounds_type, buffer_position, buffer_size
-    integer(kind=ik) :: ijk1(2,3), ijk2(2,3)
+    integer(kind=ik) :: level_diff, bounds_type, buffer_position, buffer_size
+    integer(kind=ik) :: ijk1(2,3)
 
     ! did I recv something from this rank?
     if ( (communication_counter(id_Friend, istage_buffer) /= 0) ) then
@@ -760,7 +755,7 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, id_Fri
         else  ! interpolation or restriction before inserting
 
             call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, INCLUDE_REDUNDANT, 1), &
-            neighborhood, level_diff, bounds_type, hvy_block, sender_hvy_id )
+            neighborhood, level_diff, hvy_block, sender_hvy_id )
 
             ! copy interpolated / restricted data to ghost nodes layer
             ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
@@ -827,8 +822,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
 
     ! status of the check
     logical                             :: testOriginFlag
-    integer(kind=ik)                    :: hvy_id_k, iteration , lgt_id
-    real(kind=rk) :: tmp
+    integer(kind=ik)                    :: hvy_id_k, lgt_id
 
     integer(kind=ik)                    :: i1, i2, iStep, j1, j2, jStep, k1, k2, kStep  , i,j,k, boundaryIndex
     integer(kind=ik)                    :: Bs, g    , levelLocal , levelOrigin , lastRedundantOrigin
@@ -1335,19 +1329,13 @@ subroutine isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_re
     integer(kind=ik)                    :: length_realBuffer, int_length, mpirank_partner
 
     ! loop variable
-    integer(kind=ik)                    :: k, i, ifriend
+    integer(kind=ik)                    :: k, i
 
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
     rank = params%rank
-
-    ! do ifriend = 1,4
-    !     write(*,*) rank, " freund:",ifriend, "is rank", &
-    !     friend2mpirank(ifriend)-1, "messages:", communication_counter(ifriend)
-    ! enddo
-    ! call MPI_barrier(WABBIT_COMM, k)
 
 
 !---------------------------------------------------------------------------------------------
@@ -1938,7 +1926,7 @@ subroutine check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hv
                         hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
                     else
                         ! interpoliere daten
-                        call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, data_bounds_type, hvy_block, hvy_active(k))
+                        call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, hvy_block, hvy_active(k))
 
                         data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, data_bounds_type, 3)
                         ! lese daten, verwende interpolierte daten

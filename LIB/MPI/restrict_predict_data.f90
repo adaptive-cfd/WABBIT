@@ -1,5 +1,5 @@
 subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, &
-    level_diff, data_bounds_type, hvy_block, hvy_id )
+    level_diff, hvy_block, hvy_id )
 
     !---------------------------------------------------------------------------------------------
     ! modules
@@ -19,8 +19,6 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
     integer(kind=ik), intent(in)                    :: neighborhood
     !> difference between block levels
     integer(kind=ik), intent(in)                    :: level_diff
-    ! data_bounds_type
-    integer(kind=ik), intent(in)                    :: data_bounds_type
     !> heavy data array - block data
     real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
     !> hvy id

@@ -9,8 +9,8 @@ subroutine init_triangle(params,FILE)
 
   ! read in the angle between the symmetry axis and the triangle side
   call read_param_mpi(FILE, 'VPM', 'angle', triangle%angle, 30.0_rk )
-  call read_param_mpi(FILE, 'VPM', 'x_cntr', triangle%x_cntr, (/0.2*params%Lx, 0.5*params%Ly, 0.0_rk/) )
-  call read_param_mpi(FILE, 'VPM', 'length', triangle%base_length, 0.1*params%Lx )
+  call read_param_mpi(FILE, 'VPM', 'x_cntr', triangle%x_cntr, (/0.2_rk, 0.5_rk, 0.0_rk/) )
+  call read_param_mpi(FILE, 'VPM', 'length', triangle%length, 0.1*params%Lx )
 
   ! convert degrees to radians
   if ( triangle%angle>0.0_rk .and. triangle%angle<90.0_rk ) then
@@ -19,6 +19,9 @@ subroutine init_triangle(params,FILE)
     call abort(45756,"somebody has to go back to preeshool! 0< angle <90")
   end if
 
+  !convert from height to length
+  triangle%length=triangle%length/(2*tan(triangle%angle))
+
   ! a rhombus is only a double triangle
   if ( mask_geometry=="rhombus" ) then
     triangle%rhombus    =.true.
@@ -26,13 +29,16 @@ subroutine init_triangle(params,FILE)
     triangle%rhombus    =.false.
   end if
 
-  if (triangle%x_cntr(1)>params%Lx .or. triangle%x_cntr(1)<0.0_rk ) then
-    triangle%x_cntr(1) =0.2*params%Lx
+  if (triangle%x_cntr(1)>1.0_rk .or. triangle%x_cntr(1)<0.0_rk ) then
+    triangle%x_cntr(1) =0.2_rk
   end if
 
-  if (triangle%x_cntr(2)>params%Lx .or. triangle%x_cntr(2)<0.0_rk ) then
-      triangle%x_cntr(2) =0.5*params%Ly
+  if (triangle%x_cntr(2)>1.0_rk .or. triangle%x_cntr(2)<0.0_rk ) then
+      triangle%x_cntr(2) =0.5_rk
   end if
+  triangle%x_cntr(1)=triangle%x_cntr(1)*params%Lx
+  triangle%x_cntr(2)=triangle%x_cntr(2)*params%Ly
+  triangle%x_cntr(3)=triangle%x_cntr(3)*params%Lz
 
 end subroutine init_triangle
 
@@ -64,7 +70,7 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
     mask  = 0.0_rk
 
     triangle_is_rhombus =triangle%rhombus
-    length              =triangle%base_length
+    length              =triangle%length
     tan_theta           =tan(triangle%angle)
 
 !---------------------------------------------------------------------------------------------

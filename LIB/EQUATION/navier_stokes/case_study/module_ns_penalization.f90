@@ -42,7 +42,7 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: shockVals,init_penalization,add_constraints,get_mask,mean_quant,integrate_over_pump_area
+  PUBLIC :: shockVals,init_penalization,add_constraints,get_mask,mean_quantity,integrate_over_pump_area
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -73,7 +73,7 @@ module module_ns_penalization
 
   type :: type_triangle
       real(kind=rk), dimension(3) :: x_cntr
-      real(kind=rk)               :: base_length
+      real(kind=rk)               :: length
       real(kind=rk)               :: angle
       logical                     :: rhombus
   end type type_triangle

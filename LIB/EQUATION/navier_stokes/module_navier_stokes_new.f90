@@ -339,7 +339,7 @@ contains
       ! this stage is called only once, not for each block.
       if (params_ns%penalization .and. params_ns%geometry=="funnel") then
         ! reduce sum on each block to global sum
-        call mean_quant(integral,area)
+        call mean_quantity(integral,area)
 
       endif
 
@@ -418,7 +418,7 @@ contains
     integer(kind=ik)            :: Bs, mpierr,ix,iy
     real(kind=rk),save          :: area
     real(kind=rk), allocatable  :: mask(:,:)
-    real(kind=rk)               :: eps_inv,tmp(3),y,x,r
+    real(kind=rk)               :: eta_inv,tmp(5),y,x,r
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -432,6 +432,7 @@ contains
       ! performs initializations in the RHS module, such as resetting integrals
       params_ns%mean_density  = 0.0_rk
       params_ns%mean_pressure = 0.0_rk
+      params_ns%force         = 0.0_rk
       area                    = 0.0_rk
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -445,17 +446,18 @@ contains
         call abort(6661,"ns fail: very very large values in state vector.")
       endif
       ! compute mean density and pressure
-      allocate(mask(Bs+2*g, Bs+2*g))
+      if(.not. allocated(mask)) allocate(mask(Bs+2*g, Bs+2*g))
       if ( params_ns%penalization ) then
         call get_mask(mask, x0, dx, Bs, g)
       else
         mask=0.0_rk
       end if
 
+      eta_inv                 = 1.0_rk/params_ns%C_eta
 
       if (size(u,3)==1) then
         ! compute density and pressure only in physical domain
-        tmp(1:3) =0.0_rk
+        tmp(1:5) =0.0_rk
         ! we do not want to sum over redudant points so exclude Bs+g!!!
         do iy=g+1, Bs+g-1
           y = dble(iy-(g+1)) * dx(2) + x0(2)
@@ -464,14 +466,23 @@ contains
             if (mask(ix,iy)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
                   tmp(2) = tmp(2)   + u(ix,iy, 1, pF)
-                  tmp(3) = tmp(3)   + 1.0_rk
+                  tmp(5) = tmp(5)   + 1.0_rk
             endif
+            ! force on obstacle (see Boiron)
+            !Fx=1/Ceta mask*rho*u
+            tmp(3) = tmp(3)   + u(ix,iy, 1, rhoF)*u(ix,iy, 1, UxF)*mask(ix,iy)
+            !Fy=1/Ceta mask*rho*v
+            tmp(4) = tmp(4)   + u(ix,iy, 1, rhoF)*u(ix,iy, 1, UyF)*mask(ix,iy)
+
           enddo
         enddo
 
         params_ns%mean_density = params_ns%mean_density   + tmp(1)*dx(1)*dx(2)
         params_ns%mean_pressure= params_ns%mean_pressure  + tmp(2)*dx(1)*dx(2)
-        area                   = area                     + tmp(3)*dx(1)*dx(2)
+        params_ns%force(1)     = params_ns%force(1)       + tmp(3)*dx(1)*dx(2)*eta_inv
+        params_ns%force(2)     = params_ns%force(2)       + tmp(4)*dx(1)*dx(2)*eta_inv
+        params_ns%force(3)     = 0
+        area                   = area                     + tmp(5)*dx(1)*dx(2)
       endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
     case ("post_stage")
@@ -485,23 +496,34 @@ contains
       call MPI_ALLREDUCE(tmp(1), params_ns%mean_density, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       tmp(2) = params_ns%mean_pressure
       call MPI_ALLREDUCE(tmp(2), params_ns%mean_pressure, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-      tmp(3) = area
-      call MPI_ALLREDUCE(tmp(3), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+      tmp(3) = params_ns%force(1)
+      call MPI_ALLREDUCE(tmp(3), params_ns%Force(1)     , 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+      tmp(4) = params_ns%force(2)
+      call MPI_ALLREDUCE(tmp(4), params_ns%Force(2)     , 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+      tmp(5) = area
+      call MPI_ALLREDUCE(tmp(5), area                   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
 
 
 
        if (params_ns%mpirank == 0) then
          ! write mean flow to disk...
-         write(*,*) "mean_area/Lx/Ly=",area/params_ns%Lx/params_ns%Ly,'density=', &
-                    params_ns%mean_density/area , 'pressure=',params_ns%mean_pressure/area
+         write(*,*) 'density=', params_ns%mean_density/area ,&
+                    'pressure=',params_ns%mean_pressure/area, &
+                    'drag=',params_ns%force(1)*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
+                    'Fy=',params_ns%force(2)
          open(14,file='meandensity.t',status='unknown',position='append')
-         write (14,'(4(es15.8,1x))') time, params_ns%mean_density
+         write (14,'(2(es15.8,1x))') time, params_ns%mean_density/area
+         close(14)
+
+         ! write mean Force
+         open(14,file='Force.t',status='unknown',position='append')
+         write (14,'(4(es15.8,1x))') time, params_ns%force
          close(14)
 
          ! write forces to disk...
          open(14,file='meanpressure.t',status='unknown',position='append')
-         write (14,'(4(es15.8,1x))') time, params_ns%mean_pressure
+         write (14,'(2(es15.8,1x))') time, params_ns%mean_pressure/area
          close(14)
        end if
 
@@ -555,10 +577,10 @@ contains
     ! get smallest spatial seperation
     if(size(u,3)==1) then
         deltax=minval(dx(1:2))
-        allocate(v_physical(2*g+Bs,2*g+Bs,1))
+      if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs,2*g+Bs,1))
     else
         deltax=minval(dx)
-        allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
+      if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
     endif
 
     ! calculate norm of velocity at every spatial point
@@ -587,7 +609,7 @@ contains
     if (params_ns%sponge_layer ) then
         dt=min(dt,params_ns%C_sp)
     endif
-    deallocate(v_physical)
+    !deallocate(v_physical)
   end subroutine GET_DT_BLOCK_NStokes
 
 
@@ -614,7 +636,9 @@ contains
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     integer(kind=ik)          :: Bs,ix
-    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3),mach
+    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
+                                radius,max_R,width
+
 
     p_init    =params_ns%initial_pressure
     rho_init  =params_ns%initial_density
@@ -670,11 +694,22 @@ contains
         write(*,*) "rho_right=",tmp(1), "p_right=",tmp(3)
         call abort(3572,"ERROR [module_navier_stokes_new.f90]: initial values are insufficient for simple-shock")
       end if
+      ! following values are imposed and smoothed with tangens:
+      ! ------------------------------------------
+      !   rhoL    | rhoR                  | rhoL
+      !   uL      | uR                    | uL
+      !   pL      | pR                    | pL
+      ! 0-----------------------------------------Lx
+      !           x0_inicond             x0_inicond+width
+      width       = params_ns%Lx*(1-params_ns%inicond_width-0.1)
+      x0_inicond  = params_ns%inicond_width*params_ns%Lx
+      max_R       = width*0.5_rk
       do ix=g+1, Bs+g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
          call continue_periodic(x,params_ns%Lx)
          ! left region
-         b=0.5_rk*(1-tanh((abs(x-params_ns%Lx*0.5_rk)-params_ns%Lx*0.35_rk)*2*PI/(10*dx(1)) ))
+         radius=abs(x-x0_inicond-width*0.5_rk)
+         b=0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
          u( ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
          u(ix, : , :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
          u(ix, : , :, UyF)  = 0.0_rk

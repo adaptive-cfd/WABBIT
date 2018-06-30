@@ -274,7 +274,7 @@ end subroutine integrate_over_pump_area
 
 
 
-subroutine mean_quant(integral,area)
+subroutine mean_quantity(integral,area)
     !> area of taking the mean
     real(kind=rk),intent(in)    :: area
     !> integral over the area
@@ -305,7 +305,7 @@ subroutine mean_quant(integral,area)
     funnel%pump_density = integral(1)/2
     funnel%pump_pressure = integral(4)/2
 
-end subroutine mean_quant
+end subroutine mean_quantity
 
 
 

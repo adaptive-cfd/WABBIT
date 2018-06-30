@@ -7,10 +7,11 @@ subroutine init_vortex_street(FILE)
   type(inifile) , intent(inout) :: FILE
 
 
-  call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/ 0.25*domain_size(1) , 0.5*domain_size(2) /) )
+  call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/ 0.25_rk , 0.5_rk/) )
   call read_param_mpi(FILE, 'VPM', 'length', cyl%radius,0.05_rk*min(domain_size(1),domain_size(2)) )
   cyl%radius=cyl%radius*0.5_rk
-
+  cyl%x_cntr(1)=cyl%x_cntr(1)*domain_size(1)
+  cyl%x_cntr(2)=cyl%x_cntr(2)*domain_size(2)
 end subroutine init_vortex_street
 
 

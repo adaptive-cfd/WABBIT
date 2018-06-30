@@ -123,6 +123,7 @@ module module_navier_stokes_params
         ! mean variables on domain
         real(kind=rk)                               :: mean_density
         real(kind=rk)                               :: mean_pressure
+        real(kind=rk)                               :: force(3)
         ! we need to know which mpirank prints output..
         integer(kind=ik)                            :: mpirank, mpisize
         !---------------------------------------------------------

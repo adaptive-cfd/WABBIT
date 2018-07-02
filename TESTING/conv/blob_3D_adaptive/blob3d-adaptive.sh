@@ -15,7 +15,7 @@ prefixes=(phi)
 times=(000000000000 000000045105)
 
 # run actual test
-${mpi_command} ./wabbit 3D ${params} --memory=4GB ${ghosts}
+${mpi_command} ./wabbit 3D ${params} --memory=3.0GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"

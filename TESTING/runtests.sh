@@ -34,6 +34,9 @@ end_color=$'\033[0m'
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=("---convection---"
+       "TESTING/conv/blob_3D_adaptive/blob3d-adaptive.sh"
+       "TESTING/conv/blob_3D_equi/blob3d.sh"
+       "TESTING/conv/blob_3D_nonequi/blob3d.sh"
        "TESTING/conv/blob_convection_equi/blob-convection-equi.sh"
        "TESTING/conv/blob_convection_2nd_serial/blob-conv-adaptive-serial.sh"
        "TESTING/conv/blob_convection/blob-convection-adaptive.sh"

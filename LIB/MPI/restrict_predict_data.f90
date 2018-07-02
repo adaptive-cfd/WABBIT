@@ -20,7 +20,7 @@ subroutine restrict_predict_data( params, res_pre_data, data_bounds, neighborhoo
     !> difference between block levels
     integer(kind=ik), intent(in)                    :: level_diff
     !> heavy data array - block data
-    real(kind=rk), intent(in)                       :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> hvy id
     integer(kind=ik), intent(in)                    :: hvy_id
 

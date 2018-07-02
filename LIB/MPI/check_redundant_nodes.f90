@@ -825,7 +825,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     integer(kind=ik)                    :: hvy_id_k, lgt_id
 
     integer(kind=ik)                    :: i1, i2, iStep, j1, j2, jStep, k1, k2, kStep  , i,j,k, boundaryIndex
-    integer(kind=ik)                    :: Bs, g    , levelLocal , levelOrigin , lastRedundantOrigin
+    integer(kind=ik)                    :: Bs, g    , levelLocal , levelOrigin , lastRedundantOrigin=-1
 
     integer(kind=ik)                    :: redundantOriginLgtId, local_hvy_id, localLightId, spaceDirections
     logical                             :: shouldDominate , originHistoricFine, localHistoricFine , originLghtIdHigher

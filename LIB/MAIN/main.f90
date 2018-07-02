@@ -120,7 +120,6 @@ program main
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4
-    logical                             :: test, go_sync
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data
 !---------------------------------------------------------------------------------------------
@@ -258,12 +257,6 @@ program main
         if (params%debug) then
             ! run the internal test for the ghost nodes.
             call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-
-            if (test) then
-                iteration = 99
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
-                call abort(111111,"Redundant nodes check failed - stopping.")
-            endif
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 

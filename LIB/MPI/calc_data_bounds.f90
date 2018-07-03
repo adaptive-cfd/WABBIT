@@ -1159,10 +1159,8 @@ subroutine calc_data_bounds( params, data_bounds, neighborhood, level_diff, data
                     ! 'ENE'
                     case(13)
                         if ( level_diff == -1 ) then
-                            data_bounds(1,1) = g+1
-                            data_bounds(2,1) = (Bs+1)/2+g+g
-                            data_bounds(1,2) = (Bs+1)/2
-                            data_bounds(2,2) = Bs+g
+                            data_bounds(1:2,1) = (/ g+1, (Bs+1)/2+g+g /)
+                            data_bounds(1:2,2) = (/ (Bs+1)/2, Bs+g /)
 
                         elseif ( level_diff == 1 ) then
                             data_bounds(1,1) = g+1

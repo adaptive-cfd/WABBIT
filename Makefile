@@ -159,7 +159,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
 	synchronize_ghosts.f90 blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 check_redundant_nodes.f90 \
-	restrict_predict_data.f90 calc_data_bounds.f90
+	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \

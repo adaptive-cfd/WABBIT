@@ -112,6 +112,7 @@ module module_MPI
 contains
 
     include "synchronize_ghosts.f90"
+    include "synchronize_ghosts_generic.f90"
     include "blocks_per_mpirank.f90"
     include "synchronize_lgt_data.f90"
     include "reset_ghost_nodes.f90"

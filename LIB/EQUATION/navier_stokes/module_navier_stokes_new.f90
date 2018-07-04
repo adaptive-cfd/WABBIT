@@ -510,7 +510,7 @@ contains
          ! write mean flow to disk...
          write(*,*) 'density=', params_ns%mean_density/area ,&
                     'pressure=',params_ns%mean_pressure/area, &
-                    'drag=',params_ns%force(1)*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
+                    'drag=',params_ns%force(1),&!*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
                     'Fy=',params_ns%force(2)
          open(14,file='meandensity.t',status='unknown',position='append')
          write (14,'(2(es15.8,1x))') time, params_ns%mean_density/area

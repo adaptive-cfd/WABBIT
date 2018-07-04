@@ -121,7 +121,7 @@ program main
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4
     ! decide if data is saved or not
-    logical                             :: it_is_time_to_save_data
+    logical                             :: it_is_time_to_save_data, test_failed
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -256,7 +256,12 @@ program main
         t4 = MPI_wtime()
         if (params%debug) then
             ! run the internal test for the ghost nodes.
-            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
+
+            if (test_failed) then
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+                call abort(111111,"Same origin of ghost nodes check failed - stopping.")
+            endif
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 

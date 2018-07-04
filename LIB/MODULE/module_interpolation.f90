@@ -108,6 +108,11 @@ contains
             call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
         endif
 
+        if ( ((nxfine<7) .or. (nyfine<7)).and.(order_predictor=="multiresolution_4th") ) then
+            write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
+            call abort(888193,"ERROR: prediction_2D: not enough points for 4th order one-sided interp.")
+        endif
+
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point)
         fine(1:nxfine:2, 1:nyfine:2) = coarse(:,:)
@@ -142,7 +147,7 @@ contains
 
             ! step (a)
             ! first columns (x: const y: variable )
-            ! these points requie one-sided interpolation.
+            ! these points require one-sided interpolation.
             fine( 2, 1:nyfine:2 ) = a(1)*fine( 1, 1:nyfine:2 ) &
                                   + a(2)*fine( 3, 1:nyfine:2 ) &
                                   + a(3)*fine( 5, 1:nyfine:2 ) &

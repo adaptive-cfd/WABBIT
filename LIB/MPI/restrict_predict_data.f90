@@ -35,9 +35,14 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     if ( level_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data
         call predict_data( params, res_pre_data, ijk, hvy_block, hvy_id )
-    elseif ( level_diff == 1) then
+
+    elseif ( level_diff == +1) then
         ! The neighbor is coarser: we have to downsample the data
         call restrict_data( params, res_pre_data, ijk, hvy_block, hvy_id )
+
+    else
+        call abort(123005, "Lord Vader, restrict_predict_data is called with leveldiff /= -+1")
+
     end if
 
 end subroutine restrict_predict_data
@@ -130,14 +135,14 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
 
         do dF = 1, NdF
             call prediction_3D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), &
-            ijk(1,3):ijk(2,3), dF, hvy_id ), pre_data( 1:nx*2-1, 1:ny*2-1, 1:nz*2-1, dF), &
+            ijk(1,3):ijk(2,3), dF, hvy_id ), pre_data( 1:2*nx-1, 1:2*ny-1, 1:2*nz-1, dF), &
             params%order_predictor)
         end do
 
     else      ! 2D
         do dF = 1, NdF
             call prediction_2D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2),&
-            1, dF, hvy_id ), pre_data( 1:nx*2-1, 1:ny*2-1, 1, dF),  params%order_predictor)
+            1, dF, hvy_id ), pre_data( 1:2*nx-1, 1:2*ny-1, 1, dF),  params%order_predictor)
         end do
 
     end if !3d/2D

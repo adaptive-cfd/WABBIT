@@ -73,7 +73,8 @@ module module_MPI
     real(kind=rk), allocatable    :: res_pre_data(:,:,:,:), tmp_block(:,:,:,:)
 
     ! it is faster to use named consts than strings, although strings are nicer to read
-    integer(kind=ik), PARAMETER   :: exclude_redundant = 1_ik, include_redundant = 2_ik, only_redundant = 3_ik
+    integer(kind=ik), PARAMETER   :: EXCLUDE_REDUNDANT = 1_ik, INCLUDE_REDUNDANT = 2_ik, ONLY_REDUNDANT = 3_ik
+    integer(kind=ik), PARAMETER   :: SENDER=1_ik, RECVER=2_ik, RESPRE=3_ik
 
     ! we set up a table that gives us directly the inverse neighbor relations.
     ! it is filled (once) in init_ghost_nodes
@@ -100,6 +101,10 @@ module module_MPI
     ! we use this flag to call the allocation routine only once.
     logical          :: ghost_nodes_module_ready = .false.
 
+    ! two shift parameters (asymmetric and symmetric ) used for selection of interpolation
+    ! bounds on sender side. used to avoid one-sided interpolation if desired. They're
+    ! global so we can save them easily to the ghosts_bounds.dat file
+    integer(kind=ik) :: A, S
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
@@ -282,7 +287,7 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 10 )
 
-            allocate( res_pre_data( Bs+2*g, Bs+2*g, 1, Neqn) )
+            allocate( res_pre_data( Bs+2*g+10, Bs+2*g+10, 1, Neqn) )
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
 
@@ -350,14 +355,13 @@ subroutine init_ghost_nodes( params )
             do leveldiff = -1, 1
                 do idata_bounds_type = 1, 3
                     call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'sender')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 1) = data_bounds
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, SENDER) = data_bounds
 
                     call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'receiver')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 2) = data_bounds
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RECVER) = data_bounds
 
                     call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'restricted-predicted')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, 3) = data_bounds
-
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RESPRE) = data_bounds
 
 
                     !---------TESTING-------------------------------------------
@@ -424,6 +428,10 @@ subroutine init_ghost_nodes( params )
 
         if (params%rank==0) Then
             open(16,file='ghost_bounds.dat',status='replace')
+            write(16,'(i3)') Bs
+            write(16,'(i3)') g
+            write(16,'(i3)') S
+            write(16,'(i3)') A
             do ineighbor = 1, Nneighbor
                 do leveldiff = -1, 1
                     do idata_bounds_type = 1, 3

@@ -102,7 +102,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
 
                 ! 1 = sender
-                data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, 1)
+                data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, SENDER)
 
                 if ( level_diff == 0 ) then
                     !-----------------------------------------------------------
@@ -118,7 +118,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                     call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, hvy_block, hvy_active(k))
 
                     ! 3: restrict-predict
-                    data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, data_bounds_type, 3)
+                    data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, data_bounds_type, RESPRE)
 
                     ! lese daten, verwende interpolierte daten
                     call GhostLayer2Line( params, line_buffer, buffer_size, res_pre_data( data_bounds2(1,1):data_bounds2(2,1), &
@@ -179,7 +179,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k, 1 )
 
                 ! data bounds (2-recv)
-                data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, 2)
+                data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, RECVER)
 
                 ! compare data
                 call hvy_id_to_lgt_id( lgt_id, hvy_id, myrank, N )

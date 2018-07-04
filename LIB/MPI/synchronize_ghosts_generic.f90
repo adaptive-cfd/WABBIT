@@ -375,17 +375,19 @@ subroutine send_prepare_external_neighbor( params, id_Friend, istage, hvy_block,
 
         ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
         ! we will send to our neighbor mpirank
-        ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 1)
+        ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, SENDER)
 
         call GhostLayer2Line( params, line_buffer, buffer_size, &
         hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, sender_hvy_id) )
 
     else
         ! up/downsample data first, then flatten to 1D buffer
-        call restrict_predict_data( params, res_pre_data, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 1), &
+        ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, SENDER)
+
+        call restrict_predict_data( params, res_pre_data, ijk1, &
         neighborhood, level_diff, hvy_block, sender_hvy_id )
 
-        ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 3)
+        ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RESPRE)
 
         call GhostLayer2Line( params, line_buffer, buffer_size, &
         res_pre_data( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) )
@@ -396,7 +398,7 @@ subroutine send_prepare_external_neighbor( params, id_Friend, istage, hvy_block,
     hvy_id_receiver, neighborhood, level_diff_indicator, istage )
 
 
-end subroutine
+end subroutine send_prepare_external_neighbor
 
 
 subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, id_Friend, istage_buffer, &
@@ -450,22 +452,22 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, id_Fri
             if ( bounds_type == EXCLUDE_REDUNDANT ) then
 
                 ! extract INCLUDE_REDUNDANT in tmp block
-                call Line2GhostLayer2( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, 2), tmp_block )
+                call Line2GhostLayer2( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER), tmp_block )
                 ! COPY ONLY_REDUNDANT from block
-                ijk1 = ijkGhosts( :, :, neighborhood, level_diff, ONLY_REDUNDANT, 2)
+                ijk1 = ijkGhosts( :, :, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) = &
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver)
 
                 ! copy everything to the block, INCLUDE_REDUNDANT
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, 2)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :)
 
             else
                 ! for INCLUDE_REDUNDANT, just copy
-                 call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 2), hvy_block, hvy_id_receiver )
+                 call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RECVER), hvy_block, hvy_id_receiver )
             endif
 
 
@@ -474,7 +476,7 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, id_Fri
         end do
     end if
 
-end subroutine
+end subroutine unpack_all_ghostlayers_currentRound_external_neighbor
 
 subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, id_Friend, istage_buffer, &
     currentSortInRound, hvy_block )
@@ -526,28 +528,28 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, id_Fri
                 ! step (c) put the data form step (a) back into the block.
 
                 ! ------- step (a) -------
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, 2)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) = &
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2),ijk1(1,3):ijk1(2,3), :, hvy_id_receiver)
 
                 ! ------- step (b) -------
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, 2)
-                ijk2 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, 1)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
+                ijk2 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, SENDER)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :, sender_hvy_id)
 
                 ! ------- step (c) -------
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, 2)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :)
 
             else
                 ! for INCLUDE_REDUNDANT, just copy the patch and be happy
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 2)
-                ijk2 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, 1)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RECVER)
+                ijk2 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, SENDER)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :, sender_hvy_id)
@@ -555,7 +557,7 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, id_Fri
 
         else  ! interpolation or restriction before inserting
 
-            call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, INCLUDE_REDUNDANT, 1), &
+            call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, INCLUDE_REDUNDANT, SENDER), &
             neighborhood, level_diff, hvy_block, sender_hvy_id )
 
             ! copy interpolated / restricted data to ghost nodes layer
@@ -567,27 +569,27 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, id_Fri
                 ! step (b) patch the entire INCLUDE_REDUNDANT into the block
                 ! step (c) put the data from step (a) back into the block.
                 ! ------- step (a) -------
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, 2)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) = &
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver)
 
                 ! ------- step (b) -------
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, 2)
-                ijk2 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, 3)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
+                ijk2 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RESPRE)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 res_pre_data( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :)
 
                 ! ------- step (c) -------
-                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, 2)
+                ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :)
 
             else
-                ijk1 = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, 2)
-                ijk2 = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, 3)
+                ijk1 = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
+                ijk2 = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, RESPRE)
 
                 hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
                 res_pre_data( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :)
@@ -599,12 +601,12 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, id_Fri
         l = l + 5
     end do
 
-end subroutine
+end subroutine unpack_all_ghostlayers_currentRound_internal_neighbor
 
 
 !############################################################################################################
 
-subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, testOriginFlag)
 
     implicit none
 
@@ -622,7 +624,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! status of the check
-    logical                             :: testOriginFlag
+    logical,intent(out)                 :: testOriginFlag
     integer(kind=ik)                    :: hvy_id_k, lgt_id
 
     integer(kind=ik)                    :: i1, i2, iStep, j1, j2, jStep, k1, k2, kStep  , i,j,k, boundaryIndex
@@ -691,7 +693,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
         call write_real5( hvy_block_test_interpref, hvy_active, hvy_n, "hvy_block_test_interpref", params%rank )
 
         call MPI_barrier(WABBIT_COMM, i1)
-        call abort(111111,"Same origin of ghost nodes check failed - stopping.")
+        ! call abort(111111,"Same origin of ghost nodes check failed - stopping.")
     endif
 
     ! ------------------------   check if dominace rules are fulfilled locally, globaly

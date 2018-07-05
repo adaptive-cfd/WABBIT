@@ -34,6 +34,7 @@ end_color=$'\033[0m'
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=("---convection---"
+"TESTING/navier_stokes/funnel/ion_funnel_light.sh"
        "TESTING/conv/blob_3D_adaptive/blob3d-adaptive.sh"
        "TESTING/conv/blob_3D_equi/blob3d.sh"
        "TESTING/conv/blob_3D_nonequi/blob3d.sh"
@@ -48,7 +49,7 @@ tests=("---convection---"
        "TESTING/navier_stokes/filter/explicit_5pt/explicit_5pt.sh"
        "TESTING/navier_stokes/filter/explicit_7pt/explicit_7pt.sh"
        "TESTING/navier_stokes/filter/explicit_9pt/explicit_9pt.sh"
-       "TESTING/navier_stokes/filter/explicit_11pt/explicit_11pt.sh"       
+       "TESTING/navier_stokes/filter/explicit_11pt/explicit_11pt.sh"
        "---acm---"
        "TESTING/acm/acm_cyl_equi/acm_cylinder_equi.sh"
        "TESTING/acm/acm_cyl_nonequi/acm_cylinder_nonequi.sh"

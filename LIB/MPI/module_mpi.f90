@@ -285,7 +285,7 @@ subroutine init_ghost_nodes( params )
             dim = 2_ik
             ! set default number of "friends", that is mpiranks we exchange data with.
             ! NOTE: their number can be increased if necessary
-            N_friends = min( params%number_procs, 10 )
+            N_friends = min( params%number_procs, 20 )
 
             allocate( res_pre_data( Bs+2*g+10, Bs+2*g+10, 1, Neqn) )
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )

@@ -26,20 +26,20 @@ subroutine init_funnel(FILE)
   call read_param_mpi(FILE, 'funnel', 'jet_diameter'          , funnel%jet_radius, R_domain*0.5_rk)
   !call read_param_mpi(FILE, 'funnel', 'pump_diameter'         , funnel%pump_diameter, domain_size(1)/5.0_rk)
   !optional values
-  call read_param_mpi(FILE, 'funnel', 'plates_thickness'         , funnel%plates_thickness, 0.0_rk)
-  call read_param_mpi(FILE, 'funnel', 'first_plate_thickness'    , funnel%first_plate_thickness, 0.0_rk)
-  call read_param_mpi(FILE, 'funnel', 'distance_between_plates'  , funnel%plates_distance, 0.0_rk)
-  call read_param_mpi(FILE, 'funnel', 'diameter_slope_per_plate'  , funnel%slope, 0.0_rk)
+  call read_param_mpi(FILE, 'funnel', 'plates_thickness'         , funnel%plates_thickness, -1.0_rk)
+  call read_param_mpi(FILE, 'funnel', 'first_plate_thickness'    , funnel%first_plate_thickness, -1.0_rk)
+  call read_param_mpi(FILE, 'funnel', 'distance_between_plates'  , funnel%plates_distance, -1.0_rk)
+  call read_param_mpi(FILE, 'funnel', 'diameter_slope_per_plate'  , funnel%slope, -1.0_rk)
 
 
 
   funnel%max_inner_diameter   = dmax
   funnel%min_inner_diameter   = dmin
   funnel%wall_thickness       = 0.05*domain_size(1)
-  if ( funnel%plates_thickness  ==0.0_rk .or. &
-       funnel%plates_distance   ==0.0_rk .or. &
-       funnel%slope             ==0.0_rk .or. &
-       funnel%plates_thickness  ==0.0_rk ) then !default values
+  if ( funnel%plates_thickness  < 0.0_rk .or. &
+       funnel%plates_distance   <0.0_rk .or. &
+       funnel%slope             <0.0_rk .or. &
+       funnel%plates_thickness  <0.0_rk ) then !default values
       funnel%length               = domain_size(1)*0.95_rk-funnel%wall_thickness*2.0_rk
       funnel%plates_thickness     = funnel%length/(2.0_rk*funnel%nr_plates)
       funnel%first_plate_thickness= funnel%plates_thickness

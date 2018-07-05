@@ -96,23 +96,23 @@ module module_ns_penalization
   type :: type_funnel
       real(kind=rk)       ::outer_diameter         ! outer diameter
       real(kind=rk)       ::max_inner_diameter     ! maximal inner diameter
-      real(kind=rk)       ::min_inner_diameter    =0.0_rk ! minimal inner diameter
-      integer(kind=ik)    ::nr_plates             =0.0_rk ! Number of plates
-      real(kind=rk)       ::plates_distance       =0.0_rk ! distance between origin of plates
-      real(kind=rk)       ::plates_thickness      =0.0_rk !
-      real(kind=rk)       ::first_plate_thickness =0.0_rk
-      real(kind=rk)       ::temperatur            =0.0_rk ! temperatur of plates
+      real(kind=rk)       ::min_inner_diameter    =-1.0_rk ! minimal inner diameter
+      integer(kind=ik)    ::nr_plates             =0.0_ik ! Number of plates
+      real(kind=rk)       ::plates_distance       =-1.0_rk ! distance between origin of plates
+      real(kind=rk)       ::plates_thickness      =-1.0_rk !
+      real(kind=rk)       ::first_plate_thickness =-1.0_rk
+      real(kind=rk)       ::temperatur            =-1.0_rk ! temperatur of plates
 
-      real(kind=rk)       ::length                =0.0_rk ! total length of funnel
-      real(kind=rk)       ::slope                 =0.0_rk ! slope of funnel
-      real(kind=rk)       ::offset(2)             =0.0_rk ! offset of funnel in x and y
+      real(kind=rk)       ::length                =-1.0_rk ! total length of funnel
+      real(kind=rk)       ::slope                 =-1.0_rk ! slope of funnel
+      real(kind=rk)       ::offset(2)             =-1.0_rk ! offset of funnel in x and y
 
       ! parameters of flow inlet outlet
-      real(kind=rk)       ::pump_diameter  =0.0_rk
-      real(kind=rk)       ::pump_x_center  =0.0_rk
-      real(kind=rk)       ::jet_radius     =0.0_rk        ! cappilary inner Radius
-      real(kind=rk)       ::r_out_cappilary=0.0_rk         ! cappilary outer Radus
-      real(kind=rk)       ::wall_thickness =0.0_rk           !
+      real(kind=rk)       ::pump_diameter  =-1.0_rk
+      real(kind=rk)       ::pump_x_center  =-1.0_rk
+      real(kind=rk)       ::jet_radius     =-1.0_rk        ! cappilary inner Radius
+      real(kind=rk)       ::r_out_cappilary=-1.0_rk         ! cappilary outer Radus
+      real(kind=rk)       ::wall_thickness =-1.0_rk           !
 
       real(kind=rk)       ::inlet_velocity(2)       !
       real(kind=rk)       ::inlet_density       !

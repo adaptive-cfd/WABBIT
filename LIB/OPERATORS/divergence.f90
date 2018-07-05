@@ -43,12 +43,12 @@ subroutine divergence(u, v, w, dx, Bs, g, discretization, div)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
-    dz_inv = 1.0_rk / dx(3)
 
 !---------------------------------------------------------------------------------------------
 ! main body
 
     if (size(u,3)>2) then ! 3D case
+        dz_inv = 1.0_rk / dx(3)
         if (discretization == "FD_2nd_central" ) then
             do ix = g+1, Bs+g
                 do iy = g+1, Bs+g

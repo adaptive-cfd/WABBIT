@@ -592,7 +592,8 @@ contains
 
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
     if ( minval(u(:,:,:,pF))<0 ) then
-      call abort(23456,"Error [module_navier_stokes new]: pressure is smaller then 0!")
+      write(*,*)"minval=",minval(u(:,:,:,pF))
+      call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
     end if
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
 
@@ -895,6 +896,7 @@ subroutine pack_statevector2D(phi,format)
     case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
       ! sqrt(rho)
       if ( minval(phi(:,:,1))<0 ) then
+        write(*,*) "minval=", minval(phi(:,:,1))
         call abort(457881,"ERROR [module_navier_stokes.f90]: density smaller then 0!!")
       end if
       converted_vector(:,:,1)=sqrt(phi(:,:,1))

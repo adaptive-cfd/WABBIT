@@ -118,6 +118,7 @@ module module_ns_penalization
       real(kind=rk)       ::inlet_density       !
       real(kind=rk)       ::inlet_pressure       !
       real(kind=rk)       ::outlet_pressure       !
+      real(kind=rk)       ::outlet_density
       real(kind=rk)       ::pump_speed       !
       real(kind=rk)       ::pump_density      !
       real(kind=rk)       ::pump_pressure     !

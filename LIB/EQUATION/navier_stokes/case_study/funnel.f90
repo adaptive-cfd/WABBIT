@@ -71,7 +71,7 @@ subroutine init_funnel(FILE)
   call read_param_mpi(FILE, 'funnel', 'inlet_pressure'  , funnel%inlet_pressure, 1.0_rk )
   call read_param_mpi(FILE, 'funnel', 'pump_speed'      , funnel%pump_speed, 30.0_rk )
   call read_param_mpi(FILE, 'funnel', 'outlet_pressure' , funnel%outlet_pressure, 1.0_rk)
-
+  funnel%outlet_density=funnel%outlet_pressure/(Rs*funnel%temperatur)
   if (funnel%length         >domain_size(1)-2.0_rk*funnel%wall_thickness .or. &
       funnel%outer_diameter >domain_size(2)-2.0_rk*funnel%wall_thickness) then
     call abort(5032,"ERROR [funnel.f90]:funnel is larger then simulation domain!")
@@ -109,7 +109,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
                                                          rho_capillary,u_capillary,v_capillary,p_capillary, &
                                                          p_2nd_pump_stage,rho_2nd_pump_stage
     ! smooth width of jet
-    real(kind=rk)                                     ::jet_smooth_width,pump_smooth_width
+    real(kind=rk)                                     ::jet_smooth_width,pump_smooth_width,C_inv
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     if (size(penalization,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
@@ -124,14 +124,11 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     v_capillary       =funnel%inlet_velocity(2)
     rho_capillary     =funnel%inlet_density
     rho_pump          =funnel%pump_density
-    rho_2nd_pump_stage=funnel%inlet_density/100.0_rk
     p_capillary       =funnel%inlet_pressure
     velocity_pump     =funnel%pump_speed
     pressure_pump     =funnel%pump_pressure
     p_2nd_pump_stage  =funnel%outlet_pressure
-
-
-
+    rho_2nd_pump_stage=funnel%outlet_density
     ! parameter for smoothing function (width)
     h  = 1.5_rk*max(dx(1), dx(2))
 
@@ -165,6 +162,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             p           = phi(ix,iy,4)
 
 
+            C_inv=C_sp_inv
             ! Funnel
             ! ------
             ! 1. compute mask term:
@@ -175,6 +173,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
               Phi_ref(ix,iy,2) = 0.0_rk                     ! no velocity in x
               Phi_ref(ix,iy,3) = 0.0_rk                     ! no velocity in y
               Phi_ref(ix,iy,4) = rho*Rs*funnel%temperatur   ! pressure set according to
+              C_inv=C_eta_inv
             endif                                           ! the temperature of the funnel
 
             ! Walls
@@ -187,6 +186,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
               Phi_ref(ix,iy,2) = 0.0_rk                     ! no velocity in x
               Phi_ref(ix,iy,3) = 0.0_rk                     ! no velocity in y
               Phi_ref(ix,iy,4) = rho*Rs*funnel%temperatur   ! pressure set according to
+              C_inv=C_eta_inv
             endif                                           ! the temperature of the funnel
 
             ! Outlet flow: PUMPS
@@ -204,6 +204,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
               else
                 Phi_ref(ix,iy,3) = -rho*v_ref
               endif
+                C_inv=C_eta_inv
             endif
             ! mass and energy sink
             chi=  draw_pumps_sink(x,r,funnel,h)
@@ -212,6 +213,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
               mask(ix,iy,4) = mask(ix,iy,4)+chi
               Phi_ref(ix,iy,1) = rho_pump
               Phi_ref(ix,iy,4) = pressure_pump
+              C_inv=C_eta_inv
             endif
 
 
@@ -245,13 +247,13 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
 
 
             ! density
-            penalization(ix,iy,1)=C_eta_inv*mask(ix,iy,1)*(rho-  Phi_ref(ix,iy,1) )
+            penalization(ix,iy,1)=C_inv*mask(ix,iy,1)*(rho-  Phi_ref(ix,iy,1) )
             ! x-velocity
-            penalization(ix,iy,2)=C_eta_inv*mask(ix,iy,2)*(rho*u-  Phi_ref(ix,iy,2) )
+            penalization(ix,iy,2)=C_inv*mask(ix,iy,2)*(rho*u-  Phi_ref(ix,iy,2) )
             ! y-velocity
-            penalization(ix,iy,3)=C_eta_inv*mask(ix,iy,3)*(rho*v-  Phi_ref(ix,iy,3) )
+            penalization(ix,iy,3)=C_inv*mask(ix,iy,3)*(rho*v-  Phi_ref(ix,iy,3) )
             ! preasure
-            penalization(ix,iy,4)=C_eta_inv*mask(ix,iy,4)*(p-  Phi_ref(ix,iy,4) )
+            penalization(ix,iy,4)=C_inv*mask(ix,iy,4)*(p-  Phi_ref(ix,iy,4) )
 
        end do
     end do
@@ -328,8 +330,8 @@ subroutine mean_quantity(integral,area)
     !devide by the area of the region
     integral = integral / A
 
-    funnel%pump_density = integral(1)! /2.0_rk
-    funnel%pump_pressure = integral(4)! /2.0_rk
+    funnel%pump_density = integral(1)
+    funnel%pump_pressure = integral(4)
 end subroutine mean_quantity
 
 
@@ -427,12 +429,11 @@ function draw_walls(x,r,funnel,h)
 
 
   ! wall in EAST
-  if (  r > funnel%jet_radius  ) then
+  !if (  r > funnel%jet_radius  ) then
          mask=mask+smoothstep(x-funnel%wall_thickness,h)
-  else
-         mask=mask+smoothstep(x-funnel%wall_thickness*0.5_rk,h)
-  endif
-
+  !else
+  !       mask=mask+smoothstep(x-funnel%wall_thickness*0.5_rk,h)
+  !endif
   ! attach cappilary to wall in EAST
   if (  r > funnel%jet_radius  ) then
          mask=mask+smoothstep(x-funnel%plate(1)%x0(1),h)*smoothstep(r-funnel%r_out_cappilary,h)
@@ -482,7 +483,7 @@ function draw_pumps_sink(x,r,funnel,h)
 
   draw_pumps_sink  = 0.0_rk
   r0    =(R_domain-funnel%wall_thickness*0.666_rk)
-  depth =funnel%wall_thickness*0.333_rk
+  depth =funnel%wall_thickness*0.4_rk
   x_lb  =funnel%pump_x_center-funnel%pump_diameter*0.5_rk
   x_rb  =funnel%pump_x_center+funnel%pump_diameter*0.5_rk
 

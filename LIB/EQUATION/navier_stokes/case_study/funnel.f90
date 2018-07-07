@@ -498,11 +498,11 @@ function draw_jet(x,r,funnel,h)
 
   real(kind=rk)                         ::draw_jet,length_of_jet
 
-  length_of_jet=funnel%plate(1)%x0(1)-funnel%wall_thickness
+  length_of_jet=funnel%plate(1)%x0(1)-funnel%wall_thickness-h
 
   if (r< funnel%jet_radius) then
     ! wall in EAST
-    draw_jet=soft_bump2(x,funnel%wall_thickness,length_of_jet,h)
+    draw_jet=soft_bump2(x,funnel%wall_thickness+h,length_of_jet,h)
 
     !draw_jet=smoothstep(x-funnel%wall_thickness,h)-smoothstep(x-funnel%wall_thickness/2.0_rk,h)
   else

@@ -638,8 +638,8 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik)          :: Bs,ix
-    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
+    integer(kind=ik)          :: Bs,ix,iy
+    real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
                                 radius,max_R,width
 
     p_init    =params_ns%initial_pressure
@@ -778,7 +778,17 @@ contains
 
       ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
       u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
-      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
+
+      if ( params_ns%geometry=="funnel" ) then
+        do iy=g+1, Bs+g
+            !initial y-velocity negative in lower half and positive in upper half
+            y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%Ly*0.5_rk
+            b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
+            u( :, iy, 1, UyF) = (1-u(:,iy,1,UyF))*b*u_init(2)*sqrt(rho_init)
+        enddo
+      else
+        u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
+      end if
     case ("pressure_blob")
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )

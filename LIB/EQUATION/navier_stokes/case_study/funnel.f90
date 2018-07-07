@@ -1,11 +1,13 @@
 
 !> \brief reads parameters for mask function from file
-subroutine init_funnel(FILE)
+subroutine init_funnel(params,FILE)
 
   implicit none
 
  ! character(len=*), intent(in) :: filename
   type(inifile) , intent(inout) :: FILE
+  !> params structure of navier stokes
+type(type_params_ns),intent(inout)  :: params
 
   real(kind=rk)                 :: dmax,dmin
   integer(kind=ik)              :: nr_focus_plates
@@ -35,6 +37,7 @@ subroutine init_funnel(FILE)
 
   funnel%max_inner_diameter   = dmax
   funnel%min_inner_diameter   = dmin
+  params%inicond_width        = dmax
   funnel%wall_thickness       = 0.05*domain_size(1)
   if ( funnel%plates_thickness  < 0.0_rk .or. &
        funnel%plates_distance   <0.0_rk .or. &

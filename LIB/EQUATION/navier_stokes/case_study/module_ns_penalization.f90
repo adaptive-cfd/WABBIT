@@ -203,7 +203,7 @@ subroutine init_penalization( params,FILE )
       call init_simple_sponge(params,FILE)
       call init_vortex_street(FILE)
     case ('funnel')
-      call init_funnel(FILE)
+      call init_funnel(params,FILE)
     case default
       call abort(8546501,"[module_ns_penalization.f90] ERROR: geometry for VPM is unknown"//mask_geometry)
 

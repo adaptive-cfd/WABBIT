@@ -97,7 +97,7 @@ module module_ns_penalization
       real(kind=rk)       ::outer_diameter         ! outer diameter
       real(kind=rk)       ::max_inner_diameter     ! maximal inner diameter
       real(kind=rk)       ::min_inner_diameter    =-1.0_rk ! minimal inner diameter
-      integer(kind=ik)    ::nr_plates             =0.0_ik ! Number of plates
+      integer(kind=ik)    ::nr_plates             =0_ik ! Number of plates
       real(kind=rk)       ::plates_distance       =-1.0_rk ! distance between origin of plates
       real(kind=rk)       ::plates_thickness      =-1.0_rk !
       real(kind=rk)       ::first_plate_thickness =-1.0_rk

@@ -151,11 +151,9 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     ! smooth width in x and y direction
     do iy=1, Bs+2*g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
-       call continue_periodic(y,domain_size(2))
        r = abs(y-domain_size(2)*0.5_rk)
        do ix=1, Bs+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-            call continue_periodic(x,domain_size(1))
             rho         = phi(ix,iy,1)**2
             u           = phi(ix,iy,2)/phi(ix,iy,1)
             v           = phi(ix,iy,3)/phi(ix,iy,1)

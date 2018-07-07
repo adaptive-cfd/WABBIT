@@ -650,14 +650,16 @@ contains
 
 
 
+    ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
     if ( params_ns%inicond=="read_from_files") then
         if (params_ns%dim==2) then
-        ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p)
         call pack_statevector2D(u(:,:,1,:),'pure_variables')
       endif
       return
+    else
+      u = 0.0_rk
     endif
-    u = 0.0_rk
+
 
     if (p_init<=0.0_rk .or. rho_init <=0.0) then
       call abort(6032, "Error [module_navier_stokes_new.f90]: initial pressure and density must be larger then 0")

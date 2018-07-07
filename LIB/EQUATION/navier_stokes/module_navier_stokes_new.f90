@@ -102,8 +102,6 @@ contains
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
 
-    machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)/&
-    sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
     dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
 
@@ -115,15 +113,20 @@ contains
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
       write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
-      write(*,'("initial speed of sound:", T40, f6.2)') &
-      sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
 
-      write(*,'("initial Machnumber:", T40, f6.2)') machspeed
+      if (.not. params_ns%inicond=="read_from_files") then
+          machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2&
+                      +params_ns%initial_velocity(3)**2) /&
+                      sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
-      write(*,'("Reynolds for Ly:", T40, f12.1)') &
-                params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
-                sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
+          write(*,'("initial speed of sound:", T40, f6.2)') &
+          sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+          write(*,'("initial Machnumber:", T40, f6.2)') machspeed
+          write(*,'("Reynolds for Ly:", T40, f12.1)') &
+                    params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
+                    sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
+      endif
     endif
 
     ! set global parameters pF,rohF, UxF etc
@@ -349,7 +352,6 @@ contains
       !-------------------------------------------------------------------------
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
-
 
       ! called for each block.
       if (size(u,3)==1) then
@@ -640,13 +642,21 @@ contains
     real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
                                 radius,max_R,width
 
-
     p_init    =params_ns%initial_pressure
     rho_init  =params_ns%initial_density
     u_init    =params_ns%initial_velocity
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
+
+
+    if ( params_ns%inicond=="read_from_files") then
+        if (params_ns%dim==2) then
+        ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p)
+        call pack_statevector2D(u(:,:,1,:),'pure_variables')
+      endif
+      return
+    endif
     u = 0.0_rk
 
     if (p_init<=0.0_rk .or. rho_init <=0.0) then
@@ -880,7 +890,7 @@ end subroutine convert_statevector2D
 
 
 !> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from
-!>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$
+!>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$ or pure variables (rho,u,v,p)
 subroutine pack_statevector2D(phi,format)
     implicit none
     ! convert to type "conservative","pure_variables"

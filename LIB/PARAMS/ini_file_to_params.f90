@@ -258,11 +258,11 @@ subroutine ini_file_to_params( params, filename )
             g = real(params%number_ghost_nodes)
             ! we assume sort of a worst-case scenario and assume 20 friends.
             ! in 2D that is too much (11 in practice), in 3d we dont know yet
-            Nfriend = min(Ncpu, 20.0)
+            Nfriend = min(Ncpu, 20.0_rk)
             Jmax = real(params%max_treelevel)
             Nrk4 = real(size(params%butcher_tableau, 1)+1)
 
-            maxmem = 0.90 * maxmem / Ncpu
+            maxmem = 0.90_rk * maxmem / Ncpu
 
             if ( d == 2 ) then
                 ! in 2d, we try to be precise and take all fat arrays into account. this worked well

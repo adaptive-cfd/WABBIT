@@ -533,8 +533,8 @@ function draw_outlet(x,r,funnel,h)
 
          ! wall in WEST
     !draw_outlet=smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
-draw_outlet=soft_bump(x,domain_size(1)-funnel%wall_thickness+h,funnel%wall_thickness*0.5_rk-2*h,h)&
-            *smoothstep(r-funnel%min_inner_diameter*0.5_rk,h)
+draw_outlet=soft_bump2(x,domain_size(1)-funnel%wall_thickness,funnel%wall_thickness*0.5_rk,h)&
+            *smoothstep(r-(funnel%min_inner_diameter*0.5_rk-h),h)
 
 end function draw_outlet
 

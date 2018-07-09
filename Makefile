@@ -43,9 +43,9 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG= -cpp #preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
-#FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
-#FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
-#FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
+FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
+FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
@@ -159,7 +159,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
 	synchronize_ghosts.f90 blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 check_redundant_nodes.f90 \
-	restrict_predict_data.f90 calc_data_bounds.f90
+	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \

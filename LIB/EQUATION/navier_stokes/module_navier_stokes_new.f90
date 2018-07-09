@@ -102,8 +102,6 @@ contains
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
 
-    machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)/&
-    sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
     dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
 
@@ -115,15 +113,20 @@ contains
       nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
       write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
       write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
-      write(*,'("initial speed of sound:", T40, f6.2)') &
-      sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
 
-      write(*,'("initial Machnumber:", T40, f6.2)') machspeed
+      if (.not. params_ns%inicond=="read_from_files") then
+          machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2&
+                      +params_ns%initial_velocity(3)**2) /&
+                      sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
 
-      write(*,'("Reynolds for Ly:", T40, f12.1)') &
-                params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
-                sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
+          write(*,'("initial speed of sound:", T40, f6.2)') &
+          sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+          write(*,'("initial Machnumber:", T40, f6.2)') machspeed
+          write(*,'("Reynolds for Ly:", T40, f12.1)') &
+                    params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
+                    sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
+      endif
     endif
 
     ! set global parameters pF,rohF, UxF etc
@@ -189,7 +192,7 @@ contains
 
     !
     ! compute vorticity
-    allocate(tmp_u(size(u,1),size(u,2),size(u,3),3))
+    allocate(tmp_u(size(u,1),size(u,2),size(u,3),size(u,4)))
 
     if (size(u,3)==1) then
           ! ---------------------------------
@@ -350,7 +353,6 @@ contains
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
 
-
       ! called for each block.
       if (size(u,3)==1) then
 
@@ -510,7 +512,7 @@ contains
          ! write mean flow to disk...
          write(*,*) 'density=', params_ns%mean_density/area ,&
                     'pressure=',params_ns%mean_pressure/area, &
-                    'drag=',params_ns%force(1)*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
+                    'drag=',params_ns%force(1),&!*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
                     'Fy=',params_ns%force(2)
          open(14,file='meandensity.t',status='unknown',position='append')
          write (14,'(2(es15.8,1x))') time, params_ns%mean_density/area
@@ -592,7 +594,8 @@ contains
 
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
     if ( minval(u(:,:,:,pF))<0 ) then
-      call abort(23456,"Error [module_navier_stokes new]: pressure is smaller then 0!")
+      write(*,*)"minval=",minval(u(:,:,:,pF))
+      call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
     end if
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
 
@@ -635,10 +638,9 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik)          :: Bs,ix
-    real(kind=rk)             :: x,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
+    integer(kind=ik)          :: Bs,ix,iy
+    real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
                                 radius,max_R,width
-
 
     p_init    =params_ns%initial_pressure
     rho_init  =params_ns%initial_density
@@ -646,7 +648,18 @@ contains
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
-    u = 0.0_rk
+
+
+    ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
+    if ( params_ns%inicond=="read_from_files") then
+        if (params_ns%dim==2) then
+        call pack_statevector2D(u(:,:,1,:),'pure_variables')
+      endif
+      return
+    else
+      u = 0.0_rk
+    endif
+
 
     if (p_init<=0.0_rk .or. rho_init <=0.0) then
       call abort(6032, "Error [module_navier_stokes_new.f90]: initial pressure and density must be larger then 0")
@@ -765,7 +778,17 @@ contains
 
       ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
       u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
-      u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
+
+      if ( params_ns%geometry=="funnel" ) then
+        do iy=g+1, Bs+g
+            !initial y-velocity negative in lower half and positive in upper half
+            y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%Ly*0.5_rk
+            b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
+            u( :, iy, 1, UyF) = (1-u(:,iy,1,UyF))*b*u_init(2)*sqrt(rho_init)
+        enddo
+      else
+        u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
+      end if
     case ("pressure_blob")
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
@@ -879,7 +902,7 @@ end subroutine convert_statevector2D
 
 
 !> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from
-!>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$
+!>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$ or pure variables (rho,u,v,p)
 subroutine pack_statevector2D(phi,format)
     implicit none
     ! convert to type "conservative","pure_variables"
@@ -895,6 +918,7 @@ subroutine pack_statevector2D(phi,format)
     case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
       ! sqrt(rho)
       if ( minval(phi(:,:,1))<0 ) then
+        write(*,*) "minval=", minval(phi(:,:,1))
         call abort(457881,"ERROR [module_navier_stokes.f90]: density smaller then 0!!")
       end if
       converted_vector(:,:,1)=sqrt(phi(:,:,1))

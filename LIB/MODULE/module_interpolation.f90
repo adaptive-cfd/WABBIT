@@ -84,110 +84,112 @@ contains
 
     ! refine the block by one level
     subroutine prediction_2D(coarse, fine, order_predictor)
-
         implicit none
 
-        real(kind=rk), dimension(1:,1:), intent(out) :: fine
-        real(kind=rk), dimension(1:,1:), intent(in)  :: coarse
-
-        character(len=80), intent(in)                :: order_predictor
+        real(kind=rk), dimension(1:,1:), intent(inout) :: fine
+        real(kind=rk), dimension(1:,1:), intent(inout) :: coarse
+        character(len=*), intent(in)                :: order_predictor
 
         integer(kind=ik) :: i, j, l
-        integer(kind=ik) :: ncoarse, nfine
-        integer(kind=ik) :: icoarse, ifine
+        integer(kind=ik) :: nxcoarse, nxfine
+        integer(kind=ik) :: nycoarse, nyfine
+        integer(kind=ik) :: ixfine, iyfine
         ! interpolation coefficients
         ! a: one sided, b: central
         real(kind=rk) :: a(4), b(2)
 
-        ncoarse = size(coarse, 1)
-        nfine   = size(fine, 1)
+        nxcoarse = size(coarse, 1)
+        nxfine   = size(fine  , 1)
+        nycoarse = size(coarse, 2)
+        nyfine   = size(fine  , 2)
 
-        if ( 2*ncoarse-1 /= nfine ) then
-          call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
+        if ( (2*nxcoarse-1 /= nxfine) .or. (2*nycoarse-1 /= nyfine)) then
+            write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
+            call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
+        endif
+
+        if ( ((nxfine<7) .or. (nyfine<7)).and.(order_predictor=="multiresolution_4th") ) then
+            write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
+            call abort(888193,"ERROR: prediction_2D: not enough points for 4th order one-sided interp.")
         endif
 
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point)
-        fine(1:nfine:2, 1:nfine:2) = coarse(:,:)
+        fine(1:nxfine:2, 1:nyfine:2) = coarse(:,:)
 
 
         if ( order_predictor == "multiresolution_2nd" ) then
-            !-----------------------------------------------------------------------
+            !-------------------------------------------------------------------
             ! second order interpolation
-            !-----------------------------------------------------------------------
+            !-------------------------------------------------------------------
             ! y direction
-            do i = 2, nfine, 2
-              do j = 1, nfine, 2
-                fine(i,j) = ( fine(i-1, j) + fine(i+1, j) ) / 2.0_rk
-              end do
+            do i = 2, nxfine, 2
+                do j = 1, nyfine, 2
+                    fine(i,j) = ( fine(i-1, j) + fine(i+1, j) ) * 0.5_rk
+                end do
             end do
 
             ! x direction
-            do i = 1, nfine
-              do j = 2, nfine, 2
-                fine(i,j) = ( fine(i, j-1) + fine(i, j+1) ) / 2.0_rk
-              end do
+            do i = 1, nxfine
+                do j = 2, nyfine, 2
+                    fine(i,j) = ( fine(i, j-1) + fine(i, j+1) ) * 0.5_rk
+                end do
             end do
 
         elseif ( order_predictor == "multiresolution_4th"  ) then
-            !-----------------------------------------------------------------------
+            !-------------------------------------------------------------------
             ! fourth order interpolation
-            !-----------------------------------------------------------------------
-            ! init coefficients
-            a(1) =  5.0_rk/16.0_rk
-            a(2) =  15.0_rk/16.0_rk
-            a(3) =  -5.0_rk/16.0_rk
-            a(4) =  1.0_rk/16.0_rk
+            !-------------------------------------------------------------------
+            ! one-side coeffs:
+            a = (/ 5.0_rk/16.0_rk, 15.0_rk/16.0_rk, -5.0_rk/16.0_rk, 1.0_rk/16.0_rk /)
+            ! centered coeffs (symmetric)
+            b = (/ 9.0_rk/16.0_rk, -1.0_rk/16.0_rk /)
 
-            b(1) =  9.0_rk/16.0_rk
-            b(2) =  -1.0_rk/16.0_rk
-            ! ist easier to use a 1D prediction operator and apply it just to rows
-            ! and columns...
-            ! along x
-            do icoarse = 1, ncoarse
-                ! we travel along the coarse grid
-                ifine  = 2*(icoarse-1)+1
-                fine( 2, ifine ) = a(1)*coarse(1,icoarse) + a(2)*coarse(2,icoarse) &
-                                 + a(3)*coarse(3,icoarse) + a(4)*coarse(4,icoarse)
+            ! step (a)
+            ! first columns (x: const y: variable )
+            ! these points require one-sided interpolation.
+            fine( 2, 1:nyfine:2 ) = a(1)*fine( 1, 1:nyfine:2 ) &
+                                  + a(2)*fine( 3, 1:nyfine:2 ) &
+                                  + a(3)*fine( 5, 1:nyfine:2 ) &
+                                  + a(4)*fine( 7, 1:nyfine:2 )
 
-                fine( nfine-1, ifine ) = a(4)*coarse(ncoarse-3,icoarse) + a(3)*coarse(ncoarse-2,icoarse) &
-                                       + a(2)*coarse(ncoarse-1,icoarse) + a(1)*coarse(ncoarse  ,icoarse)
+            ! last columns (same as above)
+            fine( nxfine-1, 1:nyfine:2 ) = a(4)*fine( nxfine-6, 1:nyfine:2 ) &
+                                  + a(3)*fine( nxfine-4, 1:nyfine:2 ) &
+                                  + a(2)*fine( nxfine-2, 1:nyfine:2 ) &
+                                  + a(1)*fine( nxfine,   1:nyfine:2 )
 
-                do l = 2, ncoarse-2
-                    fine( 2*l, ifine ) = b(1)*coarse(l  ,icoarse) + b(1)*coarse(l+1,icoarse) &
-                                       + b(2)*coarse(l-1,icoarse) + b(2)*coarse(l+2,icoarse)
-                end do
-            end do
+            ! interpolate regular columns
+            do ixfine =  4, nxfine-3, 2
+                fine( ixfine, 1:nyfine:2 ) = b(2)*fine( ixfine-3, 1:nyfine:2 ) &
+                                           + b(1)*fine( ixfine-1, 1:nyfine:2 ) &
+                                           + b(1)*fine( ixfine+1, 1:nyfine:2 ) &
+                                           + b(2)*fine( ixfine+3, 1:nyfine:2 )
+            enddo
 
-            ! along y
-            do icoarse = 1, ncoarse
-                ! we travel along the coarse grid
-                ifine  = 2*(icoarse-1)+1
-                fine( ifine, 2  ) = a(1)*coarse(icoarse,1) + a(2)*coarse(icoarse,2) &
-                                  + a(3)*coarse(icoarse,3) + a(4)*coarse(icoarse,4)
 
-                fine( ifine, nfine-1  ) = a(4)*coarse(icoarse,ncoarse-3) + a(3)*coarse(icoarse,ncoarse-2) &
-                                        + a(2)*coarse(icoarse,ncoarse-1) + a(1)*coarse(icoarse,ncoarse  )
+            ! At this point, we have only every 2nd complete row missing
+            ! so from now on, no step size 2 anymore
 
-                do l = 2, ncoarse-2
-                    fine( ifine, 2*l ) = b(1)*coarse(icoarse,l  ) + b(1)*coarse(icoarse,l+1) &
-                                       + b(2)*coarse(icoarse,l-1) + b(2)*coarse(icoarse,l+2)
-                end do
-            end do
+            ! first row
+            ! these points requie one-sided interpolation.
+            fine( 1:nxfine, 2 ) = a(1)*fine( 1:nxfine, 1 ) &
+                                + a(2)*fine( 1:nxfine, 3 ) &
+                                + a(3)*fine( 1:nxfine, 5 ) &
+                                + a(4)*fine( 1:nxfine, 7 )
+            ! last row (same as above)
+            fine( 1:nxfine, nyfine-1 ) = a(4)*fine( 1:nxfine, nyfine-6) &
+                                  + a(3)*fine( 1:nxfine, nyfine-4 ) &
+                                  + a(2)*fine( 1:nxfine, nyfine-2 ) &
+                                  + a(1)*fine( 1:nxfine, nyfine )
+            ! remaining interior rows
+            do iyfine =  4, nyfine-3, 2
+                fine( 1:nxfine, iyfine ) = b(2)*fine( 1:nxfine, iyfine-3 ) &
+                                         + b(1)*fine( 1:nxfine, iyfine-1 ) &
+                                         + b(1)*fine( 1:nxfine, iyfine+1 ) &
+                                         + b(2)*fine( 1:nxfine, iyfine+3 )
+            enddo
 
-            ! diagonal (this is also in x-direction, but we could also do it in y-dir)
-            do ifine = 2, nfine, 2
-                fine( 2, ifine  ) = a(1)*fine(1, ifine) + a(2)*fine(3, ifine) &
-                                  + a(3)*fine(5, ifine) + a(4)*fine(7, ifine)
-
-                fine( nfine-1, ifine ) = a(4)*fine(nfine-6, ifine) + a(3)*fine(nfine-4, ifine) &
-                                       + a(2)*fine(nfine-2, ifine) + a(1)*fine(nfine, ifine  )
-
-                do l = 4, nfine-3, 2
-                    fine( l, ifine ) = b(1)*fine(l-1, ifine) + b(1)*fine(l+1, ifine) &
-                                     + b(2)*fine(l-3, ifine) + b(2)*fine(l+3, ifine)
-                end do
-            end do
         else
              ! error case
              call abort(888194,"ERROR: prediction_2D: wrong method..")
@@ -195,60 +197,64 @@ contains
 
     end subroutine prediction_2D
 
+
     ! refine the block by one level
     subroutine prediction_3D(coarse, fine, order_predictor)
-
         implicit none
 
-        real(kind=rk), dimension(1:,1:,1:), intent(out) :: fine
-        real(kind=rk), dimension(1:,1:,1:), intent(in)  :: coarse
-        character(len=80), intent(in)                :: order_predictor
+        real(kind=rk), dimension(1:,1:,1:), intent(inout) :: fine
+        real(kind=rk), dimension(1:,1:,1:), intent(inout) :: coarse
+        character(len=*), intent(in) :: order_predictor
 
-        integer(kind=ik) :: i, j, k, l
-        integer(kind=ik) :: ncoarse, nfine
-        integer(kind=ik) :: icoarse, ifine
+        integer(kind=ik) :: i, j, k
+        integer(kind=ik) :: nxcoarse, nxfine, nycoarse, nyfine, nzcoarse, nzfine
+        integer(kind=ik) :: ixfine, iyfine, izfine
         ! interpolation coefficients
         ! a: one sided, b: central
         real(kind=rk) :: a(4), b(2)
 
-        ncoarse = size(coarse, 1)
-        nfine   = size(fine, 1)
+        nxcoarse = size(coarse, 1)
+        nxfine   = size(fine  , 1)
+        nycoarse = size(coarse, 2)
+        nyfine   = size(fine  , 2)
+        nzcoarse = size(coarse, 3)
+        nzfine   = size(fine  , 3)
 
-        if ( 2*ncoarse-1 /= nfine ) then
+        if ( 2*nxcoarse-1 /= nxfine .or. 2*nycoarse-1 /= nyfine .or. 2*nzcoarse-1 /= nzfine ) then
           call abort(888195,"ERROR: prediction_3D: arrays wrongly sized..")
         endif
 
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point)
-        fine(1:nfine:2, 1:nfine:2, 1:nfine:2) = coarse(:,:,:)
+        fine(1:nxfine:2, 1:nyfine:2, 1:nzfine:2) = coarse(:, :, :)
 
         if ( order_predictor == "multiresolution_2nd" ) then
             !-------------------------------------------------------------------
             ! second order interpolation
             !-------------------------------------------------------------------
             ! y direction
-            do k = 1, nfine, 2
-                do j = 1, nfine, 2
-                    do i = 2, nfine, 2
-                        fine(i,j,k) = ( fine(i-1, j, k) + fine(i+1, j, k) ) / 2.0_rk
+            do k = 1, nzfine, 2
+                do j = 1, nyfine, 2
+                    do i = 2, nxfine, 2
+                        fine(i,j,k) = ( fine(i-1, j, k) + fine(i+1, j, k) ) * 0.5_rk
                     end do
                 end do
             end do
 
             ! x direction
-            do k = 1, nfine, 2
-                do j = 2, nfine, 2
-                    do i = 1, nfine
-                        fine(i,j,k) = ( fine(i, j-1, k) + fine(i, j+1, k) ) / 2.0_rk
+            do k = 1, nzfine, 2
+                do j = 2, nyfine, 2
+                    do i = 1, nxfine
+                        fine(i,j,k) = ( fine(i, j-1, k) + fine(i, j+1, k) ) * 0.5_rk
                     end do
                 end do
             end do
 
             ! z direction
-            do k = 2, nfine, 2
-                do j = 1, nfine
-                    do i = 1, nfine
-                        fine(i,j,k) = ( fine(i, j, k-1) + fine(i, j, k+1) ) / 2.0_rk
+            do k = 2, nzfine, 2
+                do j = 1, nyfine
+                    do i = 1, nxfine
+                        fine(i,j,k) = ( fine(i, j, k-1) + fine(i, j, k+1) ) * 0.5_rk
                     end do
                 end do
             end do
@@ -257,91 +263,78 @@ contains
             !-----------------------------------------------------------------------
             ! fourth order interpolation
             !-----------------------------------------------------------------------
-            ! init coefficients
-            a(1) =  5.0_rk/16.0_rk
-            a(2) =  15.0_rk/16.0_rk
-            a(3) =  -5.0_rk/16.0_rk
-            a(4) =  1.0_rk/16.0_rk
+            ! one-side coeffs:
+            a = (/ 5.0_rk/16.0_rk, 15.0_rk/16.0_rk, -5.0_rk/16.0_rk, 1.0_rk/16.0_rk /)
+            ! centered coeffs (symmetric)
+            b = (/ 9.0_rk/16.0_rk, -1.0_rk/16.0_rk /)
 
-            b(1) =  9.0_rk/16.0_rk
-            b(2) =  -1.0_rk/16.0_rk
+            do izfine = 1, nzfine, 2
+                ! --> in the planes, execute the 2d code
+                ! step (a)
+                ! first columns (x: const y: variable )
+                ! these points requie one-sided interpolation.
+                fine( 2, 1:nyfine:2, izfine ) = a(1)*fine( 1, 1:nyfine:2, izfine ) &
+                                      + a(2)*fine( 3, 1:nyfine:2, izfine ) &
+                                      + a(3)*fine( 5, 1:nyfine:2, izfine ) &
+                                      + a(4)*fine( 7, 1:nyfine:2, izfine )
 
-            ! ist easier to use a 1D prediction operator and apply it just to rows
-            ! and columns...
-            ! loop over all z-level
-            do k = 1, ncoarse
-                ! along x
-                do icoarse = 1, ncoarse
-                    ! we travel along the coarse grid
-                    ifine  = 2*(icoarse-1)+1
+                ! last columns (same as above)
+                fine( nxfine-1, 1:nyfine:2, izfine ) = a(4)*fine( nxfine-6, 1:nyfine:2, izfine ) &
+                                      + a(3)*fine( nxfine-4, 1:nyfine:2, izfine ) &
+                                      + a(2)*fine( nxfine-2, 1:nyfine:2, izfine ) &
+                                      + a(1)*fine( nxfine,   1:nyfine:2, izfine )
 
-                    !call prediction1D( coarse(:,icoarse,k), fine(:,ifine,2*(k-1)+1) )
+                ! interpolate regular columns
+                do ixfine =  4, nxfine-3, 2
+                    fine( ixfine, 1:nyfine:2, izfine ) = b(2)*fine( ixfine-3, 1:nyfine:2, izfine ) &
+                                               + b(1)*fine( ixfine-1, 1:nyfine:2, izfine ) &
+                                               + b(1)*fine( ixfine+1, 1:nyfine:2, izfine ) &
+                                               + b(2)*fine( ixfine+3, 1:nyfine:2, izfine )
+                enddo
 
-                    fine( 2, ifine, 2*(k-1)+1  ) = a(1)*coarse(1,icoarse,k) + a(2)*coarse(2,icoarse,k) &
-                                                 + a(3)*coarse(3,icoarse,k) + a(4)*coarse(4,icoarse,k)
 
-                    fine( nfine-1, ifine, 2*(k-1)+1  ) = a(4)*coarse(ncoarse-3,icoarse,k) + a(3)*coarse(ncoarse-2,icoarse,k) &
-                                                       + a(2)*coarse(ncoarse-1,icoarse,k) + a(1)*coarse(ncoarse  ,icoarse,k)
+                ! At this point, we have only every 2nd complete row missing
+                ! so from now on, no step size 2 anymore
 
-                    do l = 2, ncoarse-2
-                        fine( 2*l, ifine, 2*(k-1)+1 ) = b(1)*coarse(l  ,icoarse,k) + b(1)*coarse(l+1,icoarse,k) &
-                                                      + b(2)*coarse(l-1,icoarse,k) + b(2)*coarse(l+2,icoarse,k)
-                    end do
-                end do
+                ! first row
+                ! these points requie one-sided interpolation.
+                fine( 1:nxfine, 2, izfine ) = a(1)*fine( 1:nxfine, 1, izfine ) &
+                                    + a(2)*fine( 1:nxfine, 3, izfine ) &
+                                    + a(3)*fine( 1:nxfine, 5, izfine ) &
+                                    + a(4)*fine( 1:nxfine, 7, izfine )
+                ! last row (same as above)
+                fine( 1:nxfine, nyfine-1, izfine ) = a(4)*fine( 1:nxfine, nyfine-6, izfine ) &
+                                      + a(3)*fine( 1:nxfine, nyfine-4, izfine ) &
+                                      + a(2)*fine( 1:nxfine, nyfine-2, izfine ) &
+                                      + a(1)*fine( 1:nxfine, nyfine, izfine )
+                ! remaining interior rows
+                do iyfine =  4, nyfine-3, 2
+                    fine( 1:nxfine, iyfine, izfine ) = b(2)*fine( 1:nxfine, iyfine-3, izfine ) &
+                                             + b(1)*fine( 1:nxfine, iyfine-1, izfine ) &
+                                             + b(1)*fine( 1:nxfine, iyfine+1, izfine ) &
+                                             + b(2)*fine( 1:nxfine, iyfine+3, izfine )
+                enddo
+            enddo
 
-                ! along y
-                do icoarse = 1, ncoarse
-                    ! we travel along the coarse grid
-                    ifine  = 2*(icoarse-1)+1
+            ! interpolate the z-direction (completely missing planes, no step 2)
+            ! first plane
+            fine( :, :, 2 ) = a(1)*fine( :, :, 1 ) &
+                            + a(2)*fine( :, :, 3 ) &
+                            + a(3)*fine( :, :, 5 ) &
+                            + a(4)*fine( :, :, 7 )
+            ! last plane
+            fine( :, :, nzfine-1 ) = a(4)*fine( :, :, nzfine-6 ) &
+                                   + a(3)*fine( :, :, nzfine-4 ) &
+                                   + a(2)*fine( :, :, nzfine-2 ) &
+                                   + a(1)*fine( :, :, nzfine )
+            ! remaining planes
+            do izfine =  4, nzfine-3, 2
+                fine( :, :, izfine ) = b(2)*fine( :, :, izfine-3 ) &
+                                     + b(1)*fine( :, :, izfine-1 ) &
+                                     + b(1)*fine( :, :, izfine+1 ) &
+                                     + b(2)*fine( :, :, izfine+3 )
+            enddo
 
-                    !call prediction1D( coarse(icoarse,:,k), fine(ifine,:,2*(k-1)+1) )
-
-                    fine( ifine, 2, 2*(k-1)+1  )        = a(1)*coarse(icoarse,1,k) + a(2)*coarse(icoarse,2,k) &
-                                                        + a(3)*coarse(icoarse,3,k) + a(4)*coarse(icoarse,4,k)
-
-                    fine( ifine, nfine-1, 2*(k-1)+1  )  = a(4)*coarse(icoarse,ncoarse-3,k) + a(3)*coarse(icoarse,ncoarse-2,k) &
-                                                        + a(2)*coarse(icoarse,ncoarse-1,k) + a(1)*coarse(icoarse,ncoarse  ,k)
-
-                    do l = 2, ncoarse-2
-                        fine( ifine, 2*l, 2*(k-1)+1 )   = b(1)*coarse(icoarse,l  ,k) + b(1)*coarse(icoarse,l+1,k) &
-                                                        + b(2)*coarse(icoarse,l-1,k) + b(2)*coarse(icoarse,l+2,k)
-                    end do
-                end do
-
-                ! between (this is also in x-direction, but we could also do it in y-dir)
-                do ifine = 2, nfine, 2
-                    !call prediction1D( fine(1:nfine:2,ifine,2*(k-1)+1 ), fine( :, ifine, 2*(k-1)+1) )
-
-                    fine( 2, ifine, 2*(k-1)+1  ) = a(1)*fine(1, ifine, 2*(k-1)+1) + a(2)*fine(3, ifine, 2*(k-1)+1) &
-                                                 + a(3)*fine(5, ifine, 2*(k-1)+1) + a(4)*fine(7, ifine, 2*(k-1)+1)
-
-                    fine( nfine-1, ifine, 2*(k-1)+1 ) = a(4)*fine(nfine-6, ifine, 2*(k-1)+1) + a(3)*fine(nfine-4, ifine, 2*(k-1)+1) &
-                                                      + a(2)*fine(nfine-2, ifine, 2*(k-1)+1) + a(1)*fine(nfine, ifine, 2*(k-1)+1  )
-
-                    do l = 4, nfine-3, 2
-                        fine( l, ifine, 2*(k-1)+1 ) = b(1)*fine(l-1, ifine, 2*(k-1)+1) + b(1)*fine(l+1, ifine, 2*(k-1)+1) &
-                                                    + b(2)*fine(l-3, ifine, 2*(k-1)+1) + b(2)*fine(l+3, ifine, 2*(k-1)+1)
-                    end do
-                end do
-            end do
-
-            ! interpolate z
-            do i = 1, nfine
-                do j = 1, nfine
-                    !call prediction1D( fine( i, j, 1:nfine:2 ), fine( i, j, : ) )
-
-                    fine( i, j, 2  ) = a(1)*fine(i,j,1) + a(2)*fine(i,j,3) &
-                                     + a(3)*fine(i,j,5) + a(4)*fine(i,j,7)
-
-                    fine( i, j, nfine-1 ) = a(4)*fine(i,j,nfine-6) + a(3)*fine(i,j,nfine-4) &
-                                          + a(2)*fine(i,j,nfine-2) + a(1)*fine(i,j,nfine  )
-
-                    do l = 4, nfine-3, 2
-                        fine( i, j, l ) = b(1)*fine(i,j,l-1) + b(1)*fine(i,j,l+1) &
-                                        + b(2)*fine(i,j,l-3) + b(2)*fine(i,j,l+3)
-                    end do
-                end do
-            end do
 
         else
             ! error case

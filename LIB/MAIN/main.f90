@@ -120,9 +120,8 @@ program main
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4
-    logical                             :: test, go_sync
     ! decide if data is saved or not
-    logical                             :: it_is_time_to_save_data
+    logical                             :: it_is_time_to_save_data, test_failed
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -256,20 +255,12 @@ program main
         !***********************************************************************
         t4 = MPI_wtime()
         if (params%debug) then
-            ! First we need to be sure that the ghost nodes are indeed sync'ed before we can
-            ! apply the test. This is not always the case, i.e. if adaptivity is turned off.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            ! run the internal test for the ghost nodes.
+            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
 
-            ! test=.false. ! test
-            ! call check_redundant_nodes( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, &
-            ! hvy_n, test, .false., .false.)
-
-            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-
-            if (test) then
-                iteration = 99
+            if (test_failed) then
                 call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
-                call abort(111111,"Redundant nodes check failed - stopping.")
+                call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)

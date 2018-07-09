@@ -102,6 +102,8 @@ end subroutine draw_triangle
 
 
 
+
+
 subroutine add_triangle(penalization, x0, dx, Bs, g ,phi)
 
 
@@ -174,6 +176,20 @@ subroutine add_triangle(penalization, x0, dx, Bs, g ,phi)
     penalization(:,:,3)= penalization(:,:,3) + C_sp_inv*mask * ( rho*v )
     ! preasure
     penalization(:,:,4)= penalization(:,:,4) + C_sp_inv*mask *( p - p0 )
+
+
+
+          ! sponge-free outlet
+          !--------
+          call draw_free_outlet_wall(mask, x0, dx, Bs, g )
+
+          penalization(:,:,1)= penalization(:,:,1) + C_sp_inv*mask * ( rho - rho0 )
+          ! x-velocity
+          !penalization(:,:,2)= penalization(:,:,2) + C_sp_inv*mask * ( rho*u - rho0*u0  )
+          ! y-velocity
+          penalization(:,:,3)= penalization(:,:,3) + C_sp_inv*mask * ( rho*v )
+          ! preasure
+          penalization(:,:,4)= penalization(:,:,4) + C_sp_inv*mask *( p - p0 )
 
 
 end subroutine add_triangle

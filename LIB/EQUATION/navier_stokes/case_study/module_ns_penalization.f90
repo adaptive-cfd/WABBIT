@@ -390,6 +390,45 @@ end subroutine add_constraints
 !==========================================================================
 
 
+!==========================================================================
+  !> \brief This subroutine returns the value f of a step function \n
+  !> The sharp step function is 1 if delta<=0 and 0 if delta>0 \n
+  !> h is the semi-size of the smoothing area, so \n
+  !> f is 1 if delta<=0-h \n
+  !> f is 0 if delta>0+h \n
+    function hardstep(delta)
+
+      implicit none
+      real(kind=rk), intent(in)  :: delta
+
+      real(kind=rk)              :: hardstep
+      !-------------------------------------------------
+      ! cos shaped smoothing (compact in phys.space)
+      !-------------------------------------------------
+      if (delta<=0) then
+        hardstep= 1.0_rk
+      else
+        hardstep = 0.0_rk
+      endif
+
+    end function hardstep
+!==========================================================================
+
+
+
+
+function hard_bump(x,x0,width)
+
+  real(kind=rk), intent(in)      :: x, x0, width
+  real(kind=rk)                  :: hard_bump
+
+    if (x>=x0 .and. x<=x0+width) then
+        hard_bump = 1.0
+    else
+        hard_bump = 0.0
+    endif
+
+end function hard_bump
 
 
 

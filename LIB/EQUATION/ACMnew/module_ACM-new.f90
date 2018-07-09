@@ -567,22 +567,12 @@ contains
       !-------------------------------------------------------------------------
       ! kinetic energy
       tmp(1) = params_acm%e_kin
-      call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-      if (params_acm%dim == 2) then
-        params_acm%e_kin = params_acm%e_kin / (params_acm%Lx*params_acm%Ly)
-      else
-        params_acm%e_kin = params_acm%e_kin / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-      endif
+      call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
       !-------------------------------------------------------------------------
       ! kinetic enstrophy
       tmp(1)= params_acm%enstrophy
-      call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-      if (params_acm%dim == 2) then
-        params_acm%enstrophy = params_acm%enstrophy / (params_acm%Lx*params_acm%Ly)
-      else
-        params_acm%enstrophy = params_acm%enstrophy / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-      endif
+      call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
       !-------------------------------------------------------------------------
       ! write statistics to ascii files.

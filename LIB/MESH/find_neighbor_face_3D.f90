@@ -87,7 +87,9 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! auxiliary variables
-    integer(kind=ik)                    :: list_id, list_id2, virt_code(4), virt_list_id(4)
+    integer(kind=ik)                    :: neighborID_sameLevel
+    integer(kind=ik)                    :: neighborID_coarserLevel, virt_code(4)
+    integer(kind=ik)                    :: neighborID_finerLevel(4)
 
     ! mesh level
     integer(kind=ik)                    :: level
@@ -110,10 +112,10 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     my_treecode     = lgt_block( lgt_id, 1:max_treelevel )
     level           = lgt_block( lgt_id, max_treelevel + 1 )
 
-    list_id         = -1
-    list_id2        = -1
-    virt_code       = -1
-    virt_list_id    = -1
+    neighborID_sameLevel     = -1
+    neighborID_coarserLevel  = -1
+    virt_code                = -1
+    neighborID_finerLevel    = -1
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -123,159 +125,159 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('__1/___')
 
-            list_id    = 1
+            neighborID_sameLevel    = 1
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 4) then
-                list_id2 = 30
+                neighborID_coarserLevel = 30
             elseif ( lgt_block(lgt_id, level) == 5) then
-                list_id2 = 29
+                neighborID_coarserLevel = 29
             elseif ( lgt_block(lgt_id, level) == 6) then
-                list_id2 = 27
+                neighborID_coarserLevel = 27
             elseif ( lgt_block(lgt_id, level) == 7) then
-                list_id2 = 28
+                neighborID_coarserLevel = 28
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 4
-            virt_list_id(1) = 30
+            neighborID_finerLevel(1) = 30
             virt_code(2)    = 5
-            virt_list_id(2) = 29
+            neighborID_finerLevel(2) = 29
             virt_code(3)    = 6
-            virt_list_id(3) = 27
+            neighborID_finerLevel(3) = 27
             virt_code(4)    = 7
-            virt_list_id(4) = 28
+            neighborID_finerLevel(4) = 28
 
         case('__2/___')
 
-            list_id    = 2
+            neighborID_sameLevel    = 2
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 0) then
-                list_id2 = 34
+                neighborID_coarserLevel = 34
             elseif ( lgt_block(lgt_id, level) == 2) then
-                list_id2 = 32
+                neighborID_coarserLevel = 32
             elseif ( lgt_block(lgt_id, level) == 4) then
-                list_id2 = 33
+                neighborID_coarserLevel = 33
             elseif ( lgt_block(lgt_id, level) == 6) then
-                list_id2 = 31
+                neighborID_coarserLevel = 31
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 0
-            virt_list_id(1) = 34
+            neighborID_finerLevel(1) = 34
             virt_code(2)    = 2
-            virt_list_id(2) = 32
+            neighborID_finerLevel(2) = 32
             virt_code(3)    = 4
-            virt_list_id(3) = 33
+            neighborID_finerLevel(3) = 33
             virt_code(4)    = 6
-            virt_list_id(4) = 31
+            neighborID_finerLevel(4) = 31
 
         case('__3/___')
 
-            list_id    = 3
+            neighborID_sameLevel    = 3
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 2) then
-                list_id2 = 36
+                neighborID_coarserLevel = 36
             elseif ( lgt_block(lgt_id, level) == 3) then
-                list_id2 = 38
+                neighborID_coarserLevel = 38
             elseif ( lgt_block(lgt_id, level) == 6) then
-                list_id2 = 35
+                neighborID_coarserLevel = 35
             elseif ( lgt_block(lgt_id, level) == 7) then
-                list_id2 = 37
+                neighborID_coarserLevel = 37
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 2
-            virt_list_id(1) = 36
+            neighborID_finerLevel(1) = 36
             virt_code(2)    = 3
-            virt_list_id(2) = 38
+            neighborID_finerLevel(2) = 38
             virt_code(3)    = 6
-            virt_list_id(3) = 35
+            neighborID_finerLevel(3) = 35
             virt_code(4)    = 7
-            virt_list_id(4) = 37
+            neighborID_finerLevel(4) = 37
 
         case('__4/___')
 
-            list_id    = 4
+            neighborID_sameLevel    = 4
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 1) then
-                list_id2 = 42
+                neighborID_coarserLevel = 42
             elseif ( lgt_block(lgt_id, level) == 3) then
-                list_id2 = 40
+                neighborID_coarserLevel = 40
             elseif ( lgt_block(lgt_id, level) == 5) then
-                list_id2 = 41
+                neighborID_coarserLevel = 41
             elseif ( lgt_block(lgt_id, level) == 7) then
-                list_id2 = 39
+                neighborID_coarserLevel = 39
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 1
-            virt_list_id(1) = 42
+            neighborID_finerLevel(1) = 42
             virt_code(2)    = 3
-            virt_list_id(2) = 40
+            neighborID_finerLevel(2) = 40
             virt_code(3)    = 5
-            virt_list_id(3) = 41
+            neighborID_finerLevel(3) = 41
             virt_code(4)    = 7
-            virt_list_id(4) = 39
+            neighborID_finerLevel(4) = 39
 
         case('__5/___')
 
-            list_id    = 5
+            neighborID_sameLevel    = 5
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 0) then
-                list_id2 = 46
+                neighborID_coarserLevel = 46
             elseif ( lgt_block(lgt_id, level) == 1) then
-                list_id2 = 44
+                neighborID_coarserLevel = 44
             elseif ( lgt_block(lgt_id, level) == 4) then
-                list_id2 = 45
+                neighborID_coarserLevel = 45
             elseif ( lgt_block(lgt_id, level) == 5) then
-                list_id2 = 43
+                neighborID_coarserLevel = 43
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 0
-            virt_list_id(1) = 46
+            neighborID_finerLevel(1) = 46
             virt_code(2)    = 1
-            virt_list_id(2) = 44
+            neighborID_finerLevel(2) = 44
             virt_code(3)    = 4
-            virt_list_id(3) = 45
+            neighborID_finerLevel(3) = 45
             virt_code(4)    = 5
-            virt_list_id(4) = 43
+            neighborID_finerLevel(4) = 43
 
         case('__6/___')
 
-            list_id    = 6
+            neighborID_sameLevel    = 6
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood
             if ( lgt_block(lgt_id, level) == 0) then
-                list_id2 = 50
+                neighborID_coarserLevel = 50
             elseif ( lgt_block(lgt_id, level) == 1) then
-                list_id2 = 49
+                neighborID_coarserLevel = 49
             elseif ( lgt_block(lgt_id, level) == 2) then
-                list_id2 = 47
+                neighborID_coarserLevel = 47
             elseif ( lgt_block(lgt_id, level) == 3) then
-                list_id2 = 48
+                neighborID_coarserLevel = 48
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 0
-            virt_list_id(1) = 50
+            neighborID_finerLevel(1) = 50
             virt_code(2)    = 1
-            virt_list_id(2) = 49
+            neighborID_finerLevel(2) = 49
             virt_code(3)    = 2
-            virt_list_id(3) = 47
+            neighborID_finerLevel(3) = 47
             virt_code(4)    = 3
-            virt_list_id(4) = 48
+            neighborID_finerLevel(4) = 48
 
         case default
             call abort(636300, "well you mustnt")
@@ -284,14 +286,12 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
     ! calculate treecode for neighbor on same level
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
-
-    ! proof existence of neighbor block and find light data id
+    ! check existence of neighbor block and find light data id
     call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
     if (exists) then
         ! neighbor on same level
-        hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
-
+        hvy_neighbor( heavy_id, neighborID_sameLevel ) = neighbor_light_id
     else
 
         ! We did not find the neighbor on the same level, and now check on coarser levels.
@@ -299,12 +299,11 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
         ! the last index to -1 = I go one level down (coarser)
         neighbor( level ) = -1
 
-        ! proof existence of neighbor block
+        ! check existence of neighbor block
         call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
         if ( exists ) then
-            if (list_id2<0) write(*,*) "ERROR", list_id, list_id2, dir, "..", lgt_block(lgt_id, :)
-            ! save list_id2
-            hvy_neighbor( heavy_id, list_id2 ) = neighbor_light_id
+            ! neighbor is one level down (coarser)
+            hvy_neighbor( heavy_id, neighborID_coarserLevel ) = neighbor_light_id
 
         elseif ( .not.(exists) ) then
             ! 4 neighbors one level up
@@ -318,13 +317,13 @@ subroutine find_neighbor_face_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
-                ! proof existence of neighbor block
+                ! check existence of neighbor block
                 call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+                
                 if (exists) then
                     ! neigbor is one level up
                     ! write data
-                    hvy_neighbor( heavy_id, virt_list_id(k) ) = neighbor_light_id
-
+                    hvy_neighbor( heavy_id, neighborID_finerLevel(k) ) = neighbor_light_id
                 else
                     ! error case
                     print*, dir

@@ -107,6 +107,9 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
     my_treecode     = lgt_block( light_id, 1:max_treelevel )
     level           = lgt_block( light_id, max_treelevel + 1 )
 
+    ! it is not always possible to have a corner neighbor on a coarser level, because
+    ! the 4/8 sister blocks are complete. That means, a block cannot have all neighbors
+    ! coarser. but has instead to have some on the same level.
     lvl_down_neighbor = .false.
 
     virt_code = -1
@@ -120,97 +123,89 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
     select case(dir)
 
         case('123/___')
-
             list_id    = 19
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 6
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 6 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('134/___')
-
             list_id    = 20
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 7
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 7 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('145/___')
-
             list_id    = 21
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 5
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 5 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('152/___')
-
             list_id    = 22
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 4
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 4 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('623/___')
-
             list_id    = 23
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 2
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 2 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('634/___')
-
             list_id    = 24
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 3
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 3 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('645/___')
-
             list_id    = 25
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 1
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 1 ) then
                 lvl_down_neighbor = .true.
             end if
 
         case('652/___')
-
             list_id    = 26
 
             ! virtual treecodes for neighbor search on higher level
             virt_code = 0
 
-            ! set logical for valid corner neighbors
+            ! is it possible to have a coarser neighbor?
             if ( my_treecode( level ) == 0 ) then
                 lvl_down_neighbor = .true.
             end if
@@ -219,8 +214,7 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
 
     ! calculate treecode for neighbor on same level
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
-
-    ! proof existence of neighbor block and find light data id
+    ! check existence of neighbor block and find light data id
     call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
     if (exists) then
@@ -231,7 +225,7 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
 
         ! neighbor could be one level down
         neighbor( level ) = -1
-        ! proof existence of neighbor block
+        ! check existence of neighbor block
         call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
         if ( exists .and. lvl_down_neighbor ) then
             ! neigbor is one level down
@@ -245,8 +239,9 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
 
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
-            ! proof existence of neighbor block
+            ! check existence of neighbor block
             call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+            
             if (exists) then
                 ! neigbor is one level up
                 hvy_neighbor( heavy_id, list_id ) = neighbor_light_id

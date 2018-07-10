@@ -185,9 +185,10 @@ program main
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! initalize debugging ( this is mainly time measurements )
     call allocate_init_debugging( params )
-    ! The ghost nodes will cal their own setup on the first call, but for cleaner output
+    ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
+
     !---------------------------------------------------------------------------
     ! Unit tests
     !---------------------------------------------------------------------------
@@ -220,6 +221,7 @@ program main
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+
     else
         ! next write time for reloaded data
         if (params%write_method .eq. 'fixed_time') then

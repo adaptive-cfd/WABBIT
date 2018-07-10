@@ -89,15 +89,22 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
       case ("random")
           ! randomized refinement. This can be used to generate debug meshes for
           ! testing purposes. For example the unit tests use that
-          ref_chance = 0.25_rk
+          ref_chance = 0.10_rk
           ! random refinement can set at most this many blocks to refine (avoid errors
-          ! sue to insufficient memory) (since we already have lgt_n blocks we can set the status
-          ! at most for Nmax-lgt_n blocks, which genrate each 2**d new blocks)
-          max_blocks = ((size(lgt_block,1)-lgt_n-10) / 2**d) / 2
+          ! due to insufficient memory) (since we already have lgt_n blocks we can set the status
+          ! at most for Nmax-lgt_n blocks)
+          max_blocks = (size(lgt_block,1) - lgt_n ) ! / 4 ! 4: safety
+          ! each block flagged for refinement creates (2**d-1) new blocks
+          max_blocks = ( max_blocks / (2**d-1) )
+          ! safety
+          max_blocks = max_blocks / 6
+
           ! set random seed
           call init_random_seed()
+
           ! unset all refinement flags
           lgt_block( :,Jmax+2 ) = 0
+
           ! only root rank sets the flag, then we sync. It is messy if all procs set a
           ! random value which is not sync'ed
           if (params%rank == 0) then
@@ -105,7 +112,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
               ! random number
               call random_number(r)
               ! set refinement status to refine
-              if ( r <= ref_chance .and. sum(lgt_block( :,Jmax+2 )) <= max_blocks) then
+              if ( r <= ref_chance .and. sum(lgt_block(:, Jmax+2)) <= max_blocks) then
                   lgt_block( lgt_active(k), Jmax+2 ) = 1
               else
                   lgt_block( lgt_active(k), Jmax+2 ) = 0

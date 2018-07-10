@@ -86,7 +86,9 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
 
     ! auxiliary variables
-    integer(kind=ik)                    :: list_id, list_id2, virt_code(2), virt_list_id(2)
+    integer(kind=ik)                    :: neighborID_sameLevel, neighborID_coarserLevel
+    integer(kind=ik)                    :: virt_code(2)
+    integer(kind=ik)                    :: neighborID_finerLevel(2)
 
     ! mesh level
     integer(kind=ik)                    :: level
@@ -112,10 +114,10 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     my_treecode     = lgt_block( lgt_id, 1:max_treelevel )
     level           = lgt_block( lgt_id, max_treelevel + 1 )
 
-    list_id         = -1
-    list_id2        = -1
-    virt_code       = -1
-    virt_list_id    = -1
+    neighborID_sameLevel    = -1
+    neighborID_coarserLevel = -1
+    virt_code               = -1
+    neighborID_finerLevel   = -1
 
     lvl_down_neighbor = .false.
 
@@ -127,20 +129,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_12/___')
 
-            list_id    = 7
+            neighborID_sameLevel    = 7
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 4) then
-                list_id2 = 52
+                neighborID_coarserLevel = 52
             elseif ( lgt_block(lgt_id, level) == 6) then
-                list_id2 = 51
+                neighborID_coarserLevel = 51
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 4
-            virt_list_id(1) = 52
+            neighborID_finerLevel(1) = 52
             virt_code(2)    = 6
-            virt_list_id(2) = 51
+            neighborID_finerLevel(2) = 51
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 4) .or. (my_treecode( level ) == 6) ) then
@@ -149,20 +151,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_13/___')
 
-            list_id    = 8
+            neighborID_sameLevel    = 8
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 6) then
-                list_id2 = 53
+                neighborID_coarserLevel = 53
             elseif ( lgt_block(lgt_id, level) == 7) then
-                list_id2 = 54
+                neighborID_coarserLevel = 54
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 6
-            virt_list_id(1) = 53
+            neighborID_finerLevel(1) = 53
             virt_code(2)    = 7
-            virt_list_id(2) = 54
+            neighborID_finerLevel(2) = 54
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 6) .or. (my_treecode( level ) == 7) ) then
@@ -171,20 +173,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_14/___')
 
-            list_id    = 9
+            neighborID_sameLevel    = 9
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 5) then
-                list_id2 = 56
+                neighborID_coarserLevel = 56
             elseif ( lgt_block(lgt_id, level) == 7) then
-                list_id2 = 55
+                neighborID_coarserLevel = 55
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 5
-            virt_list_id(1) = 56
+            neighborID_finerLevel(1) = 56
             virt_code(2)    = 7
-            virt_list_id(2) = 55
+            neighborID_finerLevel(2) = 55
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 5) .or. (my_treecode( level ) == 7) ) then
@@ -193,20 +195,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_15/___')
 
-            list_id    = 10
+            neighborID_sameLevel    = 10
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 4) then
-                list_id2 = 58
+                neighborID_coarserLevel = 58
             elseif ( lgt_block(lgt_id, level) == 5) then
-                list_id2 = 57
+                neighborID_coarserLevel = 57
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 4
-            virt_list_id(1) = 58
+            neighborID_finerLevel(1) = 58
             virt_code(2)    = 5
-            virt_list_id(2) = 57
+            neighborID_finerLevel(2) = 57
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 4) .or. (my_treecode( level ) == 5) ) then
@@ -215,20 +217,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_62/___')
 
-            list_id    = 11
+            neighborID_sameLevel    = 11
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 0) then
-                list_id2 = 60
+                neighborID_coarserLevel = 60
             elseif ( lgt_block(lgt_id, level) == 2) then
-                list_id2 = 59
+                neighborID_coarserLevel = 59
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 0
-            virt_list_id(1) = 60
+            neighborID_finerLevel(1) = 60
             virt_code(2)    = 2
-            virt_list_id(2) = 59
+            neighborID_finerLevel(2) = 59
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 0) .or. (my_treecode( level ) == 2) ) then
@@ -237,20 +239,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_63/___')
 
-            list_id    = 12
+            neighborID_sameLevel    = 12
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 2) then
-                list_id2 = 61
+                neighborID_coarserLevel = 61
             elseif ( lgt_block(lgt_id, level) == 3) then
-                list_id2 = 62
+                neighborID_coarserLevel = 62
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 2
-            virt_list_id(1) = 61
+            neighborID_finerLevel(1) = 61
             virt_code(2)    = 3
-            virt_list_id(2) = 62
+            neighborID_finerLevel(2) = 62
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 2) .or. (my_treecode( level ) == 3) ) then
@@ -259,20 +261,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_64/___')
 
-            list_id    = 13
+            neighborID_sameLevel    = 13
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 1) then
-                list_id2 = 64
+                neighborID_coarserLevel = 64
             elseif ( lgt_block(lgt_id, level) == 3) then
-                list_id2 = 63
+                neighborID_coarserLevel = 63
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 1
-            virt_list_id(1) = 64
+            neighborID_finerLevel(1) = 64
             virt_code(2)    = 3
-            virt_list_id(2) = 63
+            neighborID_finerLevel(2) = 63
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 1) .or. (my_treecode( level ) == 3) ) then
@@ -281,20 +283,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_65/___')
 
-            list_id    = 14
+            neighborID_sameLevel    = 14
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 0) then
-                list_id2 = 66
+                neighborID_coarserLevel = 66
             elseif ( lgt_block(lgt_id, level) == 1) then
-                list_id2 = 65
+                neighborID_coarserLevel = 65
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 0
-            virt_list_id(1) = 66
+            neighborID_finerLevel(1) = 66
             virt_code(2)    = 1
-            virt_list_id(2) = 65
+            neighborID_finerLevel(2) = 65
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 0) .or. (my_treecode( level ) == 1) ) then
@@ -303,20 +305,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_23/___')
 
-            list_id    = 15
+            neighborID_sameLevel    = 15
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 2) then
-                list_id2 = 68
+                neighborID_coarserLevel = 68
             elseif ( lgt_block(lgt_id, level) == 6) then
-                list_id2 = 67
+                neighborID_coarserLevel = 67
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 2
-            virt_list_id(1) = 68
+            neighborID_finerLevel(1) = 68
             virt_code(2)    = 6
-            virt_list_id(2) = 67
+            neighborID_finerLevel(2) = 67
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 2) .or. (my_treecode( level ) == 6) ) then
@@ -325,20 +327,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_25/___')
 
-            list_id    = 16
+            neighborID_sameLevel    = 16
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 0) then
-                list_id2 = 70
+                neighborID_coarserLevel = 70
             elseif ( lgt_block(lgt_id, level) == 4) then
-                list_id2 = 69
+                neighborID_coarserLevel = 69
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 0
-            virt_list_id(1) = 70
+            neighborID_finerLevel(1) = 70
             virt_code(2)    = 4
-            virt_list_id(2) = 69
+            neighborID_finerLevel(2) = 69
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 0) .or. (my_treecode( level ) == 4) ) then
@@ -347,20 +349,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_43/___')
 
-            list_id    = 17
+            neighborID_sameLevel    = 17
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 3) then
-                list_id2 = 72
+                neighborID_coarserLevel = 72
             elseif ( lgt_block(lgt_id, level) == 7) then
-                list_id2 = 71
+                neighborID_coarserLevel = 71
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 3
-            virt_list_id(1) = 72
+            neighborID_finerLevel(1) = 72
             virt_code(2)    = 7
-            virt_list_id(2) = 71
+            neighborID_finerLevel(2) = 71
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 3) .or. (my_treecode( level ) == 7) ) then
@@ -369,20 +371,20 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
         case('_45/___')
 
-            list_id    = 18
+            neighborID_sameLevel    = 18
 
             ! id2 for cases with neighbor one level down
             if ( lgt_block(lgt_id, level) == 1) then
-                list_id2 = 74
+                neighborID_coarserLevel = 74
             elseif ( lgt_block(lgt_id, level) == 5) then
-                list_id2 = 73
+                neighborID_coarserLevel = 73
             end if
 
             ! virtual treecodes, list_ids for neighbors on higher level
             virt_code(1)    = 1
-            virt_list_id(1) = 74
+            neighborID_finerLevel(1) = 74
             virt_code(2)    = 5
-            virt_list_id(2) = 73
+            neighborID_finerLevel(2) = 73
 
             ! set logical for valid edge neighbors
             if ( (my_treecode( level ) == 1) .or. (my_treecode( level ) == 5) ) then
@@ -393,25 +395,24 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
     ! calculate treecode for neighbor on same level
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
-
-    ! proof existence of neighbor block and find light data id
+    ! check existence of neighbor block and find light data id
     call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
 
     if (exists) then
         ! neighbor on same level
-        hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
+        hvy_neighbor( heavy_id, neighborID_sameLevel ) = neighbor_light_id
 
     else
 
-        ! neighbor could be one level down
+        ! neighbor could be one level down  (coarser)
         neighbor( level ) = -1
-        ! proof existence of neighbor block
+        ! check existence of neighbor block
         call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
-        if ( exists .and. lvl_down_neighbor ) then
 
-            ! neigbor is one level down
-            ! save list_id2
-            hvy_neighbor( heavy_id, list_id2 ) = neighbor_light_id
+        if ( exists .and. lvl_down_neighbor ) then
+            ! neigbor is one level down (coarser)
+            ! save neighborID_coarserLevel
+            hvy_neighbor( heavy_id, neighborID_coarserLevel ) = neighbor_light_id
 
         elseif ( .not.(exists) ) then
             ! 2 neighbors one level up
@@ -425,12 +426,12 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
-                ! proof existence of neighbor block
+                ! check existence of neighbor block
                 call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
                 if (exists) then
                     ! neigbor is one level up
                     ! write data
-                    hvy_neighbor( heavy_id, virt_list_id(k) ) = neighbor_light_id
+                    hvy_neighbor( heavy_id, neighborID_finerLevel(k) ) = neighbor_light_id
 
                 else
                     ! error case

@@ -16,7 +16,7 @@ subroutine flusi_to_wabbit(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid, create_equidistant_base_mesh
+    use module_initialization, only: allocate_grid, create_equidistant_grid
     use mpi
 
     implicit none
@@ -89,7 +89,7 @@ subroutine flusi_to_wabbit(help, params)
         call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
             hvy_active, lgt_sortednumlist, .false.)
 
-        call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor,&
+        call create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor,&
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
             params%max_treelevel, .true.)
 

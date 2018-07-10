@@ -3,7 +3,7 @@
 ! ********************************************************************************************
 ! WABBIT
 ! ============================================================================================
-!> \name create_equidistant_base_mesh.f90
+!> \name create_equidistant_grid.f90
 !> \version 0.5
 !> \author engels
 !
@@ -22,7 +22,7 @@
 !
 ! ********************************************************************************************
 
-subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity )
 
   !---------------------------------------------------------------------------------------------
@@ -192,4 +192,4 @@ subroutine create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neigh
   ! update neighbor relations
   call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
-end subroutine create_equidistant_base_mesh
+end subroutine create_equidistant_grid

@@ -145,8 +145,10 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         ! NOTE: S is symmetric, we add the layer on all sides.
         if (params%order_predictor == "multiresolution_4th" ) then
             S  = 1
+            min_size = 4
         elseif (params%order_predictor == "multiresolution_2nd" ) then
             S  = 0
+            min_size = 2
         else
             call abort(2875490, "The predictor method is unknown")
         endif
@@ -168,7 +170,6 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         ! direction of the interior. We use this also if we do not have enough points
         ! for the interpolation stencil. This way, one can still set S=0 but ensure having
         ! enough points.
-        min_size = 4 ! 4th order
 
         do i = 1, params%dim
             ! patch at least A (defined above) but possibly the required number to
@@ -197,10 +198,9 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
             r1 = real(ijkrecv(1,i)-(g+1), kind=rk)
             r2 = real(ijkrecv(2,i)-(g+1), kind=rk)
 
+            ! there's a very simple relation between sender and buffer boundarys.
             ! Buffer: x = x0 + dx*(ix-1)
             ! Recver: x = x0 + dx*(ix-(g+1))
-
-            ! there's a very simple relation between sender and buffer boundarys.
             ! we only need to define the recver bounds (NOTE: RESPRE buffer starts 1,1,1 not g+1,g+1,g+1)
             i1 = nint( (r1*dx_recv(i) + x0_recv(i) - x0_buffer(i)) / dx_buffer(i) ) +1
             i2 = nint( (r2*dx_recv(i) + x0_recv(i) - x0_buffer(i)) / dx_buffer(i) ) +1

@@ -282,7 +282,6 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 20 )
 
-            allocate( res_pre_data( 2*Bs+2*g, 2*Bs+2*g, 2*Bs+2*g, Neqn) )
             allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
         else
             !---2d---2d---
@@ -297,7 +296,6 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 20 )
 
-            allocate( res_pre_data( 2*Bs+2*g, 2*Bs+2*g, 1, Neqn) )
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
 
@@ -373,6 +371,13 @@ subroutine init_ghost_nodes( params )
                 enddo
             enddo
         enddo
+
+        ! now we know how large the patches are we'd like to store in the RESPRE buffer
+        i = maxval( ijkGhosts(2,1,:,:,:,RESPRE) )*2
+        j = maxval( ijkGhosts(2,2,:,:,:,RESPRE) )*2
+        k = maxval( ijkGhosts(2,3,:,:,:,RESPRE) )*2
+
+        allocate( res_pre_data( i, j, k, Neqn) )
 
         ! this output can be plotted using the python script
         if (params%rank==0) Then

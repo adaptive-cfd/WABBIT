@@ -206,6 +206,12 @@ contains
         write(*,*) "PARAMS: initial conditions"
         write(*,'(" ---------------------------")')
       endif
+      call read_param_mpi(FILE, 'Physics', 'initial_cond', params_ns%inicond, "read_from_files" )
+      if ( params_ns%inicond == "read_from_files") then
+        if (params_ns%mpirank==0) write(*,'("initial configuration is read from file!")')
+        if (params_ns%mpirank==0) write(*,'("we read in (rho,u , v, p) and convert it to skew: (sqrt(rho),sqrt(rho)u, sqrt(rho)v, p)!")')
+        return
+      end if
       call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
       call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%Lx*0.1_rk )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )

@@ -94,6 +94,12 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        ! Navier stokes has different statevector (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) then
+        ! the statevector saved to file (rho,u,v,p)
+        ! we therefore convert it once here
+        if (params%physics_type == 'navier_stokes') then
+          call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond, hvy_work, .true.)
+        end if
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------

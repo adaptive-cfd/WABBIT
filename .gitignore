@@ -5,6 +5,8 @@ TESTING/B_SWIRL/dt*
 TESTING/B_SWIRL/fixeps*
 TESTING/B_SWIRL/adapt_*
 TESTING/B_SWIRL/adaptiv*_swirl-*
+TESTING/navier_stokes/funnel/*.dat
+TESTING/navier_stokes/filter/**/*.dat
 *times.dat
 *.log
 *.t

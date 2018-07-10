@@ -97,7 +97,7 @@ module module_ns_penalization
       real(kind=rk)       ::outer_diameter         ! outer diameter
       real(kind=rk)       ::max_inner_diameter     ! maximal inner diameter
       real(kind=rk)       ::min_inner_diameter    =-1.0_rk ! minimal inner diameter
-      integer(kind=ik)    ::nr_plates             =0.0_ik ! Number of plates
+      integer(kind=ik)    ::nr_plates             =0_ik ! Number of plates
       real(kind=rk)       ::plates_distance       =-1.0_rk ! distance between origin of plates
       real(kind=rk)       ::plates_thickness      =-1.0_rk !
       real(kind=rk)       ::first_plate_thickness =-1.0_rk
@@ -118,6 +118,7 @@ module module_ns_penalization
       real(kind=rk)       ::inlet_density       !
       real(kind=rk)       ::inlet_pressure       !
       real(kind=rk)       ::outlet_pressure       !
+      real(kind=rk)       ::outlet_density
       real(kind=rk)       ::pump_speed       !
       real(kind=rk)       ::pump_density      !
       real(kind=rk)       ::pump_pressure     !
@@ -202,7 +203,7 @@ subroutine init_penalization( params,FILE )
       call init_simple_sponge(params,FILE)
       call init_vortex_street(FILE)
     case ('funnel')
-      call init_funnel(FILE)
+      call init_funnel(params,FILE)
     case default
       call abort(8546501,"[module_ns_penalization.f90] ERROR: geometry for VPM is unknown"//mask_geometry)
 
@@ -389,6 +390,45 @@ end subroutine add_constraints
 !==========================================================================
 
 
+!==========================================================================
+  !> \brief This subroutine returns the value f of a step function \n
+  !> The sharp step function is 1 if delta<=0 and 0 if delta>0 \n
+  !> h is the semi-size of the smoothing area, so \n
+  !> f is 1 if delta<=0-h \n
+  !> f is 0 if delta>0+h \n
+    function hardstep(delta)
+
+      implicit none
+      real(kind=rk), intent(in)  :: delta
+
+      real(kind=rk)              :: hardstep
+      !-------------------------------------------------
+      ! cos shaped smoothing (compact in phys.space)
+      !-------------------------------------------------
+      if (delta<=0) then
+        hardstep= 1.0_rk
+      else
+        hardstep = 0.0_rk
+      endif
+
+    end function hardstep
+!==========================================================================
+
+
+
+
+function hard_bump(x,x0,width)
+
+  real(kind=rk), intent(in)      :: x, x0, width
+  real(kind=rk)                  :: hard_bump
+
+    if (x>=x0 .and. x<=x0+width) then
+        hard_bump = 1.0
+    else
+        hard_bump = 0.0
+    endif
+
+end function hard_bump
 
 
 
@@ -510,6 +550,49 @@ end subroutine simple_sponge
 
 
 
+
+subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
+
+    implicit none
+    ! grid
+    integer(kind=ik), intent(in)                              :: Bs, g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:), intent(out)              :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)                                             :: x, y,h,r,Delta_r
+    ! loop variables
+    integer(kind=ik)                                          :: ix, iy
+
+!---------------------------------------------------------------------------------------------
+! variables initialization
+    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+
+    ! reset mask array
+    mask  = 0.0_rk
+
+
+!---------------------------------------------------------------------------------------------
+! main body
+    Delta_r =Domain_Size(2)*0.475_rk
+
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
+
+    do ix=1, Bs+2*g
+        x = dble(ix-(g+1)) * dx(1) + x0(1)
+        do iy=1, Bs+2*g
+           y = dble(iy-(g+1)) * dx(2) + x0(2)
+           r = abs(y-Domain_Size(2)*0.5_rk)
+
+           mask(ix,iy) = smoothstep(Delta_r-r,h)
+
+       end do
+    end do
+end subroutine draw_free_outlet_wall
+!==========================================================================
 
 
 

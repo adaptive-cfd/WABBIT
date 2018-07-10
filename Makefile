@@ -79,7 +79,9 @@ ifeq ($(shell $(FC) -qversion 2>&1 | head -c 3),IBM)
 #code below are of two different types; ct0 is double precision and -0.999
 #is single (-0.999d0 would be double). If you want xlf to auto-promote
 #single precision constants to doubles, add the compiler option "-qdpc".
-FFLAGS += -O3 -qnohot -qfullpath -qdpc -qmoddir=$(OBJDIR)
+FFLAGS += -O5 -qdpc -qmoddir=$(OBJDIR)
+FFLAGS += -qnohot
+#FFLAGS += -C -qflttrap=overflow:underflow:nanq:zerodivide:qpxstore:enable -qsigtrap -g9 -qnoopt -qfullpath
 FFLAGS += -I$(OBJDIR)
 endif
 

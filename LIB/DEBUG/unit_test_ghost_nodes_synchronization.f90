@@ -65,7 +65,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     real(kind=rk)                           :: ddx(1:3), xx0(1:3)
 
     ! grid parameter
-    integer(kind=ik)                        :: Bs, g, Ds, number_blocks
+    integer(kind=ik)                        :: Bs, g, number_blocks
     real(kind=rk)                           :: Lx, Ly, Lz
     ! data dimensionality
     integer(kind=ik)                        :: d, dF, max_neighbors
@@ -112,7 +112,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
     Bs = params%number_block_nodes
     g  = params%number_ghost_nodes
-    Ds = params%number_domain_nodes
     dF = params%number_data_fields
     number_procs  = params%number_procs
     number_blocks = params%number_blocks
@@ -126,32 +125,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! and perform the same test for differnet frequencies (= resolutions) only on
     ! this one grid.
     !---------------------------------------------------------------------------
-    ! allocate coord arrays
-    allocate( coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ) )
-
-    ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
-         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-
-    ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
-    ! Note that active lists + neighbor relations are updated inside this routine as well, as
-    ! the grid is modified
-    call create_equidistant_base_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true. )
-
-    !---------------------------------------------------------------------------------------------
-    ! second: refine some blocks (random), coarsen some blocks (random)
-    do l = 1, 5
-        if (params%rank==0) write(*,'("UNIT TEST: iteration ",i1," of random grid generation")') l
-
-        ! refine some blocks
-        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
-             lgt_sortednumlist, hvy_active, hvy_n, "random" )
-
-        ! random adapt some blocks
-        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )
-    end do
+    l = 5
+    call create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l )
 
     if (params%rank == 0) then
         write(*,'(80("-"))')
@@ -167,6 +143,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! equivalent to using different block sizes, but way easier to program.
     ! These frequencies are tested:
     frequ=(/1.0_rk , 2.0_rk, 4.0_rk, 8.0_rk, 16.0_rk, 32.0_rk/)
+    allocate( coord_x( Bs + 2*g ), coord_y( Bs + 2*g ), coord_z( Bs + 2*g ) )
 
     ! loop over frequencies
     do ifrequ = 1 , size(frequ)

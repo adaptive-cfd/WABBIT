@@ -256,6 +256,9 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             ! preasure
             penalization(ix,iy,4)=C_inv*mask(ix,iy,4)*(p-  Phi_ref(ix,iy,4) )
 
+
+
+
        end do
     end do
 end subroutine add_funnel
@@ -282,7 +285,7 @@ subroutine integrate_over_pump_area(u,g,Bs,x0,dx,integral,area)
      h  = 1.5_rk*max(dx(1), dx(2))
     ! calculate mean density close to the pump
     width =funnel%wall_thickness*0.5_rk
-    tmp   =  0
+    tmp   =  0.0_rk
     r0    =(R_domain-funnel%wall_thickness)
      do iy=g+1, Bs+g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
@@ -407,7 +410,9 @@ function draw_plate(x,r,plate,h)
   real(kind=rk)                      ::draw_plate,delta_r
 
   delta_r     = plate%r_out-plate%r_in
-  draw_plate  = soft_bump(x,plate%x0(1),plate%width,h)*soft_bump(r,plate%r_in,delta_r,h)
+  !draw_plate  = soft_bump(x,plate%x0(1),plate%width,h)*soft_bump(r,plate%r_in,delta_r,h)
+  draw_plate  = hard_bump(x,plate%x0(1),plate%width)*hard_bump(r,plate%r_in,delta_r)
+
 end function draw_plate
 
 
@@ -420,32 +425,38 @@ function draw_walls(x,r,funnel,h)
 
   mask=0.0_rk
 
+  ! wall in south and north
   if (abs(x-funnel%pump_x_center)> funnel%pump_diameter*0.5_rk) then
     ! mask for r>R_domain-wall_thickness   (outer wall)
-         mask=mask+smoothstep(R_domain-funnel%wall_thickness-r,h)
+         !mask=mask+smoothstep(R_domain-funnel%wall_thickness-r,h)
+         mask=mask+hardstep(R_domain-funnel%wall_thickness-r)
   else
         ! +h because the sponge domain should not overlap with the walls
-         mask=mask+smoothstep(R_domain-0.333_rk*funnel%wall_thickness+h-r,h)
+        mask=mask+hardstep(R_domain-0.333_rk*funnel%wall_thickness+h-r)
+
+         !mask=mask+smoothstep(R_domain-0.333_rk*funnel%wall_thickness+h-r,h)
   endif
 
+  ! wall in east
+  !mask=mask+smoothstep(x-funnel%wall_thickness,h)
+  mask=mask+hardstep(x-funnel%wall_thickness)
 
-  ! wall in EAST
-  !if (  r > funnel%jet_radius  ) then
-         mask=mask+smoothstep(x-funnel%wall_thickness,h)
-  !else
-  !       mask=mask+smoothstep(x-funnel%wall_thickness*0.5_rk,h)
-  !endif
   ! attach cappilary to wall in EAST
   if (  r > funnel%jet_radius  ) then
-         mask=mask+smoothstep(x-funnel%plate(1)%x0(1),h)*smoothstep(r-funnel%r_out_cappilary,h)
+      mask=mask+hardstep(x-funnel%plate(1)%x0(1))*hardstep(r-funnel%r_out_cappilary)
+
+         !mask=mask+smoothstep(x-funnel%plate(1)%x0(1),h)*smoothstep(r-funnel%r_out_cappilary,h)
   endif
 
 
   ! wall in WEST
   if ( r > funnel%min_inner_diameter*0.5_rk) then
-         mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+        !  mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+
+         mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness)
   else
-         mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
+        mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk)
+        ! mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
   endif
 
    ! is needed because mask off walls overlap
@@ -522,8 +533,8 @@ function draw_outlet(x,r,funnel,h)
 
          ! wall in WEST
     !draw_outlet=smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
-draw_outlet=soft_bump(x,domain_size(1)-funnel%wall_thickness+h,funnel%wall_thickness*0.5_rk-2*h,h)&
-            *smoothstep(r-funnel%min_inner_diameter*0.5_rk,h)
+draw_outlet=soft_bump2(x,domain_size(1)-funnel%wall_thickness,funnel%wall_thickness*0.5_rk,h)&
+            *smoothstep(r-(funnel%min_inner_diameter*0.5_rk-h),h)
 
 end function draw_outlet
 

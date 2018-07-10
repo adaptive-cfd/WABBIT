@@ -27,6 +27,7 @@ module module_MPI
     use module_debug
     ! interpolation routines
     use module_interpolation
+    use module_treelib
 
     implicit none
 !---------------------------------------------------------------------------------------------
@@ -243,8 +244,11 @@ subroutine init_ghost_nodes( params )
     ! local variables
     integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, rank
     integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idata_bounds_type
-    integer(kind=ik) :: data_bounds(2,3), j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
+    integer(kind=ik) ::  j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
     integer(kind=ik) :: i, k
+    integer(kind=ik) :: ijkrecv(2,3)
+    integer(kind=ik) :: ijkbuffer(2,3)
+    integer(kind=ik) :: ijksend(2,3)
 
     ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then
@@ -253,6 +257,12 @@ subroutine init_ghost_nodes( params )
         g               = params%number_ghost_nodes
         Neqn            = params%number_data_fields
         rank            = params%rank
+
+        if (g>=(Bs+1)/2) then
+            call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 which implies &
+            & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
+            & number_ghost_nodes or increase number_block_nodes.")
+        endif
 
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
@@ -272,7 +282,6 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 20 )
 
-            allocate( res_pre_data( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
             allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
         else
             !---2d---2d---
@@ -287,7 +296,6 @@ subroutine init_ghost_nodes( params )
             ! NOTE: their number can be increased if necessary
             N_friends = min( params%number_procs, 20 )
 
-            allocate( res_pre_data( Bs+2*g+10, Bs+2*g+10, 1, Neqn) )
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
 
@@ -350,82 +358,28 @@ subroutine init_ghost_nodes( params )
         ! This arrays indices are:
         ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [idata_bounds_type], [isendrecv])
 
-        ijkGhosts = -1
+        ijkGhosts = 1
         do ineighbor = 1, Nneighbor
             do leveldiff = -1, 1
                 do idata_bounds_type = 1, 3
-                    call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'sender')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, SENDER) = data_bounds
+                    call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, idata_bounds_type, 'receiver')
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RECVER) = ijkrecv
 
-                    call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'receiver')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RECVER) = data_bounds
-
-                    call calc_data_bounds( params, data_bounds, ineighbor, leveldiff, idata_bounds_type, 'restricted-predicted')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RESPRE) = data_bounds
-
-
-                    !---------TESTING-------------------------------------------
-                    if (leveldiff==0) then
-                        rx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 2)
-                        rx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 2)
-                        ry0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 2)
-                        ry1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 2)
-                        rz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 2)
-                        rz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 2)
-
-                        sx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 1)
-                        sx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 1)
-                        sy0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 1)
-                        sy1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 1)
-                        sz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 1)
-                        sz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 1)
-                        if ((sx1-sx0+1.ne.rx1-rx0+1).or.(sy1-sy0+1.ne.ry1-ry0+1).or.(sz1-sz0+1.ne.rz1-rz0+1)) then
-                            write(*,*) "leveldiff", leveldiff, "bounds-type", idata_bounds_type, "neighhborhood:", ineighbor, "dim=", dim
-
-                            write(*,'("send ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') sx0, sx1, sx1-sx0+1, &
-                            sy0, sy1, sy1-sy0+1, sz0, sz1, sz1-sz0+1
-                            write(*,'("recv ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') rx0, rx1, rx1-rx0+1, &
-                            ry0, ry1, ry1-ry0+1, rz0, rz1, rz1-rz0+1
-
-                            call abort(66271, "Preflight: array bounds mismatch during ghost copy on same level.")
-                        endif
-                    else
-                        rx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 2)
-                        rx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 2)
-                        ry0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 2)
-                        ry1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 2)
-                        rz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 2)
-                        rz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 2)
-
-                        sx0 = ijkGhosts(1,1, ineighbor, leveldiff, idata_bounds_type, 3)
-                        sx1 = ijkGhosts(2,1, ineighbor, leveldiff, idata_bounds_type, 3)
-                        sy0 = ijkGhosts(1,2, ineighbor, leveldiff, idata_bounds_type, 3)
-                        sy1 = ijkGhosts(2,2, ineighbor, leveldiff, idata_bounds_type, 3)
-                        sz0 = ijkGhosts(1,3, ineighbor, leveldiff, idata_bounds_type, 3)
-                        sz1 = ijkGhosts(2,3, ineighbor, leveldiff, idata_bounds_type, 3)
-
-                        ! there is neighborhoods that do not make sense: in this case, all indices
-                        ! are set to 1. we skip those. An example would be a face neighbor in 3D on the same level (code 1)
-                        ! which is never restricted/predicted
-                        if (sx0/=1 .and. sx1/=1 .and. sy0/=1 .and. sy1/=1 .and. sz0/=1 .and. sz1/=1 ) then
-                            if ((sx1-sx0+1.ne.rx1-rx0+1).or.(sy1-sy0+1.ne.ry1-ry0+1).or.(sz1-sz0+1.ne.rz1-rz0+1)) then
-                                write(*,*) "leveldiff", leveldiff, "bounds-type", idata_bounds_type, "neighhborhood:", ineighbor, "dim=", dim
-
-                                write(*,'("send ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') sx0, sx1, sx1-sx0+1, &
-                                sy0, sy1, sy1-sy0+1, sz0, sz1, sz1-sz0+1
-                                write(*,'("recv ",i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x,  i3,":",i3," N=",i3,6x)') rx0, rx1, rx1-rx0+1, &
-                                ry0, ry1, ry1-ry0+1, rz0, rz1, rz1-rz0+1
-
-                                call abort(66272, "Preflight: array bounds mismatch during ghost copy on different level.")
-                            endif
-                        endif
-
-                    endif
-
+                    call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, idata_bounds_type)
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, SENDER) = ijksend
+                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RESPRE) = ijkbuffer
                 enddo
             enddo
         enddo
 
+        ! now we know how large the patches are we'd like to store in the RESPRE buffer
+        i = maxval( ijkGhosts(2,1,:,:,:,RESPRE) )*2
+        j = maxval( ijkGhosts(2,2,:,:,:,RESPRE) )*2
+        k = maxval( ijkGhosts(2,3,:,:,:,RESPRE) )*2
+
+        allocate( res_pre_data( i, j, k, Neqn) )
+
+        ! this output can be plotted using the python script
         if (params%rank==0) Then
             open(16,file='ghost_bounds.dat',status='replace')
             write(16,'(i3)') Bs

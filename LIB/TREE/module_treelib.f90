@@ -5,6 +5,8 @@ module module_treelib
 
 contains
 
+    include "get_neighbor_treecode.f90"
+
   !===============================================================================
 
   ! from agiven treecode (in the form of an array), we compute a unique integer
@@ -67,6 +69,8 @@ subroutine adjacent4( treecode, direction, treecode_neighbor)
       case('_SW')
           call adjacent4_NESW( treecode, '__N', treecode_tmp)
           call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
+      case default
+          call abort(118118, "Lord vader, the treelib does not know the direction")
     end select
 
 end subroutine adjacent4
@@ -204,6 +208,8 @@ end subroutine adjacent4
               i = i + 1
             endif
           enddo
+      case default
+          call abort(118118, "Lord vader, the treelib does not know the direction")
     end select
 
   end subroutine
@@ -549,6 +555,8 @@ end subroutine adjacent4
               call adjacent_block_2D(me, neighbor2, '__S', level, max_treelevel)
               call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
 
+          case default
+              call abort(118119, "Lord vader, the treelib does not know the direction")
       end select
   end subroutine adjacent_block_2D
 
@@ -908,7 +916,9 @@ end subroutine adjacent4
               call adjacent_block_3D(me, neighbor3, '__6/___', level, max_treelevel)
               call adjacent_block_3D(neighbor3, neighbor2, '__5/___', level, max_treelevel)
               call adjacent_block_3D(neighbor2, neighbor, '__2/___', level, max_treelevel)
-
+              
+          case default
+              call abort(118112, "Lord vader, the treelib does not know the direction")
       end select
 
   end subroutine adjacent_block_3D

@@ -46,8 +46,6 @@ contains
     ! ghost nodes unit test
     include "unit_test_ghost_nodes_synchronization.f90"
 
-    include "unit_test_wavelet_compression.f90"
-
     include "unit_test_treecode.f90"
 
 end module module_unit_test

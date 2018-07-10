@@ -11,13 +11,13 @@
 !! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
 !! and origin are 3D vectors, the third component being zero in a 2D case. \n
 !
-!> 
-!! input:    
+!>
+!! input:
 !!           - params
 !!           - lgt_id (this is the block we look at)
 !!           - lgt_block (this is the list of light block data, which contains the treecode, level (and refinement status, but we don't use that here))
 !!
-!! output:   
+!! output:
 !!           - x0(1:3) vector with the origin of the block
 !!           - dx(1:3) spacing on the block
 !!
@@ -39,9 +39,6 @@ subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
   integer(kind=ik), intent(in)               :: lgt_block(:, :)
   ! loop variables and shortcuts
   integer(kind=ik)                           :: ix,iy,iz,level,bs
-
-  x0 = 0.0_rk
-  dx = 0.0_rk
 
   bs = params%number_block_nodes
 

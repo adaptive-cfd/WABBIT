@@ -15,7 +15,6 @@ subroutine sparse_to_dense(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid, deallocate_grid
     use module_mpi
 
     implicit none

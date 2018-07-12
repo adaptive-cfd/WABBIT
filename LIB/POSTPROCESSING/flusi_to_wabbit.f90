@@ -16,7 +16,6 @@ subroutine flusi_to_wabbit(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid, create_equidistant_grid
     use mpi
 
     implicit none

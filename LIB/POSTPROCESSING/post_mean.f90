@@ -15,7 +15,6 @@ subroutine post_mean(params, help)
   use module_IO
   use module_precision
   use module_params
-  use module_initialization, only: allocate_grid
   use module_mesh
   use mpi
 

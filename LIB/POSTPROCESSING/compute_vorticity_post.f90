@@ -15,7 +15,6 @@ subroutine compute_vorticity_post(help, params)
     use module_mesh
     use module_params
     use module_IO
-    use module_initialization, only: allocate_grid
     use module_mpi
     use module_operators
 

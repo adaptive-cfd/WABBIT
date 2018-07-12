@@ -336,7 +336,8 @@ end subroutine ini_file_to_params
       write(*,'(" ----------------------------")')
     endif
 
-    call read_param_mpi(FILE, 'MPI', 'mpi_data_exchange', params%mpi_data_exchange, "---" )
+    ! read number of friends 
+    call read_param_mpi(FILE, 'MPI', 'N_friends', params%N_friends, 20_ik)
 
     ! READ Bridge Parameter
     ! ----------------------

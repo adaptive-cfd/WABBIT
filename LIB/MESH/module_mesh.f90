@@ -129,4 +129,12 @@ contains
     include "gather_blocks_on_proc.f90"
     include "quicksort.f90"
 
+    ! routines for creation of an initial grid
+    include "create_equidistant_grid.f90"
+    include "create_random_grid.f90"
+    
+    ! allocate and reset all memory required for the gird
+    include "reset_grid.f90"
+    include "allocate_grid.f90"
+
 end module module_mesh

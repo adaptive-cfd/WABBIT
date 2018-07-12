@@ -153,8 +153,8 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o \
-	set_initial_grid.f90 new_block_heavy.f90 create_equidistant_grid.f90 create_random_grid.f90 \
-	allocate_grid.f90 reset_grid.f90 set_inicond_blocks.f90 get_inicond_from_file.f90
+	set_initial_grid.f90 new_block_heavy.f90 \
+	set_inicond_blocks.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o\
@@ -181,7 +181,8 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
     treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
     refinement_execute_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
 	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90 \
-	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90
+	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 \
+	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

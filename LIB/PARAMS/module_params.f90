@@ -86,7 +86,8 @@ module module_params
 
         ! number of allocated heavy data fields per process
         integer(kind=ik)                             :: number_blocks=0
-        ! number of allocated data fields in heavy data array, number of fields in heavy work data (depend from time step scheme, ...)
+        ! number of allocated data fields in heavy data array, number of fields 
+        ! in heavy work data (depend from time step scheme, ...)
         integer(kind=ik)                             :: number_data_fields=0
         integer(kind=ik)                             :: number_fields=0
 
@@ -121,8 +122,13 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! MPI
         ! -------------------------------------------------------------------------------------
-        ! data exchange method
-        character(len=80)                           :: mpi_data_exchange=""
+        ! number of friends
+        ! Just because we have MPISIZE ranks does not mean that everybody talks to everybody.
+        ! While this CAN happen, it is much more likely that an MPIRANK talks only to a limited number of
+        ! "friends". This is a direct consequence of the space-filling curves. Therefore, we do not allocate
+        ! buffer for all MPSIZE ranks, but only for N_FRIENDS. If the number happens to be too small, we increase
+        ! it dynamically (via deallocate / reallocate)
+        integer(kind=ik)                            :: N_friends=20
         ! process rank
         integer(kind=ik)                            :: rank=-1
         ! number of processes

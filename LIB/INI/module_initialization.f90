@@ -51,12 +51,6 @@ contains
     include "set_inicond_blocks.f90"
     include "get_inicond_from_file.f90"
 
-    ! allocate and reset all memotry requred for the gird
-    include "allocate_grid.f90"
-    include "reset_grid.f90"
-    include "create_equidistant_grid.f90"
-    include "create_random_grid.f90"
-
     ! subroutine to write new heavy block data
     include "new_block_heavy.f90"
 

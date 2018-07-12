@@ -79,7 +79,6 @@ subroutine sparse_to_dense(help, params)
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
     ! we do not read an ini file, so defaults may not be set.
     params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
-    params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
     allocate(params%butcher_tableau(1,1))
     ! we read only one datafield in this routine
     params%number_data_fields  = 1

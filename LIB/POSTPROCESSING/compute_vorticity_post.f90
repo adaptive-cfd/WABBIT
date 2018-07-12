@@ -91,7 +91,6 @@ subroutine compute_vorticity_post(help, params)
     params%Ly = domain(2)
     params%Lz = domain(3)
     params%number_block_nodes = Bs
-    params%mpi_data_exchange = "Non_blocking_Isend_Irecv"
     allocate(params%butcher_tableau(1,1))
     params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)

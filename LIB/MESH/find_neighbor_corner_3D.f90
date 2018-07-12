@@ -54,7 +54,8 @@
 !
 ! ********************************************************************************************
 
-subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist)
+subroutine find_neighbor_corner_3D(params, heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, &
+    lgt_n, lgt_sortednumlist, error)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -63,7 +64,8 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
 ! variables
 
     implicit none
-
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
     !> light data id
@@ -79,7 +81,8 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    logical, intent(inout)              :: error
 
     ! mesh level
     integer(kind=ik)                    :: level
@@ -241,14 +244,15 @@ subroutine find_neighbor_corner_3D(heavy_id, light_id, lgt_block, max_treelevel,
             call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! check existence of neighbor block
             call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
-            
+
             if (exists) then
                 ! neigbor is one level up
                 hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
 
             else
                 ! error case
-                call abort(26363, 'ERROR: can not find corner neighbor')
+                write(*,*) "find_neighbor_corner_3D: my treecode", my_treecode, "dir", dir, "neighbor treecode", virt_treecode
+                error = .true.
             end if
 
         end if

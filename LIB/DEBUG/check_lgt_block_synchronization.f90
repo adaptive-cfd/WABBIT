@@ -94,7 +94,7 @@ subroutine write_lgt_data(params, lgt_block, file)
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    integer(kind=ik), intent(in)     :: lgt_block(:, :)
     character(len=*), intent(in) :: file
     integer(kind=ik) :: k
 
@@ -133,7 +133,7 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
     integer(kind=ik) , allocatable, save :: tmp(:,:), tmp2(:,:)
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
+    integer(kind=ik), intent(in)     :: hvy_n
     character(len=*), intent(in) :: file
     integer(kind=ik) :: k, lgt_start, rank, lgt_id
 

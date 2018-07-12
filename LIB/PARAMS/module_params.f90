@@ -77,7 +77,6 @@ module module_params
         character(len=80), dimension(:), allocatable :: input_files
 
         ! grid parameter
-        integer(kind=ik)                             :: number_domain_nodes=0
         integer(kind=ik)                             :: number_block_nodes=0
         integer(kind=ik)                             :: number_ghost_nodes=0
 
@@ -86,7 +85,7 @@ module module_params
 
         ! number of allocated heavy data fields per process
         integer(kind=ik)                             :: number_blocks=0
-        ! number of allocated data fields in heavy data array, number of fields 
+        ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
         integer(kind=ik)                             :: number_data_fields=0
         integer(kind=ik)                             :: number_fields=0

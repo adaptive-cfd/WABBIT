@@ -58,7 +58,8 @@
 !
 ! ********************************************************************************************
 
-subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist)
+subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treelevel, dir, hvy_neighbor, &
+    lgt_n, lgt_sortednumlist, error)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -67,7 +68,8 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 ! variables
 
     implicit none
-
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
     !> light data id
@@ -81,9 +83,10 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)   :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    logical, intent(inout)              :: error
 
     ! auxiliary variables
     integer(kind=ik)                    :: neighborID_sameLevel, neighborID_coarserLevel
@@ -435,10 +438,8 @@ subroutine find_neighbor_edge_3D(heavy_id, lgt_id, lgt_block, max_treelevel, dir
 
                 else
                     ! error case
-                    print*, dir
-                    print*, my_treecode
-                    print*, neighbor
-                    call abort(363733, 'ERROR: can not find edge neighbor')
+                    write(*,*) "find_neighbor_edge_3D: my treecode", my_treecode, "dir", dir, "neighbor treecode", neighbor
+                    error = .true.
                 end if
 
             end do

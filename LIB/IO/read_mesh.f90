@@ -36,33 +36,31 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     implicit none
 
     !> file name
-    character(len=*), intent(in)                  :: fname
+    character(len=*), intent(in)      :: fname
     !> user defined parameter structure
-    type (type_params), intent(in)                :: params
+    type (type_params), intent(in)    :: params
     !> number of active blocks (heavy and light data)
-    integer(kind=ik), intent(inout)               :: hvy_n, lgt_n
+    integer(kind=ik), intent(inout)   :: hvy_n, lgt_n
     !> light data array
-    integer(kind=ik), intent(inout)               :: lgt_block(:,:)
+    integer(kind=ik), intent(inout)   :: lgt_block(:,:)
 
-    ! file id integer
-    integer(hid_t)                                :: file_id
-    ! process rank, number of procs
-    integer(kind=ik)                              :: rank, number_procs
-    ! grid parameter
-    integer(kind=ik)                              :: Bs, g
-    ! offset variables
-    integer(kind=ik), dimension(2)                :: ubounds, lbounds
     ! treecode array
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
-    integer(kind=ik), dimension(:,:), allocatable :: my_lgt_block
-    integer(kind=ik)                   :: blocks_per_rank_list(0:params%number_procs-1)
-    ! loop variables
-    integer(kind=ik)                              :: lgt_id, k
-    ! error variable
-    integer(kind=ik)                              :: ierr
-    integer(kind=ik)                              :: treecode_size
-    integer(hsize_t), dimension(2)                :: dims_treecode
-    integer(kind=ik)                              :: WABBIT_COMM
+    ! file id integer
+    integer(hid_t)        :: file_id
+    ! process rank, number of procs
+    integer(kind=ik)      :: rank, number_procs
+    ! grid parameter
+    integer(kind=ik)      :: Bs, g
+    ! offset variables
+    integer(kind=ik)      :: ubounds(2), lbounds(2)
+    integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)
+    integer(kind=ik)      :: lgt_id, k
+    integer(kind=ik)      :: ierr
+    integer(kind=ik)      :: treecode_size
+    integer(hsize_t)      :: dims_treecode(2)
+    integer(kind=ik)      :: WABBIT_COMM
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -74,7 +72,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
 
-    lgt_id = 0
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -100,7 +97,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note
     ! zero indexing as required by MPI
     ! set list to the average value
-    blocks_per_rank_list = lgt_n / number_procs
+    blocks_per_rank_list(:) = lgt_n / number_procs
 
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
     if (mod(lgt_n, number_procs) > 0) then
@@ -119,48 +116,43 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
 
     ! compare dimensions
-    if (dims_treecode(1)<=params%max_treelevel) then
-        ! max_treelevels are the same or
-        ! want to continue with greater max_treevel, read old treecode and fill up the rest with -1
-    else
+    if (dims_treecode(1)>params%max_treelevel) then
         ! treecode in input file is greater than the new one, abort and output on screen
-        if (params%threeD_case) write(*,'("ERROR: max_treelevel is smaller than saved in file, this is not possible.",/ ,"max_treelevel in ini-file:",i4," in input-file:",i4)') &
-            params%max_treelevel, dims_treecode(1)
-        call MPI_ABORT( WABBIT_COMM, 10004, ierr)
+        ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
+        ! but active level=4). On the other hand, that appears to be rare.
+        call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
     end if
 
     allocate(block_treecode(1:dims_treecode(1), 1:hvy_n))
-    allocate (my_lgt_block(size(lgt_block,1), size(lgt_block,2)))
-    my_lgt_block = -1
     block_treecode = -1
     ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + 2]
     ! array we want to hold, so that all CPU can read from the same file simultaneously
     ! (note zero-based offset):
     lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
     ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + hvy_n - 1/)
-    call read_dset_mpi_hdf5_2D(file_id, "block_treecode", &
-        lbounds, ubounds, block_treecode)
-
+    call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
-     do k=1, hvy_n
+
+    ! this is expensive but we do it only once:
+    lgt_block = -1
+
+     do k = 1, hvy_n
         call hvy_id_to_lgt_id( lgt_id, k, rank, params%number_blocks )
         ! copy treecode
-        my_lgt_block(lgt_id,1:dims_treecode(1)) = block_treecode(1:dims_treecode(1),k)
+        lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1),k)
         ! set mesh level
-        my_lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k),dims_treecode(1))
+        lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k),dims_treecode(1))
         ! set refinement status
-        my_lgt_block(lgt_id, params%max_treelevel+2) = 0
+        lgt_block(lgt_id, params%max_treelevel+2) = 0
     end do
+
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
     ! be synced. However, the light data has to.
-    lgt_block = -1
-    call MPI_Allreduce(my_lgt_block, lgt_block, size(lgt_block,1)*size(lgt_block,2), &
-        MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
+    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
-    deallocate(my_lgt_block)
     deallocate(block_treecode)
 
     ! it is useful to print out the information on active levels in the file

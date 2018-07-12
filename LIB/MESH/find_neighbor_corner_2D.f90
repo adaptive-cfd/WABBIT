@@ -33,7 +33,8 @@
 ! ********************************************************************************************
 !> \image html neighborhood.svg "Neighborhood Relations in 2D" width=400
 
-subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist)
+subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_treelevel, dir, &
+    hvy_neighbor, lgt_n, lgt_sortednumlist, error)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,6 +44,8 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
 
     implicit none
 
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
     !> light data id
@@ -58,7 +61,8 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    logical, intent(inout)              :: error
 
     ! mesh level
     integer(kind=ik)                    :: level
@@ -166,9 +170,8 @@ subroutine find_neighbor_corner_2D(heavy_id, light_id, lgt_block, max_treelevel,
 
             else
                 ! error case
-                write(*,*) "my treecode", lgt_block( light_id, : )
-                write(*,*) "neighbor treecode", virt_treecode
-                call abort(292928, 'ERROR: can not find corner neighbor')
+                write(*,*) "find_neighbor_corner_2D: my treecode", lgt_block( light_id, : ), "dir", dir, "neighbor treecode", virt_treecode
+                error = .true.
             end if
 
         end if

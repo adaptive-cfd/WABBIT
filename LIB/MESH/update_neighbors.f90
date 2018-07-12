@@ -40,16 +40,37 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
+    logical :: error = .false., error2 = .false.
+    integer(kind=ik ) :: mpierror
+
     if ( params%threeD_case ) then
         ! 3D:
-        call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+        call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
     else
         ! 2D:
-        call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+        call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
     end if
 
+
+    if (params%debug) then
+        call MPI_Allreduce(error, error2, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierror )
+
+        if (error2) then
+            write(*,*) "DUMPING DEBUG DATA TO *_ERROR.dat"
+            call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
+            call write_lgt_data(params, lgt_block, 'lgt_block_ERROR.dat')
+
+            call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
+            & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
+        endif
+    else
+        if (error) then
+            call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
+            & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
+        endif
+    endif
 end subroutine update_neighbors

@@ -1,8 +1,4 @@
-subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
-
-    ! use module_params
-    ! use module_precision
-
+subroutine create_mask_2D(mask, x0, dx, Bs, g )
     implicit none
 
     ! grid
@@ -14,8 +10,6 @@ subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
 
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if ( params_acm%penalization .eqv. .false.) return
@@ -31,7 +25,7 @@ subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
       call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
     end select
 
-end subroutine create_mask_2D_NEW
+end subroutine create_mask_2D
 
 
 subroutine draw_cylinder(mask, x0, dx, Bs, g )
@@ -164,32 +158,3 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
 
 end subroutine draw_two_cylinders
-
-
-    subroutine smoothstep(f,x,t,h)
-      !-------------------------------------------------------------------------------
-      !> This subroutine returns the value f of a smooth step function \n
-      !> The sharp step function would be 1 if x<=t and 0 if x>t \n
-      !> h is the semi-size of the smoothing area, so \n
-      !> f is 1 if x<=t-h \n
-      !> f is 0 if x>t+h \n
-      !> f is variable (smooth) in between
-      !-------------------------------------------------------------------------------
-      use module_precision
-
-      implicit none
-      real(kind=rk), intent(out) :: f
-      real(kind=rk), intent(in)  :: x,t,h
-
-      !-------------------------------------------------
-      ! cos shaped smoothing (compact in phys.space)
-      !-------------------------------------------------
-      if (x<=t-h) then
-        f = 1.0_rk
-      elseif (((t-h)<x).and.(x<(t+h))) then
-        f = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
-      else
-        f = 0.0_rk
-      endif
-
-    end subroutine smoothstep

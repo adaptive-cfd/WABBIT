@@ -12,7 +12,7 @@
 !> \author sm, engels
 !--------------------------------------------------------------------------------------------
 
-subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, time, rhs)
+subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, volume_int, time, rhs)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -51,8 +51,6 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     ! coefficients for Tam&Webb
     real(kind=rk)       :: a(-3:3)
     real(kind=rk)       :: b(-2:2)
-    !> startup conditioner
-    real(kind=rk)       :: startup_conditioner
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -79,12 +77,14 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 
     eps_inv = 1.0_rk / eps
 
-    if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,3)/=3) &
+    if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,3)/=3) then
         call abort(66233,"wrong size, I go for a walk instead.")
+    endif
 
     ! Tam & Webb, 4th order optimized (for first derivative)
     a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
         0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+
     ! 4th order coefficients for second derivative
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk,&
         4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
@@ -96,8 +96,8 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
 ! main body
 
     if (params_acm%penalization) then
-      ! create mask term for every grid point in this block
-      call create_mask_2D_NEW(mask, x0, dx, Bs, g)
+        ! create mask term for every grid point in this block
+        call create_mask_2D(mask, x0, dx, Bs, g)
     end if
 
 
@@ -204,7 +204,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
           ! do nothing in this direction.
 !          forcing(idir) = 0.0_rk
         case('taylor_green')
-            if (idir==1) then  
+            if (idir==1) then
                 do iy = g+1, Bs+g
                     do ix = g+1, Bs+g
                         x = x0(1) + dble(ix-g-1) * dx(1)
@@ -234,7 +234,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
-        call sponge_2D_NEW(sponge, x0, dx, Bs, g)
+        call sponge_2D(sponge, x0, dx, Bs, g)
         eps_inv = 1.0_rk / params_acm%C_sponge
 
         ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
@@ -246,7 +246,7 @@ subroutine RHS_2D_acm_new(g, Bs, dx, x0, phi, order_discretization, volume_int, 
     end if
 
 
-end subroutine RHS_2D_acm_new
+end subroutine RHS_2D_acm
 
 
 

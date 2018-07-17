@@ -433,10 +433,101 @@ end subroutine read_intarray_from_ascii_file_mpi
       ! set here:
       !-----------------------------------------------------------------------------
       subroutine set_lattice_spacing_mpi(dx_unit)
-        implicit none
-        real(kind=rk), intent(in) :: dx_unit
+          implicit none
+          real(kind=rk), intent(in) :: dx_unit
 
-        call set_lattice_spacing(dx_unit)
+          call set_lattice_spacing(dx_unit)
       end subroutine
+
+
+      !-------------------------------------------------------------------------------
+      ! Fetches a MATRIX VALUED parameter from the PARAMS.ini file.
+      ! Displays what it does on stdout (so you can see whats going on)
+      ! Input:
+      !       PARAMS: the complete *.ini file
+      !       section: the section we're looking for
+      !       keyword: the keyword we're looking for
+      ! Output:
+      !       matrixlines, matrixcols are the dimensions of the matrix
+      !
+      ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
+      ! as arguments. so we have to split the routine in one part that returns the size
+      ! of the array, then let the caller allocate, then read the matrix. very tedious.
+      !
+      ! EXAMPLE:
+      !   call param_matrix_size_mpi(PARAMS,"Stuff","matrix",a,b)
+      !   allocate(matrix(1:a,1:b))
+      !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
+      !-------------------------------------------------------------------------------
+      subroutine param_matrix_size_mpi (PARAMS, section, keyword, matrixlines, matrixcols)
+          implicit none
+          ! Contains the ascii-params file
+          type(inifile), intent(inout) :: PARAMS
+          character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+          character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+          integer, intent(out) :: matrixcols, matrixlines
+
+          integer :: n,m
+          integer :: mpicode
+          integer :: mpirank
+
+          ! fetch my process id
+          call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+
+          ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
+          if (mpirank==0) then
+              call param_matrix_size (PARAMS, section, keyword, matrixlines, matrixcols)
+          endif
+
+          ! And then broadcast
+          call MPI_BCAST(  matrixlines, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpicode )
+          call MPI_BCAST(  matrixcols, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpicode )
+      end subroutine param_matrix_size_mpi
+
+      !-------------------------------------------------------------------------------
+      ! Fetches a MATRIX VALUED parameter from the PARAMS.ini file.
+      ! Displays what it does on stdout (so you can see whats going on)
+      ! Input:
+      !       PARAMS: the complete *.ini file
+      !       section: the section we're looking for
+      !       keyword: the keyword we're looking for
+      ! Output:
+      !       matrixlines, matrixcols are the dimensions of the matrix
+      !
+      ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
+      ! as arguments. so we have to split the routine in one part that returns the size
+      ! of the array, then let the caller allocate, then read the matrix. very tedious.
+      !
+      ! EXAMPLE:
+      !   call param_matrix_size_mpi(PARAMS,"Stuff","matrix",a,b)
+      !   allocate(matrix(1:a,1:b))
+      !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
+      !-------------------------------------------------------------------------------
+      subroutine param_matrix_read_mpi (PARAMS, section, keyword, matrix)
+          implicit none
+          ! Contains the ascii-params file
+          type(inifile), intent(inout) :: PARAMS
+          real(kind=rk), intent(inout) :: matrix(1:,1:)
+          character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+          character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+          integer :: matrixcols, matrixlines
+
+          integer :: mpicode
+          integer :: mpirank
+
+          matrixlines = size(matrix,1)
+          matrixcols = size(matrix,2)
+
+          ! fetch my process id
+          call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+
+          ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
+          if (mpirank==0) then
+              call param_matrix_read (PARAMS, section, keyword, matrix)
+          endif
+
+          ! And then broadcast
+          call MPI_BCAST(  matrix, matrixlines*matrixcols, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+      end subroutine param_matrix_read_mpi
 
 end module

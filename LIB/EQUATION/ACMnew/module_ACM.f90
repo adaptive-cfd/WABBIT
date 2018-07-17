@@ -11,10 +11,12 @@
 !!
 ! ********************************************************************************************
 
-module module_acm_new
+module module_acm
 
   !---------------------------------------------------------------------------------------------
   ! modules
+
+  use module_insects
 
   use module_precision
   ! ini file parser module, used to read parameters. note: in principle, you can also
@@ -23,6 +25,8 @@ module module_acm_new
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
   use mpi
+
+  use module_helpers, only : startup_conditioner, smoothstep
   !---------------------------------------------------------------------------------------------
   ! variables
 
@@ -79,7 +83,7 @@ module module_acm_new
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params), save :: params_acm
 
-
+  type(diptera), save :: insect
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
@@ -90,10 +94,10 @@ module module_acm_new
 contains
 
   include "rhs.f90"
-  include "create_mask_new.f90"
+  include "create_mask.f90"
   ! include "dt.f90"
   include "iniconds.f90"
-  include "sponge_new.f90"
+  include "sponge.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -188,6 +192,10 @@ contains
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'(80("<"))')
     endif
+
+    if (params_acm%geometry == "Insect") then
+        call insect_init( 0.0_rk, filename, insect, .false.,"" , (/params_acm%Lx, params_acm%Ly, params_acm%Lz/), params_acm%nu)
+    endif
   end subroutine READ_PARAMETERS_ACM
 
 
@@ -250,10 +258,10 @@ contains
                     g, params_acm%discretization,work(:,:,:,k))
             case('mas')
                 ! mask
-                call create_mask_2D_NEW(work(:,:,1,k), x0, dx, Bs, g )
+                call create_mask_2D(work(:,:,1,k), x0, dx, Bs, g )
             case('spo')
                 ! mask for sponge
-                call sponge_2D_NEW(work(:,:,1,k), x0, dx, Bs, g )
+                call sponge_2D(work(:,:,1,k), x0, dx, Bs, g )
         end select
     end do
 
@@ -390,12 +398,12 @@ contains
       !
       ! called for each block.
 
-      if (size(u,4) == 3) then
+      if (params_acm%dim == 2) then
         ! this is a 2d case (ux,uy,p)
-        call RHS_2D_acm_new(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
+        call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
         (/1.0_rk,0.0_rk,0.0_rk/), time, rhs(:,:,1,:))
 
-      elseif (size(u,4) == 4) then
+      else
         ! this is a 3d case (ux,uy,uz,p)
         call abort(888,"module_ACM-new.f90: 3d not yet implemented")
       endif
@@ -514,7 +522,7 @@ contains
       ! compute fluid force on penalized obstacle. The force can be computed by
       ! volume integration (which is much easier than surface integration), see
       ! Angot et al. 1999
-      call create_mask_2D_NEW(work(:,:,1,1), x0, dx, Bs, g)
+      call create_mask_2D(work(:,:,1,1), x0, dx, Bs, g)
       eps_inv = 1.0_rk / params_acm%C_eta
 
       if (params_acm%dim == 2) then
@@ -716,7 +724,7 @@ contains
     ! if we use volume penalization, the mask is first used for refinement of the grid.
     ! In a second stage, the initial condition without penalization is then applied to the refined grid.
     if (adapting .and. params_acm%penalization) then
-        call create_mask_2D_NEW(work(:,:,1,1), x0, dx, Bs, g )
+        call create_mask_2D(work(:,:,1,1), x0, dx, Bs, g )
         u(:,:,:,1) = (1.0_rk-work(:,:,:,1))*u(:,:,:,1)
         u(:,:,:,2) = (1.0_rk-work(:,:,:,1))*u(:,:,:,2)
         if (params_acm%dim == 3) then
@@ -750,4 +758,4 @@ contains
 
   end subroutine continue_periodic
 
-end module module_acm_new
+end module module_acm

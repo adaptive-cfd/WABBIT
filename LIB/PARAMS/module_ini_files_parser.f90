@@ -869,7 +869,204 @@ end subroutine param_matrix
   enddo
 end subroutine getvalue
 
+!-------------------------------------------------------------------------------
+  ! Fetches a MATRIX VALUED parameter from the PARAMS.ini file.
+  ! Displays what it does on stdout (so you can see whats going on)
+  ! Input:
+  !       PARAMS: the complete *.ini file
+  !       section: the section we're looking for
+  !       keyword: the keyword we're looking for
+  ! Output:
+  !       matrixlines, matrixcols are the dimensions of the matrix
+  !
+  ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
+  ! as arguments. so we have to split the routine in one part that returns the size
+  ! of the array, then let the caller allocate, then read the matrix. very tedious.
+  !
+  ! EXAMPLE:
+  !   call param_matrix_size_mpi(PARAMS,"Stuff","matrix",a,b)
+  !   allocate(matrix(1:a,1:b))
+  !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
+  !-------------------------------------------------------------------------------
+  subroutine param_matrix_size(PARAMS, section, keyword, matrixlines, matrixcols)
+    implicit none
+    ! Contains the ascii-params file
+    type(inifile), intent(inout) :: PARAMS
+    character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+    character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+    integer, intent(out) :: matrixcols, matrixlines
+    character(len=maxcolumns) ::  value    ! returns the value
+    integer :: i, j
+    integer :: index1, index2
+    logical :: foundsection
 
+    foundsection = .false.
+    value = ''
+
+    !-- loop over the lines of PARAMS.ini file
+    do i = 1, PARAMS%nlines
+      !-- ignore commented lines completely, if first non-blank character is one of #,!,;,%
+      if ((PARAMS%PARAMS(i)(1:1).ne.'#').and.(PARAMS%PARAMS(i)(1:1).ne.';').and.&
+      (PARAMS%PARAMS(i)(1:1).ne.'!').and.(PARAMS%PARAMS(i)(1:1).ne.'%')) then
+
+      !-- does this line contain the "[section]" statement?
+      if (index(PARAMS%PARAMS(i),'['//section//']')==1) then
+        ! yes, it does
+        foundsection = .true.
+      elseif (PARAMS%PARAMS(i)(1:1) == '[') then
+        ! we're already at the next section mark, so we left the section we
+        ! were looking for again
+        foundsection = .false.
+      endif
+
+      !-- we're inside the section we want
+      if (foundsection) then
+        ! for a matrix, prototype is
+        ! [SECTION]
+        ! keyword=(/1 2 3 4
+        ! 4 5 6 7
+        ! 9 9 9 9/);
+
+        ! does this line contain the beginning of the keyword we're looking for ?
+        if (index(PARAMS%PARAMS(i),keyword//'=(/')==1) then
+          ! yes, it does.
+          index1 = index(PARAMS%PARAMS(i),'=(/')+3
+          ! remove trailing spaces.
+          index2 = len_trim( PARAMS%PARAMS(i) )
+          ! remove spaces between (/     and values
+          value = adjustl(PARAMS%PARAMS(i)(index1:index2))
+
+          ! first we check how many columns we have, by looping over the first line
+          ! containing the =(/ substring
+          matrixcols = 1
+          do j = 1, len_trim(value)
+            ! count elements in the line by counting the separating spaces
+            if ( value(j:j) == " " ) then
+              matrixcols = matrixcols + 1
+            end if
+          enddo
+
+          ! now count lines in array, loop until you find /) substring (or = substring)
+          matrixlines = 0
+          do j = i, PARAMS%nlines
+            matrixlines = matrixlines +1
+            if (index(PARAMS%PARAMS(j),"/)") /= 0) then
+              ! we found the terminal line of the matrix statement
+              exit
+            elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
+              ! a = would mean we skipped past the matrix definition to the next variable..
+              write(*,*) "INIFILES: ERROR: invalid ini matrix (code 767626201)"
+              stop
+            end if
+          end do
+
+          exit ! loop over lines
+        endif ! found first line
+      endif ! found section
+    end if
+    end do ! loop over lines
+
+
+  ! in verbose mode, inform about what we did
+  if (verbosity) then
+    write(*,'("Determined ",A,"::",A," as Matrix of size ",i6," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
+  endif
+end subroutine param_matrix_size
+
+
+!-------------------------------------------------------------------------------
+! Fetches a MATRIX VALUED parameter from the PARAMS.ini file.
+! Displays what it does on stdout (so you can see whats going on)
+! Input:
+!       PARAMS: the complete *.ini file
+!       section: the section we're looking for
+!       keyword: the keyword we're looking for
+! Output:
+!       matrixlines, matrixcols are the dimensions of the matrix
+!
+! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
+! as arguments. so we have to split the routine in one part that returns the size
+! of the array, then let the caller allocate, then read the matrix. very tedious.
+!
+! EXAMPLE:
+!   call param_matrix_size_mpi(PARAMS,"Stuff","matrix",a,b)
+!   allocate(matrix(1:a,1:b))
+!   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
+!-------------------------------------------------------------------------------
+subroutine param_matrix_read(PARAMS, section, keyword, matrix)
+  implicit none
+  ! Contains the ascii-params file
+  type(inifile), intent(inout) :: PARAMS
+  character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+  character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+  real(kind=rk), intent(inout) :: matrix(1:,1:)
+  character(len=maxcolumns) ::  value    ! returns the value
+  integer :: i, j, matrixcols, matrixlines
+  integer :: index1, index2
+  logical :: foundsection
+
+  foundsection = .false.
+  value = ''
+
+  matrixlines = size(matrix,1)
+  matrixcols = size(matrix,2)
+
+  !-- loop over the lines of PARAMS.ini file
+  do i=1, PARAMS%nlines
+    !-- ignore commented lines completely, if first non-blank character is one of #,!,;,%
+    if ((PARAMS%PARAMS(i)(1:1).ne.'#').and.(PARAMS%PARAMS(i)(1:1).ne.';').and.&
+    (PARAMS%PARAMS(i)(1:1).ne.'!').and.(PARAMS%PARAMS(i)(1:1).ne.'%')) then
+
+    !-- does this line contain the "[section]" statement?
+    if (index(PARAMS%PARAMS(i),'['//section//']')==1) then
+      ! yes, it does
+      foundsection = .true.
+    elseif (PARAMS%PARAMS(i)(1:1) == '[') then
+      ! we're already at the next section mark, so we left the section we
+      ! were looking for again
+      foundsection = .false.
+    endif
+
+    !-- we're inside the section we want
+    if (foundsection) then
+      ! for a matrix, prototype is
+      ! [SECTION]
+      ! keyword=(/1 2 3 4
+      ! 4 5 6 7
+      ! 9 9 9 9/);
+
+      ! does this line contain the beginning of the keyword we're looking for ?
+      if (index(PARAMS%PARAMS(i),keyword//'=(/')==1) then
+        do j = i, i+matrixlines-1
+          if ( j == i ) then
+            ! first line
+            index1 = index(PARAMS%PARAMS(j),"(/")+2
+            index2 = len_trim(PARAMS%PARAMS(j))
+          elseif (j == i+matrixlines-1) then
+            ! last line
+            index1 = 1
+            index2 = index(PARAMS%PARAMS(j),"/)")-1
+          else
+            ! interior lines
+            index1 = 1
+            index2 = len_trim(PARAMS%PARAMS(j))
+          endif
+          ! remove leading spaces, then read
+          value = adjustl(PARAMS%PARAMS(j)(index1:index2))
+          read( value, * ) matrix(j-i+1,:)
+        enddo
+
+        exit ! loop over lines
+      endif ! found first line
+    endif ! found section
+  end if
+  end do ! loop over lines
+
+! in verbose mode, inform about what we did
+if (verbosity) then
+  write(*,'("Read ",A,"::",A," as Matrix of size ",i6," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
+endif
+end subroutine param_matrix_read
 
 
 end module

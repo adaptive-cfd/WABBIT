@@ -13,7 +13,7 @@ module module_physics_metamodule
     ! of the code, we just load that. as all other physics modules, it provides some
     ! public routines, at which the corresponding actual physics modules are called
     use module_ConvDiff_new
-    use module_ACM_new
+    use module_acm
     use module_navier_stokes_new
 
     implicit none

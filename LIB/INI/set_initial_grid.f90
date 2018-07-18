@@ -120,7 +120,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
           ! we have to repeat the adapation process until the grid has reached a final
           ! state. Since we start on the coarsest level, in each iteration we cannot loose
           ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
-          do while ( lgt_n /= lgt_n_old  .and. iter<params%max_treelevel)
+          do while ( lgt_n /= lgt_n_old  .and. iter<(params%max_treelevel-params%min_treelevel))
             lgt_n_old = lgt_n
 
             ! push up the entire grid one level.

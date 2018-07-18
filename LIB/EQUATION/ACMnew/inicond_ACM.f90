@@ -85,7 +85,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
         endif
 
         do idir = 1, params_acm%dim
-            u(:,:,:,idir) = (1.0_rk - mask) * u(:,:,:,idir)
+            u(:,:,:,idir) = mask
         enddo
     end if
 

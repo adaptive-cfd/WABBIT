@@ -33,6 +33,8 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
   ! local variables
   integer(kind=ik)  :: neqn, nwork, Bs, k
   character(len=80) :: name
+  real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
+
 
   ! number of state variables
   neqn = size(u,4)
@@ -43,6 +45,17 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
 
   ! copy state vector
   work(:,:,:,1:size(u,4)) = u(:,:,:,:)
+
+
+
+  if (params_acm%dim==3) then
+      if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
+      if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+  else
+      if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
+      if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
+  endif
+
 
   do k = neqn, size(params_acm%names,1)
       name = params_acm%names(k)
@@ -57,7 +70,12 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
                   g, params_acm%discretization,work(:,:,:,k))
           case('mas')
               ! mask
-              call create_mask_2D(work(:,:,1,k), x0, dx, Bs, g )
+              if (params_acm%dim==2) then
+                  call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+              else
+                  call create_mask_3D(time, x0, dx, Bs, g, mask, us )
+              endif
+              work(:,:,:,k) = mask
           case('spo')
               ! mask for sponge
               call sponge_2D(work(:,:,1,k), x0, dx, Bs, g )

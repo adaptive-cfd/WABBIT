@@ -25,6 +25,10 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   zl = box_domain(3)
   nu = viscosity
 
+  if (root) then
+      write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4," nu=",g12.4)') xl,yl,zl,nu
+  endif
+
   call MPI_COMM_RANK (MPI_COMM_WORLD,mpirank,mpicode)
   if (mpirank==0) root = .true.
 

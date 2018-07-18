@@ -14,14 +14,11 @@ module module_insects
   PUBLIC :: Draw_Insect, insect_init, insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
   aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_time_step, &
   BodyMotion, FlappingMotion_right, FlappingMotion_left, StrokePlane, mask_from_pointcloud, &
-  body_rotation_matrix, wing_right_rotation_matrix, wing_left_rotation_matrix
+  body_rotation_matrix, wing_right_rotation_matrix, wing_left_rotation_matrix, write_kinematics_file
   ! type definitions
   PUBLIC :: wingkinematics, diptera
 
-  ! precision of doubles, inside the insect module
-  ! integer, parameter :: rk = 8
-  ! integer, parameter :: strlen = 120
-
+  ! we use this so only root prints write statements...
   logical :: root = .false.
 
   ! size (global) of domain
@@ -116,6 +113,7 @@ module module_insects
     ! variables to decide whether to draw the body or not.
     character(len=strlen) :: body_moves="yes"
     logical :: body_already_drawn = .false.
+    real(kind=rk) :: body_drawn_time = 0.0d0
     !-------------------------------------------------------------
     ! for free flight solver
     !-------------------------------------------------------------
@@ -186,6 +184,7 @@ module module_insects
     ! is that during postprocessing of an existing run, the dry run would overwrite the
     ! simulation data.
     character(len=strlen) :: kinematics_file = "kinematics.t"
+
 
     !-------------------------------------------------------------
     ! parameters that control shape of wings,body, and motion
@@ -274,17 +273,14 @@ contains
     real(kind=rk),dimension(1:3) :: x, x_body, v_tmp
     real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
     integer :: ix, iy, iz
-    integer, save :: counter = 0
     integer(kind=2) :: c
 
     if ((dabs(Insect%time-time)>1.0d-10).and.(root).and.(Insect%BodyMotion=="free_flight")) then
       write (*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
     endif
 
-
     Insect%smooth = 1.0d0*maxval(ddx)
     Insect%safety = 3.5d0*Insect%smooth
-
 
     ! delete old mask
     call delete_old_mask( time, mask, mask_color, us, Insect )
@@ -322,22 +318,7 @@ contains
     Insect%x_pivot_r_g = matmul(M_body_inv, Insect%x_pivot_r_b)
 
     !-----------------------------------------------------------------------------
-    ! write kinematics to disk (Dmitry, 28 Oct 2013)
-    ! do so only every 5 time steps (Thomas, 8 Jul 2014)
-    !-----------------------------------------------------------------------------
-    counter = counter + 1
-    if ((root).and.(mod(counter,5)==0)) then
-      open  (17,file=Insect%kinematics_file,status='unknown',position='append')
-      write (17,'(26(es15.8,1x))') time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-      Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-      Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-      Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-      Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w
-      close (17)
-    endif
-
-    !-----------------------------------------------------------------------------
-    ! Draw indivudual parts of the Diptera. Separate loops are faster
+    ! Draw individual parts of the Diptera. Separate loops are faster
     ! since the compiler can optimize them better
     !-----------------------------------------------------------------------------
     ! BODY. Now the body is special: if the insect does not move (or rotate), the
@@ -347,14 +328,23 @@ contains
     ! We thus try to draw it only once and then simply not to erase it later.
     !-----------------------------------------------------------------------------
     if (Insect%body_moves=="no") then
-      if (Insect%body_already_drawn .eqv. .false.) then
+      if (.not. Insect%body_already_drawn .or. (abs(time-Insect%body_drawn_time)<1.0e-10)) then
         ! the body is at rest, but it is the first call to this routine, so
         ! draw it now.
-        if (root) write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
-        if (root) write(*,*) "the body once: we do that now, and skip draw_body"
-        if (root) write(*,*) "from now on."
+        if (root) then
+            write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
+            write(*,*) "the body once: we do that now, and skip draw_body"
+            write(*,*) "from now on. time=", time
+        endif
+
         call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, M_body)
+
+        ! the adaptive code calls this routine for all blocks. therefore, Insect%body_already_drawn = .true.
+        ! is set after the first block and subsequently does not draw the body on other blocks.
+        ! to avoid this, we save the time at which we draw the body, and as long we're at that time,
+        ! we draw the body anyways.
         Insect%body_already_drawn = .true.
+        Insect%body_drawn_time = time
       endif
     else
       ! the body moves, draw it
@@ -1134,5 +1124,26 @@ contains
 
   end subroutine
 
+  !-----------------------------------------------------------------------------
+  ! write kinematics to disk. Note this cannot be done in the main Draw_Insect anymore
+  ! because in the adaptive code, the routine is called Nblock times per time step,
+  ! while FLUSI calls only once.
+  !-----------------------------------------------------------------------------
+  subroutine write_kinematics_file( time, Insect )
+      implicit none
+      real(kind=pr), intent(in) :: time
+      type(diptera), intent(inout) :: Insect
+
+      if (root) then
+        open  (17, file=Insect%kinematics_file, status='unknown', position='append')
+        write (17,'(26(es15.8,1x))') time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w
+        close (17)
+      endif
+
+  end subroutine
 
 end module module_insects

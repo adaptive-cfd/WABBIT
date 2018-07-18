@@ -184,7 +184,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     ! variables initialization
     if (.not. allocated(sponge)) allocate(sponge(1:Bs+2*g, 1:Bs+2*g))
     if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:3))
+    if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:2))
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -222,7 +222,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask_2D(mask, x0, dx, Bs, g)
+        call create_mask_2D(time, x0, dx, Bs, g, mask, us)
     end if
 
 
@@ -403,7 +403,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     real(kind=rk), dimension(3) :: forcing
 
     !> inverse dx, physics/acm parameters
-    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0,&
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
                      nu, eps, eps_inv, gamma
     !> derivatives
     real(kind=rk) :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
@@ -455,7 +455,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask_3D(mask, x0, dx, Bs, g)
+        call create_mask_3D(time, x0, dx, Bs, g, mask, us)
     end if
 
     if (order_discretization == "FD_2nd_central" ) then

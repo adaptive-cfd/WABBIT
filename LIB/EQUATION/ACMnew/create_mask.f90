@@ -1,3 +1,38 @@
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+
+subroutine create_mask_3D(mask, x0, dx, Bs, g )
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: Bs, g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(inout) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    if (size(mask,1) /= Bs+2*g .or. size(mask,2) /= Bs+2*g .or. size(mask,3) /= Bs+2*g ) then
+        call abort(777107,"wrong array size, there's pirates, captain!")
+    endif
+
+    ! usually, the routine should not be called with no penalization, but if it still
+    ! happens, do nothing.
+    if ( params_acm%penalization .eqv. .false.) return
+
+    select case(params_acm%geometry)
+    case('none')
+      mask = 0.0_rk
+
+    case default
+      call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
+
+    end select
+
+end subroutine create_mask_3D
+
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+
 subroutine create_mask_2D(mask, x0, dx, Bs, g )
     implicit none
 
@@ -17,16 +52,22 @@ subroutine create_mask_2D(mask, x0, dx, Bs, g )
     select case(params_acm%geometry)
     case('cylinder')
       call draw_cylinder( mask, x0, dx, Bs, g )
+
     case('two-cylinders')
       call draw_two_cylinders( mask, x0, dx, Bs, g )
+
     case('none')
       mask = 0.0_rk
+
     case default
       call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
+
     end select
 
 end subroutine create_mask_2D
 
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 
 subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
@@ -82,7 +123,8 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
 end subroutine draw_cylinder
 
-
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 
 subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 

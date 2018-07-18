@@ -16,6 +16,7 @@ module module_acm
   !---------------------------------------------------------------------------------------------
   ! modules
 
+  use mpi
   use module_insects
 
   use module_precision
@@ -24,9 +25,8 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
-  use mpi
-
   use module_helpers, only : startup_conditioner, smoothstep
+
   !---------------------------------------------------------------------------------------------
   ! variables
 
@@ -83,6 +83,7 @@ module module_acm
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params), save :: params_acm
 
+  ! all parameters for insects go here:
   type(diptera), save :: insect
 
   !---------------------------------------------------------------------------------------------
@@ -194,135 +195,11 @@ contains
       write(*,'(80("<"))')
     endif
 
+    ! if used, setup insect
     if (params_acm%geometry == "Insect") then
         call insect_init( 0.0_rk, filename, insect, .false.,"" , (/params_acm%Lx, params_acm%Ly, params_acm%Lz/), params_acm%nu)
     endif
   end subroutine READ_PARAMETERS_ACM
-
-
-  !-----------------------------------------------------------------------------
-  ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid any an MPI formalism, neighboring relations and the like.
-  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
-  ! from that. Ghost nodes are assumed to be sync'ed.
-  !-----------------------------------------------------------------------------
-  subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
-    implicit none
-
-    ! it may happen that some source terms have an explicit time-dependency
-    ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
-
-    ! block data, containg the state vector. In general a 4D field (3 dims+components)
-    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
-
-    ! as you are allowed to compute the RHS only in the interior of the field
-    ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g
-
-    ! for each block, you'll need to know where it lies in physical space. The first
-    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    ! output. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
-
-    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
-    ! terms that depend on global qtys, such as forces etc, which cannot be computed
-    ! from a single block alone, the first stage does that. the second stage can then
-    ! use these integral qtys for the actual RHS evaluation.
-    character(len=*), intent(in) :: stage
-
-    ! local variables
-    integer(kind=ik) :: Bs, mpierr
-    real(kind=rk) :: tmp(1:3), tmp2
-
-    ! compute the size of blocks
-    Bs = size(u,1) - 2*g
-
-    select case(stage)
-    case ("init_stage")
-      !-------------------------------------------------------------------------
-      ! 1st stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
-      ! performs initializations in the RHS module, such as resetting integrals
-
-      params_acm%mean_flow = 0.0_rk
-      params_acm%mean_p = 0.0_rk
-
-    case ("integral_stage")
-      !-------------------------------------------------------------------------
-      ! 2nd stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! For some RHS, the eqn depend not only on local, block based qtys, such as
-      ! the state vector, but also on the entire grid, for example to compute a
-      ! global forcing term (e.g. in FSI the forces on bodies). As the physics
-      ! modules cannot see the grid, (they only see blocks), in order to encapsulate
-      ! them nicer, two RHS stages have to be defined: integral / local stage.
-      !
-      ! called for each block.
-
-      if (maxval(abs(u))>1.0e5) then
-        call abort(6661,"ACM fail: very very large values in state vector.")
-      endif
-
-      if (params_acm%dim == 2) then
-        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
-        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
-        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 3))*dx(1)*dx(2)
-      else
-        params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
-        params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 4))*dx(1)*dx(2)*dx(3)
-      endif ! NOTE: MPI_SUM is perfomed in the post_stage.
-
-    case ("post_stage")
-      !-------------------------------------------------------------------------
-      ! 3rd stage: post_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
-
-      tmp = params_acm%mean_flow
-      call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-      tmp2 = params_acm%mean_p
-      call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
-      if (params_acm%dim == 2) then
-        params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
-        params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly)
-      else
-        params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-        params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-      endif
-
-    case ("local_stage")
-      !-------------------------------------------------------------------------
-      ! 4th stage: local evaluation of RHS on all blocks
-      !-------------------------------------------------------------------------
-      ! the second stage then is what you would usually do: evaluate local differential
-      ! operators etc.
-      !
-      ! called for each block.
-
-      if (params_acm%dim == 2) then
-        ! this is a 2d case (ux,uy,p)
-        call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
-        (/1.0_rk,0.0_rk,0.0_rk/), time, rhs(:,:,1,:))
-
-      else
-        ! this is a 3d case (ux,uy,uz,p)
-        call abort(888,"module_ACM-new.f90: 3d not yet implemented")
-      endif
-
-    case default
-      call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
-    end select
-
-
-  end subroutine RHS_ACM
 
 
   !-----------------------------------------------------------------------------

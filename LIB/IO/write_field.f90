@@ -74,7 +74,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! loop variable
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: Bs, g, dim
 
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
@@ -106,6 +106,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! grid parameter
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
+    dim  = 2
+    if (params%threeD_case) dim = 3
 
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
@@ -126,7 +128,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! output on screen
     if (rank == 0) then
-        write(*,'("IO: writing data for time = ", f15.8," file = ",A," active blocks=",i5)') time, trim(adjustl(fname)), lgt_n
+        write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i5," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
+        time, trim(adjustl(fname)), lgt_n, 100.0*dble(lgt_n)/dble( (2**max_active_level( lgt_block, lgt_active, lgt_n ))**dim ), &
+        100.0*dble(lgt_n)/dble( (2**params%max_treelevel)**dim )
     endif
 
     ! we need to know how many blocks each rank actually holds, and all procs need to

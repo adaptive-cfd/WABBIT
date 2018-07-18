@@ -113,6 +113,12 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     ! this block is excecuted only once
     !---------------------------------------------------------------------------
     if (.not.kine%initialized) then
+        if (root) then
+          write(*,'(80("<"))')
+          write(*,*) "Initializing wing kinematics!"
+          write(*,*) "*.ini file is: "//trim(adjustl(kine%infile))
+          write(*,'(80("<"))')
+        endif
       ! parse ini file
       call read_ini_file_mpi(kinefile, kine%infile, .true.)
 
@@ -152,6 +158,8 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       call read_param_mpi(kinefile,"kinematics","bi_theta",kine%bi_theta(1:kine%nfft_theta))
       kine%initialized = .true.
       call clean_ini_file_mpi( kinefile )
+      
+      if (root) write(*,'(80(">"))')
     endif
 
     !---------------------------------------------------------------------------

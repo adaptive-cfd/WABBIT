@@ -1,9 +1,10 @@
+! The idea is to have small functions here, which can be useful anywhere.
+! Note you must not have any dependencies for this module (other than precision)
+! in order not to create makefile conflicts.
 module module_helpers
     use module_precision
     use mpi
     implicit none
-
-    ! module global variables
 
 contains
 
@@ -228,5 +229,20 @@ contains
         endif
 
     end subroutine smoothstep
+
+    ! abort program if file does not exist
+    subroutine check_file_exists(fname)
+        implicit none
+
+        character (len=*), intent(in) :: fname
+        logical :: exist1
+
+        inquire ( file=fname, exist=exist1 )
+        if ( exist1 .eqv. .false.) then
+            write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
+            call abort( 191919, "File not found...."//trim(adjustl(fname)) )
+        endif
+
+    end subroutine check_file_exists
 
 end module module_helpers

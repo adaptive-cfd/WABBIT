@@ -12,7 +12,6 @@ module module_insects_wabbit
   ! we need this to read from ini files (e.g. the wing kinematics or shape are read this way)
   use module_ini_files_parser_mpi
 
-  use module_IO, only : check_file_exists
 
 implicit none
 

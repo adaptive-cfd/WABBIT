@@ -184,50 +184,52 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, volume_int, time
     ! --------------------------------------------------------------------------
     ! is mean flow forcing used at all?
     if (params_acm%forcing) then
+        do idir = 1, 2
+            select case (params_acm%forcing_type(idir))
+            case('accelerate')
+                forcing(idir) = max(0.0_rk, params_acm%u_mean_set(idir)-params_acm%mean_flow(idir)) &
+                * startup_conditioner(time, 0.0_rk, 0.5_rk)
+                ! add forcing to right hand side
+                rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
 
-      do idir = 1, 2
+            case('fixed')
+                ! note fixed forcing directly modifies the state vetor and is not a
+                ! forcing term in the conventional sense.
+                forcing(idir) = 0.0_rk
+                phi(:,:,idir) = phi(:,:,idir) - params_acm%mean_flow(idir) + params_acm%u_mean_set(idir)
+                ! add forcing to right hand side
+                rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
 
-        select case (params_acm%forcing_type(idir))
-        case('accelerate')
-          forcing(idir) = max(0.0_rk, params_acm%u_mean_set(idir)-params_acm%mean_flow(idir)) &
-                        * startup_conditioner(time, 0.0_rk, 0.5_rk)
-          ! add forcing to right hand side
-          rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
-        case('fixed')
-          ! note fixed forcing directly modifies the state vetor and is not a
-          ! forcing term in the conventional sense.
-          forcing(idir) = 0.0_rk
-          phi(:,:,idir) = phi(:,:,idir) - params_acm%mean_flow(idir) + params_acm%u_mean_set(idir)
-          ! add forcing to right hand side
-          rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
-        case('none')
-          ! do nothing in this direction.
-!          forcing(idir) = 0.0_rk
-        case('taylor_green')
-            if (idir==1) then
-                do iy = g+1, Bs+g
-                    do ix = g+1, Bs+g
-                        x = x0(1) + dble(ix-g-1) * dx(1)
-                        y = x0(2) + dble(iy-g-1) * dx(2)
-                        call continue_periodic(x,params_acm%Lx)
-                        call continue_periodic(y,params_acm%Ly)
-                        term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
-                        forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) *&
+            case('none')
+                ! do nothing in this direction.
+
+            case('taylor_green')
+                if (idir==1) then
+                    do iy = g+1, Bs+g
+                        do ix = g+1, Bs+g
+                            x = x0(1) + dble(ix-g-1) * dx(1)
+                            y = x0(2) + dble(iy-g-1) * dx(2)
+                            call continue_periodic(x,params_acm%Lx)
+                            call continue_periodic(y,params_acm%Ly)
+                            term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
+                            forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) *&
                             dcos(y - params_acm%u_mean_set(2)*time) *term_2
-                        forcing(2) = -dcos(x - params_acm%u_mean_set(1)*time) *&
+                            forcing(2) = -dcos(x - params_acm%u_mean_set(1)*time) *&
                             dsin(y - params_acm%u_mean_set(2) * time) *term_2
-                        rhs(ix,iy,1:2) = rhs(ix,iy,1:2) + forcing(1:2)
+                            rhs(ix,iy,1:2) = rhs(ix,iy,1:2) + forcing(1:2)
+                        end do
                     end do
-                end do
-            end if
-        case default
-          call abort(7710, "ACM::rhs.f90::meanflow forcing type unkown")
-        end select
-    end do
+                end if
+
+            case default
+                call abort(7710, "ACM::rhs.f90::meanflow forcing type unkown")
+
+            end select
+        end do
     end if
 
     if (params_acm%p_mean_zero) then
-      phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
+        phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
     end if
 
     ! --------------------------------------------------------------------------

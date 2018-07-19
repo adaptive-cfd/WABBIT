@@ -11,7 +11,7 @@
 !! gives back the input for the RHS (from which in the final stage the next
 !! time step is computed).\n
 !!
-!! k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_jl*k_l))
+!! k_j = RHS(t+dt*c_j,  datafield(t) + dt*sum(a_jl*k_l))
 !! (e.g. k3 = RHS(t+dt*c_3, data_field(t) + dt*(a31*k1+a32*k2)) ) \n
 !!
 !! This routine is in charge of setting the input and saving it in the hvy_work and hvy_block array \n
@@ -75,8 +75,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
             do k = 1, hvy_n
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block(:,:,:,1:N_dF,hvy_active(k)) = hvy_block(:,:,:,1:N_dF,hvy_active(k)) &
-                            + dt*rk_coeffs(l)*hvy_work(:,:,:,(l-1)*N_dF+1:l*N_dF,hvy_active(k))
+                hvy_block(:, :, :, 1:N_dF, hvy_active(k)) = hvy_block(:, :, :, 1:N_dF, hvy_active(k)) &
+                + dt * rk_coeffs(l) * hvy_work(:, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
             end do
         end if
     end do

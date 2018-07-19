@@ -155,7 +155,8 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         if (params_acm%dim ==2) then
             params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs+g-1,g+1:Bs+g-1,1,1)**2)*dx(1)*dx(2)
         else
-            call abort(6661,"ACM 3D not implemented.")
+            params_acm%enstrophy = 0.0_rk
+            ! call abort(6661,"ACM 3D not implemented.")
         end if
 
     case ("post_stage")

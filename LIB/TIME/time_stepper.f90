@@ -105,7 +105,8 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
     ! synchronize ghost nodes
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    ! ----------------------------------------------------------------------------------------
+
+
     ! calculate time step
     call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
         lgt_active, lgt_n, dt)

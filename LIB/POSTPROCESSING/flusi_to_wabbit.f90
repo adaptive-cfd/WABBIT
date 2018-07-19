@@ -17,6 +17,7 @@ subroutine flusi_to_wabbit(help, params)
     use module_params
     use module_IO
     use mpi
+    use module_MPI
 
     implicit none
 
@@ -34,11 +35,13 @@ subroutine flusi_to_wabbit(help, params)
     integer(kind=ik), allocatable     :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable     :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                  :: hvy_n, lgt_n,level, Bs
+    integer(kind=ik)                  :: hvy_n, lgt_n,level, Bs, k
+    real(kind=rk), dimension(3)       :: x0, dx
     real(kind=rk), dimension(3)       :: domain
     character(len=3)                  :: Bs_read
     integer(kind=ik), dimension(3)    :: nxyz
     real(kind=rk)                     :: level_tmp
+    integer(kind=ik)                  :: status, start_x, start_y, start_z
 
 !-----------------------------------------------------------------------------------------------------
     params%number_data_fields  = 1
@@ -75,7 +78,8 @@ subroutine flusi_to_wabbit(help, params)
         params%Lx = domain(2)
         params%Ly = domain(3)
         params%number_block_nodes = Bs
-        params%number_ghost_nodes = 0_ik
+        params%number_ghost_nodes = 1_ik
+        params%order_predictor = 'multiresolution_4th'
         if (params%threeD_case) then
             lgt_n = 8_ik**params%max_treelevel
             params%Lz = domain(1)
@@ -92,8 +96,22 @@ subroutine flusi_to_wabbit(help, params)
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
             params%max_treelevel, .true.)
 
-        call read_field_flusi(file_in, hvy_block, lgt_block, hvy_n,&
+        call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
             hvy_active, params, nxyz(2))
+
+        do k=1,lgt_n
+            call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
+            start_x = nint(x0(1)/dx(1))
+            start_y = nint(x0(2)/dx(2))
+            if (params%threeD_case) then
+                start_z = nint(x0(3)/dx(3))
+            else
+                start_z = 0_ik
+            end if
+            lgt_block(lgt_active(k), params%max_treelevel+2) = status(start_x, start_y, start_z, nxyz(2), Bs)
+        end do
+
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         iteration = 0
         call write_field(file_out, time, iteration, 1, params, lgt_block,&
@@ -101,3 +119,17 @@ subroutine flusi_to_wabbit(help, params)
     end if
 
 end subroutine flusi_to_wabbit
+
+function status(start_x, start_y, start_z, Bs_f, Bs)
+  use module_precision
+  implicit none
+  integer(kind=ik), intent(in) :: start_x, start_y, start_z, Bs_f, Bs
+  integer(kind=ik) :: status
+
+  if (((start_x==Bs_f-Bs+1) .or. (start_y==Bs_f-Bs+1)) .or. (start_z==Bs_f-Bs+1)) then
+      status = 0_ik
+  else
+      status = 11_ik
+  end if
+
+end function status

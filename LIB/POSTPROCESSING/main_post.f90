@@ -95,9 +95,9 @@ program main_post
         end if
     case ("--flusi-to-wabbit")
         ! does not (yet?) work in parallel....
-        if (rank==0) then
+        !if (rank==0) then
             call flusi_to_wabbit(help, params)
-        end if
+        !end if
     case default
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"

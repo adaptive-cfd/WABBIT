@@ -229,7 +229,7 @@ contains
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
 
-    dt = minval( params_acm%CFL * dx / params_acm%c_0 )
+    dt = minval( params_acm%CFL * dx(1:params_acm%dim) / params_acm%c_0 )
 
     if (params_acm%penalization) dt = min( dt, params_acm%C_eta )
 

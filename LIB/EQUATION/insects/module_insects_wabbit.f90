@@ -38,6 +38,7 @@ implicit none
 
     real(kind=rk) :: x0, y0, z0
 
+    logical :: avoid_drawing_static_body = .false.
 
     integer, parameter :: pr = rk
 end module module_insects_wabbit

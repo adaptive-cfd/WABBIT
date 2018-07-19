@@ -21,6 +21,7 @@ module module_insects
   ! we use this so only root prints write statements...
   logical :: root = .false.
 
+
   ! size (global) of domain
   real(kind=rk) :: xl, yl, zl
   ! viscosity (just for Reynolds number)
@@ -327,7 +328,7 @@ contains
     ! load balancing problems, since many cores do not draw the body at all.
     ! We thus try to draw it only once and then simply not to erase it later.
     !-----------------------------------------------------------------------------
-    if (Insect%body_moves=="no") then
+    if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
       if (.not. Insect%body_already_drawn .or. (abs(time-Insect%body_drawn_time)<1.0e-10)) then
         ! the body is at rest, but it is the first call to this routine, so
         ! draw it now.

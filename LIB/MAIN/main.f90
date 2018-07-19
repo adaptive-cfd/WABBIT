@@ -256,7 +256,7 @@ program main
         ! check redundant nodes
         !***********************************************************************
         t4 = MPI_wtime()
-        if (params%debug) then
+        if (params%check_redundant_nodes) then
             ! run the internal test for the ghost nodes.
             call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
 

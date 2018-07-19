@@ -210,6 +210,7 @@ subroutine ini_file_to_params( params, filename )
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
+    call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .true.)
 
     !***************************************************************************
     ! read PHYSICS parameters
@@ -336,7 +337,7 @@ end subroutine ini_file_to_params
       write(*,'(" ----------------------------")')
     endif
 
-    ! read number of friends 
+    ! read number of friends
     call read_param_mpi(FILE, 'MPI', 'N_friends', params%N_friends, 20_ik)
 
     ! READ Bridge Parameter

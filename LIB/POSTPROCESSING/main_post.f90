@@ -55,7 +55,7 @@ program main_post
     call set_mpi_comm_global(MPI_COMM_WORLD)
     ! output MPI status
     if (rank==0) then
-        write(*,'(80("_"))')
+        write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
     end if
 
@@ -80,25 +80,29 @@ program main_post
     select case(post_mode)
     case("--mean")
         call post_mean(params, help)
+
     case("--sparse-to-dense")
         call sparse_to_dense(help, params)
+
     case("--vorticity")
         call compute_vorticity_post(help, params)
+
     case("--keyvalues")
         call get_command_argument(3,filename)
         call keyvalues(filename, params, help)
+
     case ("--compare-keys")
         if (rank == 0) then
             call get_command_argument(3,key1)
             call get_command_argument(4,key2)
             call compare_keys(help,key1,key2)
         end if
+
     case ("--flusi-to-wabbit")
-        ! does not (yet?) work in parallel....
-        !if (rank==0) then
-            call flusi_to_wabbit(help, params)
-        !end if
+        call flusi_to_wabbit(help, params)
+
     case default
+
     if (params%rank==0) then
         write(*,*) "Available Postprocessing tools are:"
         write(*,*) "--sparse-to-dense"
@@ -114,6 +118,10 @@ program main_post
         end if
     end if
     end select
+
+    if (rank==0) then
+        write(*,'(40("*"),A,40("*"))') "(regular) EXIT wabbit-post"
+    endif
 
     ! end mpi
     call MPI_Finalize(ierr)

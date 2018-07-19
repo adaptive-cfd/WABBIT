@@ -36,7 +36,9 @@ module module_IO
     use module_operators, only: compute_vorticity
     ! use physics modules to save the data
     use module_physics_metamodule
-    
+
+    use module_helpers, only : check_file_exists
+
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -61,9 +63,6 @@ contains
 
     ! read field from input file
     include "read_field.f90"
-
-    ! check if input file exists
-    include "check_file_exists.f90"
 
     include "read_attributes.f90"
 

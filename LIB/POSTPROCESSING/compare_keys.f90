@@ -11,7 +11,7 @@
 !*********************************************************************************************
 
 subroutine compare_keys(help, key1, key2)
-    use module_IO, only: check_file_exists
+    use module_helpers, only: check_file_exists
     use module_precision
 
     implicit none

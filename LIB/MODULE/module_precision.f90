@@ -28,6 +28,8 @@ module module_precision
     ! define data precision parameters
     integer, parameter, public      :: sngl_prec=selected_real_kind(4)
     integer, parameter, public      :: dble_prec=selected_real_kind(8)
+    ! default length of strings
+    integer, parameter, public      :: strlen=120
 
     integer, parameter, public      :: int_prec=selected_int_kind(8)
 
@@ -51,40 +53,112 @@ module module_precision
 
 contains
 
-   !> \brief initialize global communicator of WABBIT MPI_World
-   subroutine set_mpi_comm_global(comm)
-      implicit none
+    !> \brief initialize global communicator of WABBIT MPI_World
+    subroutine set_mpi_comm_global(comm)
+        implicit none
         integer, intent(in) :: comm
 
-      WABBIT_COMM=comm
-  end subroutine set_mpi_comm_global
+        WABBIT_COMM=comm
+    end subroutine set_mpi_comm_global
 
 
-  subroutine abort1(code,msg)
-    implicit none
-    character(len=*), intent(in) :: msg
-    integer(kind=ik), intent(in) :: code
-    integer(kind=ik) :: mpierr
+    subroutine abort1(code,msg)
+        implicit none
+        character(len=*), intent(in) :: msg
+        integer(kind=ik), intent(in) :: code
+        integer(kind=ik) :: mpierr
 
-    write(*,*) msg
-    call MPI_ABORT( WABBIT_COMM, code, mpierr)
-  end subroutine
+        write(*,*) msg
+        call MPI_ABORT( WABBIT_COMM, code, mpierr)
+    end subroutine
 
-  subroutine abort2(code)
-    implicit none
-    integer(kind=ik), intent(in) :: code
-    integer(kind=ik) :: mpierr
+    subroutine abort2(code)
+        implicit none
+        integer(kind=ik), intent(in) :: code
+        integer(kind=ik) :: mpierr
 
-    call MPI_ABORT( WABBIT_COMM, code, mpierr)
-  end subroutine
+        call MPI_ABORT( WABBIT_COMM, code, mpierr)
+    end subroutine
 
-  subroutine abort3(msg)
-    implicit none
-    character(len=*), intent(in) :: msg
-    integer(kind=ik) :: mpierr
+    subroutine abort3(msg)
+        implicit none
+        character(len=*), intent(in) :: msg
+        integer(kind=ik) :: mpierr
 
-    write(*,*) msg
-    call MPI_ABORT( WABBIT_COMM, 666, mpierr)
-  end subroutine
+        write(*,*) msg
+        call MPI_ABORT( WABBIT_COMM, 666, mpierr)
+    end subroutine
+
+    !-----------------------------------------------------------------------------
+    ! convert degree to radiant
+    !-----------------------------------------------------------------------------
+    real(kind=rk) function deg2rad(deg)
+        implicit none
+        real(kind=rk), intent(in) :: deg
+        real(kind=rk),parameter :: pi2 = 3.1415926535897932384626433832795028841971693993751058209749445923078164d0
+        deg2rad = deg*pi2/180.d0
+        return
+    end function
+
+    !-----------------------------------------------------------------------------
+    ! radiant to degree
+    !-----------------------------------------------------------------------------
+    real(kind=rk) function rad2deg(deg)
+        implicit none
+        real(kind=rk), intent(in) :: deg
+        real(kind=rk),parameter :: pi2 = 3.1415926535897932384626433832795028841971693993751058209749445923078164d0
+        rad2deg = deg*180.d0/pi2
+        return
+    end function
+
+    !-----------------------------------------------------------------------------
+    ! cross product of two vectors
+    !-----------------------------------------------------------------------------
+    function cross(a,b)
+        implicit none
+        real(kind=rk),dimension(1:3),intent(in) :: a,b
+        real(kind=rk),dimension(1:3) :: cross
+        cross(1) = a(2)*b(3)-a(3)*b(2)
+        cross(2) = a(3)*b(1)-a(1)*b(3)
+        cross(3) = a(1)*b(2)-a(2)*b(1)
+    end function
+
+    !-----------------------------------------------------------------------------
+    ! 2-norm length of vectors
+    !-----------------------------------------------------------------------------
+    function norm2(a)
+        implicit none
+        real(kind=rk),dimension(1:3),intent(in) :: a
+        real(kind=rk) :: norm2
+        norm2 = sqrt( a(1)*a(1) + a(2)*a(2) + a(3)*a(3) )
+    end function
+
+    !-----------------------------------------------------------------------------
+    ! given a point x, check if it lies in the computational domain centered at zero
+    ! (note: we assume [-xl/2...+xl/2] size this is useful for insects )
+    !-----------------------------------------------------------------------------
+    function periodize_coordinate(x_glob, box)
+        real(kind=rk),intent(in) :: x_glob(1:3), box(1:3)
+        real(kind=rk),dimension(1:3) :: periodize_coordinate
+
+        periodize_coordinate = x_glob
+
+        if (x_glob(1)<-box(1)/2.0) periodize_coordinate(1)=x_glob(1)+box(1)
+        if (x_glob(2)<-box(2)/2.0) periodize_coordinate(2)=x_glob(2)+box(2)
+        if (x_glob(3)<-box(3)/2.0) periodize_coordinate(3)=x_glob(3)+box(3)
+
+        if (x_glob(1)>box(1)/2.0) periodize_coordinate(1)=x_glob(1)-box(1)
+        if (x_glob(2)>box(2)/2.0) periodize_coordinate(2)=x_glob(2)-box(2)
+        if (x_glob(3)>box(3)/2.0) periodize_coordinate(3)=x_glob(3)-box(3)
+
+    end function
+
+    !---------------------------------------------------------------------------
+    ! wrapper for random number generator (this may be compiler dependent)
+    !---------------------------------------------------------------------------
+    real(kind=rk) function rand_nbr()
+        implicit none
+        call random_number( rand_nbr )
+    end function
 
 end module module_precision

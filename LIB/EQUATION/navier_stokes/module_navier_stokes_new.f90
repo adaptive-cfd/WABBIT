@@ -567,7 +567,8 @@ contains
 
     ! local variables
     real(kind=rk),allocatable  :: v_physical(:,:,:)
-    real(kind=rk) :: deltax
+    real(kind=rk) :: deltax,x,y
+    integer(kind=ik)::ix,iy
 
     dt = 9.9e9_rk
 
@@ -595,7 +596,14 @@ contains
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
     if ( minval(u(:,:,:,pF))<0 ) then
       write(*,*)"minval=",minval(u(:,:,:,pF))
-      call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
+      do ix=g+1, Bs+g
+        x = dble(ix-(g+1)) * dx(1) + x0(1)
+        do iy=g+1,Bs+g
+           y= dble(iy-(g+1))* dx(2)*x0(2)
+           if (u(ix,iy,1,pF)<0.0_rk) write(*,*) "minval=",u(ix,iy,1,pF),"at (x,y)=",x,y
+        end do
+      end do
+      !call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
     end if
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
 

@@ -161,10 +161,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             u           = phi(ix,iy,2)/phi(ix,iy,1)
             v           = phi(ix,iy,3)/phi(ix,iy,1)
             p           = phi(ix,iy,4)
-
-
             C_inv=C_sp_inv
-            ! Funnel
             ! ------
             ! 1. compute mask term:
             chi = draw_funnel_plates(x,r,funnel,h)
@@ -198,14 +195,14 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             if (chi>0.0_rk) then
               mask(ix,iy,2:3) = mask(ix,iy,2:3)+chi
               !compute velocity profile
-              v_ref=velocity_pump*jet_stream(abs(x-funnel%pump_x_center),funnel%pump_diameter*0.5_rk,pump_smooth_width)
+              v_ref=velocity_pump!*jet_stream(abs(x-funnel%pump_x_center),funnel%pump_diameter*0.5_rk,pump_smooth_width)
                Phi_ref(ix,iy,2) = 0
+               C_inv=C_eta_inv
               if (y>R_domain) then
                 Phi_ref(ix,iy,3) = rho*v_ref
               else
                 Phi_ref(ix,iy,3) = -rho*v_ref
               endif
-                C_inv=C_eta_inv
             endif
             ! mass and energy sink
             chi=  draw_pumps_sink(x,r,funnel,h)
@@ -224,7 +221,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             chi=  draw_jet(x,r,funnel,h)
             if (chi>0.0_rk) then
               dq               =jet_stream(r,funnel%jet_radius,jet_smooth_width)
-
+              C_inv=C_sp_inv
               mask(ix,iy,1:4)  =  mask(ix,iy,1:4)+chi
               Phi_ref(ix,iy,1) =  rho_capillary
               Phi_ref(ix,iy,2) =  rho_capillary*u_capillary*dq
@@ -237,13 +234,14 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             ! ! ---------------------
             chi=  draw_outlet(x,r,funnel,h)
             !   chi=  draw_sink(x,y,funnel,h)
-              if (chi>0) then
+              if (chi>0.0_rk) then
                 mask(ix,iy,1) = mask(ix,iy,1)+chi
-                mask(ix,iy,4) = mask(ix,iy,4)+chi
+                mask(ix,iy,3:4) = mask(ix,iy,3:4)+chi
                 Phi_ref(ix,iy,1) = rho_2nd_pump_stage
                 !Phi_ref(ix,iy,2) = 0
                 Phi_ref(ix,iy,3) = 0
                 Phi_ref(ix,iy,4) = p_2nd_pump_stage
+                C_inv=C_sp_inv
               endif
 
 
@@ -284,9 +282,9 @@ subroutine integrate_over_pump_area(u,g,Bs,x0,dx,integral,area)
 
      h  = 1.5_rk*max(dx(1), dx(2))
     ! calculate mean density close to the pump
-    width =funnel%wall_thickness*0.5_rk
+    width =funnel%wall_thickness
     tmp   =  0.0_rk
-    r0    =(R_domain-funnel%wall_thickness)
+    r0    =(R_domain-2*funnel%wall_thickness)
      do iy=g+1, Bs+g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        r = abs(y-R_domain)
@@ -358,7 +356,6 @@ subroutine draw_funnel(mask, x0, dx, Bs, g )
     integer(kind=ik)                                          :: ix, iy
 !-------------------------------------------------------------------------
 ! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     ! reset mask array
     mask = 0.0_rk
@@ -439,8 +436,11 @@ function draw_walls(x,r,funnel,h)
 
   ! wall in east
   !mask=mask+smoothstep(x-funnel%wall_thickness,h)
-  mask=mask+hardstep(x-funnel%wall_thickness)
-
+  if ( r > funnel%jet_radius) then
+      mask=mask+hardstep(x-funnel%wall_thickness)
+  else
+      mask=mask+hardstep(x-funnel%wall_thickness*0.5_rk)
+  endif
   ! attach cappilary to wall in EAST
   if (  r > funnel%jet_radius  ) then
       mask=mask+hardstep(x-funnel%plate(1)%x0(1))*hardstep(r-funnel%r_out_cappilary)
@@ -495,7 +495,7 @@ function draw_pumps_sink(x,r,funnel,h)
 
   draw_pumps_sink  = 0.0_rk
   r0    =(R_domain-funnel%wall_thickness*0.666_rk)
-  depth =funnel%wall_thickness*0.4_rk
+  depth =funnel%wall_thickness*0.3_rk
   x_lb  =funnel%pump_x_center-funnel%pump_diameter*0.5_rk
   x_rb  =funnel%pump_x_center+funnel%pump_diameter*0.5_rk
 
@@ -510,16 +510,15 @@ function draw_jet(x,r,funnel,h)
 
   real(kind=rk)                         ::draw_jet,length_of_jet
 
-  length_of_jet=funnel%plate(1)%x0(1)-funnel%wall_thickness-h
+  length_of_jet=funnel%plate(1)%x0(1)-funnel%wall_thickness*0.5_rk-h
 
-  if (r< funnel%jet_radius) then
+  !if (r< funnel%jet_radius) then
     ! wall in EAST
-    draw_jet=soft_bump2(x,funnel%wall_thickness+h,length_of_jet,h)
+    draw_jet=soft_bump2(x,funnel%wall_thickness*0.5_rk+h,length_of_jet,h)*smoothstep(r-funnel%jet_radius+h,h)
 
     !draw_jet=smoothstep(x-funnel%wall_thickness,h)-smoothstep(x-funnel%wall_thickness/2.0_rk,h)
-  else
-    draw_jet=0.0_rk
-  endif
+  !else
+  !endif
 
 end function draw_jet
 

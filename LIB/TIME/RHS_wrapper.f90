@@ -69,8 +69,10 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! grid parameter
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
+    
 !---------------------------------------------------------------------------------------------
 ! main body
+
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------

@@ -49,7 +49,7 @@ subroutine flusi_to_wabbit(help, params)
     if (help .eqv. .true.) then
         if (params%rank==0) then
             write(*,*) "postprocessing subroutine to read a file from flusi and convert it to wabbit format. command line:"
-            write(*,*) "mpi_command -n 1 ./wabbit-post 2D --flusi-to-wabbit source.h5 target.h5 target_blocksize"
+            write(*,*) "mpi_command -n number_of_processes ./wabbit-post 2D --flusi-to-wabbit source.h5 target.h5 target_blocksize"
         end if
     else
         ! get values from command line (filename and desired blocksize)

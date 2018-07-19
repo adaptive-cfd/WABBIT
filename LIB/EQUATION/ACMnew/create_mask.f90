@@ -1,38 +1,95 @@
-subroutine create_mask_2D_NEW(mask, x0, dx, Bs, g )
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 
-    ! use module_params
-    ! use module_precision
+subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us )
+    implicit none
 
+    ! grid
+    integer(kind=ik), intent(in) :: Bs, g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(inout) :: mask
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+
+    integer(kind=2), allocatable, save :: mask_color(:,:,:)
+
+    if (size(mask,1) /= Bs+2*g .or. size(mask,2) /= Bs+2*g .or. size(mask,3) /= Bs+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    if (size(us,4) /= 3 ) then
+        call abort(777107, "us: wrong array size, there's pirates, captain!")
+    endif
+
+    mask = 0.0_rk
+    us = 0.0_rk
+
+    ! usually, the routine should not be called with no penalization, but if it still
+    ! happens, do nothing.
+    if ( params_acm%penalization .eqv. .false.) return
+
+    select case (params_acm%geometry)
+    case ('Insect')
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g,1:Bs+2*g,1:Bs+2*g))
+
+        call Draw_Insect( time, Insect, x0-dble(g+1)*dx, dx, mask, mask_color, us)
+
+    case ('none')
+      mask = 0.0_rk
+
+    case default
+      call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
+
+    end select
+
+end subroutine create_mask_3D
+
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+
+subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     implicit none
 
     ! grid
     integer(kind=ik), intent(in) :: Bs, g
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(inout) :: mask
+    real(kind=rk), dimension(:,:,:), intent(inout) :: us
     !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in) :: x0, dx
+    real(kind=rk), intent(in) :: x0(1:2), dx(1:2), time
 
+    ! some cheap checks
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(us,3) /= 2) call abort(777209,"wrong array size, there's pirates, captain!")
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    mask = 0.0_rk
+    us = 0.0_rk
+
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if ( params_acm%penalization .eqv. .false.) return
 
-    select case(params_acm%geometry)
-    case('cylinder')
+
+    select case (params_acm%geometry)
+    case ('cylinder')
       call draw_cylinder( mask, x0, dx, Bs, g )
-    case('two-cylinders')
+
+    case ('two-cylinders')
       call draw_two_cylinders( mask, x0, dx, Bs, g )
-    case('none')
+
+    case ('none')
       mask = 0.0_rk
+
     case default
       call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
+
     end select
 
-end subroutine create_mask_2D_NEW
+end subroutine create_mask_2D
 
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 
 subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
@@ -88,7 +145,8 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
 end subroutine draw_cylinder
 
-
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 
 subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
@@ -164,32 +222,3 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
 
 end subroutine draw_two_cylinders
-
-
-    subroutine smoothstep(f,x,t,h)
-      !-------------------------------------------------------------------------------
-      !> This subroutine returns the value f of a smooth step function \n
-      !> The sharp step function would be 1 if x<=t and 0 if x>t \n
-      !> h is the semi-size of the smoothing area, so \n
-      !> f is 1 if x<=t-h \n
-      !> f is 0 if x>t+h \n
-      !> f is variable (smooth) in between
-      !-------------------------------------------------------------------------------
-      use module_precision
-
-      implicit none
-      real(kind=rk), intent(out) :: f
-      real(kind=rk), intent(in)  :: x,t,h
-
-      !-------------------------------------------------
-      ! cos shaped smoothing (compact in phys.space)
-      !-------------------------------------------------
-      if (x<=t-h) then
-        f = 1.0_rk
-      elseif (((t-h)<x).and.(x<(t+h))) then
-        f = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
-      else
-        f = 0.0_rk
-      endif
-
-    end subroutine smoothstep

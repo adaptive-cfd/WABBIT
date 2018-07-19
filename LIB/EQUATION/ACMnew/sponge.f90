@@ -18,8 +18,7 @@
 !! \n
 !! 12/18 - create
 !*********************************************************************************************
-subroutine sponge_2D_NEW(sponge, x0, dx, Bs, g)
-
+subroutine sponge_2D(sponge, x0, dx, Bs, g)
     implicit none
 
     ! grid
@@ -49,4 +48,4 @@ subroutine sponge_2D_NEW(sponge, x0, dx, Bs, g)
        end do
     end do
 
-end subroutine sponge_2D_NEW
+end subroutine sponge_2D

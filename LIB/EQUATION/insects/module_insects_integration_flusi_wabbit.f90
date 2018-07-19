@@ -1,4 +1,4 @@
-module module_insects_wabbit
+module module_insects_integration_flusi_wabbit
   ! use vars, only : xl, yl, zl, abort, &
   ! periodize_coordinate, cross, deg2rad, pi, rad2deg, root, norm2, &
   ! x0, y0, z0, startup_conditioner, rand_nbr, &
@@ -41,4 +41,4 @@ implicit none
     logical :: avoid_drawing_static_body = .false.
 
     integer, parameter :: pr = rk
-end module module_insects_wabbit
+end module module_insects_integration_flusi_wabbit

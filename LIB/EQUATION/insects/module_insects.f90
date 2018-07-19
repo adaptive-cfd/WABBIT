@@ -1,8 +1,7 @@
 module module_insects
   ! The following module includes required functions from FLUSI/WABBIT and hence
   ! makes this module here independent of that
-  ! use module_insects_flusi
-  use module_insects_wabbit
+  use module_insects_integration_flusi_wabbit
 
   implicit none
 

@@ -16,7 +16,7 @@ MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wra
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
-	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_wabbit.f90 \
+	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
@@ -106,11 +106,11 @@ $(OBJDIR)/module_precision.o: module_precision.f90
 $(OBJDIR)/module_bridge.o: module_bridge.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_insects_wabbit.o: module_insects_wabbit.f90  $(OBJDIR)/module_precision.o \
+$(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_flusi_wabbit.f90  $(OBJDIR)/module_precision.o \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_wabbit.o \
+$(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o \
 	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 \
 	wings_motion.f90 stroke_plane.f90 pointcloud.f90 fractal_trees.f90 insect_init_clean.f90 \
 	kineloader.f90 active_grid_winglets.f90

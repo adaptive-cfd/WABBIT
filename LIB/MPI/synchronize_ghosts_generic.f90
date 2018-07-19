@@ -647,6 +647,13 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     !---------------------------------------------------------------------------
 
     if (.not. allocated(hvy_block_test)) then
+        if (params%rank == 0) then
+            write(*,*) "---------------ATTENTION---------------ATTENTION---------------ATTENTION---------------"
+            write(*,*) " The ghost nodes test is on (check_unique_origin) and allocates a huge"
+            write(*,*) " amount of memory. If this is a production run, consider disabeling it!"
+            write(*,*) "---------------ATTENTION---------------ATTENTION---------------ATTENTION---------------"
+        endif
+
         allocate( hvy_block_test (size(hvy_block,1),size(hvy_block,2),size(hvy_block,3),size(hvy_block,4),size(hvy_block,5) ) ) !its just a test, so not most time efficient..
 
         ! this array is global within the MODULE scope

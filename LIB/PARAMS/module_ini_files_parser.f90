@@ -445,7 +445,7 @@ end subroutine read_intarray_from_ascii_file
 
     ! in verbose mode, inform about what we did
     if (verbosity) then
-      write (*,FORMAT1)trim(section),trim(keyword),adjustl(trim(value))
+      write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
     endif
   end subroutine param_str
 

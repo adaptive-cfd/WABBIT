@@ -173,7 +173,7 @@ module module_params
         ! unit test wavelet compression
         logical                                     :: test_wavelet_comp=.false.
         ! unit test treecode flag
-        logical                                     :: test_treecode=.false., test_ghost_nodes_synch=.false.
+        logical :: test_treecode=.false., test_ghost_nodes_synch=.false., check_redundant_nodes=.false.
 
         ! -------------------------------------------------------------------------------------
         ! filter

@@ -28,8 +28,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     ! if the initial grid is adapted we set our initial condition without penalization (impulsive start).
     logical, intent(in) :: adapting
 
-    real(kind=rk)    :: x,y
-    integer(kind=ik) :: Bs, ix, iy, idir
+    real(kind=rk)    :: x,y,z
+    integer(kind=ik) :: Bs, ix, iy, iz, idir
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
@@ -37,13 +37,41 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
+    u = 0.0_rk
 
     select case (params_acm%inicond)
     case("meanflow")
-        u = 0.0_rk
         do idir = 1, params_acm%dim
             u(:,:,:,idir) = params_acm%u_mean_set(idir)
         enddo
+
+    case("sinewaves-nopress")
+        ! some random sine waves, but no pressure imposed.
+        if (params_acm%dim == 2) then
+            do iy= 1,Bs+2*g
+                do ix= 1, Bs+2*g
+                    x = x0(1) + dble(ix-g-1)*dx(1)
+                    y = x0(2) + dble(iy-g-1)*dx(2)
+                    u(ix,iy,1,1) = sin( 2.0_rk*pi*x/params_acm%Lx ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%Lx )
+                    u(ix,iy,1,2) = cos( 2.0_rk*pi*y/params_acm%Ly )*sin( 2.0_rk*pi*x/params_acm%Lx )
+                enddo
+            enddo
+        else
+            do iz = 1, Bs+2*g
+                do iy= 1,Bs+2*g
+                    do ix= 1, Bs+2*g
+                        x = x0(1) + dble(ix-g-1)*dx(1)
+                        y = x0(2) + dble(iy-g-1)*dx(2)
+                        z = x0(3) + dble(iz-g-1)*dx(3)
+
+                        u(ix,iy,iz,1) = sin( 2.0_rk*pi*x/params_acm%Lx ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%Lx )
+                        u(ix,iy,iz,2) = cos( 2.0_rk*pi*y/params_acm%Ly )*sin( 2.0_rk*pi*x/params_acm%Lx )*sin( 2.0_rk*pi*z/params_acm%Lz )
+                        u(ix,iy,iz,3) = cos( 2.0_rk*pi*y/params_acm%Ly )*sin( 3.0_rk*pi*x/params_acm%Lx )*cos( 2.0_rk*pi*z/params_acm%Lz )
+                    enddo
+                enddo
+            enddo
+
+        endif
 
     case("taylor_green")
         do iy= 1,Bs+2*g

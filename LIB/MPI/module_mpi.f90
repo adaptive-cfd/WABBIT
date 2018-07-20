@@ -245,7 +245,7 @@ subroutine init_ghost_nodes( params )
     integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, rank
     integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idata_bounds_type
     integer(kind=ik) ::  j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
-    integer(kind=ik) :: i, k
+    integer(kind=ik) :: i, k, status(1:4)
     integer(kind=ik) :: ijkrecv(2,3)
     integer(kind=ik) :: ijkbuffer(2,3)
     integer(kind=ik) :: ijksend(2,3)
@@ -303,11 +303,21 @@ subroutine init_ghost_nodes( params )
         ! allocate auxiliary memory
         !-----------------------------------------------------------------------
         ! allocate synch buffer
-        allocate( int_send_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages) )
-        allocate( int_receive_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages) )
-        allocate( real_send_buffer( 1:buffer_N, 1:N_friends, 1:Nstages) )
-        allocate( real_receive_buffer( 1:buffer_N, 1:N_friends, 1:Nstages) )
+        if (rank==0) then
+            write(*,'("GHOSTS-INIT: Attempting to allocate the ghost-sync-buffer.")')
+            write(*,'("GHOSTS-INIT: buffer_N_int=",i8," buffer_N=",i8,"N_friends=",i3,"Nstages=",i1)') &
+            buffer_N_int, buffer_N, N_friends, Nstages
+            write(*,'("GHOSTS-INIT: Int  buffer:", f9.4, "GB")') 2.0*dble(buffer_N_int)*dble(N_friends)*dble(Nstages)*8e-9
+            write(*,'("GHOSTS-INIT: Real buffer:", f9.4, "GB")') 2.0*dble(buffer_N)*dble(N_friends)*dble(Nstages)*8e-9
+            write(*,'("---------------- allocating now ----------------")')
+        endif
 
+        allocate( int_send_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages), stat=status(1) )
+        allocate( int_receive_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages), stat=status(2) )
+        allocate( real_send_buffer( 1:buffer_N, 1:N_friends, 1:Nstages), stat=status(3) )
+        allocate( real_receive_buffer( 1:buffer_N, 1:N_friends, 1:Nstages), stat=status(4) )
+
+        if (maxval(status) /= 0) call abort(48769531, "Buffer allocation failed. Not enough memory?")
 
         ! synch array, use for ghost nodes synchronization
         if (params%threeD_case) then
@@ -318,26 +328,26 @@ subroutine init_ghost_nodes( params )
 
         if (rank==0) then
             write(*,'("GHOSTS-INIT: initial N_friends=",i4)') N_friends
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "hvy_synch", shape(hvy_synch)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "real_receive_buffer", shape(real_receive_buffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "real_send_buffer", shape(real_send_buffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "int_send_buffer", shape(int_send_buffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A," shape=",7(i9,1x))') &
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "int_receive_buffer", shape(int_receive_buffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Real buffer size is",g15.3," GB ")') &
-             2.0_rk*size(real_send_buffer)/8.0e9_rk
+            write(*,'("GHOSTS-INIT: on each mpirank, Real buffer size is",f9.4," GB ")') &
+             2.0*dble(buffer_N)*dble(N_friends)*dble(Nstages)*8e-9
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Int  buffer size is",g15.3," GB ")') &
-             2.0_rk*size(int_send_buffer)/8.0e9_rk
+            write(*,'("GHOSTS-INIT: on each mpirank, Int  buffer size is",f9.4," GB ")') &
+             2.0*dble(buffer_N_int)*dble(N_friends)*dble(Nstages)*8e-9
         endif
 
         ! this is a list of communications with all other procs

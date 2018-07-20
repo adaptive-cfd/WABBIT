@@ -87,7 +87,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
-    rk_steps = max(size(params%butcher_tableau,1)-1,params%N_fields_saved)
+    rk_steps = max(size(params%butcher_tableau,1)-1, params%N_fields_saved)
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:

@@ -258,6 +258,10 @@ subroutine init_ghost_nodes( params )
         Neqn            = params%number_data_fields
         rank            = params%rank
 
+        if (rank==0) write(*,'("---------------------------------------------------------")')
+        if (rank==0) write(*,'("                     GHOST-INIT ")')
+        if (rank==0) write(*,'("---------------------------------------------------------")')
+
         if (g>=(Bs+1)/2) then
             call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 which implies &
             & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
@@ -305,12 +309,20 @@ subroutine init_ghost_nodes( params )
         ! allocate synch buffer
         if (rank==0) then
             write(*,'("GHOSTS-INIT: Attempting to allocate the ghost-sync-buffer.")')
-            write(*,'("GHOSTS-INIT: buffer_N_int=",i8," buffer_N=",i8,"N_friends=",i3,"Nstages=",i1)') &
+
+            write(*,'("GHOSTS-INIT: buffer_N_int=",i12," buffer_N=",i12," N_friends=",i3," Nstages=",i1)') &
             buffer_N_int, buffer_N, N_friends, Nstages
-            write(*,'("GHOSTS-INIT: Int  buffer:", f9.4, "GB")') 2.0*dble(buffer_N_int)*dble(N_friends)*dble(Nstages)*8e-9
-            write(*,'("GHOSTS-INIT: Real buffer:", f9.4, "GB")') 2.0*dble(buffer_N)*dble(N_friends)*dble(Nstages)*8e-9
+
+            write(*,'("GHOSTS-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
+                2.0*dble(buffer_N_int)*dble(N_friends)*dble(Nstages)*8e-9
+
+            write(*,'("GHOSTS-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
+                2.0*dble(buffer_N)*dble(N_friends)*dble(Nstages)*8e-9
             write(*,'("---------------- allocating now ----------------")')
         endif
+
+        ! wait now so that if allocation fails, we get at least the above info
+        call MPI_barrier( WABBIT_COMM, status(1))
 
         allocate( int_send_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages), stat=status(1) )
         allocate( int_receive_buffer( 1:buffer_N_int, 1:N_friends, 1:Nstages), stat=status(2) )

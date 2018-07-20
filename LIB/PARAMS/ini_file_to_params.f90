@@ -41,10 +41,9 @@ subroutine ini_file_to_params( params, filename )
     ! inifile structure
     type(inifile)                                   :: FILE
     ! maximum memory available on all cpus
-    real(kind=rk)                                   :: maxmem, byte_int=4.0_rk, &
-    byte_real=8.0_rk, Ncpu, Nfriend, Bs, g, max_neighbors, Nrk4, Neqn,Jmax
+    real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
     ! power used for dimensionality (d=2 or d=3)
-    integer(kind=ik)                                :: d,i, Nblocks_Jmax
+    integer(kind=ik)                                :: d,i, Nblocks_Jmax, Bs, g, Neqn, Nrk
     real(kind=rk), dimension(:), allocatable        :: tmp
     ! string read from command line call
     character(len=80)                               :: memstring
@@ -240,43 +239,35 @@ subroutine ini_file_to_params( params, filename )
         if ( index(memstring,"--memory=")==1 ) then
             if (params%rank==0) write(*,'(80("-"))')
             if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
+            if (params%rank==0) write(*,'(80("-"))')
 
-            ! read memory from command line and convert to bytes
+            ! read memory from command line (in GB)
             read(memstring(10:len_trim(memstring)-2),* ) maxmem
-            ! how much memory is reserved, in bytes?
-            maxmem = maxmem * 1000.0 * 1000.0 * 1000.0 ! in bytes
+            ! memory per MPIRANK (in GB)
+            maxmem = maxmem / dble(params%number_procs)
+
             if ( params%threeD_case ) then
                 d = 3
                 max_neighbors = 56.0
             else
-                max_neighbors = 12.0
                 d = 2
+                max_neighbors = 12.0
             endif
 
-            Ncpu = real(params%number_procs)
-            Neqn = real(params%number_data_fields)
-            Bs = real(params%number_block_nodes)
-            g = real(params%number_ghost_nodes)
-            ! we assume sort of a worst-case scenario and assume 20 friends.
-            ! in 2D that is too much (11 in practice), in 3d we dont know yet
-            Nfriend = min(Ncpu, 20.0_rk)
-            Jmax = real(params%max_treelevel)
-            Nrk4 = real(size(params%butcher_tableau, 1)+1)
+            Bs      = params%number_block_nodes
+            g       = params%number_ghost_nodes
+            Neqn    = params%number_data_fields
+            Nrk     = max( size(params%butcher_tableau,1)-1, params%N_fields_saved ) + 2
+            nstages = 2.0
 
-            maxmem = 0.90_rk * maxmem / Ncpu
+            mem_per_block = real(Neqn)*real(Nrk)*(real(Bs+2*g))**d & ! hvy_work+hvy_block
+            + 2.0 * nstages * real(Neqn) * real((Bs+g+1)*(g+1)**(d-1)) &
+            * max_neighbors * real(params%N_friends) ! real buffer ghosts
 
-            if ( d == 2 ) then
-                ! in 2d, we try to be precise and take all fat arrays into account. this worked well
-                params%number_blocks = ceiling( maxmem/( 2.0*max_neighbors*3.0*Nfriend*byte_int &
-                + 2.0*max_neighbors*(Bs+g+1.0)*((g+1.)**(d-1))*Neqn*Nfriend*byte_real &
-                + (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real &
-                + max_neighbors*byte_int &
-                + Ncpu*(Jmax+2.0+2.0+1.0)*byte_int ) )
-            else
-                ! in 3d, use a simpler formula which takes only hvy and lgt data into account.
-                ! the buffers are negligible in front of it. I still do not understand it fully. 21/06/2018
-                params%number_blocks = ceiling( maxmem/( (Nrk4+1.)*((Bs+2.0*g)**d)*Neqn*byte_real + Ncpu*(Jmax+2.0+2.0+1.0)*byte_int ) )
-            endif
+            ! in GB:
+            mem_per_block = mem_per_block * 8.0e-9
+
+            params%number_blocks = nint( maxmem / mem_per_block)
 
             if (params%rank==0) then
                 write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
@@ -339,6 +330,7 @@ end subroutine ini_file_to_params
 
     ! read number of friends
     call read_param_mpi(FILE, 'MPI', 'N_friends', params%N_friends, 20_ik)
+    params%N_friends = min(params%N_friends, params%number_procs)
 
     ! READ Bridge Parameter
     ! ----------------------

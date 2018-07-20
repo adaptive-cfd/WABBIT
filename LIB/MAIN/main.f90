@@ -116,7 +116,7 @@ program main
     character(len=80)                   :: filename
 
     ! loop variable
-    integer(kind=ik)                    :: k, max_neighbors
+    integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4
@@ -294,6 +294,7 @@ program main
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
 
+        Nblocks_rhs = lgt_n
         !***********************************************************************
         ! advance in time
         !***********************************************************************
@@ -340,6 +341,7 @@ program main
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_work )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
+        Nblocks = lgt_n
 
         ! statistics
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
@@ -386,8 +388,8 @@ program main
         t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=",i7," Jmin=",i2," Jmax=",i2)') &
-             iteration, time, t2, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=(",i6,"/",i6,") Jmin=",i2," Jmax=",i2)') &
+             iteration, time, t2, Nblocks_rhs, Nblocks, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
 
              open(14,file='timesteps_info.t',status='unknown',position='append')

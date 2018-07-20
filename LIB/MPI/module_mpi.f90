@@ -177,7 +177,7 @@ subroutine reallocate_buffers(params)
     communication_counter_tmp = communication_counter
     deallocate(communication_counter)
     allocate( communication_counter(1:N_friends, 1:Nstages) )
-    communication_counter(1:size(communication_counter_tmp), :) = communication_counter_tmp
+    communication_counter(1:size(communication_counter_tmp,1), :) = communication_counter_tmp
     deallocate( communication_counter_tmp )
     communication_counter( N_friends, : ) = 0
 
@@ -186,7 +186,7 @@ subroutine reallocate_buffers(params)
     int_pos_tmp = int_pos
     deallocate(int_pos)
     allocate( int_pos(1:N_friends, 1:Nstages) )
-    int_pos(1:size(int_pos_tmp),:) = int_pos_tmp
+    int_pos(1:size(int_pos_tmp,1),:) = int_pos_tmp
     deallocate( int_pos_tmp )
     ! new appended buffer requires initialization
     int_pos(N_friends, 1:Nstages) = 2

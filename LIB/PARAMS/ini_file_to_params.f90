@@ -330,7 +330,7 @@ end subroutine ini_file_to_params
     endif
 
     ! read number of friends
-    call read_param_mpi(FILE, 'MPI', 'N_friends', params%N_friends, 20_ik)
+    call read_param_mpi(FILE, 'MPI', 'N_friends', params%N_friends, 32_ik)
     params%N_friends = min(params%N_friends, params%number_procs)
 
     ! READ Bridge Parameter

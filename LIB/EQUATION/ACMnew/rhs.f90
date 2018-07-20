@@ -50,6 +50,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         params_acm%mean_flow = 0.0_rk
         params_acm%mean_p = 0.0_rk
 
+        if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+
     case ("integral_stage")
         !-------------------------------------------------------------------------
         ! 2nd stage: init_stage.

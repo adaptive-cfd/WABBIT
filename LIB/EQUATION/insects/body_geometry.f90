@@ -190,8 +190,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
     !-----------------------------------------------------------------------------
     ! Legs, antennae and proboscis
     !-----------------------------------------------------------------------------
-    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="legs")&
-    .or.(Insect%HasDetails=="antennae_proboscis")) then
+    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="legs").or.(Insect%HasDetails=="antennae_proboscis")) then
     ! Bounding box
     xmin_bbox = -0.74-Insect%safety
     xmax_bbox = 0.8+Insect%safety

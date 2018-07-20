@@ -246,6 +246,8 @@ subroutine ini_file_to_params( params, filename )
             ! memory per MPIRANK (in GB)
             maxmem = maxmem / dble(params%number_procs)
 
+            if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
+
             if ( params%threeD_case ) then
                 d = 3
                 max_neighbors = 56.0
@@ -260,9 +262,8 @@ subroutine ini_file_to_params( params, filename )
             Nrk     = max( size(params%butcher_tableau,1)-1, params%N_fields_saved ) + 2
             nstages = 2.0
 
-            mem_per_block = real(Neqn)*real(Nrk)*(real(Bs+2*g))**d & ! hvy_work+hvy_block
-            + 2.0 * nstages * real(Neqn) * real((Bs+g+1)*(g+1)**(d-1)) &
-            * max_neighbors * real(params%N_friends) ! real buffer ghosts
+            mem_per_block = real(Neqn) * real(Nrk) * (real(Bs+2*g))**d & ! hvy_work+hvy_block
+            + 2.0 * nstages * real(Neqn) * real( ((Bs+2*g)**d - Bs**d) / params%N_friends ) * real(params%N_friends) ! real buffer ghosts
 
             ! in GB:
             mem_per_block = mem_per_block * 8.0e-9

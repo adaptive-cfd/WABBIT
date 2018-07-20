@@ -268,6 +268,10 @@ subroutine init_ghost_nodes( params )
             & number_ghost_nodes or increase number_block_nodes.")
         endif
 
+        ! set default number of "friends", that is mpiranks we exchange data with.
+        ! NOTE: their number can be increased if necessary
+        N_friends = min( params%number_procs, params%N_friends )
+
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
         ! max neighbor number: 2D = 12, 3D = 56
@@ -275,30 +279,26 @@ subroutine init_ghost_nodes( params )
         ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
         if ( params%threeD_case ) then
             !---3d---3d---
+            ! space dimensions: used in the static arrays as index
+            dim = 3
 
-            buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * Neqn
+            buffer_N = number_blocks * Neqn * ((Bs+2*g)**dim - Bs**dim) / N_friends
+            ! buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 56 * 3
             ! how many possible neighbor relations are there?
             Nneighbor = 74
-            ! space dimensions: used in the static arrays as index
-            dim = 3_ik
-            ! set default number of "friends", that is mpiranks we exchange data with.
-            ! NOTE: their number can be increased if necessary
-            N_friends = min( params%number_procs, params%N_friends )
 
             allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
         else
             !---2d---2d---
+            ! space dimensions: used in the static arrays as index
+            dim = 2
 
-            buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * Neqn
+            buffer_N = number_blocks * Neqn * ((Bs+2*g)**dim - Bs**dim) / N_friends
+            ! buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 12 * 3
             ! how many possible neighbor relations are there?
             Nneighbor = 16
-            ! space dimensions: used in the static arrays as index
-            dim = 2_ik
-            ! set default number of "friends", that is mpiranks we exchange data with.
-            ! NOTE: their number can be increased if necessary
-            N_friends = min( params%number_procs, params%N_friends )
 
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
@@ -329,7 +329,7 @@ subroutine init_ghost_nodes( params )
         allocate( real_send_buffer( 1:buffer_N, 1:N_friends, 1:Nstages), stat=status(3) )
         allocate( real_receive_buffer( 1:buffer_N, 1:N_friends, 1:Nstages), stat=status(4) )
 
-        if (maxval(status) /= 0) call abort(48769531, "Buffer allocation failed. Not enough memory?")
+        if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         ! synch array, use for ghost nodes synchronization
         if (params%threeD_case) then

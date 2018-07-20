@@ -483,12 +483,12 @@ end subroutine get_rank_datafield
     ! get the dimensions of the field in the file
     call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
 
-    if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
-        write(*,*) 'file', dims_file
-        write(*,*) 'global', dims_global
-      write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
-    endif
+    !if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
+    !    write(*,*) 'file', dims_file
+    !    write(*,*) 'global', dims_global
+    !  write(*,*) "read_hdf5 error: file dimensions do not match"
+    !  call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+    !endif
 
     ! Select hyperslab in the file.
     call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
@@ -509,6 +509,7 @@ end subroutine get_rank_datafield
 
 
   end subroutine read_dset_mpi_hdf5_3D
+
 
   subroutine read_dset_mpi_hdf5_4D( file_id, dsetname, lbounds, ubounds, field )
     implicit none

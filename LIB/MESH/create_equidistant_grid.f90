@@ -129,9 +129,10 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
   allocate( treecode( params%max_treelevel ) )
 
   ! loop over blocks in x,y,z directions (in the 2d case, 3rd loop degenerates)
-  do ix = 1, nx
-    do iy = 1, ny
-      do iz = 1, nz
+  ! NOTE: This ordering is necessary for POSTPROCESSING flusi to wabbit!
+  do ix = nx, 1, -1
+    do iy = ny,1,-1
+      do iz = nz,1,-1
         ! for each of the points (ix,iy,iz), find an mpirank to hold it.
         do icpu = 0, number_procs -1
           ! can the current cpu "icpu" still accept more blocks?

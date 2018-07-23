@@ -397,7 +397,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     !> temporary, persistent arrays
     !> mask term for every grid point in this block
-    real(kind=rk), allocatable, save :: mask(:, :, :)
+    real(kind=rk), allocatable, save :: mask(:, :, :), sponge(:, :, :)
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:, :, :, :)
 
@@ -424,6 +424,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    if (.not. allocated(sponge)) allocate(sponge(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
     if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
     if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
 
@@ -593,6 +594,22 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     else
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
+    end if
+
+    ! --------------------------------------------------------------------------
+    ! sponge term.
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_sponge) then
+        call sponge_3D(sponge, x0, dx, Bs, g)
+        eps_inv = 1.0_rk / params_acm%C_sponge
+        sponge = sponge * eps_inv
+
+        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+        ! which is different from the penalization term, which acts only on ux,uy and not p
+        rhs(:,:,:,1) = rhs(:,:,:,1) - (phi(:,:,:,1)-params_acm%u_mean_set(1)) * sponge
+        rhs(:,:,:,2) = rhs(:,:,:,2) - (phi(:,:,:,2)-params_acm%u_mean_set(2)) * sponge
+        rhs(:,:,:,3) = rhs(:,:,:,3) - (phi(:,:,:,3)-params_acm%u_mean_set(3)) * sponge
+        rhs(:,:,:,4) = rhs(:,:,:,4) - phi(:,:,:,4)*sponge
     end if
 
 end subroutine RHS_3D_acm

@@ -78,7 +78,12 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
               work(:,:,:,k) = mask
           case('spo')
               ! mask for sponge
-              call sponge_2D(work(:,:,1,k), x0, dx, Bs, g )
+              if (params_acm%dim==2) then
+                  call sponge_2D(work(:,:,1,k), x0(1:2), dx(1:2), Bs, g )
+              else
+                  call sponge_3D(work(:,:,:,k), x0, dx, Bs, g )
+              endif
+
       end select
   end do
 

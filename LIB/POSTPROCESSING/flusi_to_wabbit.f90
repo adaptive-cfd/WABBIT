@@ -9,6 +9,7 @@
 !
 ! = log ======================================================================================
 !> \date  07/03/18 - create hashcode: commit 8f4858f429c6c3f537190f48a8e8a931154a01d5
+!> \date 20/7/2018 - add read_field_flusi_MPI for parallel reading, commit 03b933e706b988828a0b0321baedb2dc9f76773d
 !-----------------------------------------------------------------------------------------------------
 !
 subroutine flusi_to_wabbit(help, params)
@@ -49,9 +50,10 @@ subroutine flusi_to_wabbit(help, params)
     if (help .eqv. .true.) then
         if (params%rank==0) then
             write(*,*) "postprocessing subroutine to read a file from flusi and convert it to wabbit format. command line:"
-            write(*,*) "mpi_command -n number_of_processes ./wabbit-post 2D --flusi-to-wabbit source.h5 target.h5 target_blocksize"
+            write(*,*) "mpi_command -n number_of_processes ./wabbit-post 2D/3D --flusi-to-wabbit source.h5 target.h5 target_blocksize"
         end if
     else
+        if (params%rank==0) write(*,*) "ATTENTION: this routine works in parallel only with ghost nodes synchronization --generic-sequence (default)"
         ! get values from command line (filename and desired blocksize)
         call get_command_argument(3, file_in)
         call check_file_exists(trim(file_in))
@@ -74,6 +76,7 @@ subroutine flusi_to_wabbit(help, params)
         if (mod(nxyz(2),(Bs-1))/=0 .or. abs(level-level_tmp)>1.e-14)&
             call abort(2948, "ERROR: I'm afraid your saved blocksize does not match for WABBIT")
 
+        ! set important parameters
         params%max_treelevel=level
         params%Lx = domain(2)
         params%Ly = domain(3)
@@ -92,13 +95,17 @@ subroutine flusi_to_wabbit(help, params)
         call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
             hvy_active, lgt_sortednumlist, .false.)
 
+        ! create an equidistant grid (order of light id is important!)
         call create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor,&
             lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
             params%max_treelevel, .true.)
 
+        ! read the field from flusi file and organize it in WABBITs blocks
         call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
             hvy_active, params, nxyz(2))
 
+        ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
+        ! they will therefore send their redundant points to the last blocks in x,y and z-direction
         do k=1,lgt_n
             call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
             start_x = nint(x0(1)/dx(1))
@@ -126,6 +133,8 @@ function status(start_x, start_y, start_z, Bs_f, Bs)
   integer(kind=ik), intent(in) :: start_x, start_y, start_z, Bs_f, Bs
   integer(kind=ik) :: status
 
+  ! if I'm the last block in x,y and/or z-direction,
+  ! set my refinement status to 0, otherwise to 11 (historic fine)
   if (((start_x==Bs_f-Bs+1) .or. (start_y==Bs_f-Bs+1)) .or. (start_z==Bs_f-Bs+1)) then
       status = 0_ik
   else

@@ -8,6 +8,7 @@
 !
 ! = log ======================================================================
 !> \date  9/3/2018 - create hashcode: commit 
+!> \date 20/7/2018 - add read_field_flusi_MPI for parallel reading
 !-----------------------------------------------------------------------------
 subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params, Bs_f)
 
@@ -85,7 +86,6 @@ end subroutine read_field_flusi
 
 subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params, Bs_f)
 
-
   implicit none
   !> file name
   character(len=*),intent(in)         :: fname
@@ -108,6 +108,8 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
 !----------------------------------------------------------------------------
   Bs = params%number_block_nodes
   g  = params%number_ghost_nodes
+  ! this is necessary in 2D because flusi data is organised as field(1,1:Bs_f,1:Bs_f)
+  ! whereas in wabbit the field has only one component in z direction
   if (.not. params%threeD_case) allocate(blockbuffer(1,0:Bs-1,0:Bs-1))
 !----------------------------------------------------------------------------
   call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
@@ -121,6 +123,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   do k=1, hvy_n
       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+      ! from spacing and origin of the block, get position in flusi matrix
       start_x = nint(x0(1)/dx(1))
       start_y = nint(x0(2)/dx(2))
       if (params%threeD_case) then
@@ -186,6 +189,8 @@ integer(kind=ik) function end_bound(start, Bs, Bs_f)
   implicit none
   integer(kind=ik), intent(in) :: start, Bs, Bs_f
 
+  ! if I'm the last block in x, y and/or z direction, I get to read only Bs-1 points, 
+  ! otherwise all Bs points
   if (start==Bs_f-Bs+1) then
       end_bound = start + Bs - 2
   else

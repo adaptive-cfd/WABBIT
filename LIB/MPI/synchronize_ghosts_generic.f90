@@ -33,13 +33,20 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! such a patner is called "friend"
     integer(kind=ik)  :: id_Friend
 
-    integer(kind=ik) :: bounds_type, istage, istage_buffer(1:4), rounds(1:4)
+    integer(kind=ik) :: ijk(2,3)
+
+
+    integer(kind=ik) :: bounds_type, istage, istage_buffer(1:4), rounds(1:4), inverse
+    integer(kind=ik) :: recv_counter(0:params%number_procs-1), send_counter(0:params%number_procs-1)
 
     if (.not. ghost_nodes_module_ready) then
         ! in order to keep the syntax clean, buffers are module-global and need to be
         ! allocated here.
         call init_ghost_nodes( params )
     endif
+
+recv_counter(:) =0
+send_counter(:) = 0
 
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
@@ -66,7 +73,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! Stage I: send the data for entrySortInRound= 2,3,4 and effectively do the rounds 2,3,4
     !          afterwards, the ghost nodes on coarser block, including the redundant nodes, should be fine
     ! Stage II: send the data for entrySortInRound = 1 (interpolation) and do the complete sort in again 1,2,3,4
-    !           the data for rouns 2,3,4 is not changed, so it is taken from the buffer for the first stage.
+    !           the data for rounds 2,3,4 is not changed, so it is taken from the buffer for the first stage.
     do istage = 1, 2
         !***************************************************************************
         ! (i) stage initialization
@@ -86,8 +93,51 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         ! reset integer send buffer position
         int_pos(:, istage) = 2       ! TODO JR why 2? , the first filed contains the size of the XXX
         ! reset first in send buffer position
-        int_send_buffer( 1 ,: ,istage) = 0
-        int_send_buffer( 2 ,: ,istage) = -99
+        int_send_buffer( 1, : ,istage) = 0
+        int_send_buffer( 2, : ,istage) = -99
+
+        ! 1) we need to know how much data each friend gets. dry-run for counting only.
+        ! I think the receiver ranks can at this occasion likewise compute the amount of data they will receive
+        ! this would be good since no comm involved.
+        do k = 1, hvy_n
+            ! calculate light id
+            sender_hvy_id = hvy_active(k)
+            call hvy_id_to_lgt_id( sender_lgt_id, sender_hvy_id, myrank, N )
+
+            ! loop over all neighbors
+            do neighborhood = 1, size(hvy_neighbor, 2)
+                ! neighbor exists
+                if ( hvy_neighbor( sender_hvy_id, neighborhood ) /= -1 ) then
+                    ! neighbor light data id
+                    neighbor_lgt_id = hvy_neighbor( sender_hvy_id, neighborhood )
+                    ! calculate neighbor rank
+                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_lgt_id, N )
+
+                    if (neighbor_rank /= myrank) then
+                        ! neighbor heavy id
+                        call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
+                        ! define level difference: sender - receiver, so +1 means sender on higher level
+                        level_diff = lgt_block( sender_lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
+
+                        inverse = inverse_neighbor(neighborhood, dim)
+
+                        ijk = ijkGhosts(:, :, inverse, level_diff, INCLUDE_REDUNDANT, RECVER)
+
+                        recv_counter(neighbor_rank) = recv_counter(neighbor_rank) + &
+                        (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
+
+                        ijk = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
+
+                        send_counter(neighbor_rank) = send_counter(neighbor_rank) + &
+                        (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
+                    endif
+
+                end if ! neighbor exists
+            end do ! loop over all possible  neighbors
+        end do ! loop over all heavy active
+
+        ! NOTE ACTUAL SEND / RECV DATA IS NEQN
+        ! write(*,*) "rank=", myrank, "send:", send_counter, "recv", recv_counter
 
         !***************************************************************************
         ! (ii) prepare data for sending
@@ -133,7 +183,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                          lgt_block, sender_lgt_id, neighbor_lgt_id )
 
                     if ( istage == 1 ) then
-                        if ( entrySortInRound == 1 ) Then
+                        if ( level_diff == -1 ) Then
                             ! this block just receives data in this neighborhood relation, but does not send anything
                             communication_counter(id_Friend, istage) = communication_counter(id_Friend, istage) + 1
                             cycle
@@ -172,7 +222,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         !***************************************************************************
         ! (iii) transfer part (send/recv)
         !***************************************************************************
-
         call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, &
         communication_counter, istage )
 
@@ -262,8 +311,6 @@ subroutine set_bounds_according_to_ghost_dominance_rules( params, bounds_type, e
     bounds_type = EXCLUDE_REDUNDANT  ! default value, may be changed below
     ! in what round in the extraction process will this neighborhood be unpacked?
     entrySortInRound = level_diff + 2  ! now has values 1,2,3 ; is overwritten with 4 if sender is historic fine
-
-! if (entrySortInRound == 2) entrySortInRound=1
 
     ! here we decide who dominates. would be simple without the historic fine
     if (senderHistoricFine) then

@@ -48,9 +48,8 @@ module module_MPI
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
-    integer(kind=ik), allocatable :: int_send_buffer(:,:,:), int_receive_buffer(:,:,:)
-    real(kind=rk), allocatable    :: real_send_buffer(:,:,:), real_receive_buffer(:,:,:)
-    integer(kind=ik), allocatable :: recv_counter(:), send_counter(:)
+    integer(kind=ik), allocatable :: int_send_buffer(:,:,:), int_recv_buffer(:,:,:)
+    integer(kind=ik), allocatable :: recv_counter(:,:), send_counter(:,:)
     real(kind=rk), allocatable    :: new_send_buffer(:,:), new_recv_buffer(:,:)
 
     ! an array to count how many messages we send to the other mpiranks.
@@ -64,8 +63,8 @@ module module_MPI
     real(kind=rk), allocatable    :: res_pre_data(:,:,:,:), tmp_block(:,:,:,:)
 
     ! it is faster to use named consts than strings, although strings are nicer to read
-    integer(kind=ik), PARAMETER   :: EXCLUDE_REDUNDANT = 1_ik, INCLUDE_REDUNDANT = 2_ik, ONLY_REDUNDANT = 3_ik
-    integer(kind=ik), PARAMETER   :: SENDER=1_ik, RECVER=2_ik, RESPRE=3_ik
+    integer(kind=ik), PARAMETER   :: EXCLUDE_REDUNDANT = 1, INCLUDE_REDUNDANT = 2, ONLY_REDUNDANT = 3
+    integer(kind=ik), PARAMETER   :: SENDER = 1, RECVER = 2, RESPRE = 3
 
     ! we set up a table that gives us directly the inverse neighbor relations.
     ! it is filled (once) in init_ghost_nodes
@@ -160,9 +159,6 @@ subroutine init_ghost_nodes( params )
             !---3d---3d---
             ! space dimensions: used in the static arrays as index
             dim = 3
-
-            buffer_N = number_blocks * Neqn * ((Bs+2*g)**dim - Bs**dim)
-            ! buffer_N = number_blocks * 56 * (Bs+g+1)*(g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 56 * 3
             ! how many possible neighbor relations are there?
             Nneighbor = 74
@@ -172,9 +168,6 @@ subroutine init_ghost_nodes( params )
             !---2d---2d---
             ! space dimensions: used in the static arrays as index
             dim = 2
-
-            buffer_N = number_blocks * Neqn * ((Bs+2*g)**dim - Bs**dim)
-            ! buffer_N = number_blocks * 12 * (Bs+g+1)*(g+1) * Neqn
             buffer_N_int = number_blocks * 12 * 3
             ! how many possible neighbor relations are there?
             Nneighbor = 16
@@ -182,10 +175,9 @@ subroutine init_ghost_nodes( params )
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
 
-        allocate( recv_counter(0:Ncpu-1), send_counter(0:Ncpu-1) )
-
-        allocate( new_send_buffer(1:(number_blocks*Neqn*((Bs+2*g)**dim-Bs**dim)), 1:Nstages) )
-        allocate( new_recv_buffer(1:(number_blocks*Neqn*((Bs+2*g)**dim-Bs**dim)), 1:Nstages) )
+        ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
+        ! for all my blocks. previous versions allocated one of those per "friend"
+        buffer_N = number_blocks * Neqn * ((Bs+2*g)**dim - Bs**dim)
 
         !-----------------------------------------------------------------------
         ! allocate auxiliary memory
@@ -201,7 +193,7 @@ subroutine init_ghost_nodes( params )
                 2.0*dble(buffer_N_int)*dble(Ncpu)*dble(Nstages)*8e-9
 
             write(*,'("GHOSTS-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N)*dble(Ncpu)*dble(Nstages)*8e-9
+                2.0*dble(buffer_N)*dble(Nstages)*8e-9
             write(*,'("---------------- allocating now ----------------")')
         endif
 
@@ -209,37 +201,38 @@ subroutine init_ghost_nodes( params )
         call MPI_barrier( WABBIT_COMM, status(1))
 
         allocate( int_send_buffer( 1:buffer_N_int, 1:Ncpu, 1:Nstages), stat=status(1) )
-        allocate( int_receive_buffer( 1:buffer_N_int, 1:Ncpu, 1:Nstages), stat=status(2) )
-        allocate( real_send_buffer( 1:buffer_N, 1:Ncpu, 1:Nstages), stat=status(3) )
-        allocate( real_receive_buffer( 1:buffer_N, 1:Ncpu, 1:Nstages), stat=status(4) )
+        allocate( int_recv_buffer( 1:buffer_N_int, 1:Ncpu, 1:Nstages), stat=status(2) )
+        allocate( new_send_buffer( 1:buffer_N, 1:Nstages), stat=status(3) )
+        allocate( new_recv_buffer( 1:buffer_N, 1:Nstages), stat=status(4) )
 
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "real_receive_buffer", shape(real_receive_buffer)
+             "new_send_buffer", shape(new_send_buffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "real_send_buffer", shape(real_send_buffer)
+             "new_recv_buffer", shape(new_recv_buffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "int_send_buffer", shape(int_send_buffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "int_receive_buffer", shape(int_receive_buffer)
+             "int_recv_buffer", shape(int_recv_buffer)
 
-            ! write(*,'("GHOSTS-INIT: on each mpirank, Real buffer size is",f9.4," GB ")') &
-            !  2.0*dble(buffer_N)*dble(N_friends)*dble(Nstages)*8e-9
-            !
-            ! write(*,'("GHOSTS-INIT: on each mpirank, Int  buffer size is",f9.4," GB ")') &
-            !  2.0*dble(buffer_N_int)*dble(N_friends)*dble(Nstages)*8e-9
+            write(*,'("GHOSTS-INIT: on each mpirank, new_send_buffer size is",f9.4," GB ")') &
+             size(new_send_buffer)*8e-9
+
+             write(*,'("GHOSTS-INIT: on each mpirank, new_recv_buffer size is",f9.4," GB ")') &
+              size(new_recv_buffer)*8e-9
         endif
 
         ! this is a list of communications with all other procs
         allocate( communication_counter(1:Ncpu, 1:Nstages) )
         allocate( int_pos(1:Ncpu, 1:Nstages) )
         allocate( line_buffer( Neqn*(Bs+2*g)**(dim) ) )
+        allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
 
         !-----------------------------------------------------------------------
         ! set up constant arrays

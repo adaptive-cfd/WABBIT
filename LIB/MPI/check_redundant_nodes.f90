@@ -27,20 +27,18 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! MPI parameter
     integer(kind=ik)                    :: myrank
     ! loop variables
-    integer(kind=ik)                    :: N, k, l, neighborhood, neighbor_num, level_diff
+    integer(kind=ik)                    :: N, k, l, neighborhood, level_diff
     ! id integers
     integer(kind=ik)                    :: lgt_id, neighbor_lgt_id, neighbor_rank, hvy_id
-    ! type of data bounds
-    ! exclude_redundant, include_redundant, only_redundant
-    integer(kind=ik)                    :: data_bounds_type
-    integer(kind=ik), dimension(2,3)    :: data_bounds, data_bounds2
+    integer(kind=ik), dimension(2,3)    :: ijk, ijk2
     ! data buffer size
     integer(kind=ik)                    :: buffer_size, buffer_position
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: Bs, g, i0
     ! number of datafields
     integer(kind=ik)                    :: NdF
     logical                             :: test2
+    integer(kind=ik), parameter         :: stage=1
 
  !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -52,9 +50,6 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
-    ! nodes test
-    ! exclude_redundant, include_redundant, only_redundant
-    data_bounds_type = include_redundant
     ! reset status
     stop_status = .false.
 
@@ -63,22 +58,26 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     NdF      = params%number_data_fields
     N        = params%number_blocks
     myrank   = params%rank
-    neighbor_num = size(hvy_neighbor, 2)
 
 
     ! the (module-global) communication_counter is the number of neighboring relations
     ! this rank has with all other ranks (it is thus an array of number_procs)
-    communication_counter(:, 1) = 0_ik
+    communication_counter(:, stage) = 0_ik
 
 
-    int_pos(:,1) = 2
+    int_pos(:, stage) = 2
     ! reset first in send buffer position
-    int_send_buffer( 1, :, 1 ) = 0
-    int_send_buffer( 2, :, 1 ) = -99
+    int_send_buffer( 1, :, stage ) = 0
+    int_send_buffer( 2, :, stage ) = -99
 
+    ! in this routine we treat internal and external neighbors identically, therefore we need to
+    ! count also my own neighorhood relations. this is not highly efficient (involves copying)
+    ! but this routine is meant for testing, not production.
+    call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
+    recv_counter(:, stage), send_counter(:, stage), INCLUDE_REDUNDANT, .true.)
 
     do k = 1, hvy_n
-        do neighborhood = 1, neighbor_num
+        do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists
             if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
 
@@ -86,39 +85,39 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 call lgt_id_to_proc_rank( neighbor_rank, neighbor_lgt_id, N )
                 call hvy_id_to_lgt_id( lgt_id, hvy_active(k), myrank, N )
                 call lgt_id_to_hvy_id( hvy_id, neighbor_lgt_id, neighbor_rank, N )
+
                 ! define leveldiff: sender - receiver, so +1 means sender on higher level. sender is active block (me)
                 level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
 
-                data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, SENDER)
+                ijk = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, SENDER)
 
                 if ( level_diff == 0 ) then
                     !-----------------------------------------------------------
                     ! same level
                     !-----------------------------------------------------------
                     call GhostLayer2Line( params, line_buffer, buffer_size, &
-                    hvy_block( data_bounds(1,1):data_bounds(2,1), data_bounds(1,2):data_bounds(2,2), data_bounds(1,3):data_bounds(2,3), :, hvy_active(k)) )
+                    hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), ijk(1,3):ijk(2,3), :, hvy_active(k)) )
+
                 else
                     !-----------------------------------------------------------
                     ! different level
                     !-----------------------------------------------------------
-                    ! interpoliere daten
-                    call restrict_predict_data( params, res_pre_data, data_bounds, neighborhood, level_diff, hvy_block, hvy_active(k))
+                    call restrict_predict_data( params, res_pre_data, ijk, neighborhood, level_diff, hvy_block, hvy_active(k))
 
-                    ! 3: restrict-predict
-                    data_bounds2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, data_bounds_type, RESPRE)
+                    ijk2 = ijkGhosts(1:2, 1:3, neighborhood, level_diff, INCLUDE_REDUNDANT, RESPRE)
 
-                    ! lese daten, verwende interpolierte daten
-                    call GhostLayer2Line( params, line_buffer, buffer_size, res_pre_data( data_bounds2(1,1):data_bounds2(2,1), &
-                    data_bounds2(1,2):data_bounds2(2,2), data_bounds2(1,3):data_bounds2(2,3),:) )
+                    call GhostLayer2Line( params, line_buffer, buffer_size, res_pre_data( ijk2(1,1):ijk2(2,1), &
+                    ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3),:) )
+
                 end if
 
 
                 ! first: fill com matrix, count number of communication to neighboring process, needed for int buffer length
-                communication_counter(neighbor_rank+1, 1) = communication_counter(neighbor_rank+1, 1) + 1
+                communication_counter(neighbor_rank+1, stage) = communication_counter(neighbor_rank+1, stage) + 1
                 ! active block send data to its neighbor block
                 ! fill int/real buffer
-                call AppendLineToBuffer( int_send_buffer, real_send_buffer, buffer_size, neighbor_rank+1, line_buffer, &
-                hvy_id, neighborhood, level_diff, 1 )
+                call AppendLineToBuffer( int_send_buffer, new_send_buffer, buffer_size, neighbor_rank+1, line_buffer, &
+                hvy_id, neighborhood, level_diff, stage )
 
             end if
         end do
@@ -127,49 +126,37 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     !***********************************************************************
     ! transfer part (send/recv)
     !***********************************************************************
-    ! pretend that no communication with myself takes place, in order to skip the
-    ! MPI transfer in the following routine. NOTE: you can also skip this step and just have isend_irecv_data_2
-    ! transfer the data, in which case you should skip the copy part directly after isend_irecv_data_2
-    communication_counter( myrank+1, 1 ) = 0
-
     ! send/receive data
-    call isend_irecv_data_2( params, int_send_buffer, real_send_buffer, int_receive_buffer, real_receive_buffer, &
-    communication_counter, 1 )
-
-    ! copy internal buffer (BAD! Performance penalty!)
-    int_receive_buffer( 1:int_pos(myrank+1,1), myrank+1, 1 ) = &
-    int_send_buffer( 1:int_pos(myrank+1,1), myrank+1, 1 )
-    real_receive_buffer( 1:int_receive_buffer(1,myrank+1,1), myrank+1, 1 ) = &
-    real_send_buffer( 1:int_receive_buffer(1,myrank+1,1), myrank+1, 1 )
-
-    ! change communication_counter, equired to trigger buffer unpacking in last step
-    communication_counter(myrank+1,1) = 1
+    call isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_recv_buffer, &
+    new_recv_buffer, communication_counter, stage )
 
     !***********************************************************************
     ! Unpack received data and compare with ghost nodes data
     !***********************************************************************
-    ! sortiere den real buffer ein
     ! loop over all mpiranks
     do k = 1, params%number_procs
-        if ( communication_counter(k,1) /= 0 ) then
+        if ( communication_counter(k, stage) /= 0 ) then
             ! first element in int buffer is real buffer size
             l = 2
             ! -99 marks end of data
-            do while ( int_receive_buffer(l, k, 1) /= -99 )
+            do while ( int_recv_buffer(l, k, stage) /= -99 )
 
-                hvy_id          = int_receive_buffer(l, k,1)
-                neighborhood    = int_receive_buffer(l+1, k,1)
-                level_diff      = int_receive_buffer(l+2, k,1)
-                buffer_position = int_receive_buffer(l+3, k,1)
-                buffer_size     = int_receive_buffer(l+4, k,1)
-                line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k, 1 )
+                hvy_id          = int_recv_buffer(l,   k, stage)
+                neighborhood    = int_recv_buffer(l+1, k, stage)
+                level_diff      = int_recv_buffer(l+2, k, stage)
+                buffer_position = int_recv_buffer(l+3, k, stage)
+                buffer_size     = int_recv_buffer(l+4, k, stage)
+
+                !line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k, 1 )
+                i0 = sum(recv_counter(0:k-1-1, stage)) + buffer_position
+                line_buffer(1:buffer_size) = new_recv_buffer( i0 : i0+buffer_size-1, stage )
 
                 ! data bounds (2-recv)
-                data_bounds = ijkGhosts(:,:, neighborhood, level_diff, data_bounds_type, RECVER)
+                ijk = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
 
                 ! compare data
                 call hvy_id_to_lgt_id( lgt_id, hvy_id, myrank, N )
-                call compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, &
+                call compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_status, level_diff, &
                 lgt_block(lgt_id, params%max_treelevel+2), treecode2int( lgt_block(lgt_id, 1:params%max_treelevel) ) )
 
                 l = l + 5
@@ -185,7 +172,7 @@ end subroutine check_redundant_nodes_clean
 
 
 
-subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id, stop_status, level_diff, my_ref, tc )
+subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_status, level_diff, my_ref, tc )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -199,8 +186,8 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
     type (type_params), intent(in)                  :: params
     !> data buffer
     real(kind=rk), intent(inout)                    :: line_buffer(:)
-    !> data_bounds
-    integer(kind=ik), intent(inout)                 :: data_bounds(2,3)
+    !> ijk
+    integer(kind=ik), intent(inout)                 :: ijk(2,3)
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> hvy id
@@ -246,11 +233,11 @@ subroutine compare_hvy_data( params, line_buffer, data_bounds, hvy_block, hvy_id
     ! loop over all data fields
     do dF = 1, params%number_data_fields
         ! third dimension, note: for 2D cases k is always 1
-        do k = data_bounds(1,3), data_bounds(2,3)
+        do k = ijk(1,3), ijk(2,3)
             ! second dimension
-            do j = data_bounds(1,2), data_bounds(2,2)
+            do j = ijk(1,2), ijk(2,2)
                 ! first dimension
-                do i = data_bounds(1,1), data_bounds(2,1)
+                do i = ijk(1,1), ijk(2,1)
 
                     if (level_diff /= -1) then
                         ! on the same or coarser level, the comparison just takes all points, no odd/even downsampling required.

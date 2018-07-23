@@ -263,7 +263,7 @@ subroutine ini_file_to_params( params, filename )
             nstages = 2.0
 
             mem_per_block = real(Neqn) * real(Nrk) * (real(Bs+2*g))**d & ! hvy_work+hvy_block
-            + 2.0 * nstages * real(Neqn) * real( ((Bs+2*g)**d - Bs**d) / params%N_friends ) * real(params%N_friends) ! real buffer ghosts
+            + 2.0 * nstages * real(Neqn) * real( ((Bs+2*g)**d - Bs**d) ) ! real buffer ghosts
 
             ! in GB:
             mem_per_block = mem_per_block * 8.0e-9
@@ -328,10 +328,6 @@ end subroutine ini_file_to_params
       write(*,*) "PARAMS: MPI Communication!"
       write(*,'(" ----------------------------")')
     endif
-
-    ! read number of friends
-    call read_param_mpi(FILE, 'MPI', 'N_friends', params%N_friends, 32_ik)
-    params%N_friends = min(params%N_friends, params%number_procs)
 
     ! READ Bridge Parameter
     ! ----------------------

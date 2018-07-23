@@ -121,13 +121,6 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! MPI
         ! -------------------------------------------------------------------------------------
-        ! number of friends
-        ! Just because we have MPISIZE ranks does not mean that everybody talks to everybody.
-        ! While this CAN happen, it is much more likely that an MPIRANK talks only to a limited number of
-        ! "friends". This is a direct consequence of the space-filling curves. Therefore, we do not allocate
-        ! buffer for all MPSIZE ranks, but only for N_FRIENDS. If the number happens to be too small, we increase
-        ! it dynamically (via deallocate / reallocate)
-        integer(kind=ik)                            :: N_friends=20
         ! process rank
         integer(kind=ik)                            :: rank=-1
         ! number of processes

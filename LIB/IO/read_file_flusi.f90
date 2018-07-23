@@ -131,9 +131,9 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
           lbounds = (/start_x,start_y,start_z/)
           ubounds = (/end_bound(start_x,Bs,Bs_f), end_bound(start_y,Bs,Bs_f),&
               end_bound(start_z,Bs,Bs_f)/)
-          num_Bs = ubounds-lbounds
+          num_Bs = ubounds-lbounds+1
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
-          hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k)))
+          hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k)))
       else
           lbounds = (/0, start_x, start_y/)
           ubounds = (/0, end_bound(start_x,Bs,Bs_f), end_bound(start_y,Bs,Bs_f)/)

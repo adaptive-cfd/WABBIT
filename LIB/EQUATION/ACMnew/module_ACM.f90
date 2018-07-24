@@ -229,9 +229,22 @@ contains
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
 
+
+    ! ususal CFL, neglecting u
     dt = minval( params_acm%CFL * dx(1:params_acm%dim) / params_acm%c_0 )
 
-    if (params_acm%penalization) dt = min( dt, params_acm%C_eta )
+    ! explicit diffusion (NOTE: valid only for RK4, other time steppers have more
+    ! severe restrictions)
+    if(params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
+
+    ! just for completeness...this condition should never be active (gamma ~ 1)
+    if (params_acm%gamma_p>0) dt = min( dt, 0.99_rk*params_acm%gamma_p )
+
+    ! penalization
+    if (params_acm%penalization) dt = min( dt, 0.99_rk*params_acm%C_eta )
+
+    ! sponge
+    if (params_acm%use_sponge) dt = min( dt, 0.99_rk*params_acm%C_sponge )
 
   end subroutine GET_DT_BLOCK_ACM
 

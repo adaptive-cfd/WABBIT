@@ -104,6 +104,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     !! the vector of normalization factors for each qty that adaptivity will bebased on (state vector
     !! or vorticity). We currently use the L_infty norm. I have made bad experience with L_2 norm
     !! (to be checked...)
+    norm = 1.0_rk
     if (params%eps_normalized .and. params%physics_type=="ACM-new") then
         norm = 0.0_rk
         if (params%coarsening_indicator=="threshold-vorticity") then
@@ -117,26 +118,25 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
                 ! call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                 ! norm(1) = norm(1) + sum(hvy_block(:,:,:,1,hvy_active(k))**2)*dx(1)*dx(2)
 
-                ! max over ux, uy
-                norm(1) = max(norm(1), maxval(abs(hvy_block(:,:,:,1:2,hvy_active(k)))) )
+                ! max over velocities
+                norm(1) = max( norm(1), maxval(abs(hvy_block(:,:,:,1:neq-1,hvy_active(k)))) )
                 ! pressure
-                norm(3) = max(norm(3), maxval(abs(hvy_block(:,:,:,3,hvy_active(k)))) )
+                norm(neq) = max( norm(neq), maxval(abs(hvy_block(:,:,:,neq,hvy_active(k)))) )
             enddo
-            ! isotropy: uy=ux
-            norm(2) = norm(1)
+            ! isotropy: uz=uy=ux
+            norm(1:neq-1) = norm(1)
             ! norm(2) = sqrt( norm(1) )
         endif
 
+        ! note that a check norm>1.0e-10 is in threshold-block
         tmp = norm
         call MPI_ALLREDUCE(tmp, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-    else
-        norm = 1.0_rk
     endif
 
-    ! during dev is it useful to know what the normalization is, if that is actives
-    if (params%rank == 0 .and. params%eps_normalized) then
+    ! during dev is it useful to know what the normalization is, if that is active
+    if (params%rank == 0 .and. params%eps_normalized .and. params%physics_type=="ACM-new") then
         open(14,file='eps_norm.t',status='unknown',position='append')
-        write (14,'(5(g15.8,1x))') time, norm, params%eps
+        write (14,'(10(g15.8,1x))') time, norm, params%eps
         close(14)
     endif
 

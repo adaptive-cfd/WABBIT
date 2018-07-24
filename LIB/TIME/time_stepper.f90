@@ -81,18 +81,13 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     ! loop variables
     integer(kind=ik)                    :: k, j, neq
     ! time step, dx
-    real(kind=rk)                       :: dt
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, sub_t1, t_sum, t
+    real(kind=rk)                       :: dt, t
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save    :: rk_coeffs(:,:)
     logical::test
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    ! start time
-    t0 = MPI_Wtime()
-    t_sum = 0.0_rk
     neq = params%number_data_fields
 
     if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
@@ -148,5 +143,4 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     ! increase time variable after all RHS substeps
     time = time + dt
 
-    call toc( params, "time_step (everything incl ghosts)", MPI_Wtime()-t0)
 end subroutine time_stepper

@@ -50,9 +50,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         params_acm%mean_flow = 0.0_rk
         params_acm%mean_p = 0.0_rk
 
+        if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+
     case ("integral_stage")
         !-------------------------------------------------------------------------
-        ! 2nd stage: init_stage.
+        ! 2nd stage: integral_stage.
         !-------------------------------------------------------------------------
         ! For some RHS, the eqn depend not only on local, block based qtys, such as
         ! the state vector, but also on the entire grid, for example to compute a
@@ -308,9 +310,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     end if
 
     ! --------------------------------------------------------------------------
-    ! mean flow forcing term.
+    ! forcing term.
     ! --------------------------------------------------------------------------
-    ! is mean flow forcing used at all?
+    ! is forcing used at all?
     if (params_acm%forcing) then
         do idir = 1, 2
             select case (params_acm%forcing_type(idir))
@@ -354,6 +356,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
         end do
     end if
 
+    ! remove mean pressure. NOTE: there is some oddities here, as the code modifies the
+    ! state vector and not the RHS.
     if (params_acm%p_mean_zero) then
         phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
     end if
@@ -395,7 +399,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     !> temporary, persistent arrays
     !> mask term for every grid point in this block
-    real(kind=rk), allocatable, save :: mask(:, :, :)
+    real(kind=rk), allocatable, save :: mask(:, :, :), sponge(:, :, :)
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:, :, :, :)
 
@@ -422,6 +426,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
+    if (.not. allocated(sponge)) allocate(sponge(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
     if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
     if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
 
@@ -574,9 +579,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
                     div_U = u_dx + v_dy + w_dz
 
-                    penalx = -mask(ix,iy,iz  )*(phi(ix,iy,iz,1)-us(ix,iy,iz,1))
-                    penaly = -mask(ix,iy,iz  )*(phi(ix,iy,iz,2)-us(ix,iy,iz,2))
-                    penalz = -mask(ix,iy,iz  )*(phi(ix,iy,iz,3)-us(ix,iy,iz,3))
+                    penalx = -mask(ix,iy,iz)*(phi(ix,iy,iz,1)-us(ix,iy,iz,1))
+                    penaly = -mask(ix,iy,iz)*(phi(ix,iy,iz,2)-us(ix,iy,iz,2))
+                    penalz = -mask(ix,iy,iz)*(phi(ix,iy,iz,3)-us(ix,iy,iz,3))
 
                     rhs(ix,iy,iz,1) = -phi(ix,iy,iz,1)*u_dx - phi(ix,iy,iz,2)*u_dy - phi(ix,iy,iz,3)*u_dz - p_dx &
                                     + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
@@ -591,6 +596,28 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     else
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
+    end if
+
+    ! remove mean pressure. NOTE: there is some oddities here, as the code modifies the
+    ! state vector and not the RHS.
+    if (params_acm%p_mean_zero) then
+        phi(:,:,:,4) = phi(:,:,:,4) - params_acm%mean_p
+    end if
+
+    ! --------------------------------------------------------------------------
+    ! sponge term.
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_sponge) then
+        call sponge_3D(sponge, x0, dx, Bs, g)
+        eps_inv = 1.0_rk / params_acm%C_sponge
+        sponge = sponge * eps_inv
+
+        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+        ! which is different from the penalization term, which acts only on ux,uy and not p
+        rhs(:,:,:,1) = rhs(:,:,:,1) - (phi(:,:,:,1)-params_acm%u_mean_set(1)) * sponge
+        rhs(:,:,:,2) = rhs(:,:,:,2) - (phi(:,:,:,2)-params_acm%u_mean_set(2)) * sponge
+        rhs(:,:,:,3) = rhs(:,:,:,3) - (phi(:,:,:,3)-params_acm%u_mean_set(3)) * sponge
+        rhs(:,:,:,4) = rhs(:,:,:,4) - phi(:,:,:,4)*sponge
     end if
 
 end subroutine RHS_3D_acm

@@ -10,7 +10,7 @@ module module_insects
   PRIVATE
 
   ! functions
-  PUBLIC :: Draw_Insect, insect_init, insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
+  PUBLIC :: Draw_Insect, Update_Insect, insect_init, insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
   aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_time_step, &
   BodyMotion, FlappingMotion_right, FlappingMotion_left, StrokePlane, mask_from_pointcloud, &
   body_rotation_matrix, wing_right_rotation_matrix, wing_left_rotation_matrix, write_kinematics_file
@@ -113,7 +113,6 @@ module module_insects
     ! variables to decide whether to draw the body or not.
     character(len=strlen) :: body_moves="yes"
     logical :: body_already_drawn = .false.
-    real(kind=rk) :: body_drawn_time = 0.0d0
     !-------------------------------------------------------------
     ! for free flight solver
     !-------------------------------------------------------------
@@ -184,10 +183,11 @@ module module_insects
     ! is that during postprocessing of an existing run, the dry run would overwrite the
     ! simulation data.
     character(len=strlen) :: kinematics_file = "kinematics.t"
-
+    ! rotation matrices for the various coordinate system for the insect
+    real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
 
     !-------------------------------------------------------------
-    ! parameters that control shape of wings,body, and motion
+    ! parameters that control shape of wings, body, and motion
     !-------------------------------------------------------------
     character(len=strlen) :: WingShape="", BodyType="", BodyMotion="", HasDetails=""
     character(len=strlen) :: FlappingMotion_right="", FlappingMotion_left=""
@@ -253,6 +253,67 @@ contains
   end subroutine Allocate_Arrays
 
 
+    !-----------------------------------------------------------------------------
+    ! Many parts of the insect mask generation are done only once per time step (i.e.
+    ! per mask generation). Now, the adaptive code calls Draw_Insect several times, on each
+    ! block of the grid. Draw_Insect is thus called SEVERAL times per mask generation.
+    ! Therefore, we outsource the parts that need to be done only once to this routine,
+    ! and call it BEFORE calling Draw_Insect. For FLUSI, this does not have any effect
+    ! other than having two routines.
+    !-----------------------------------------------------------------------------
+    subroutine Update_Insect( time, Insect )
+        implicit none
+
+        real(kind=rk), intent(in) :: time
+        type(diptera),intent(inout) :: Insect
+        logical, save :: first_call = .true.
+
+        !-----------------------------------------------------------------------------
+        ! fetch current motion state
+        !-----------------------------------------------------------------------------
+        call BodyMotion (time, Insect)
+        call FlappingMotion_right (time, Insect)
+        call FlappingMotion_left (time, Insect)
+        call StrokePlane (time, Insect)
+
+        !-----------------------------------------------------------------------------
+        ! define the rotation matrices to change between coordinate systems
+        !-----------------------------------------------------------------------------
+        call body_rotation_matrix( Insect, Insect%M_body )
+        call wing_right_rotation_matrix( Insect, Insect%M_wing_r )
+        call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
+
+        ! inverse of the body rotation matrices
+        Insect%M_body_inv = transpose(Insect%M_body)
+
+        ! body angular velocity vector in b/g coordinate system
+        call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, Insect%M_body )
+        ! rel+abs wing angular velocities in the w/b/g coordinate system
+        call wing_angular_velocities ( time, Insect, Insect%M_body )
+        ! angular acceleration for wings (required for inertial power)
+        call wing_angular_accel( time, Insect )
+
+        !-----------------------------------------------------------------------------
+        ! vector from body centre to left/right pivot point in global reference frame,
+        ! for aerodynamic power
+        !-----------------------------------------------------------------------------
+        Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
+        Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
+
+
+        if (first_call) then
+            ! print some important numbers, routine exectuted only once during a simulation
+            call print_insect_reynolds_numbers( Insect )
+            first_call = .false.
+        endif
+
+        ! save time to insect, then we can check if the update routine has been called
+        ! or not (this is not necessary if Update_Insect is called, but helpful to prevent
+        ! human errors)
+        Insect%time = time
+
+    end subroutine Update_Insect
+
   !-------------------------------------------------------------------------------
   ! Main routine for drawing insects. Loops over the entire domain, computes
   ! coordinates in various systems (global-, body-, stroke-, wing-) and calls
@@ -260,155 +321,117 @@ contains
   ! smoothed.
   !-------------------------------------------------------------------------------
   subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us)
-    implicit none
+      implicit none
 
-    real(kind=rk), intent(in) :: time
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+      real(kind=rk), intent(in) :: time
+      type(diptera),intent(inout) :: Insect
+      real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+      real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+      real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+      integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
-    real(kind=rk) :: t1
-    real(kind=rk),dimension(1:3) :: x, x_body, v_tmp
-    real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
-    integer :: ix, iy, iz
-    integer(kind=2) :: c
+      real(kind=rk) :: t1
+      real(kind=rk),dimension(1:3) :: x, x_body, v_tmp
+      ! real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
+      integer :: ix, iy, iz
+      integer(kind=2) :: c
 
-    if ((dabs(Insect%time-time)>1.0d-10).and.(root).and.(Insect%BodyMotion=="free_flight")) then
-      write (*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
-    endif
-
-    Insect%smooth = 1.0d0*maxval(ddx)
-    Insect%safety = 3.5d0*Insect%smooth
-
-    ! delete old mask
-    call delete_old_mask( time, mask, mask_color, us, Insect )
-    !-----------------------------------------------------------------------------
-    ! fetch current motion state
-    !-----------------------------------------------------------------------------
-    call BodyMotion (time, Insect)
-    call FlappingMotion_right (time, Insect)
-    call FlappingMotion_left (time, Insect)
-    call StrokePlane (time, Insect)
-
-
-    !-----------------------------------------------------------------------------
-    ! define the rotation matrices to change between coordinate systems
-    !-----------------------------------------------------------------------------
-    call body_rotation_matrix( Insect, M_body )
-    call wing_right_rotation_matrix( Insect, M_wing_r )
-    call wing_left_rotation_matrix( Insect, M_wing_l )
-
-    ! inverse of the body rotation matrices
-    M_body_inv = transpose(M_body)
-
-    ! body angular velocity vector in b/g coordinate system
-    call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, M_body )
-    ! rel+abs wing angular velocities in the w/b/g coordinate system
-    call wing_angular_velocities ( time, Insect, M_body )
-    ! angular acceleration for wings (required for inertial power)
-    call wing_angular_accel( time, Insect )
-
-    !-----------------------------------------------------------------------------
-    ! vector from body centre to left/right pivot point in global reference frame,
-    ! for aerodynamic power
-    !-----------------------------------------------------------------------------
-    Insect%x_pivot_l_g = matmul(M_body_inv, Insect%x_pivot_l_b)
-    Insect%x_pivot_r_g = matmul(M_body_inv, Insect%x_pivot_r_b)
-
-    !-----------------------------------------------------------------------------
-    ! Draw individual parts of the Diptera. Separate loops are faster
-    ! since the compiler can optimize them better
-    !-----------------------------------------------------------------------------
-    ! BODY. Now the body is special: if the insect does not move (or rotate), the
-    ! body does not change in time. On the other hand, it is quite expensive to
-    ! compute, since it involves a lot of points (volume), and it is a source of
-    ! load balancing problems, since many cores do not draw the body at all.
-    ! We thus try to draw it only once and then simply not to erase it later.
-    !-----------------------------------------------------------------------------
-    if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
-      if (.not. Insect%body_already_drawn .or. (abs(time-Insect%body_drawn_time)<1.0e-10)) then
-        ! the body is at rest, but it is the first call to this routine, so
-        ! draw it now.
-        if (root .and. (.not. Insect%body_already_drawn) ) then
-            write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
-            write(*,*) "the body once: we do that now, and skip draw_body"
-            write(*,*) "from now on. time=", time
-        endif
-
-        call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, M_body)
-
-        ! the adaptive code calls this routine for all blocks. therefore, Insect%body_already_drawn = .true.
-        ! is set after the first block and subsequently does not draw the body on other blocks.
-        ! to avoid this, we save the time at which we draw the body, and as long we're at that time,
-        ! we draw the body anyways.
-        Insect%body_already_drawn = .true.
-        Insect%body_drawn_time = time
+      if ((dabs(Insect%time-time)>1.0d-10).and.root) then
+          write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
+          write(*,'("Did you call Update_Insect before Draw_Insect?")')
       endif
-    else
-      ! the body moves, draw it
-      call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, M_body)
-    endif
 
-    !-----------------------------------------------------------------------------
-    ! Wings
-    !-----------------------------------------------------------------------------
-    if (Insect%RightWing == "yes") then
-      call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, M_body, M_wing_r, &
-      Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
-    endif
+      Insect%smooth = 1.0d0*maxval(ddx)
+      Insect%safety = 3.5d0*Insect%smooth
 
-    if (Insect%LeftWing == "yes") then
-      call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, M_body, M_wing_l, &
-      Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
-    endif
+      ! delete old mask
+      call delete_old_mask( time, mask, mask_color, us, Insect )
 
-    !-----------------------------------------------------------------------------
-    ! Add solid body rotation (i.e. the velocity field that originates
-    ! from the body rotation and translation. Until now, the wing velocities
-    ! were the only ones set plus they are in the body reference frame
-    !-----------------------------------------------------------------------------
-    do iz = 0, size(mask,3)-1
-      do iy = 0, size(mask,2)-1
-        do ix = 0, size(mask,1)-1
-          c = mask_color(ix,iy,iz)
-          ! skip all parts that do not belong to the insect (ie they have a different color)
-          if (c==Insect%color_body .or. c==Insect%color_l .or. c==Insect%color_r ) then
-            x = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-            x = periodize_coordinate(x - Insect%xc_body_g, (/xl,yl,zl/))
-            x_body = matmul(M_body,x)
-            ! add solid body rotation in the body-reference frame, if color
-            ! indicates that this part of the mask belongs to the insect
-            if ((mask(ix,iy,iz) > 0.d0).and.(mask_color(ix,iy,iz)>0)) then
+      !-----------------------------------------------------------------------------
+      ! Draw individual parts of the Diptera. Separate loops are faster
+      ! since the compiler can optimize them better
+      !-----------------------------------------------------------------------------
+      ! BODY. Now the body is special: if the insect does not move (or rotate), the
+      ! body does not change in time. On the other hand, it is quite expensive to
+      ! compute, since it involves a lot of points (volume), and it is a source of
+      ! load balancing problems, since many cores do not draw the body at all.
+      ! We thus try to draw it only once and then simply not to erase it later.
+      !-----------------------------------------------------------------------------
+      if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
+          if (.not. Insect%body_already_drawn) then
+              ! the body is at rest, but it is the first call to this routine, so
+              ! draw it now.
+              if (root .and. (.not. Insect%body_already_drawn) ) then
+                  write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
+                  write(*,*) "the body once: we do that now, and skip draw_body"
+                  write(*,*) "from now on. time=", time
+              endif
 
-              ! translational part. we compute the rotational part in the body
-              ! reference frame, therefore, we must transform the body translation
-              ! velocity Insect%vc (which is in global coordinates) to the body frame
-              v_tmp = matmul(M_body,Insect%vc_body_g)
-
-              ! add solid body rotation to the translational velocity field. Note
-              ! that rot_body_b and x_body are in the body reference frame
-              v_tmp(1) = v_tmp(1)+Insect%rot_body_b(2)*x_body(3)-Insect%rot_body_b(3)*x_body(2)
-              v_tmp(2) = v_tmp(2)+Insect%rot_body_b(3)*x_body(1)-Insect%rot_body_b(1)*x_body(3)
-              v_tmp(3) = v_tmp(3)+Insect%rot_body_b(1)*x_body(2)-Insect%rot_body_b(2)*x_body(1)
-
-              ! the body motion is added to the wing motion, which is already in us
-              ! and they are also in the body refrence frame. However, us has to be
-              ! in the global reference frame, so M_body_inverse is applied
-              us(ix,iy,iz,1:3) = matmul( M_body_inv, us(ix,iy,iz,1:3)+v_tmp )
-            endif
+              call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
+              Insect%body_already_drawn = .true.
           endif
-        enddo
+      else
+          ! the body moves, draw it
+          call draw_body(xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
+      endif
+
+      !-----------------------------------------------------------------------------
+      ! Wings
+      !-----------------------------------------------------------------------------
+      if (Insect%RightWing == "yes") then
+          call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, Insect%M_body, &
+          Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
+      endif
+
+      if (Insect%LeftWing == "yes") then
+          call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, Insect%M_body, &
+          Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+      endif
+
+      !-----------------------------------------------------------------------------
+      ! Add solid body rotation (i.e. the velocity field that originates
+      ! from the body rotation and translation). Until now, the wing velocities
+      ! were the only ones set plus they are in the body reference frame
+      !-----------------------------------------------------------------------------
+      do iz = 0, size(mask,3)-1
+          do iy = 0, size(mask,2)-1
+              do ix = 0, size(mask,1)-1
+                  c = mask_color(ix,iy,iz)
+                  ! skip all parts that do not belong to the insect (ie they have a different color)
+                  if (c==Insect%color_body .or. c==Insect%color_l .or. c==Insect%color_r ) then
+                      x = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
+                      x = periodize_coordinate(x - Insect%xc_body_g, (/xl,yl,zl/))
+                      x_body = matmul(Insect%M_body, x)
+
+                      ! add solid body rotation in the body-reference frame, if color
+                      ! indicates that this part of the mask belongs to the insect
+                      if (mask(ix,iy,iz) > 0.d0) then
+
+                          ! translational part. we compute the rotational part in the body
+                          ! reference frame, therefore, we must transform the body translation
+                          ! velocity Insect%vc (which is in global coordinates) to the body frame
+                          v_tmp = matmul(Insect%M_body, Insect%vc_body_g)
+
+                          ! add solid body rotation to the translational velocity field. Note
+                          ! that rot_body_b and x_body are in the body reference frame
+                          v_tmp(1) = v_tmp(1)+Insect%rot_body_b(2)*x_body(3)-Insect%rot_body_b(3)*x_body(2)
+                          v_tmp(2) = v_tmp(2)+Insect%rot_body_b(3)*x_body(1)-Insect%rot_body_b(1)*x_body(3)
+                          v_tmp(3) = v_tmp(3)+Insect%rot_body_b(1)*x_body(2)-Insect%rot_body_b(2)*x_body(1)
+
+                          ! the body motion is added to the wing motion, which is already in us
+                          ! and they are also in the body refrence frame. However, us has to be
+                          ! in the global reference frame, so M_body_inverse is applied
+                          us(ix,iy,iz,1:3) = matmul( Insect%M_body_inv, us(ix,iy,iz,1:3)+v_tmp )
+                      endif
+                  endif
+              enddo
+          enddo
       enddo
-    enddo
 
-    ! print some important numbers, routine exectutes only once during a simulation
-    call print_insect_reynolds_numbers( Insect )
-
-    ! this is a debug test, which suceeded.
-    !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
+      ! this is a debug test, which suceeded.
+      !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
   end subroutine Draw_Insect
+
 
 
   !-------------------------------------------------------
@@ -843,40 +866,43 @@ contains
 
 
   subroutine delete_old_mask( time, mask, mask_color, us, Insect )
-    implicit none
+      implicit none
 
-    real(kind=rk), intent(in) :: time
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2) :: color_body, color_l, color_r
+      real(kind=rk), intent(in) :: time
+      type(diptera),intent(in) :: Insect
+      real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+      real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+      integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+      integer(kind=2) :: color_body, color_l, color_r
+      logical, save :: cleaned_already_once = .false.
 
-    ! colors for Diptera (one body, two wings)
-    color_body = Insect%color_body
-    color_l = Insect%color_l
-    color_r = Insect%color_r
+      ! colors for Diptera (one body, two wings)
+      color_body = Insect%color_body
+      color_l = Insect%color_l
+      color_r = Insect%color_r
 
-    !-----------------------------------------------------------------------------
-    ! delete old mask
-    !-----------------------------------------------------------------------------
-    if (Insect%body_moves=="no") then
-      ! the body is at rest, so we will not draw it. Delete the wings, as they move.
-      where (mask_color==color_l .or. mask_color==color_r)
-        mask = 0.d0
-        mask_color = 0
-      end where
-      ! as the body rests it has no solid body velocity, which means we can safely
-      ! reset the velocity everywhere (this step is actually unnessesary, but for
-      ! safety we do it as well)
-      us = 0.d0
-    else
-      ! the body of the insect moves, so we will construct the entire insect in this
-      ! (and any other) call, and therefore we can safely reset the entire mask to zeros.
-      mask = 0.d0
-      mask_color = 0
-      us = 0.d0
-    endif
+      !-----------------------------------------------------------------------------
+      ! delete old mask
+      !-----------------------------------------------------------------------------
+      if (Insect%body_moves=="no" .and. avoid_drawing_static_body .and. cleaned_already_once) then
+          ! the body is at rest, so we will not draw it. Delete the wings, as they move.
+          where (mask_color==color_l .or. mask_color==color_r)
+              mask = 0.d0
+              mask_color = 0
+          end where
+          ! as the body rests it has no solid body velocity, which means we can safely
+          ! reset the velocity everywhere (this step is actually unnessesary, but for
+          ! safety we do it as well)
+          us = 0.d0
+      else
+          ! the body of the insect moves, so we will construct the entire insect in this
+          ! (and any other) call, and therefore we can safely reset the entire mask to zeros.
+          mask = 0.d0
+          mask_color = 0
+          us = 0.d0
+      endif
+
+      cleaned_already_once = .true.
 
   end subroutine delete_old_mask
 

@@ -72,10 +72,10 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     UxF  = 0
     UyF  = 0
     UzF  = 0
+    dt = 9.0e9_rk
 
 !---------------------------------------------------------------------------------------------
 ! main body
-  dt = 9.0e9_rk
 
     ! --------------------------------------------------------------------------
     ! physics module restrictions on time step
@@ -94,6 +94,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
 
         dt = min( dt, dt_tmp )
     end do
+
     ! synchronize time steps
     ! store local (per process) time step
     dt_tmp = dt
@@ -105,6 +106,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     ! --------------------------------------------------------------------------
     ! is there an upper limit for the time step set in parameter file?
     if (params%dt_max > 0.0) dt = min( params%dt_max, dt)
+
     ! is there a fixed timestep set?
     if (params%dt_fixed > 0.0) dt = params%dt_fixed
 
@@ -116,6 +118,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
             dt = params%next_write_time - time
         end if
     end if
+
     if ( abs(params%tsave_stats-9999999.9_rk)>1e-1_rk ) then
         ! time step should also fit in statistics output time step size
         ! criterion: check in time+dt above next output time
@@ -124,19 +127,21 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
             dt = params%next_stats_time - time
         end if
     end if
+
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time
 
     if (dt <= 0.0_rk) then
       call abort(12131,"For some reason, we ended up with a negative or zero time step. This is not back to the future!!!")
     endif
+    
     ! --------------------------------------------------------------------------
     ! log time step to accii file
     ! --------------------------------------------------------------------------
     if (params%rank==0) then
-      open(14,file='dt.t',status='unknown',position='append')
-      write (14,'(2(g15.8,1x))') time, dt
-      close(14)
+        open(14,file='dt.t',status='unknown',position='append')
+        write (14,'(2(g15.8,1x))') time, dt
+        close(14)
     endif
 
 end subroutine calculate_time_step

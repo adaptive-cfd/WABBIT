@@ -57,9 +57,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik)                                    :: Bs, g, N_dF, number_blocks,&
                                                       rank, number_procs
     !> do we have to allocate everything?
-    logical, intent(in)                                  :: simulation
-    integer(kind=ik)                                     :: rk_steps
-    real(kind=rk)                                        :: effective_memory
+    logical, intent(in) :: simulation
+    integer(kind=ik)    :: rk_steps
+    real(kind=rk)       :: effective_memory
+    integer             :: status
 
     !---------------------------------------------------------------------------------------------
     ! interfaces
@@ -86,49 +87,82 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
-    rk_steps = max(size(params%butcher_tableau,1)-1,params%N_fields_saved)
+    rk_steps = max(size(params%butcher_tableau,1)-1, params%N_fields_saved)
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:
-        if (rank == 0) write(*,'("INIT: Allocating a 3D case.")')
-        ! datafields
+        if (rank==0) write(*,'("INIT: Allocating a 3D case.")')
+
+        !---------------------------------------------------------------------------
         allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, N_dF, number_blocks ) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_block", shape(hvy_block)
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+            "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
+        endif
 
-
+        !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
-            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_work", shape(hvy_work)
+            if (rank==0) then
+                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+                "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
+            endif
         end if
 
+        !---------------------------------------------------------------------------
         ! 3D: maximal 74 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 74 ) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_neighbor", shape(hvy_neighbor)
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+            "hvy_neighbor", product(real(shape(hvy_neighbor)))*8.0e-9, shape(hvy_neighbor)
+        endif
+
     else
+
         ! 2D:
         if (rank==0) write(*,'("INIT: Allocating a 2D case.")')
-        ! datafields
-        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_block", shape(hvy_block)
 
+        !---------------------------------------------------------------------------
+        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+            "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
+        endif
+
+        !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
-            if (rank==0) write(*,'("INIT: Allocated ",A," shape=",5(i9,1x))') "hvy_work", shape(hvy_work)
+            if (rank==0) then
+                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",5(i9,1x))') &
+                "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
+            endif
         end if
 
+        !---------------------------------------------------------------------------
         ! 2D: maximal 16 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 16 ) )
-        if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_neighbor", shape(hvy_neighbor)
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+            "hvy_neighbor", product(real(shape(hvy_neighbor)))*8.0e-9, shape(hvy_neighbor)
+        endif
+
     end if
 
-    ! allocate memory
+    !---------------------------------------------------------------------------
     allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2) )
-    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_block", shape(lgt_block)
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+        "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)
+    endif
 
+    !---------------------------------------------------------------------------
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
-    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_sortednumlist", shape(lgt_sortednumlist)
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+        "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
+    endif
 
     ! reset data:
     ! all blocks are inactive, reset treecode
@@ -138,13 +172,21 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! set refinement to 0
     lgt_block(:, params%max_treelevel+2) = 0
 
-    ! allocate active list
+    !---------------------------------------------------------------------------
     allocate( lgt_active( size(lgt_block, 1) ) )
-    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "lgt_active", shape(lgt_active)
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+        "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
+    endif
 
+    !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
     allocate( hvy_active( size(hvy_block, 5) ) )
-    if (rank==0) write(*,'("INIT: Allocated ",A," shape=",7(i9,1x))') "hvy_active", shape(hvy_active)
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+        "hvy_active", product(real(shape(hvy_active)))*4.0e-9, shape(hvy_active)
+    endif
+
 
     if (rank == 0 .and. simulation) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
@@ -153,7 +195,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
         effective_memory = (dble(size(hvy_block)+size(hvy_work)) + & ! real data
         dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
-        )*8.0_rk/1000.0_rk/1000.0_rk/1000.0_rk ! in GB
+        )*8.0e-9 ! in GB
 
         ! note we currently use 8byte per real and integer by default, so all the same bytes per point
         write(*,'("INIT: Measured (true) local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB per mpirank")') &

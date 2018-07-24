@@ -125,6 +125,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
 
     allocate(block_treecode(1:dims_treecode(1), 1:hvy_n))
     block_treecode = -1
+
     ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + 2]
     ! array we want to hold, so that all CPU can read from the same file simultaneously
     ! (note zero-based offset):
@@ -141,9 +142,9 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
      do k = 1, hvy_n
         call hvy_id_to_lgt_id( lgt_id, k, rank, params%number_blocks )
         ! copy treecode
-        lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1),k)
+        lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level
-        lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k),dims_treecode(1))
+        lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
         lgt_block(lgt_id, params%max_treelevel+2) = 0
     end do

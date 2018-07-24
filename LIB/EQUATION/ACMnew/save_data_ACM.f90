@@ -10,96 +10,116 @@
 ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
 !-----------------------------------------------------------------------------
 subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
-  implicit none
-  ! it may happen that some source terms have an explicit time-dependency
-  ! therefore the general call has to pass time
-  real(kind=rk), intent (in) :: time
+    implicit none
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
 
-  ! block data, containg the state vector. In general a 4D field (3 dims+components)
-  ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-  real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
+    ! block data, containg the state vector. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
 
-  ! as you are allowed to compute the RHS only in the interior of the field
-  ! you also need to know where 'interior' starts: so we pass the number of ghost points
-  integer, intent(in) :: g
+    ! as you are allowed to compute the RHS only in the interior of the field
+    ! you also need to know where 'interior' starts: so we pass the number of ghost points
+    integer, intent(in) :: g
 
-  ! for each block, you'll need to know where it lies in physical space. The first
-  ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-  real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+    ! for each block, you'll need to know where it lies in physical space. The first
+    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-  ! output in work array.
-  real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+    ! output in work array.
+    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
-  ! local variables
-  integer(kind=ik)  :: neqn, nwork, Bs, k
-  character(len=80) :: name
-  real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
-
-
-  ! number of state variables
-  neqn = size(u,4)
-  ! number of available work array slots
-  nwork = size(work,4)
-
-  Bs = size(u,1)-2*g
-
-  ! copy state vector
-  work(:,:,:,1:neqn) = u(:,:,:,:)
+    ! local variables
+    integer(kind=ik)  :: neqn, nwork, Bs, k
+    character(len=80) :: name
+    real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
 
 
-  if (params_acm%dim==3) then
-      if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-      if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
-  else
-      if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
-      if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
-  endif
+    ! number of state variables
+    neqn = size(u,4)
+    ! number of available work array slots
+    nwork = size(work,4)
+
+    Bs = size(u,1)-2*g
+
+    ! copy state vector
+    work(:,:,:,1:neqn) = u(:,:,:,:)
 
 
-  do k = neqn+1, size(params_acm%names,1)
-      name = params_acm%names(k)
-      select case(name(1:3))
-          case('vor')
-              ! vorticity
-              call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
-                  dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+    if (params_acm%dim==3) then
+        if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
+        if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+    else
+        if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
+        if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
+    endif
 
-          case('div')
-              ! div(u)
-              call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, &
-                  g, params_acm%discretization,work(:,:,:,k))
 
-          case('mas')
-              ! mask
-              if (params_acm%dim==2) then
-                  call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
-              else
-                  call create_mask_3D(time, x0, dx, Bs, g, mask, us )
-              endif
-              work(:,:,:,k) = mask
+    do k = neqn+1, size(params_acm%names,1)
+        name = params_acm%names(k)
+        select case(name(1:3))
+        case('vor')
+            ! vorticity
+            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
 
-          case('spo')
-              ! mask for sponge
-              if (params_acm%dim==2) then
-                  call sponge_2D(work(:,:,1,k), x0(1:2), dx(1:2), Bs, g )
-              else
-                  call sponge_3D(work(:,:,:,k), x0, dx, Bs, g )
-              endif
+        case('div')
+            ! div(u)
+            call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, &
+            g, params_acm%discretization, work(:,:,:,k))
 
-      end select
-  end do
+        case('mas')
+            ! mask
+            if (params_acm%dim==2) then
+                call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+            else
+                call create_mask_3D(time, x0, dx, Bs, g, mask, us )
+            endif
+            work(:,:,:,k) = mask
+
+        case('usx')
+            if (params_acm%dim==2) then
+                call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+            else
+                call create_mask_3D(time, x0, dx, Bs, g, mask, us )
+            endif
+            work(:,:,:,k) = us(:,:,:,1)
+
+        case('usy')
+            if (params_acm%dim==2) then
+                call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+            else
+                call create_mask_3D(time, x0, dx, Bs, g, mask, us )
+            endif
+            work(:,:,:,k) = us(:,:,:,2)
+
+        case('usz')
+            call create_mask_3D(time, x0, dx, Bs, g, mask, us )
+            work(:,:,:,k) = us(:,:,:,3)
+
+        case('spo')
+            ! mask for sponge
+            if (params_acm%dim==2) then
+                call sponge_2D(work(:,:,1,k), x0(1:2), dx(1:2), Bs, g )
+            else
+                call sponge_3D(work(:,:,:,k), x0, dx, Bs, g )
+            endif
+
+        end select
+    end do
 
 end subroutine
 
 
-  !-----------------------------------------------------------------------------
-  ! when savig to disk, WABBIT would like to know how you named you variables.
-  ! e.g. u(:,:,:,1) is called "ux"
-  !
-  ! the main routine save_fields has to know how you label the stuff you want to
-  ! store from the work array, and this routine returns those strings
-  !-----------------------------------------------------------------------------
-  subroutine FIELD_NAMES_ACM( N, name )
+!-----------------------------------------------------------------------------
+! when savig to disk, WABBIT would like to know how you named you variables.
+! e.g. u(:,:,:,1) is called "ux"
+!
+! the main routine save_fields has to know how you label the stuff you want to
+! store from the work array, and this routine returns those strings
+!-----------------------------------------------------------------------------
+subroutine FIELD_NAMES_ACM( N, name )
     implicit none
     ! component index
     integer(kind=ik), intent(in) :: N
@@ -107,9 +127,9 @@ end subroutine
     character(len=80), intent(out) :: name
 
     if (allocated(params_acm%names)) then
-      name = params_acm%names(N)
+        name = params_acm%names(N)
     else
-      call abort(5554,'Something ricked')
+        call abort(5554,'Something ricked')
     endif
 
-  end subroutine FIELD_NAMES_ACM
+end subroutine FIELD_NAMES_ACM

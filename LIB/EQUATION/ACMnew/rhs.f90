@@ -462,6 +462,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
         call create_mask_3D(time, x0, dx, Bs, g, mask, us)
+        mask = mask * eps_inv
     end if
 
     if (order_discretization == "FD_2nd_central" ) then

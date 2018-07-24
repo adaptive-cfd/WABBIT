@@ -63,10 +63,12 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
               ! vorticity
               call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
                   dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+
           case('div')
               ! div(u)
               call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, &
                   g, params_acm%discretization,work(:,:,:,k))
+
           case('mas')
               ! mask
               if (params_acm%dim==2) then
@@ -75,6 +77,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
                   call create_mask_3D(time, x0, dx, Bs, g, mask, us )
               endif
               work(:,:,:,k) = mask
+
           case('spo')
               ! mask for sponge
               if (params_acm%dim==2) then

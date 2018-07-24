@@ -310,9 +310,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     end if
 
     ! --------------------------------------------------------------------------
-    ! mean flow forcing term.
+    ! forcing term.
     ! --------------------------------------------------------------------------
-    ! is mean flow forcing used at all?
+    ! is forcing used at all?
     if (params_acm%forcing) then
         do idir = 1, 2
             select case (params_acm%forcing_type(idir))
@@ -356,6 +356,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
         end do
     end if
 
+    ! remove mean pressure. NOTE: there is some oddities here, as the code modifies the
+    ! state vector and not the RHS.
     if (params_acm%p_mean_zero) then
         phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
     end if
@@ -577,9 +579,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
                     div_U = u_dx + v_dy + w_dz
 
-                    penalx = -mask(ix,iy,iz  )*(phi(ix,iy,iz,1)-us(ix,iy,iz,1))
-                    penaly = -mask(ix,iy,iz  )*(phi(ix,iy,iz,2)-us(ix,iy,iz,2))
-                    penalz = -mask(ix,iy,iz  )*(phi(ix,iy,iz,3)-us(ix,iy,iz,3))
+                    penalx = -mask(ix,iy,iz)*(phi(ix,iy,iz,1)-us(ix,iy,iz,1))
+                    penaly = -mask(ix,iy,iz)*(phi(ix,iy,iz,2)-us(ix,iy,iz,2))
+                    penalz = -mask(ix,iy,iz)*(phi(ix,iy,iz,3)-us(ix,iy,iz,3))
 
                     rhs(ix,iy,iz,1) = -phi(ix,iy,iz,1)*u_dx - phi(ix,iy,iz,2)*u_dy - phi(ix,iy,iz,3)*u_dz - p_dx &
                                     + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
@@ -594,6 +596,12 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     else
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
+    end if
+
+    ! remove mean pressure. NOTE: there is some oddities here, as the code modifies the
+    ! state vector and not the RHS.
+    if (params_acm%p_mean_zero) then
+        phi(:,:,:,4) = phi(:,:,:,4) - params_acm%mean_p
     end if
 
     ! --------------------------------------------------------------------------

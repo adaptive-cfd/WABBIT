@@ -222,10 +222,16 @@ subroutine init_ghost_nodes( params )
              "int_recv_buffer", shape(int_recv_buffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, new_send_buffer size is",f9.4," GB ")') &
-             size(new_send_buffer)*8e-9
+             product(real(shape(new_send_buffer)))*8e-9
 
              write(*,'("GHOSTS-INIT: on each mpirank, new_recv_buffer size is",f9.4," GB ")') &
-              size(new_recv_buffer)*8e-9
+              product(real(shape(new_recv_buffer)))*8e-9
+
+            write(*,'("GHOSTS-INIT: on each mpirank, int_send_buffer size is",f9.4," GB ")') &
+             product(real(shape(int_send_buffer)))*4e-9
+
+             write(*,'("GHOSTS-INIT: on each mpirank, int_recv_buffer size is",f9.4," GB ")') &
+              product(real(shape(int_recv_buffer)))*4e-9
         endif
 
         ! this is a list of communications with all other procs

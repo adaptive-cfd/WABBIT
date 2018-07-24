@@ -102,7 +102,7 @@ subroutine write_lgt_data(params, lgt_block, file)
 
     open(14, file=file, status='replace')
     do k = 1, size(lgt_block,1)
-        write(14,'(7(i2,1x))') lgt_block(k,:)
+        write(14,'(30(i2,1x))') lgt_block(k,:)
     enddo
     close(14)
 

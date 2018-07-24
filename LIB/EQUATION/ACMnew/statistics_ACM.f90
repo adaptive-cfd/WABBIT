@@ -136,7 +136,7 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         else
             do idir = 1, 3
                 params_acm%force(idir) = params_acm%force(idir) + sum( &
-                ( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, idir) - us(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, idir))&
+                ( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, idir) - us(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, idir) )&
                 * mask(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1))*dx(1)*dx(2)*dx(3)
             enddo
         endif

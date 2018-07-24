@@ -196,7 +196,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
     treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
     refinement_execute_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
 	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90 \
-	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 \
+	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 grid_coarsening_indicator.f90 \
 	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

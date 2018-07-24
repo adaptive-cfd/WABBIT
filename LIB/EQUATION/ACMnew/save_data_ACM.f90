@@ -44,8 +44,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
   Bs = size(u,1)-2*g
 
   ! copy state vector
-  work(:,:,:,1:size(u,4)) = u(:,:,:,:)
-
+  work(:,:,:,1:neqn) = u(:,:,:,:)
 
 
   if (params_acm%dim==3) then
@@ -57,7 +56,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
   endif
 
 
-  do k = neqn, size(params_acm%names,1)
+  do k = neqn+1, size(params_acm%names,1)
       name = params_acm%names(k)
       select case(name(1:3))
           case('vor')

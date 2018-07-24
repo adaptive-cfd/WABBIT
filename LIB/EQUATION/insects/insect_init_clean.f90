@@ -192,6 +192,8 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     call rigid_solid_init( time, Insect, resume_backup, fname_backup)
   endif
 
+  call Update_Insect( time, Insect )
+
   if (root) then
     write(*,'(80("<"))')
     write(*,*) "Insect initialization is complete."

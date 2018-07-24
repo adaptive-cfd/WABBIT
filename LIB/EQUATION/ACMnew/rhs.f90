@@ -54,7 +54,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
 
     case ("integral_stage")
         !-------------------------------------------------------------------------
-        ! 2nd stage: init_stage.
+        ! 2nd stage: integral_stage.
         !-------------------------------------------------------------------------
         ! For some RHS, the eqn depend not only on local, block based qtys, such as
         ! the state vector, but also on the entire grid, for example to compute a

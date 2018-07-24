@@ -32,7 +32,9 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us )
     select case (params_acm%geometry)
     case ('Insect')
         if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g,1:Bs+2*g,1:Bs+2*g))
-
+        
+        ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
+        ! know that the first g points are in fact ghost nodes...
         call Draw_Insect( time, Insect, x0-dble(g+1)*dx, dx, mask, mask_color, us)
 
     case ('none')

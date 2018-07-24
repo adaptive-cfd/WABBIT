@@ -29,12 +29,12 @@
 
 subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
 
-!---------------------------------------------------------------------------------------------
-! modules
+    !---------------------------------------------------------------------------------------------
+    ! modules
 
 
-!---------------------------------------------------------------------------------------------
-! variables
+    !---------------------------------------------------------------------------------------------
+    ! variables
 
     implicit none
 
@@ -64,20 +64,20 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: t0, x0(1:3), dx(1:3)
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
     ! start time
     t0 = MPI_Wtime()
     if (params%rank == 0) then
-      write(*,'("IO: Saving data triggered, time=",g15.8)')  time
+        write(*,'("IO: Saving data triggered, time=",g15.8)')  time
     endif
 
-!---------------------------------------------------------------------------------------------
-! main body
+    !---------------------------------------------------------------------------------------------
+    ! main body
 
-      ! preparatory step. The physics modules have to copy everything they want to
-      ! save to disk to the work array. missing qty's shall be computed.
-      do k = 1, hvy_n
+    ! preparatory step. The physics modules have to copy everything they want to
+    ! save to disk to the work array. missing qty's shall be computed.
+    do k = 1, hvy_n
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
 
@@ -91,11 +91,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         call PREPARE_SAVE_DATA(params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
         params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
 
-      enddo
+    enddo
 
-      ! actual saving step. one file per component.
-      ! loop over components/qty's:
-      do k = 1, params%N_fields_saved
+    ! actual saving step. one file per component.
+    ! loop over components/qty's:
+    do k = 1, params%N_fields_saved
 
         ! physics modules shall provide an interface for wabbit to know how to label
         ! the components to be stored to hard disk (in the work array)
@@ -106,9 +106,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! actual writing
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
 
-      enddo
+    enddo
 
-      call toc( params, "save_data", MPI_wtime()-t0 )
-      return
-
+    call toc( params, "save_data", MPI_wtime()-t0 )
 end subroutine save_data

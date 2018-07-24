@@ -187,11 +187,18 @@ contains
       write(*,'(80("<"))')
       write(*,*) "Some information:"
       write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
+
       dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%Lx / real(params_acm%Bs-1, kind=rk)
       nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
       dt_min = params_acm%CFL*dx_min/params_acm%c_0
+
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
+
+      if (params_acm%penalization) then
+          write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+      endif
+
       write(*,'(80("<"))')
     endif
 

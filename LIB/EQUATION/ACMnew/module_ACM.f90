@@ -235,14 +235,27 @@ contains
 
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
+    ! temporary array. note this is just one block and hence not important for overall memory consumption
+    real(kind=rk), allocatable, save :: u_mag(:,:,:)
+    real(kind=rk) :: u_eigen
 
+    if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
 
-    ! ususal CFL, neglecting u
-    dt = minval( params_acm%CFL * dx(1:params_acm%dim) / params_acm%c_0 )
+    ! compute square of velocity magnitude
+    if (params_acm%dim == 2) then
+        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2)
+    else
+        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2) + u(:,:,:,3)*u(:,:,:,3)
+    endif
+    ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
+    u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
 
-    ! explicit diffusion (NOTE: valid only for RK4, other time steppers have more
+    ! ususal CFL condition
+    dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+
+    ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
-    if(params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
+    if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
 
     ! just for completeness...this condition should never be active (gamma ~ 1)
     if (params_acm%gamma_p>0) dt = min( dt, 0.99_rk*params_acm%gamma_p )

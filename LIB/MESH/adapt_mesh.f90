@@ -101,33 +101,37 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
+        t0 = MPI_Wtime()
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call toc( params, "adapt_mesh (sync_ghosts)", MPI_Wtime()-t0 )
 
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
+        t0 = MPI_Wtime()
         call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
         hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
+        call toc( params, "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         t0 = MPI_Wtime()
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
         ! CPU timing (only in debug mode)
-        call toc( params, "adapt_mesh (min/max)", MPI_Wtime()-t0 )
+        call toc( params, "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
 
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
         ! CPU timing (only in debug mode)
-        call toc( params, "adapt_mesh (gradedness)", MPI_Wtime()-t0 )
+        call toc( params, "adapt_mesh (ensure_gradedness)", MPI_Wtime()-t0 )
 
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
         ! CPU timing (only in debug mode)
-        call toc( params, "adapt_mesh (coarse mesh)", MPI_Wtime()-t0 )
+        call toc( params, "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
 
         ! the following calls are indeed required (threshold->ghosts->neighbors->active)
@@ -163,8 +167,9 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
+    t0 = MPI_Wtime()
     call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
-
+    call toc( params, "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
 
     !> load balancing destroys the lists again, so we have to create them one last time to
     !! end on a valid mesh
@@ -183,6 +188,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
 
     ! time remaining parts of this routine.
-    call toc( params, "adapt_mesh (...)", t_misc )
+    call toc( params, "adapt_mesh (lists)", t_misc )
     call toc( params, "adapt_mesh (TOTAL)", MPI_wtime()-t1)
 end subroutine adapt_mesh

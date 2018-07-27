@@ -46,6 +46,9 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     ! kind=1 integer copy of light data, which will only hold my data
     integer(kind=1), allocatable, save      :: my_lgt_block(:, :)
     integer(kind=ik), allocatable, save     :: proc_lgt_num(:), my_proc_lgt_num(:)
+    real(kind=rk) :: t0
+
+    t0 = MPI_wtime()
 
     mpirank = params%rank
     mpisize = params%number_procs
@@ -169,4 +172,6 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
             endif
         end if
     end do
+
+    call toc( params, "synchronize_lgt_data", MPI_wtime()-t0 )
 end subroutine

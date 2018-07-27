@@ -70,6 +70,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
     integer(kind=ik) :: neighbor_num
+    real(kind=rk) :: t0
 
     !---------------------------------------------------------------------------------------------
     ! interfaces
@@ -110,6 +111,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! we hope not to set the flag to .true. again in this iteration
         grid_changed    = .false.
 
+        t0 = MPI_wtime()
         ! We first remove the -1 flag from blocks which cannot be coarsened because their sisters
         ! disagree. If 1 of 4 or 1/8 blocks has 0 or +1 status, this cannot be changed. Therefore we first
         ! remove the status -1 from the blocks which have non-1 sisters. This is not only a question of
@@ -225,18 +227,21 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 end if ! my refinement status
             end if ! mpi responsibile for block
         end do ! loop over blocks
-
+        call toc( params, "ensure_gradedness (processing part)", MPI_Wtime()-t0 )
 
         ! second: synchronize local refinement changes.
         ! Now all procs have looked at their blocks, and they may have modified their blocks
         ! (remove coarsen states, force refinement through neighbors). None of the procs had to
         ! touch the neighboring blocks, there can be no MPI conflicts.
         ! So we can simply snynchronize and know what changes have to be made
+        t0 = MPI_wtime()
         call MPI_Allreduce(my_refine_change(1:lgt_n), refine_change(1:lgt_n), lgt_n, MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
+        call toc( params, "ensure_gradedness (MPI_Allreduce)", MPI_Wtime()-t0 )
 
         ! -------------------------------------------------------------------------------------
         ! third: change light data and set grid_changed status
         ! loop over active blocks
+        t0 = MPI_wtime()
         do k = 1_ik, lgt_n
             lgt_id = lgt_active(k)
             ! refinement status changed
@@ -247,7 +252,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 grid_changed = .true.
             end if
         end do
-
+        call toc( params, "ensure_gradedness (apply changes)", MPI_Wtime()-t0 )
 
         ! avoid infinite loops
         counter = counter + 1_ik

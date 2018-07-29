@@ -21,7 +21,7 @@
 ! ********************************************************************************************
 !> \image html completeness.svg "Ensure Completeness" width=400
 
-subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, sisters )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -35,7 +35,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :), sisters(:,:)
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:)
     !> number of active blocks (light data)
@@ -75,7 +75,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sorted
             ! find sister IDs of the block we're looking at. If a sister is not found, -1
             ! is returned in the array id
             ! NOTE: the array "id" also contains the block itself
-            call find_sisters( params, lgt_active(k), id(1:N_sisters), lgt_block, lgt_n, lgt_sortednumlist )
+            id(1:N_sisters) = sisters(lgt_active(k), 1:N_sisters)
 
             ! if all sisters exists, then the array should not contain values smaller
             ! zero (-1 would mean not found)

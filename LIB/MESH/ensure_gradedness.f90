@@ -66,6 +66,10 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! here. I had severe problems which cost me several days on an IBM BLueGene/Q with just This
     ! kind=1 statement. I think the compiler had trouble with MPI_MAX in the ALLREDUCE statement
     integer(kind=ik), allocatable, save  :: refine_change( : ), my_refine_change( : )
+    ! it turned out that in some situations ensure_completeness is very expensive, mostly because
+    ! of the find_sisters routine. We therefore at least do this procedure only once and not
+    ! in each iteration of the algorithm.
+    integer(kind=ik), allocatable, save  :: sisters(:,:)
 
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
@@ -91,16 +95,31 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     if ( params%threeD_case ) then
         ! 3D:
         neighbor_num = 74
+        if (.not.allocated(sisters)) allocate( sisters(size(lgt_block,1),8) )
     else
         ! 2D:
         neighbor_num = 16
+        if (.not.allocated(sisters)) allocate( sisters(size(lgt_block,1),4) )
     end if
+
+    ! Prepartion for ensure_completeness
+    ! find the sistsers for each block at the beginning (their indices do not change
+    ! in the gradedness iterations). Note: we remove the -1 status in this routine
+    ! and possibly replace it. therefore, no block gets a new "-1" status. Therefore
+    ! we can search the sisters only for blocks that already have this status.
+    t0 = MPI_wtime()
+    do k = 1, lgt_n
+        ! if the block wants to coarsen, check refinement status of sister blocks
+        if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
+            call find_sisters(params, lgt_active(k), sisters(lgt_active(k),:), &
+            lgt_block, lgt_n, lgt_sortednumlist)
+        endif
+    enddo
+    call toc( params, "ensure_gradedness (sisters)", MPI_Wtime()-t0 )
 
     ! NOTE: The status +11 is required for ghost nodes synching, if the maxlevel
     ! is reached. It means just the same as 0 (stay) in the context of this routine
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
 
     ! we repeat the ensure_gradedness procedure until this flag is .false. since as long
     ! as the grid changes due to gradedness requirements, we have to check it again
@@ -111,7 +130,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! we hope not to set the flag to .true. again in this iteration
         grid_changed    = .false.
 
-        t0 = MPI_wtime()
         ! We first remove the -1 flag from blocks which cannot be coarsened because their sisters
         ! disagree. If 1 of 4 or 1/8 blocks has 0 or +1 status, this cannot be changed. Therefore we first
         ! remove the status -1 from the blocks which have non-1 sisters. This is not only a question of
@@ -121,10 +139,13 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! -1  -1  -1   0
         ! -1  -1  -1  -1
         ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensure_gradedness routine.
-        call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+        t0 = MPI_wtime()
+        call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, sisters )
+        call toc( params, "ensure_gradedness (completeness)", MPI_Wtime()-t0 )
 
         ! -------------------------------------------------------------------------------------
         ! first: every proc loop over the light data and calculate the refinement status change
+        t0 = MPI_wtime()
         my_refine_change(1:lgt_n) = -99_ik
         refine_change(1:lgt_n) = -99_ik
 

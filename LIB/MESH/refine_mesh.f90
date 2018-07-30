@@ -105,10 +105,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     !! the status +11
     t1 = MPI_Wtime()
     if ( params%threeD_case ) then
-        ! 3D:
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
     else
-        ! 2D:
         call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
     end if
     call toc( params, "refine_mesh (refinement_execute)", MPI_Wtime()-t1 )
@@ -120,6 +118,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     t2 = MPI_wtime()
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
          hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
     ! update neighbor relations
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
          lgt_sortednumlist, hvy_active, hvy_n )
@@ -127,20 +126,27 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
 
     !> At this point the refinement is done. Since not all blocks are refined, namely only those
     !! that were not on Jmax, Now, the distribution of blocks may no longer
-    !! be balanced, so we have to balance load now
-    t1 = MPI_Wtime()
-    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    hvy_active, hvy_n, hvy_work )
-    call toc( params, "refine_mesh (balance_load)", MPI_Wtime()-t1 )
+    !! be balanced, so we have to balance load now. EXCEPTION: if the flag force_maxlevel_dealiasing is set
+    !! then we force blocks on Jmax to coarsen, even if their details are large. Hence, each refinement
+    !! step is a true "everywhere". Then, there is no need for balancing, as all mpiranks automatically
+    !! hold the same number of blocks, if they started with a balanced distribution (which is the
+    !! output of adapt_mesh.)
+    if (params%force_maxlevel_dealiasing .eqv. .false.) then
+        t1 = MPI_Wtime()
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        hvy_active, hvy_n, hvy_work )
+        call toc( params, "refine_mesh (balance_load)", MPI_Wtime()-t1 )
 
 
-    t2 = MPI_wtime()
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-         hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-         lgt_sortednumlist, hvy_active, hvy_n )
-    t_misc = t_misc + MPI_wtime() - t2
+        t2 = MPI_wtime()
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
+             hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
+        ! update neighbor relations
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+             lgt_sortednumlist, hvy_active, hvy_n )
+        t_misc = t_misc + MPI_wtime() - t2
+    endif
 
 !---------------------------------------------------------------------------------------------
 ! End of routine

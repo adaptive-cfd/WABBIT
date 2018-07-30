@@ -91,9 +91,9 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
     ! block distribution
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
-    ! use non-uniform mesh correction
-    call read_param_mpi(FILE, 'Blocks', 'non_uniform_mesh_correction', params%non_uniform_mesh_correction, .true. )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+    call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
+
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.

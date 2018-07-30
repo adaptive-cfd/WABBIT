@@ -73,8 +73,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         lgt_block( lgt_active(k), Jmax+2 ) = 0
     enddo
 
-
+    !---------------------------------------------------------------------------
     !> Compute vorticity (if required)
+    !---------------------------------------------------------------------------
     !! it is a little unfortunate that we have to compute the vorticity here and not in
     !! block_coarsening_indicator, where it should be. but after computing it, we have to synch
     !! its vorticity ghost nodes in order to apply the detail operator to the entire
@@ -98,7 +99,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         call sync_ghosts( params, lgt_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
     endif
 
+    !---------------------------------------------------------------------------
     !> Compute normalization for eps, if desired.
+    !---------------------------------------------------------------------------
     !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
     !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
     !! the vector of normalization factors for each qty that adaptivity will bebased on (state vector
@@ -140,7 +143,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         close(14)
     endif
 
+    !---------------------------------------------------------------------------
     !> evaluate coarsing criterion on all blocks
+    !---------------------------------------------------------------------------
     ! loop over all my blocks
     do k = 1, hvy_n
         ! get lgt id of block
@@ -156,6 +161,18 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
         lgt_block(lgt_id, Jmax+2), norm )
     enddo
+
+    !---------------------------------------------------------------------------
+    !
+    !---------------------------------------------------------------------------
+    if (params%force_maxlevel_dealiasing) then
+        do k = 1, lgt_n
+            if (lgt_block(lgt_active(k), Jmax+1) == params%max_treelevel) then
+                ! force blocks on maxlevel to coarsen
+                lgt_block(lgt_active(k), Jmax+2) = -1
+            endif
+        enddo
+    endif
 
 
     !> after modifying all refinement statusses, we need to synchronize light data

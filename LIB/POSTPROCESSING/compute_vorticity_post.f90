@@ -91,7 +91,6 @@ subroutine compute_vorticity_post(help, params)
     params%Lz = domain(3)
     params%number_block_nodes = Bs
     allocate(params%butcher_tableau(1,1))
-    params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case
     params%number_blocks = 4_ik*lgt_n/params%number_procs

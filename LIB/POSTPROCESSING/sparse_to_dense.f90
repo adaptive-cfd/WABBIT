@@ -77,7 +77,6 @@ subroutine sparse_to_dense(help, params)
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
     ! we do not read an ini file, so defaults may not be set.
-    params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     allocate(params%butcher_tableau(1,1))
     ! we read only one datafield in this routine
     params%number_data_fields  = 1

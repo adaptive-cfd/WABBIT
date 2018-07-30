@@ -58,6 +58,7 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk
         logical                                      :: eps_normalized=.false.
+        logical :: force_maxlevel_dealiasing=.false.
         ! minimal level for blocks in data tree
         integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree
@@ -95,9 +96,6 @@ module module_params
 
         ! debug flag
         logical                                      :: debug=.false.
-
-        ! use non-uniform mesh correction
-        logical                                      :: non_uniform_mesh_correction=.true.
 
         ! -------------------------------------------------------------------------------------
         ! physics

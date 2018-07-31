@@ -12,7 +12,7 @@
 !> \details This routine is called after all blocks have been tagged whether to refine or coarsen or stay.
 !! It now goes through the list of blocks and looks for refinement or coarsening states that would
 !! result in an non-graded mesh. These mistakes are corrected, their status -1 or 0 is overwritten.
-!! The status +1 is always conserved (recall to call respect_min_max_treelevel before).
+!! The status +1 is always conserved (recall to call respect_min_Jmax before).
 !!
 !!
 !! Since 04/2017, the new code checks all blocks that want to coarsen or remain, NOT the ones that
@@ -58,14 +58,11 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! process rank
     integer(kind=ik)                    :: rank
     ! loop variables
-    integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, counter, hvy_id, neighbor_status, max_treelevel, proc_id, lgt_id
+    integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, &
+    counter, hvy_id, neighbor_status, Jmax, proc_id, lgt_id
     ! status of grid changing
-    logical                             :: grid_changed
+    logical                             :: grid_changed, test2
 
-    ! refinement status change, send/receive buffer, NOTE: use 8bit integers is inhibited
-    ! here. I had severe problems which cost me several days on an IBM BLueGene/Q with just This
-    ! kind=1 statement. I think the compiler had trouble with MPI_MAX in the ALLREDUCE statement
-    integer(kind=ik), allocatable, save  :: refine_change( : ), my_refine_change( : )
     ! it turned out that in some situations ensure_completeness is very expensive, mostly because
     ! of the find_sisters routine. We therefore at least do this procedure only once and not
     ! in each iteration of the algorithm.
@@ -76,18 +73,9 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     integer(kind=ik) :: neighbor_num
     real(kind=rk) :: t0
 
-    !---------------------------------------------------------------------------------------------
-    ! interfaces
-
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
-
-    ! allocate buffers, uses number of light data as maximum number for array length
-    if (.not.allocated(refine_change)) allocate( refine_change(size(lgt_block,1)) )
-    if (.not.allocated(my_refine_change)) allocate( my_refine_change(size(lgt_block,1)) )
 
     N = params%number_blocks
-    max_treelevel = params%max_treelevel
+    Jmax = params%max_treelevel
 
     ! set MPI parameter
     rank = params%rank
@@ -110,7 +98,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     t0 = MPI_wtime()
     do k = 1, lgt_n
         ! if the block wants to coarsen, check refinement status of sister blocks
-        if ( lgt_block( lgt_active(k), max_treelevel+2 ) == -1) then
+        if ( lgt_block( lgt_active(k), Jmax+2 ) == -1) then
             call find_sisters(params, lgt_active(k), sisters(lgt_active(k),:), &
             lgt_block, lgt_n, lgt_sortednumlist)
         endif
@@ -146,8 +134,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! -------------------------------------------------------------------------------------
         ! first: every proc loop over the light data and calculate the refinement status change
         t0 = MPI_wtime()
-        my_refine_change(1:lgt_n) = -99_ik
-        refine_change(1:lgt_n) = -99_ik
 
         do k = 1, lgt_n
 
@@ -161,52 +147,64 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 !-----------------------------------------------------------------------
                 ! This block wants to coarsen
                 !-----------------------------------------------------------------------
-                if ( lgt_block( lgt_active(k) , max_treelevel+2 ) == -1_ik) then
+                if ( lgt_block( lgt_active(k) , Jmax+2 ) == -1) then
                     ! loop over all neighbors
                     do i = 1, neighbor_num
                         ! neighbor exists ? If not, this is a bad error
-                        if ( hvy_neighbor( hvy_id, i ) /= -1_ik ) then
+                        if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
 
                             ! check neighbor treelevel
-                            mylevel         = lgt_block( lgt_active(k), max_treelevel+1_ik )
-                            neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , max_treelevel+1_ik )
-                            neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , max_treelevel+2_ik )
+                            mylevel         = lgt_block( lgt_active(k), Jmax+1 )
+                            neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+1 )
+                            neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+2 )
 
                             if (mylevel == neighbor_level) then
                                 ! neighbor on same level
                                 ! block can not coarsen, if neighbor wants to refine
-                                if ( neighbor_status == -1_ik ) then
+                                if ( neighbor_status == -1 ) then
                                     ! neighbor wants to coarsen, as do I, we're on the same level -> ok
-                                elseif ( neighbor_status == 0_ik .or. neighbor_status == 11_ik ) then
+                                elseif ( neighbor_status == 0 .or. neighbor_status == 11 ) then
                                     ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
-                                elseif ( neighbor_status == 1_ik ) then
+                                elseif ( neighbor_status == 1 ) then
                                     ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
                                     ! I have at least to stay on my level.
                                     ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                    my_refine_change( k ) = max( 0_ik, my_refine_change( k ) )
+                                    if (lgt_block( lgt_active(k), Jmax+2 )<0) then
+                                        lgt_block( lgt_active(k), Jmax+2 ) = max( 0, lgt_block( lgt_active(k), Jmax+2 ) )
+                                        grid_changed = .true.
+                                    endif
+
                                 end if
-                            elseif (mylevel - neighbor_level == 1_ik) then
+                            elseif (mylevel - neighbor_level == 1) then
                                 ! neighbor on lower level
-                                if ( neighbor_status == -1_ik ) then
+                                if ( neighbor_status == -1 ) then
                                     ! neighbor wants to coarsen, as do I, he is one level coarser, -> ok
-                                elseif ( neighbor_status == 0_ik .or. neighbor_status == 11_ik ) then
+                                elseif ( neighbor_status == 0 .or. neighbor_status == 11 ) then
                                     ! neighbor wants to stay, I want to coarsen, he is one level coarser, -> ok
-                                elseif ( neighbor_status == 1_ik ) then
+                                elseif ( neighbor_status == 1 ) then
                                     ! neighbor wants to refine, I want to coarsen,  he is one level coarser, -> ok
                                 end if
-                            elseif (neighbor_level - mylevel == 1_ik) then
+                            elseif (neighbor_level - mylevel == 1) then
                                 ! neighbor on higher level
                                 ! neighbor wants to refine, ...
-                                if ( neighbor_status == +1_ik) then
+                                if ( neighbor_status == +1) then
                                     ! ... so I also have to refine (not only can I NOT coarsen, I actually
                                     ! have to refine!)
-                                    my_refine_change( k ) = +1_ik
-                                elseif ( neighbor_status == 0_ik .or. neighbor_status == 11_ik) then
+                                    if (lgt_block( lgt_active(k), Jmax+2 )<+1) then
+                                        lgt_block( lgt_active(k), Jmax+2 ) = max( +1, lgt_block( lgt_active(k), Jmax+2 ) )
+                                        grid_changed = .true.
+                                    endif
+
+                                elseif ( neighbor_status == 0 .or. neighbor_status == 11) then
                                     ! neighbor wants to stay and I want to coarsen, but
                                     ! I cannot do that (there would be two levels between us)
                                     ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                    my_refine_change( k ) = max( 0_ik, my_refine_change( k ) )
-                                elseif ( neighbor_status == -1_ik) then
+                                    if (lgt_block( lgt_active(k), Jmax+2 )<+1) then
+                                        lgt_block( lgt_active(k), Jmax+2 ) = max( 0, lgt_block( lgt_active(k), Jmax+2 ) )
+                                        grid_changed = .true.
+                                    endif
+
+                                elseif ( neighbor_status == -1) then
                                     ! neighbor wants to coarsen, which is what I want too,
                                     ! so we both would just go up one level together - that's fine
                                 end if
@@ -216,29 +214,32 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                         end if ! if neighbor exists
                     end do ! loop over neighbors
 
-                    !-----------------------------------------------------------------------
-                    ! this block wants to stay on his level
-                    !-----------------------------------------------------------------------
-                elseif (lgt_block( lgt_active(k) , max_treelevel+2_ik ) == 0_ik .or. lgt_block( lgt_active(k) , max_treelevel+2_ik ) == 11_ik ) then
+                !-----------------------------------------------------------------------
+                ! this block wants to stay on his level
+                !-----------------------------------------------------------------------
+                elseif (lgt_block( lgt_active(k) , Jmax+2 ) == 0 .or. lgt_block( lgt_active(k) , Jmax+2 ) == 11 ) then
                     ! loop over all neighbors
-                    do i = 1_ik, neighbor_num
+                    do i = 1, neighbor_num
                         ! neighbor exists ? If not, this is a bad error
-                        if ( hvy_neighbor( hvy_id, i ) /= -1_ik ) then
-                            mylevel     = lgt_block( lgt_active(k), max_treelevel+1_ik )
-                            neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , max_treelevel+1_ik )
-                            neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , max_treelevel+2_ik )
+                        if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
+                            mylevel     = lgt_block( lgt_active(k), Jmax+1 )
+                            neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+1 )
+                            neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+2 )
 
                             if (mylevel == neighbor_level) then
                                 ! me and my neighbor are on the same level
                                 ! As I'd wish to stay where I am, my neighbor is free to go -1,0,+1
-                            elseif (mylevel - neighbor_level == 1_ik) then
+                            elseif (mylevel - neighbor_level == 1) then
                                 ! my neighbor is one level coarser
                                 ! My neighbor can stay or refine, but not coarsen. This case is however handled above (coarsening inhibited)
-                            elseif (neighbor_level - mylevel == 1_ik) then
+                            elseif (neighbor_level - mylevel == 1) then
                                 ! my neighbor is one level finer
-                                if (neighbor_status == +1_ik) then
+                                if (neighbor_status == +1) then
                                     ! neighbor refines (and we cannot inhibt that) so I HAVE TO do so as well
-                                    my_refine_change( k ) = +1_ik
+                                    if (lgt_block( lgt_active(k), Jmax+2 )<+1) then
+                                        lgt_block( lgt_active(k), Jmax+2 ) = max( +1, lgt_block( lgt_active(k), Jmax+2 ) )
+                                        grid_changed = .true.
+                                    endif
                                 end if
                             else
                                 call abort(785879, "ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
@@ -246,38 +247,26 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                         end if ! if neighbor exists
                     end do
                 end if ! my refinement status
-            end if ! mpi responsibile for block
+            end if ! mpi responsible for block
         end do ! loop over blocks
         call toc( params, "ensure_gradedness (processing part)", MPI_Wtime()-t0 )
 
-        ! second: synchronize local refinement changes.
-        ! Now all procs have looked at their blocks, and they may have modified their blocks
-        ! (remove coarsen states, force refinement through neighbors). None of the procs had to
-        ! touch the neighboring blocks, there can be no MPI conflicts.
-        ! So we can simply snynchronize and know what changes have to be made
-        t0 = MPI_wtime()
-        call MPI_Allreduce(my_refine_change(1:lgt_n), refine_change(1:lgt_n), lgt_n, MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
-        call toc( params, "ensure_gradedness (MPI_Allreduce)", MPI_Wtime()-t0 )
 
-        ! -------------------------------------------------------------------------------------
-        ! third: change light data and set grid_changed status
-        ! loop over active blocks
+        ! since not all mpiranks change something in their light data, but all have to perform
+        ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed
+        ! only the blocks it holds, not blocks held by other ranks.
+        test2 = grid_changed
+        call MPI_Allreduce(test2, grid_changed, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, ierr )
+
+
+        !> after locally modifying refinement statusses, we need to synchronize light data
         t0 = MPI_wtime()
-        do k = 1_ik, lgt_n
-            lgt_id = lgt_active(k)
-            ! refinement status changed
-            if ( refine_change(k) > -99_ik ) then
-                ! change light data
-                lgt_block( lgt_id, max_treelevel+2_ik ) = max( lgt_block( lgt_id, max_treelevel+2_ik ), int(refine_change(k), kind=ik) )
-                ! set grid status since if we changed something, we have to repeat the entire process
-                grid_changed = .true.
-            end if
-        end do
-        call toc( params, "ensure_gradedness (apply changes)", MPI_Wtime()-t0 )
+        call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+        call toc( params, "ensure_gradedness (sync_lgt)", MPI_Wtime()-t0 )
 
         ! avoid infinite loops
-        counter = counter + 1_ik
-        if (counter == 10_ik) call abort(785877, "ERROR: unable to build a graded mesh")
+        counter = counter + 1
+        if (counter == 10) call abort(785877, "ERROR: unable to build a graded mesh")
 
     end do ! end do of repeat procedure until grid_changed==.false.
 

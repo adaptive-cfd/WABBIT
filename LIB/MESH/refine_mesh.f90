@@ -68,15 +68,6 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     real(kind=rk)                          :: t0, t1, t2, t_misc
     integer(kind=ik)                       :: k
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
-
     ! start time
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
@@ -86,10 +77,12 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     call refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
     call toc( params, "refine_mesh (refinement_indicator)", MPI_Wtime()-t1 )
 
+
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     t1 = MPI_Wtime()
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
     call toc( params, "refine_mesh (respect_min_max_treelevel)", MPI_Wtime()-t1 )
+
 
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
     !! no way gradedness can be damaged, so we skip the call in this case. However,
@@ -99,6 +92,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
       call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
     endif
     call toc( params, "refine_mesh (ensure_gradedness)", MPI_Wtime()-t1 )
+
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
     !! except if they are already on the highest level. Note that those blocks have
@@ -110,6 +104,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
         call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
     end if
     call toc( params, "refine_mesh (refinement_execute)", MPI_Wtime()-t1 )
+
 
     !> (e) as the grid changed now with the refinement, we have to update the list of
     !! active blocks so other routines can loop just over these active blocks
@@ -124,7 +119,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
          lgt_sortednumlist, hvy_active, hvy_n )
     t_misc = MPI_wtime() - t2
 
-    !> At this point the refinement is done. Since not all blocks are refined, namely only those
+
+    !> (f) At this point the refinement is done. Since not all blocks are refined, namely only those
     !! that were not on Jmax, Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now. EXCEPTION: if the flag force_maxlevel_dealiasing is set
     !! then we force blocks on Jmax to coarsen, even if their details are large. Hence, each refinement
@@ -137,7 +133,6 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
         hvy_active, hvy_n, hvy_work )
         call toc( params, "refine_mesh (balance_load)", MPI_Wtime()-t1 )
 
-
         t2 = MPI_wtime()
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
              hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -148,8 +143,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
         t_misc = t_misc + MPI_wtime() - t2
     endif
 
-!---------------------------------------------------------------------------------------------
-! End of routine
+
     call toc( params, "refine_mesh (lists+neighbors)", t_misc )
     call toc( params, "refine_mesh (TOTAL)", MPI_wtime()-t0 )
 

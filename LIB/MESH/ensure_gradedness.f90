@@ -105,6 +105,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     grid_changed = .true. ! set true to trigger the loop
     counter = 0
 
+
     do while ( grid_changed )
         ! we hope not to set the flag to .true. again in this iteration
         grid_changed = .false.
@@ -132,6 +133,10 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 call find_sisters(params, lgt_id, sisters, lgt_block, lgt_n, lgt_sortednumlist)
                 ! check if all sisters share the -1 status, remove it if they don't
                 call ensure_completeness( params, lgt_block, lgt_id, sisters )
+                ! if the flag is removed, then it is removed only on mpiranks that hold at least
+                ! one of the blocks, but the removal may have consequences everywhere. hence,
+                ! we force the iteration to be executed one more time
+                if (lgt_block(lgt_id , Jmax+2) /= -1)  grid_changed = .true.
             endif
 
             !-----------------------------------------------------------------------
@@ -238,7 +243,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             end if ! refinement status
         end do ! loop over blocks
         call toc( params, "ensure_gradedness (processing part)", MPI_Wtime()-t0 )
-
 
         ! since not all mpiranks change something in their light data, but all have to perform
         ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed

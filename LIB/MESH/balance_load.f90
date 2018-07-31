@@ -73,7 +73,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! free light/heavy data id
     integer(kind=ik)                    :: lgt_free_id, hvy_free_id, lgt_id
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0
+    real(kind=rk)                       :: t0, t1
     ! space filling curve list
     integer(kind=ik), allocatable, save :: sfc_com_list(:,:), sfc_sorted_list(:,:)
     ! hilbert code
@@ -282,6 +282,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             !---------------------------------------------------------------------------------
             ! 1st: calculate space filling curve index for all blocks
             !---------------------------------------------------------------------------------
+            t1 = MPI_wtime()
             do k = 1, lgt_n
                 select case (params%block_distribution)
                 case("sfc_z")
@@ -322,10 +323,12 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             if (lgt_n > 1) then
                 call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
             end if
+            call toc( params, "balance_load (SFC+sort)", MPI_wtime()-t1 )
 
             !---------------------------------------------------------------------------------
             ! 2nd: plan communication
             !---------------------------------------------------------------------------------
+            t1 = MPI_wtime()
             ! proc_dist_id: process responsible for current part of sfc
             ! proc_data_id: process who stores data of sfc element
 
@@ -477,11 +480,14 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     end if
                 end if
             end do
+            call toc( params, "balance_load (comm)", MPI_wtime()-t1 )
 
             !---------------------------------------------------------------------------------
             ! 4th: synchronize light data
             !---------------------------------------------------------------------------------
+            t1 = MPI_wtime()
             call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+            call toc( params, "balance_load (sync_lgt)", MPI_wtime()-t1 )
 
         case default
             write(*,'(80("_"))')
@@ -492,5 +498,5 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     end select
 
     ! timing
-    call toc( params, "balance_load", MPI_wtime()-t0 )
+    call toc( params, "balance_load (TOTAL)", MPI_wtime()-t0 )
 end subroutine balance_load

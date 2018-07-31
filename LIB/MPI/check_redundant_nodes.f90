@@ -47,9 +47,6 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
         call init_ghost_nodes( params )
     endif
 
-    ! if this mpirank has no active blocks, it has nothing to do here.
-    if (hvy_n == 0) return
-
     ! reset status
     stop_status = .false.
 

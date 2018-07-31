@@ -89,7 +89,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     !! in all other indicators, this step is very important.
     t1 = MPI_Wtime()
     if ( indicator /= "everywhere" ) then
-      call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
+      call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+      lgt_sortednumlist, hvy_active, hvy_n )
     endif
     call toc( params, "refine_mesh (ensure_gradedness)", MPI_Wtime()-t1 )
 

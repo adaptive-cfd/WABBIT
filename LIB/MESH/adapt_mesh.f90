@@ -122,7 +122,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n )
         ! CPU timing (only in debug mode)
         call toc( params, "adapt_mesh (ensure_gradedness)", MPI_Wtime()-t0 )
 

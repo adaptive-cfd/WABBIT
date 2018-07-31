@@ -160,7 +160,8 @@ subroutine sparse_to_dense(help, params)
                 lgt_block(lgt_active(k), params%max_treelevel +2) = -1
         end do
         ! this might not be necessary since we start from an admissible grid
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n )
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
             hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -175,7 +176,8 @@ subroutine sparse_to_dense(help, params)
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
                 lgt_block(lgt_active(k), params%max_treelevel +2) = 1
         end do
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n )
         if ( params%threeD_case ) then
             ! 3D:
             call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )

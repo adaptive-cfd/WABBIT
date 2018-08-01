@@ -40,13 +40,11 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
 
     ! local variables
     integer(kind=ik) :: mpisize, mpirank, N, lgt_start, lgt_end, lgt_id, ierr, &
-    buffer_size, lgt_num, buffer_start, k, R, Jmax, treecode_size
+    buffer_size, lgt_num, buffer_start, k, R, Jmax
     ! send/receive buffer for data synchronization
-    integer(kind=1), allocatable, save      :: my_lgt_block_recv_buffer(:,:)
-    ! kind=1 integer copy of light data, which will only hold my data
-    integer(kind=1), allocatable, save      :: my_lgt_block(:, :)
+    integer(kind=ik), allocatable, save     :: my_lgt_block_recv_buffer(:,:)
     integer(kind=ik), allocatable, save     :: proc_lgt_num(:), proc_lgt_start(:)
-    real(kind=rk) :: t0
+    real(kind=rk) :: t0, t1
 
     t0 = MPI_wtime()
 
@@ -57,7 +55,6 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
 
     if (.not.allocated(proc_lgt_num)) allocate( proc_lgt_num(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
-    if (.not.allocated(my_lgt_block)) allocate( my_lgt_block( size(lgt_block,1), size(lgt_block,2)) )
     if (.not.allocated(my_lgt_block_recv_buffer)) allocate( my_lgt_block_recv_buffer( size(lgt_block,1), size(lgt_block,2) ) )
 
     ! ==========================================================================
@@ -75,17 +72,16 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     ! since it includes possibile holes.
     ! ==========================================================================
 
+    t1 = MPI_wtime()
     call proc_to_lgt_data_start_id( lgt_start, mpirank, N )
     ! first we copy the entire part to the new array (here lgt_end === lgt_end2 in the ascii art)
     ! even though we could also try to just copy the interior part
     lgt_end = lgt_start + N - 1
-    ! copy and reduce precision to kind=1 integer
-    my_lgt_block(lgt_start:lgt_end, :) = int( lgt_block(lgt_start:lgt_end, :), kind=1)
 
     ! fetch last used light id, that is the value of lgt_end in the above ascii art
     ! this will be the interval which we have to communicate via MPI
     do lgt_id = lgt_end, lgt_start, -1
-        if (my_lgt_block(lgt_id,1) /= -1) exit
+        if (lgt_block(lgt_id,1) /= -1) exit
     enddo
     lgt_end = lgt_id
     lgt_num = lgt_end - lgt_start + 1
@@ -97,9 +93,15 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     ! this is the global buffer size
     buffer_size = sum(proc_lgt_num)
 
+    buffer_start = sum(proc_lgt_num(1:mpirank)) ! note mpirank 0-based
+    do k = 1, mpisize
+        proc_lgt_start(k) = sum(proc_lgt_num(1:k-1))! + 1
+    enddo
+
+    call toc( params, "synchronize_lgt_data (prep)", MPI_wtime()-t1 )
 
     ! ==========================================================================
-    ! The data in my_lgt_block:
+    ! The data in lgt_block:
     ! mpirank=0 aaaa............................................................
     ! mpirank=1 ..............bbbb..............................................
     ! mpirank=2 ..........................cccccc................................
@@ -118,16 +120,13 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     !
     ! ==========================================================================
 
-    ! fill the buffer
-    buffer_start = sum(proc_lgt_num(1:mpirank)) ! note mpirank 0-based
-    do k = 1, mpisize
-        proc_lgt_start(k) = sum(proc_lgt_num(1:k-1))! + 1
-    enddo
+
 
     ! MPI DATA TRANSFER
+    t1 = MPI_wtime()
     if (refinement_status_only) then
-        call MPI_allgatherv( my_lgt_block(lgt_start, R), lgt_num, MPI_INTEGER1, &
-        my_lgt_block_recv_buffer(1,R), proc_lgt_num, proc_lgt_start, MPI_INTEGER1, &
+        call MPI_allgatherv( lgt_block(lgt_start, R), lgt_num, MPI_INTEGER4, &
+        my_lgt_block_recv_buffer(1,R), proc_lgt_num, proc_lgt_start, MPI_INTEGER4, &
         WABBIT_COMM, ierr)
 
     else
@@ -142,15 +141,15 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
         ! transfer active levels...
         ! do k = 1, size(lgt_block,2)
         do k = 1, Jmax
-            call MPI_allgatherv( my_lgt_block(lgt_start, k), lgt_num, MPI_INTEGER1, &
-            my_lgt_block_recv_buffer(1,k), proc_lgt_num, proc_lgt_start, MPI_INTEGER1, &
+            call MPI_allgatherv( lgt_block(lgt_start, k), lgt_num, MPI_INTEGER4, &
+            my_lgt_block_recv_buffer(1,k), proc_lgt_num, proc_lgt_start, MPI_INTEGER4, &
             WABBIT_COMM, ierr)
         enddo
 
         ! ...and their block level and refinement status
         do k = params%max_treelevel+1, params%max_treelevel+2
-            call MPI_allgatherv( my_lgt_block(lgt_start, k), lgt_num, MPI_INTEGER1, &
-            my_lgt_block_recv_buffer(1, k), proc_lgt_num, proc_lgt_start, MPI_INTEGER1, &
+            call MPI_allgatherv( lgt_block(lgt_start, k), lgt_num, MPI_INTEGER4, &
+            my_lgt_block_recv_buffer(1, k), proc_lgt_num, proc_lgt_start, MPI_INTEGER4, &
             WABBIT_COMM, ierr)
         enddo
 
@@ -160,11 +159,13 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
             my_lgt_block_recv_buffer(1:buffer_size, k) = -1
         enddo
     endif
+    call toc( params, "synchronize_lgt_data (MPI)", MPI_wtime()-t1 )
 
     ! we need to delete the old lgt_block array to avoid any rotting corpses somewhere.
     ! it is a little tricky to see why this is the case, but we found it to be necessary.
     ! basically, if on one mpirank, the last elements get removed, then the synchronized part
     ! gets smaller and the last elements are not overwritten with the copy statement below
+    t1 = MPI_wtime()
     if (.not. refinement_status_only) then
         ! reset only first column
         lgt_block(:,1) = -1
@@ -175,16 +176,17 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     do k = 1, mpisize
         ! proc k-1 has sent data
         if ( proc_lgt_num(k) /= 0 ) then
-            ! write received light data, recover original int precision (kind=ik)
+            ! write received light data
             if (refinement_status_only) then
-                lgt_block( (k-1)*N+1 : (k-1)*N + proc_lgt_num(k), R ) =  &
-                int( my_lgt_block_recv_buffer( sum(proc_lgt_num(1:k-1))+1 : sum(proc_lgt_num(1:k-1))+proc_lgt_num(k), R ), kind=ik)
+                lgt_block( (k-1)*N+1 : (k-1)*N + proc_lgt_num(k), R ) = &
+                my_lgt_block_recv_buffer( sum(proc_lgt_num(1:k-1))+1 : sum(proc_lgt_num(1:k-1))+proc_lgt_num(k), R )
             else
-                lgt_block( (k-1)*N+1 : (k-1)*N + proc_lgt_num(k), : ) =  &
-                int( my_lgt_block_recv_buffer( sum(proc_lgt_num(1:k-1))+1 : sum(proc_lgt_num(1:k-1))+proc_lgt_num(k), : ), kind=ik)
+                lgt_block( (k-1)*N+1 : (k-1)*N + proc_lgt_num(k), : ) = &
+                my_lgt_block_recv_buffer( sum(proc_lgt_num(1:k-1))+1 : sum(proc_lgt_num(1:k-1))+proc_lgt_num(k), : )
             end if
         end if
     end do
+    call toc( params, "synchronize_lgt_data (post)", MPI_wtime()-t1 )
 
-    call toc( params, "synchronize_lgt_data", MPI_wtime()-t0 )
+    call toc( params, "synchronize_lgt_data (TOTAL)", MPI_wtime()-t0 )
 end subroutine

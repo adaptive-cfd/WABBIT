@@ -223,12 +223,12 @@ program main
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
 
-    else
-        ! next write time for reloaded data
-        if (params%write_method .eq. 'fixed_time') then
-            params%next_write_time = time + params%next_write_time
-            params%next_stats_time = time + params%next_stats_time
-        end if
+    end if
+    
+    ! next write time for reloaded data
+    if (params%write_method == 'fixed_time') then
+        params%next_write_time = time + params%next_write_time
+        params%next_stats_time = time + params%next_stats_time
     end if
 
     ! max neighbor num

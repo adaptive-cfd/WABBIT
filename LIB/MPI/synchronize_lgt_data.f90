@@ -40,12 +40,12 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
 
     ! local variables
     integer(kind=ik) :: mpisize, mpirank, N, lgt_start, lgt_end, lgt_id, ierr, &
-    buffer_size, lgt_num, buffer_start, k, R
+    buffer_size, lgt_num, buffer_start, k, R, Jmax, treecode_size
     ! send/receive buffer for data synchronization
-    integer(kind=1), allocatable, save      :: my_lgt_block_send_buffer(:,:), my_lgt_block_recv_buffer(:,:)
+    integer(kind=1), allocatable, save      :: my_lgt_block_recv_buffer(:,:)
     ! kind=1 integer copy of light data, which will only hold my data
     integer(kind=1), allocatable, save      :: my_lgt_block(:, :)
-    integer(kind=ik), allocatable, save     :: proc_lgt_num(:), my_proc_lgt_num(:)
+    integer(kind=ik), allocatable, save     :: proc_lgt_num(:), proc_lgt_start(:)
     real(kind=rk) :: t0
 
     t0 = MPI_wtime()
@@ -56,9 +56,8 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     R = params%max_treelevel+2
 
     if (.not.allocated(proc_lgt_num)) allocate( proc_lgt_num(1:mpisize) )
-    if (.not.allocated(my_proc_lgt_num)) allocate( my_proc_lgt_num(1:mpisize) )
+    if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
     if (.not.allocated(my_lgt_block)) allocate( my_lgt_block( size(lgt_block,1), size(lgt_block,2)) )
-    if (.not.allocated(my_lgt_block_send_buffer)) allocate( my_lgt_block_send_buffer( size(lgt_block,1), size(lgt_block,2) ) )
     if (.not.allocated(my_lgt_block_recv_buffer)) allocate( my_lgt_block_recv_buffer( size(lgt_block,1), size(lgt_block,2) ) )
 
     ! ==========================================================================
@@ -94,17 +93,10 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
 
     ! Next, we figure out how much the union of all the different subsets (lgt_start:lgt_end)
     ! on all the mpiranks.
-    my_proc_lgt_num(:) = 0
-    my_proc_lgt_num(mpirank+1) = lgt_num
-    ! synchronize array
-    call MPI_Allreduce(my_proc_lgt_num, proc_lgt_num, mpisize, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
+    call MPI_allgather(lgt_num, 1, MPI_INTEGER4, proc_lgt_num, 1, MPI_INTEGER4, WABBIT_COMM, ierr )
     ! this is the global buffer size
     buffer_size = sum(proc_lgt_num)
 
-
-    ! ! now we can allocate send/receive buffer arrays
-    ! allocate( my_lgt_block_send_buffer( 1:buffer_size, size(lgt_block,2) ) )
-    ! allocate( my_lgt_block_recv_buffer( buffer_size, size(lgt_block,2) ) )
 
     ! ==========================================================================
     ! The data in my_lgt_block:
@@ -113,7 +105,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     ! mpirank=2 ..........................cccccc................................
     ! mpirank=3 .....................................................dd.........
     !
-    ! We remove most of the holes (in my_lgt_block_send_buffer)
+    ! We remove most of the holes (in my_lgt_block_recv_buffer)
     ! mpirank=0 aaaa............
     ! mpirank=1 ....bbbb........
     ! mpirank=2 ........cccccc..
@@ -127,35 +119,56 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     ! ==========================================================================
 
     ! fill the buffer
-    buffer_start = sum(proc_lgt_num(1:mpirank))
-    my_lgt_block_send_buffer(1:buffer_size,:) = 0
-    my_lgt_block_send_buffer( buffer_start+1 : buffer_start+lgt_num, : ) = my_lgt_block( lgt_start:lgt_end, :)
+    buffer_start = sum(proc_lgt_num(1:mpirank)) ! note mpirank 0-based
+    do k = 1, mpisize
+        proc_lgt_start(k) = sum(proc_lgt_num(1:k-1))! + 1
+    enddo
 
-    ! synchronize the buffer
+    ! MPI DATA TRANSFER
     if (refinement_status_only) then
-        call MPI_Allreduce(my_lgt_block_send_buffer(1:buffer_size,R), my_lgt_block_recv_buffer(1:buffer_size,R),&
-        buffer_size, MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
+        call MPI_allgatherv( my_lgt_block(lgt_start, R), lgt_num, MPI_INTEGER1, &
+        my_lgt_block_recv_buffer(1,R), proc_lgt_num, proc_lgt_start, MPI_INTEGER1, &
+        WABBIT_COMM, ierr)
+
     else
-        call MPI_Allreduce(my_lgt_block_send_buffer(1:buffer_size,:), my_lgt_block_recv_buffer(1:buffer_size,:), buffer_size*size(lgt_block,2), &
-        MPI_INTEGER1, MPI_SUM, WABBIT_COMM, ierr)
+        ! transfer data up to max active level (Note: as lgt_block is NOT synced
+        ! you have to ensure every proc does the same Jmax)
+        Jmax = 0
+        do k = lgt_start, lgt_end
+           Jmax = max(Jmax, lgt_block(k, params%max_treelevel+1) )
+        end do
+        call MPI_ALLREDUCE(MPI_IN_PLACE, Jmax, 1, MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
+
+        ! transfer active levels...
+        ! do k = 1, size(lgt_block,2)
+        do k = 1, Jmax
+            call MPI_allgatherv( my_lgt_block(lgt_start, k), lgt_num, MPI_INTEGER1, &
+            my_lgt_block_recv_buffer(1,k), proc_lgt_num, proc_lgt_start, MPI_INTEGER1, &
+            WABBIT_COMM, ierr)
+        enddo
+
+        ! ...and their block level and refinement status
+        do k = params%max_treelevel+1, params%max_treelevel+2
+            call MPI_allgatherv( my_lgt_block(lgt_start, k), lgt_num, MPI_INTEGER1, &
+            my_lgt_block_recv_buffer(1, k), proc_lgt_num, proc_lgt_start, MPI_INTEGER1, &
+            WABBIT_COMM, ierr)
+        enddo
+
+        ! if we do not transfer all levels, then mark the level after the last transfered
+        ! one as inactive.
+        do k = Jmax+1, params%max_treelevel
+            my_lgt_block_recv_buffer(1:buffer_size, k) = -1
+        enddo
     endif
 
     ! we need to delete the old lgt_block array to avoid any rotting corpses somewhere.
     ! it is a little tricky to see why this is the case, but we found it to be necessary.
     ! basically, if on one mpirank, the last elements get removed, then the synchronized part
     ! gets smaller and the last elements are not overwritten with the copy statement below
-    if (refinement_status_only) then
-        !> \todo We should avoid resetting the entire array, as it can be expensive.
-        !> maybe one can figure out using the input array what must be deleted
-        !lgt_block(:,size(lgt_block,2)) = 0
-        ! not necessary, only refinement status has changed
-    else
-        !> \todo We should avoid resetting the entire array, as it can be expensive.
-        !lgt_block(:,:) = -1
+    if (.not. refinement_status_only) then
         ! reset only first column
         lgt_block(:,1) = -1
     endif
-
 
     ! unpack synchronized buffer into the light data array.
     ! loop over number of procs and reset lgt_block array
@@ -169,7 +182,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
             else
                 lgt_block( (k-1)*N+1 : (k-1)*N + proc_lgt_num(k), : ) =  &
                 int( my_lgt_block_recv_buffer( sum(proc_lgt_num(1:k-1))+1 : sum(proc_lgt_num(1:k-1))+proc_lgt_num(k), : ), kind=ik)
-            endif
+            end if
         end if
     end do
 

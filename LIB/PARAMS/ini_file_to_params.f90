@@ -295,21 +295,7 @@ subroutine ini_file_to_params( params, filename )
     if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
-
-    if (params%rank==0) then
-        write(*,'("INIT: resetting some *.t files.")')
-
-        open (44, file='dt.t', status='replace')
-        close(44)
-        open (44, file='timesteps_info.t', status='replace')
-        close(44)
-        open (44, file='blocks_per_mpirank.t', status='replace')
-        close(44)
-        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
-        close(44)
-        open (44, file='eps_norm.t', status='replace')
-        close(44)
-    endif
+    
 end subroutine ini_file_to_params
 
 

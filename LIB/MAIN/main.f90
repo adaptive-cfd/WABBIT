@@ -224,7 +224,28 @@ program main
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
 
     end if
-    
+
+    if (rank==0 .and. iteration==0) then
+        open (77, file='meanflow.t', status='replace')
+        close(77)
+        open (77, file='forces.t', status='replace')
+        close(77)
+        open (77, file='e_kin.t', status='replace')
+        close(77)
+        open (77, file='enstrophy.t', status='replace')
+        close(77)
+        open (44, file='dt.t', status='replace')
+        close(44)
+        open (44, file='timesteps_info.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
+        close(44)
+        open (44, file='eps_norm.t', status='replace')
+        close(44)
+    endif
+
     ! next write time for reloaded data
     if (params%write_method == 'fixed_time') then
         params%next_write_time = time + params%next_write_time
@@ -348,18 +369,6 @@ program main
         if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
           ! we need to sync ghost nodes for some derived qtys, for sure
           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-
-          ! TODO make this nicer
-          if (iteration==1 .and. rank==0) then
-            open (77, file='meanflow.t', status='replace')
-            close(77)
-            open (77, file='forces.t', status='replace')
-            close(77)
-            open (77, file='e_kin.t', status='replace')
-            close(77)
-            open (77, file='enstrophy.t', status='replace')
-            close(77)
-          endif
 
           call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
           params%next_stats_time = params%next_stats_time + params%tsave_stats

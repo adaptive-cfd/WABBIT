@@ -91,6 +91,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
     ! block distribution
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
+    call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
 
@@ -125,6 +126,8 @@ subroutine ini_file_to_params( params, filename )
     !
     ! time to reach in simulation
     call read_param_mpi(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
+    ! maximum walltime before ending job
+    call read_param_mpi(FILE, 'Time', 'walltime_max', params%walltime_max, 24.0_rk*7-0_rk )
     ! number of time steps to be performed. default value is very large, so if not set
     ! the limit will not be reached
     call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
@@ -295,7 +298,7 @@ subroutine ini_file_to_params( params, filename )
     if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
-    
+
 end subroutine ini_file_to_params
 
 

@@ -119,9 +119,9 @@ program main
     integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, t4
+    real(kind=rk)                       :: sub_t0, t4, tstart
     ! decide if data is saved or not
-    logical                             :: it_is_time_to_save_data, test_failed
+    logical                             :: it_is_time_to_save_data, test_failed, keep_running=.true.
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -157,6 +157,7 @@ program main
     ! start time
     sub_t0 = MPI_Wtime()
     call cpu_time(t0)
+    tstart = MPI_wtime()
 
 
     ! unit test off
@@ -267,8 +268,9 @@ program main
     ! main time loop
     !---------------------------------------------------------------------------
     if (rank==0) write(*,*) "starting main time loop"
+    keep_running = .true.
 
-    do while ( time<params%time_max .and. iteration<params%nt)
+    do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
         t2 = MPI_wtime()
 
         ! new iteration
@@ -413,6 +415,12 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
              close(14)
         end if
+
+        ! walltime limiter
+        if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
+            if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
+            keep_running = .false.
+        endif
 
 
     end do

@@ -169,7 +169,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
-    if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load) then
+    if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load .or. time<1.0e-10_rk) then
         t0 = MPI_Wtime()
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
         call toc( params, "adapt_mesh (balance_load)", MPI_Wtime()-t0 )

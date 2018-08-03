@@ -69,7 +69,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     real(kind=rk)                       :: t0, t1, t_misc
     ! MPI error variable
     integer(kind=ik)                    :: ierr
-    logical::test
+    integer(kind=ik), save              :: counter=0
+    logical, save                       :: never_balanced_load=.true.
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -187,27 +188,30 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
-    t0 = MPI_Wtime()
-    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
-    call toc( params, "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
+    if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load .or. time<1.0e-10_rk) then
+        t0 = MPI_Wtime()
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
+        call toc( params, "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
+        never_balanced_load = .false.
 
-    !> load balancing destroys the lists again, so we have to create them one last time to
-    !! end on a valid mesh
-    !! update lists of active blocks (light and heavy data)
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    t0 = MPI_wtime()
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    t_misc = t_misc + (MPI_Wtime() - t0)
+        !> load balancing destroys the lists again, so we have to create them one last time to
+        !! end on a valid mesh
+        !! update lists of active blocks (light and heavy data)
+        ! update list of sorted nunmerical treecodes, used for finding blocks
+        t0 = MPI_wtime()
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        t_misc = t_misc + (MPI_Wtime() - t0)
 
 
-    ! update neighbor relations
-    t0 = MPI_Wtime()
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-    ! CPU timing (only in debug mode)
-    call toc( params, "adapt_mesh (update neighbors) ", MPI_Wtime()-t0 )
-
+        ! update neighbor relations
+        t0 = MPI_Wtime()
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        ! CPU timing (only in debug mode)
+        call toc( params, "adapt_mesh (update neighbors) ", MPI_Wtime()-t0 )
+    endif
 
     ! time remaining parts of this routine.
     call toc( params, "adapt_mesh (lists)", t_misc )
     call toc( params, "adapt_mesh (TOTAL)", MPI_wtime()-t1)
+    counter = counter + 1
 end subroutine adapt_mesh

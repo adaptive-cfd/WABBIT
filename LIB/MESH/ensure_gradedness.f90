@@ -258,7 +258,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
         ! avoid infinite loops
         counter = counter + 1
-        if (counter == 10) call abort(785877, "ERROR: unable to build a graded mesh")
+        if (counter == 10*params%max_treelevel) call abort(785877, "ERROR: unable to build a graded mesh")
 
     end do ! end do of repeat procedure until grid_changed==.false.
 

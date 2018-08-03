@@ -119,9 +119,9 @@ program main
     integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, t4
+    real(kind=rk)                       :: sub_t0, t4, tstart
     ! decide if data is saved or not
-    logical                             :: it_is_time_to_save_data, test_failed
+    logical                             :: it_is_time_to_save_data, test_failed, keep_running=.true.
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -157,6 +157,7 @@ program main
     ! start time
     sub_t0 = MPI_Wtime()
     call cpu_time(t0)
+    tstart = MPI_wtime()
 
 
     ! unit test off
@@ -223,12 +224,33 @@ program main
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
 
-    else
-        ! next write time for reloaded data
-        if (params%write_method .eq. 'fixed_time') then
-            params%next_write_time = time + params%next_write_time
-            params%next_stats_time = time + params%next_stats_time
-        end if
+    end if
+
+    if (rank==0 .and. iteration==0) then
+        open (77, file='meanflow.t', status='replace')
+        close(77)
+        open (77, file='forces.t', status='replace')
+        close(77)
+        open (77, file='e_kin.t', status='replace')
+        close(77)
+        open (77, file='enstrophy.t', status='replace')
+        close(77)
+        open (44, file='dt.t', status='replace')
+        close(44)
+        open (44, file='timesteps_info.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
+        close(44)
+        open (44, file='eps_norm.t', status='replace')
+        close(44)
+    endif
+
+    ! next write time for reloaded data
+    if (params%write_method == 'fixed_time') then
+        params%next_write_time = time + params%next_write_time
+        params%next_stats_time = time + params%next_stats_time
     end if
 
     ! max neighbor num
@@ -246,8 +268,9 @@ program main
     ! main time loop
     !---------------------------------------------------------------------------
     if (rank==0) write(*,*) "starting main time loop"
+    keep_running = .true.
 
-    do while ( time<params%time_max .and. iteration<params%nt)
+    do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
         t2 = MPI_wtime()
 
         ! new iteration
@@ -349,18 +372,6 @@ program main
           ! we need to sync ghost nodes for some derived qtys, for sure
           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-          ! TODO make this nicer
-          if (iteration==1 .and. rank==0) then
-            open (77, file='meanflow.t', status='replace')
-            close(77)
-            open (77, file='forces.t', status='replace')
-            close(77)
-            open (77, file='e_kin.t', status='replace')
-            close(77)
-            open (77, file='enstrophy.t', status='replace')
-            close(77)
-          endif
-
           call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
           params%next_stats_time = params%next_stats_time + params%tsave_stats
         endif
@@ -404,6 +415,12 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
              close(14)
         end if
+
+        ! walltime limiter
+        if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
+            if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
+            keep_running = .false.
+        endif
 
 
     end do

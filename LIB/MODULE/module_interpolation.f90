@@ -344,40 +344,40 @@ contains
     end subroutine prediction_3D
 
 
-    subroutine prediction1D(coarse, fine)
-
-        implicit none
-
-        real(kind=rk), dimension(1:), intent(out) :: fine
-        real(kind=rk), dimension(1:), intent(in) :: coarse
-
-        integer(kind=ik) :: k, nfine, ncoarse
-        real(kind=rk) :: a, b
-
-        ncoarse = size(coarse,1)
-        nfine = size(fine,1)
-
-        if ( 2*ncoarse-1 /= nfine ) then
-          call abort(888197,"ERROR: prediction1d: arrays wrongly sized..")
-        endif
-
-        ! this is the multiresolution predition operator.
-        ! it pushes a signal from a coarser level to the next higher by
-        ! interpolation
-
-        fine(1:nfine:2) = coarse(:)
-
-        ! fourth order:
-        a = 9.0_rk/16.0_rk
-        b =-1.0_rk/16.0_rk
-
-        fine(2)     = (5.0_rk/16.0_rk)*coarse(1)+(15.0_rk/16.0_rk)*coarse(2)-(5.0_rk/16.0_rk)*coarse(3)+(1.0_rk/16.0_rk)*coarse(4)
-        fine(nfine-1) = (1.0_rk/16.0_rk)*coarse(ncoarse-3) -(5.0_rk/16.0_rk)*coarse(ncoarse-2) +(15.0_rk/16.0_rk)*coarse(ncoarse-1) +(5.0_rk/16.0_rk)*coarse(ncoarse)
-
-        do k = 2, ncoarse-2
-            fine(2*k) = a*coarse(k)+a*coarse(k+1)+b*coarse(k-1)+b*coarse(k+2)
-        end do
-
-    end subroutine prediction1D
+    ! subroutine prediction1D(coarse, fine)
+    !
+    !     implicit none
+    !
+    !     real(kind=rk), dimension(1:), intent(out) :: fine
+    !     real(kind=rk), dimension(1:), intent(in) :: coarse
+    !
+    !     integer(kind=ik) :: k, nfine, ncoarse
+    !     real(kind=rk) :: a, b
+    !
+    !     ncoarse = size(coarse,1)
+    !     nfine = size(fine,1)
+    !
+    !     if ( 2*ncoarse-1 /= nfine ) then
+    !       call abort(888197,"ERROR: prediction1d: arrays wrongly sized..")
+    !     endif
+    !
+    !     ! this is the multiresolution predition operator.
+    !     ! it pushes a signal from a coarser level to the next higher by
+    !     ! interpolation
+    !
+    !     fine(1:nfine:2) = coarse(:)
+    !
+    !     ! fourth order:
+    !     a = 9.0_rk/16.0_rk
+    !     b =-1.0_rk/16.0_rk
+    !
+    !     fine(2)     = (5.0_rk/16.0_rk)*coarse(1)+(15.0_rk/16.0_rk)*coarse(2)-(5.0_rk/16.0_rk)*coarse(3)+(1.0_rk/16.0_rk)*coarse(4)
+    !     fine(nfine-1) = (1.0_rk/16.0_rk)*coarse(ncoarse-3) -(5.0_rk/16.0_rk)*coarse(ncoarse-2) +(15.0_rk/16.0_rk)*coarse(ncoarse-1) +(5.0_rk/16.0_rk)*coarse(ncoarse)
+    !
+    !     do k = 2, ncoarse-2
+    !         fine(2*k) = a*coarse(k)+a*coarse(k+1)+b*coarse(k-1)+b*coarse(k+2)
+    !     end do
+    !
+    ! end subroutine prediction1D
 
 end module

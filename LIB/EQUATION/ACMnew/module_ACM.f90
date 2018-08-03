@@ -47,7 +47,7 @@ module module_acm
   type :: type_params
     real(kind=rk) :: CFL, T_end
     real(kind=rk) :: c_0
-    real(kind=rk) :: C_eta
+    real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu, Lx, Ly, Lz
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3)
@@ -154,6 +154,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
 
 
     ! initial condition

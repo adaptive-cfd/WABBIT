@@ -36,7 +36,7 @@ module module_params
     type type_params
 
         ! maximal time for main time loop
-        real(kind=rk)                                :: time_max=0.0_rk
+        real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
         real(kind=rk)                                :: CFL=0.0_rk
         ! dt
@@ -44,7 +44,7 @@ module module_params
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
         ! data writing frequency
-        integer(kind=ik)                             :: write_freq=0
+        integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
         ! data writing frequency
         character(len=80)                            :: write_method="fixed_time"
         ! data writing frequency

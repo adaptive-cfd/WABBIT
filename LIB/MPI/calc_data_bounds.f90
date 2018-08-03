@@ -100,8 +100,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
 
             ! there's a very simple relation between sender and recver boundarys.
             ! we only need to define the recver bounds
-            i1 = floor( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
-            i2 = ceiling( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
+            i1 = nint( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
+            i2 = nint( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
             ijksend(1:2, i) = (/i1, i2/)
 
             ! NOTE at the moment, we really just computed the upper/lower bounds of the patch

@@ -55,7 +55,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
     integer(kind=ik)                                    :: Bs, g, N_dF, number_blocks,&
-                                                      rank, number_procs
+                                                      rank, number_procs,number_trees
     !> do we have to allocate everything?
     logical, intent(in) :: simulation
     integer(kind=ik)    :: rk_steps
@@ -74,7 +74,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     g               = params%number_ghost_nodes
     N_dF            = params%number_data_fields
     number_procs    = params%number_procs
-
 
     !---------------------------------------------------------------------------------------------
     ! main body

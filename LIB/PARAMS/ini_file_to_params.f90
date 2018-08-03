@@ -65,35 +65,7 @@ subroutine ini_file_to_params( params, filename )
 
     call read_param_mpi(FILE, 'Dimensionality', 'dim', params%dim, 2 )
 
-    !***************************************************************************
-    ! read BLOCK parameters
-    ! read number_block_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
-    ! read number_ghost_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
-    ! read number_blocks
-    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
-
-    ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
-    ! set number of fields in heavy work data
-    ! every datafield has 5 additional fields: old, k1, k2, k3, k4
-    params%number_fields = params%number_data_fields*5
-    ! read threshold value
-    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
-    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
-    ! read treelevel bounds
-    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
-    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
-    ! read switch to turn on|off mesh refinement
-    call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
-    call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
-    call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
-    ! block distribution
-    call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
-    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
-    call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
-
+    call init_blocks(params,FILE)
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.
@@ -341,5 +313,54 @@ end subroutine ini_file_to_params
     endif
 
   end subroutine init_MPI
+
+!!!!-------------------------------------------------------------------------!!!!
+
+
+!> @brief     reads parameters for initializing a bridge from file
+  subroutine init_blocks(params, FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)     :: FILE
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+
+    if (params%rank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Blocks!"
+      write(*,'(" ------------------------")')
+    endif
+
+    !***************************************************************************
+    ! read BLOCK parameters
+    ! read number_block_nodes
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
+    ! read number_ghost_nodes
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
+    ! read number_blocks
+    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
+    ! read number_data_fields
+    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
+    ! set number of fields in heavy work data
+    ! every datafield has 5 additional fields: old, k1, k2, k3, k4
+    params%number_fields = params%number_data_fields*5
+    ! read threshold value
+    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
+    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+    ! read treelevel bounds
+    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
+    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    ! read switch to turn on|off mesh refinement
+    call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
+    call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
+    ! block distribution
+    call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+    call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
+
+
+  end subroutine init_blocks
 
 !!!!-------------------------------------------------------------------------!!!!

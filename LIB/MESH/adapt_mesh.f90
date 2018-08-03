@@ -81,12 +81,31 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     lgt_n_old = 0
     iteration = 0
 
+
+
+
+
     if ( params%threeD_case ) then
         max_neighbors = 56
     else
         max_neighbors = 12
     end if
-
+    ! 2D case:
+    !       |          |         |
+    !   1   |    2     |    3    |  4
+    !       |          |         |
+    ! -----------------------------------
+    !       |                    |
+    !   5   |                    |  6
+    !       |                    |
+    ! ------|       my_rank      |------- 
+    !       |                    |
+    !   7   |                    |  8
+    !       |                    |
+    ! -----------------------------------
+    !       |          |         |
+    !   9   |    10    |    11   |  12
+    !       |          |         |
 !---------------------------------------------------------------------------------------------
 ! main body
 

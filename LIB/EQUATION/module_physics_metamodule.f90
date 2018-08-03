@@ -1,14 +1,14 @@
 !----------------------------------------------------------------
 !> Interface between WABBIT and Physics Modules
-!> This module contains all functions which WABBIT provides to 
+!> This module contains all functions which WABBIT provides to
 !> implement your physics module
-!> \details 
+!> \details
 !> \version 0.5
 !> \author engels
 !----------------------------------------------------------------
 module module_physics_metamodule
 
-    use module_precision
+    use module_globals
     ! at this point, you bind all physics modules into one metamodule, so in the rest
     ! of the code, we just load that. as all other physics modules, it provides some
     ! public routines, at which the corresponding actual physics modules are called
@@ -25,16 +25,16 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,& 
+    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,&
               STATISTICS_meta,FILTER_meta
     !**********************************************************************************************
 
 contains
 
  !-----------------------------------------------------------------------------
- ! main level wrapper routine to read parameters in the physics module. It reads
- ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
- ! the parameter struct for wabbit is not available.
+ !> \brief main level wrapper routine to read parameters in the physics module. It reads
+ !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
+ !> the parameter struct for wabbit is not available.
  subroutine READ_PARAMETERS( physics, filename )
    implicit none
    character(len=*), intent(in) :: physics
@@ -349,7 +349,7 @@ contains
  !-----------------------------------------------------------------------------
  subroutine FILTER_meta( physics, time, u, g, x0, dx, work_array)
    implicit none
-   !> physics type 
+   !> physics type
    character(len=*), intent(in) :: physics
    !> time in physical units
    real(kind=rk), intent (in) :: time
@@ -358,7 +358,7 @@ contains
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-   !> number of ghost nodes 
+   !> number of ghost nodes
    integer, intent(in) :: g
 
    ! for each block, you'll need to know where it lies in physical space. The first

@@ -991,7 +991,7 @@ end subroutine convert2format
 !> \brief reft and right shock values for 1D shock moving with mach to the right
 !> \detail This function converts with the Rankine-Hugoniot Conditions
 !>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
-!>  \f$\rho_R,u_R,p_R\f$ and \f$\u_L\f$ .
+!>  \f$\rho_R,u_R,p_R\f$ and \f$u_L\f$ .
 !> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
 !> author F.Toro
 subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)

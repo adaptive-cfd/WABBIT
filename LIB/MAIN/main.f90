@@ -146,8 +146,8 @@ program main
     params%number_procs=number_procs
     allocate(blocks_per_rank(1:number_procs))
     ! output MPI status
-    params%WABBIT_COMM=MPI_COMM_WORLD
-    call set_mpi_comm_global(MPI_COMM_WORLD)
+    WABBIT_COMM=MPI_COMM_WORLD
+
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs

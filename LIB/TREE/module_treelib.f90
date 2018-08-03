@@ -1,7 +1,7 @@
 !> \file
 module module_treelib
 
-  use module_precision
+  use module_globals
 
 contains
 
@@ -9,9 +9,9 @@ contains
 
   !===============================================================================
 
-  ! from agiven treecode (in the form of an array), we compute a unique integer
-  ! identifier. this can be used to compare two treecodes much faster, and also
-  ! for sorting them in a sorted list
+  !> \brief from agiven treecode (in the form of an array), we compute a unique integer
+  !! identifier. this can be used to compare two treecodes much faster, and also
+  !! for sorting them in a sorted list
   integer(kind=tsize) function treecode2int(treearray)
     implicit none
     integer(kind=ik), intent(in) :: treearray(:)
@@ -32,8 +32,8 @@ contains
 
   !===============================================================================
 
-  ! from an integer, return the first (rightmost) digit and remove it from
-  ! the number
+  !> \brief from an integer, return the first (rightmost) digit and remove it from
+  !! the number
   elemental subroutine pop( number, element )
     implicit none
     integer(kind=tsize), intent(inout) :: number, element
@@ -916,7 +916,7 @@ end subroutine adjacent4
               call adjacent_block_3D(me, neighbor3, '__6/___', level, max_treelevel)
               call adjacent_block_3D(neighbor3, neighbor2, '__5/___', level, max_treelevel)
               call adjacent_block_3D(neighbor2, neighbor, '__2/___', level, max_treelevel)
-              
+
           case default
               call abort(118112, "Lord vader, the treelib does not know the direction")
       end select

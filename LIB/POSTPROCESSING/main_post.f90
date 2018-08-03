@@ -50,9 +50,7 @@ program main_post
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
-    params%WABBIT_COMM  = MPI_COMM_WORLD
-
-    call set_mpi_comm_global(MPI_COMM_WORLD)
+    WABBIT_COMM         = MPI_COMM_WORLD
     ! output MPI status
     if (rank==0) then
         write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"

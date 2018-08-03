@@ -59,7 +59,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     integer(kind=ik)      :: ierr
     integer(kind=ik)      :: treecode_size
     integer(hsize_t)      :: dims_treecode(2)
-    integer(kind=ik)      :: WABBIT_COMM
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -67,7 +66,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! set MPI parameters
     rank         = params%rank
     number_procs = params%number_procs
-    WABBIT_COMM  = params%WABBIT_COMM
     ! grid parameter
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes

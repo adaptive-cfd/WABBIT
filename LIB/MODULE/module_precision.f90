@@ -17,14 +17,9 @@
 
 module module_precision
 
-!---------------------------------------------------------------------------------------------
-! modules
-  use MPI
-!---------------------------------------------------------------------------------------------
+
 ! variables
-
     implicit none
-
     ! define data precision parameters
     integer, parameter, public      :: sngl_prec=selected_real_kind(4)
     integer, parameter, public      :: dble_prec=selected_real_kind(8)
@@ -41,53 +36,9 @@ module module_precision
 
     real(kind=rk),parameter, public :: pi  = 4.0_rk * atan(1.0_rk)
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-   integer(kind=ik)                            :: WABBIT_COMM
-
-    interface abort
-      module procedure abort1, abort2, abort3
-    end interface
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 
-    !> \brief initialize global communicator of WABBIT MPI_World
-    subroutine set_mpi_comm_global(comm)
-        implicit none
-        integer, intent(in) :: comm
-
-        WABBIT_COMM=comm
-    end subroutine set_mpi_comm_global
-
-
-    subroutine abort1(code,msg)
-        implicit none
-        character(len=*), intent(in) :: msg
-        integer(kind=ik), intent(in) :: code
-        integer(kind=ik) :: mpierr
-
-        write(*,*) msg
-        call MPI_ABORT( WABBIT_COMM, code, mpierr)
-    end subroutine
-
-    subroutine abort2(code)
-        implicit none
-        integer(kind=ik), intent(in) :: code
-        integer(kind=ik) :: mpierr
-
-        call MPI_ABORT( WABBIT_COMM, code, mpierr)
-    end subroutine
-
-    subroutine abort3(msg)
-        implicit none
-        character(len=*), intent(in) :: msg
-        integer(kind=ik) :: mpierr
-
-        write(*,*) msg
-        call MPI_ABORT( WABBIT_COMM, 666, mpierr)
-    end subroutine
 
     !-----------------------------------------------------------------------------
     ! convert degree to radiant
@@ -143,13 +94,13 @@ contains
 
         periodize_coordinate = x_glob
 
-        if (x_glob(1)<-box(1)/2.0) periodize_coordinate(1)=x_glob(1)+box(1)
-        if (x_glob(2)<-box(2)/2.0) periodize_coordinate(2)=x_glob(2)+box(2)
-        if (x_glob(3)<-box(3)/2.0) periodize_coordinate(3)=x_glob(3)+box(3)
+        if (x_glob(1)<-box(1)*0.5_rk) periodize_coordinate(1)=x_glob(1)+box(1)
+        if (x_glob(2)<-box(2)*0.5_rk) periodize_coordinate(2)=x_glob(2)+box(2)
+        if (x_glob(3)<-box(3)*0.5_rk) periodize_coordinate(3)=x_glob(3)+box(3)
 
-        if (x_glob(1)>box(1)/2.0) periodize_coordinate(1)=x_glob(1)-box(1)
-        if (x_glob(2)>box(2)/2.0) periodize_coordinate(2)=x_glob(2)-box(2)
-        if (x_glob(3)>box(3)/2.0) periodize_coordinate(3)=x_glob(3)-box(3)
+        if (x_glob(1)>box(1)*0.5_rk) periodize_coordinate(1)=x_glob(1)-box(1)
+        if (x_glob(2)>box(2)*0.5_rk) periodize_coordinate(2)=x_glob(2)-box(2)
+        if (x_glob(3)>box(3)*0.5_rk) periodize_coordinate(3)=x_glob(3)-box(3)
 
     end function
 

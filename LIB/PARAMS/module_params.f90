@@ -83,12 +83,11 @@ module module_params
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
-
         ! number of allocated heavy data fields per process
-        integer(kind=ik)                             :: number_blocks=0
+        integer(kind=ik)                             :: number_blocks=0_ik
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
-        integer(kind=ik)                             :: number_data_fields=0
+        integer(kind=ik)                             :: number_data_fields=0_ik
         integer(kind=ik)                             :: number_fields=0
 
         ! block distribution for load balancing (also used for start distribution)
@@ -123,9 +122,6 @@ module module_params
         integer(kind=ik)                            :: rank=-1
         ! number of processes
         integer(kind=ik)                            :: number_procs=-1
-        ! WABBIT communicator
-        integer(kind=ik)                            :: WABBIT_COMM
-
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------

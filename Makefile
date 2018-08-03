@@ -11,7 +11,7 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_precision.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
+MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90 \
@@ -99,8 +99,13 @@ wabbit: main.f90 $(MOBJS) $(OBJS)
 # Compile modules (module dependency must be specified by hand in
 # Fortran). Objects are specified in MOBJS (module objects).
 
-# first compile precision module
+
+# compile precision module
 $(OBJDIR)/module_precision.o: module_precision.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+# compile module containing all globals
+$(OBJDIR)/module_globals.o: module_globals.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_bridge.o: module_bridge.f90
@@ -116,7 +121,7 @@ $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integrat
 	kineloader.f90 active_grid_winglets.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_bridge.o
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o \
@@ -126,7 +131,7 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_m
 $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_precision.o\
+$(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o\
 	initial_conditions.f90 filter_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -140,12 +145,12 @@ $(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90  $(OBJDIR)/mo
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_precision.o \
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_interpolation.o $(OBJDIR)/module_treelib.o \
@@ -153,17 +158,17 @@ $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o $(OBJDIR)/m
 	allocate_init_debugging.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
+$(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/module_precision.o \
+$(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/module_globals.o \
 	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes_new.o $(OBJDIR)/module_ACM.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
@@ -207,7 +212,7 @@ $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(O
 $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o get_neighbor_treecode.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \

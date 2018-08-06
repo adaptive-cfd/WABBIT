@@ -204,7 +204,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             endif
 
 
-            refinement_status(l) = lgt_block( lgt_active(k), params%max_treelevel+2 )
+            refinement_status(l) = lgt_block( lgt_active(k), params%max_treelevel+idx_refine_sts )
             lgt_ids(l) = lgt_active(k)
 
             ! next block

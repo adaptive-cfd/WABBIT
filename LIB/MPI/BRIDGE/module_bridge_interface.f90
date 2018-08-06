@@ -146,7 +146,7 @@ integer                              :: n,m
     ! number of blocks
     n      = size(lgt_block,1)
     ! number of columns in matrix
-    m        = params%max_treelevel+2
+    m        = params%max_treelevel + idx_refine_sts
 
     ! send number of active and maximal number of blocks
     call MPI_send((/lgt_n/), 1, MPI_integer, &

@@ -1,37 +1,19 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name unit_test_ghost_nodes_synchronization.f90
+!> \brief  unit test for ghost nodes synchronization
 !> \version 0.5
 !> \author msr, engels
-!
-!> \brief  unit test for ghost nodes synchronization
 !> \note input only params struct to this subroutine
 !!       create new light/heavy data arrays here and deallocate them after this function
-!!
-!!
-!! input:    - params \n
-!! output:   -        \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 21/01/17 - create \n
-!! 03/04/17 - major rewrite: no local memory allocation, convergence test is performed \n
-!! 05/04/17 - use the renewed refine_mesh with random indicator
+!! \details
+!! \date 21/01/17 - create
+!! \date 03/04/17 - major rewrite: no local memory allocation, convergence test is performed \n
+!! \date 05/04/17 - use the renewed refine_mesh with random indicator
 !
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
     hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
     !> user defined parameter structure
@@ -132,7 +114,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     if (params%rank == 0) then
         write(*,'(80("-"))')
         write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
-        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel+1))
+        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel + idx_mesh_lvl))
         write(*,'(" ready for testing.")')
     endif
 

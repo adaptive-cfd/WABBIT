@@ -128,7 +128,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             ! -1  -1    -1   0
             ! -1  -1    -1  -1
             ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensure_gradedness routine.
-            if ( lgt_block( lgt_id , Jmax+2 ) == -1) then
+            if ( lgt_block( lgt_id , Jmax + idx_refine_sts ) == -1) then
                 ! find the sisters of this block
                 call find_sisters(params, lgt_id, sisters, lgt_block, lgt_n, lgt_sortednumlist)
                 ! check if all sisters share the -1 status, remove it if they don't
@@ -136,21 +136,21 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
                 ! one of the blocks, but the removal may have consequences everywhere. hence,
                 ! we force the iteration to be executed one more time
-                if (lgt_block(lgt_id , Jmax+2) /= -1)  grid_changed = .true.
+                if (lgt_block(lgt_id , Jmax + idx_refine_sts) /= -1)  grid_changed = .true.
             endif
 
             !-----------------------------------------------------------------------
             ! This block (still) wants to coarsen
             !-----------------------------------------------------------------------
-            if ( lgt_block( lgt_id , Jmax+2 ) == -1) then
+            if ( lgt_block( lgt_id , Jmax + idx_refine_sts ) == -1) then
                 ! loop over all neighbors
                 do i = 1, neighbor_num
                     if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
 
                         ! check neighbor treelevel
-                        mylevel         = lgt_block( lgt_id, Jmax+1 )
-                        neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+1 )
-                        neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+2 )
+                        mylevel         = lgt_block( lgt_id, Jmax + idx_mesh_lvl )
+                        neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + idx_mesh_lvl )
+                        neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + idx_refine_sts )
 
                         if (mylevel == neighbor_level) then
                             ! neighbor on same level
@@ -163,8 +163,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                 ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
                                 ! I have at least to stay on my level.
                                 ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                if (lgt_block( lgt_id, Jmax+2 )<0) then
-                                    lgt_block( lgt_id, Jmax+2 ) = max( 0, lgt_block( lgt_id, Jmax+2 ) )
+                                if (lgt_block( lgt_id, Jmax + idx_refine_sts )<0) then
+                                    lgt_block( lgt_id, Jmax + idx_refine_sts ) = max( 0, lgt_block( lgt_id, Jmax + idx_refine_sts ) )
                                     grid_changed = .true.
                                 endif
 
@@ -184,8 +184,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                             if ( neighbor_status == +1) then
                                 ! ... so I also have to refine (not only can I NOT coarsen, I actually
                                 ! have to refine!)
-                                if (lgt_block( lgt_id, Jmax+2 )<+1) then
-                                    lgt_block( lgt_id, Jmax+2 ) = max( +1, lgt_block( lgt_id, Jmax+2 ) )
+                                if (lgt_block( lgt_id, Jmax + idx_refine_sts )<+1) then
+                                    lgt_block( lgt_id, Jmax + idx_refine_sts ) = max( +1, lgt_block( lgt_id, Jmax + idx_refine_sts ) )
                                     grid_changed = .true.
                                 endif
 
@@ -193,8 +193,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                 ! neighbor wants to stay and I want to coarsen, but
                                 ! I cannot do that (there would be two levels between us)
                                 ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                if (lgt_block( lgt_id, Jmax+2 )<0) then
-                                    lgt_block( lgt_id, Jmax+2 ) = max( 0, lgt_block( lgt_id, Jmax+2 ) )
+                                if (lgt_block( lgt_id, Jmax + idx_refine_sts )<0) then
+                                    lgt_block( lgt_id, Jmax + idx_refine_sts ) = max( 0, lgt_block( lgt_id, Jmax + idx_refine_sts ) )
                                     grid_changed = .true.
                                 endif
 
@@ -211,14 +211,14 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         !-----------------------------------------------------------------------
         ! this block wants to stay on its level
         !-----------------------------------------------------------------------
-        elseif (lgt_block( lgt_id , Jmax+2 ) == 0 .or. lgt_block( lgt_id , Jmax+2 ) == 11 ) then
+        elseif (lgt_block( lgt_id , Jmax + idx_refine_sts ) == 0 .or. lgt_block( lgt_id , Jmax + idx_refine_sts ) == 11 ) then
                 ! loop over all neighbors
                 do i = 1, neighbor_num
                     ! neighbor exists ? If not, this is a bad error
                     if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
-                        mylevel     = lgt_block( lgt_id, Jmax+1 )
-                        neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+1 )
-                        neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax+2 )
+                        mylevel     = lgt_block( lgt_id, Jmax + idx_mesh_lvl )
+                        neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + idx_mesh_lvl )
+                        neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + idx_refine_sts )
 
                         if (mylevel == neighbor_level) then
                             ! me and my neighbor are on the same level
@@ -230,8 +230,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                             ! my neighbor is one level finer
                             if (neighbor_status == +1) then
                                 ! neighbor refines (and we cannot inhibt that) so I HAVE TO do so as well
-                                if (lgt_block( lgt_id, Jmax+2 )<+1) then
-                                    lgt_block( lgt_id, Jmax+2 ) = max( +1, lgt_block( lgt_id, Jmax+2 ) )
+                                if (lgt_block( lgt_id, Jmax + idx_refine_sts )<+1) then
+                                    lgt_block( lgt_id, Jmax + idx_refine_sts ) = max( +1, lgt_block( lgt_id, Jmax + idx_refine_sts ) )
                                     grid_changed = .true.
                                 endif
                             end if

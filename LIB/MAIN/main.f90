@@ -65,8 +65,8 @@ program main
 
     ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
-    !                   -> column(max_treelevel+1): treecode length = mesh level
-    !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    !                   -> column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
+    !                   -> column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: lgt_block(:, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
@@ -202,6 +202,8 @@ program main
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
         hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     endif
+    ! write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
+    ! call abort(25435432,"domain")
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
@@ -212,7 +214,6 @@ program main
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_work )
-
     if (params%initial_cond /= "read_from_files" .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
@@ -291,7 +292,7 @@ program main
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
-
+        write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call MPI_Barrier(WABBIT_COMM,ierr)

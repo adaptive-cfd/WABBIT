@@ -1,29 +1,11 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name get_block_spacing_origin.f90
-!> \version 0.5
 !> \author engels
-!
 !> \brief For any block lgt_id this routine computes, from the treecode stored in
 !! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
 !! and origin are 3D vectors, the third component being zero in a 2D case. \n
 !
-!>
-!! input:
-!!           - params
-!!           - lgt_id (this is the block we look at)
-!!           - lgt_block (this is the list of light block data, which contains the treecode, level (and refinement status, but we don't use that here))
-!!
-!! output:
-!!           - x0(1:3) vector with the origin of the block
-!!           - dx(1:3) spacing on the block
-!!
-!! = log ======================================================================================
-!! \n
-!! 30/03/17 - create
+!! \details
+!! \date 30/03/17 - create
 !
 subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
@@ -43,7 +25,7 @@ subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
   bs = params%number_block_nodes
 
   ! fetch this blocks level:
-  level = lgt_block( lgt_id, params%max_treelevel+1 )
+  level = lgt_block( lgt_id, params%max_treelevel + idx_mesh_lvl )
 
   ! compute its coordinates in ijk space
   call decoding( lgt_block( lgt_id, 1:level ), ix,iy,iz, level)

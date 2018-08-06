@@ -12,7 +12,7 @@ contains
   !> \brief from agiven treecode (in the form of an array), we compute a unique integer
   !! identifier. this can be used to compare two treecodes much faster, and also
   !! for sorting them in a sorted list
-  integer(kind=tsize) function treecode2int(treearray)
+    integer(kind=tsize) function treecode2int(treearray)
     implicit none
     integer(kind=ik), intent(in) :: treearray(:)
     integer(kind=ik) :: N,i
@@ -31,7 +31,6 @@ contains
   end function
 
   !===============================================================================
-
   !> \brief from an integer, return the first (rightmost) digit and remove it from
   !! the number
   elemental subroutine pop( number, element )
@@ -42,8 +41,33 @@ contains
     ! remove it from number
     number = number / 10
   end subroutine
+!===============================================================================
 
 !===============================================================================
+!> \brief convert treecodenumber to treearray
+subroutine treecodenumber2array( number, level, array )
+  implicit none
+  integer(kind=tsize),intent(in):: number
+  integer(kind=ik),intent(in)      :: level
+  integer(kind=ik),intent(inout)   :: array(:)
+  integer(kind=ik)                 :: i
+  integer(kind=tsize)              :: element,tmp
+
+
+  tmp=number
+  array=0
+  i=0
+  do while (tmp .ne. 0 )
+    call pop(tmp,element)
+    array(level-i)=int(element,kind=ik)
+    i=i+1
+  enddo
+
+end subroutine
+!===============================================================================
+
+
+
 
 subroutine adjacent4( treecode, direction, treecode_neighbor)
     implicit none
@@ -923,17 +947,9 @@ end subroutine adjacent4
 
   end subroutine adjacent_block_3D
 
-  !> \file
-  !> \callgraph
-  ! ********************************************************************************************
-  ! WABBIT
-  ! ============================================================================================
-  !> \name decoding.f90
-  !> \version 0.5
-  !
   !> \brief from the treecode (quad/octtree), go back to cartesian coordinates i,j,k
   !
-  !>
+  !> \details
   !! a word on normalization:
   !!
   !! the pair i,j is to be understood on the level the quaterny code k
@@ -1008,34 +1024,45 @@ end subroutine adjacent4
   end subroutine decoding
 
 
-  !> \file
-  !> \callgraph
-  ! ********************************************************************************************
-  ! WABBIT
-  ! ============================================================================================
-  !> \name encoding_2D.f90
-  !> \version 0.4
-  !> \author msr
-  !
-  !> \brief encoding 2D treecode
-  !
-  !> \details input:
-  !!                   - block position varaibles i, j
-  !!                   - number of blocks
-  !!                   - length of treecode in light data
-  !!
-  !!          output:
-  !!                   - treecode
-  !!
-  !> = log ======================================================================================
-  !! \n
-  !! 07/11/16 - switch to v0.4 \n
-  !! 26/01/17 - rename to encoding 2D
-  !
-  ! ********************************************************************************************
+  !> \author PKrah
+  !> \brief encoding from block position (cartesian coordinates) to treecode
+  !! \details
+  !> \note Subroutine works with both 2D and 3D (quad/octtrees)
+  !! \date 3.08.2018 - created from 2D/3D and simplified for d dimensions
+! ix(1)->   0      1     2     3      4     5     6     7
+! ix(2)  ---------------------------------------------------
+!   0    || 000 | 001 | 010 | 011 || 100  | 101 | 110 | 111||
+!        ---------------------------------------------------
+!   1    || 002 | 003 | 012 | 013 || 102  | 103 | 112 | 113||
+!        ---------------------------------------------------
+!   2    || 020 | 021 | 030 | 031 || 120  | 121 | 130 | 131||
+!        ---------------------------------------------------
+!   3    || 022 | 023 | 032 | 033 || 122  | 123 | 132 | 133||
+!        :::::::::::::::::::::::::::::::::::::::::::::::::::
+!   4    || 200 | 201 | 210 | 211 || 300  | 301 | 310 | 311||
+!        ---------------------------------------------------
+!   5    || 202 | 203 | 212 | 213 || 302  | 303 | 312 | 313||
+!       ----------------------------------------------------
+!   6    || 220 | 221 | 230 | 231 || 320  | 321 | 330 | 331||
+!       ----------------------------------------------------
+!   7    || 222 | 223 | 232 | 233 || 322  | 323 | 332 | 333||
+!       ----------------------------------------------------
+! Coordinate Transformation:
+! 1. transformation of the cartesian coordinates from dezimal(basis 10) to binary (basis 2)
+!       ix      = 2^{N-1} c_{N-1} + ... +  2^2 c_2 + 2^1 c_1 + 2^0 c_0 =(c_{N-1},...,c_2,c_1,c_0)_2
+!       example:
+!       ix      =(5,6)_10                 =((101),(110))_2
+! 2. coordinate transformation from cartesian to treecode
+!       ix -> treecode
+!       example for d=2
+!       ((101),(011))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
+!       compare to the quaternary codes in the quadrants above
+!
 
-  subroutine encoding_2D(treecode, i, j, nx, ny, treeN)
 
+
+
+  subroutine encoding(treearray, ix,dimension , block_num, treeN)
   !---------------------------------------------------------------------------------------------
   ! modules
 
@@ -1046,242 +1073,84 @@ end subroutine adjacent4
   ! variables
 
       implicit none
-
+      !> dimension (2 or 3)
+      integer(kind=ik), intent(in)    :: dimension
       !> block position coordinates
-      integer(kind=ik), intent(in)    :: i, j
-      !> number of blocks
-      integer(kind=ik), intent(in)    :: nx, ny
-
-      !> treecode size
-      integer(kind=ik), intent(in)    :: treeN
-      !> treecode
-      integer(kind=ik), intent(out)   :: treecode(treeN)
-
-      ! variables for calculate real treecode length N
-      real(kind=rk)                   :: Jx, Jy
-      integer(kind=ik)                :: N
-
-      ! loop variables
-      integer(kind=ik)                :: k
-
-      ! auxiliary vectors
-      integer(kind=ik), allocatable   :: c(:), d(:)
-
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
-
-      ! real treecode length
-      Jx = log(dble(nx)) / log(2.0_rk)
-      Jy = log(dble(ny)) / log(2.0_rk)
-      N = nint(Jx)
-
-      ! reset output
-      treecode = -1
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
-
-      ! allocate auxiliary vectors
-      allocate( c(N), d(N) )
-
-      ! convert block coordinates into binary numbers
-      call int_to_binary(i-1, N, c)
-      call int_to_binary(j-1, N, d)
-
-      ! loop over binary vectors to calculate treecode
-      do k = 1, N
-          if (c(N-k+1)==0 .and. d(N-k+1)==0) then
-              treecode(k) = 0
-          end if
-          if (c(N-k+1)==0 .and. d(N-k+1)==1) then
-              treecode(k) = 1
-          end if
-          if (c(N-k+1)==1 .and. d(N-k+1)==0) then
-              treecode(k) = 2
-          end if
-          if (c(N-k+1)==1 .and. d(N-k+1)==1) then
-              treecode(k) = 3
-          end if
-      end do
-
-      ! clean up
-      deallocate( c, d )
-
-  end subroutine encoding_2D
-
-
-
-
-  !> \file
-  !> \callgraph
-  ! ********************************************************************************************
-  ! WABBIT
-  ! ============================================================================================
-  !> \name encoding_3D.f90
-  !> \version 0.5
-  !> \author msr
-  !
-  !> \brief encoding 3D treecode
-  !
-  !> \details  input:
-  !!                    - block position varaibles i, j, k
-  !!                    - number of blocks
-  !!                    - length of treecode in light data
-  !!
-  !!           output:
-  !!                    - treecode
-  !!
-  !! = log ======================================================================================
-  !! \n
-  !! 26/01/17 - create
-  !
-  ! ********************************************************************************************
-
-  subroutine encoding_3D(treecode, i, j, k, block_num, treeN)
-
-  !---------------------------------------------------------------------------------------------
-  ! modules
-
-      ! global parameters
-      use module_params
-
-  !---------------------------------------------------------------------------------------------
-  ! variables
-
-      implicit none
-
-      !> block position coordinates
-      integer(kind=ik), intent(in)    :: i, j, k
+      integer(kind=ik), intent(in)    :: ix(dimension)
       !> number of blocks
       integer(kind=ik), intent(in)    :: block_num
-
       !> treecode size
       integer(kind=ik), intent(in)    :: treeN
       !> treecode
-      integer(kind=ik), intent(out)   :: treecode(treeN)
+      integer(kind=ik), intent(out)   :: treearray(treeN)
 
       ! variables for calculate real treecode length N
       real(kind=rk)                   :: Jn
-      integer(kind=ik)                :: N, l
+      integer(kind=ik)                :: N, l,d
 
 
       ! auxiliary vectors
-      integer(kind=ik), allocatable   :: c(:), d(:), e(:), c_flip(:), d_flip(:), e_flip(:)
-
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
-
+      integer(kind=ik), allocatable   :: ix_binary(:)
       ! real treecode length
-      !Jn = log(dble(block_num)) / log(2.0_rk)
-      Jn = log(dble(block_num)) / log(8.0_rk)
+      Jn = log(dble(block_num)) / log(2.0_rk**dimension)
       N  = nint(Jn)
-
       ! set N to 1, for one block decomposition
       if (N==0) N=1
-
       ! reset output
-      treecode = -1
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
-
+      treearray = 0
       ! allocate auxiliary vectors
-      allocate( c(N) )
-      allocate( d(N) )
-      allocate( e(N) )
-      allocate( c_flip(N) )
-      allocate( d_flip(N) )
-      allocate( e_flip(N) )
+      allocate( ix_binary(N) )
+
       ! convert block coordinates into binary numbers
-      call int_to_binary(i-1, N, c_flip)
-      call int_to_binary(j-1, N, d_flip)
-      call int_to_binary(k-1, N, e_flip)
-
-      do l = 1, N
-          e(N+1-l) = e_flip(l)
-          d(N+1-l) = d_flip(l)
-          c(N+1-l) = c_flip(l)
+      do d=1, dimension
+          call int_to_binary(ix(d)-1, N, ix_binary)
+          treearray  =     treearray+ix_binary(1:N)*2**(d-1)
       end do
-
-      ! calculate treecode
-      treecode(1:N) = e*4 + d*2 + c
-
+      ! converts treecodearray to treecode
+      ! if treearray is (00123) the treecode will be 00123+11111=11234
+      !treecode=treecode2int(treearray)
       ! clean up
-      deallocate( c )
-      deallocate( d )
-      deallocate( e )
-      deallocate( c_flip )
-      deallocate( d_flip )
-      deallocate( e_flip )
+      deallocate( ix_binary )
 
-  end subroutine encoding_3D
+  end subroutine encoding
 
-  !> \file
-  !> \callgraph
-  ! ********************************************************************************************
-  ! WABBIT
-  ! ============================================================================================
-  !> \name int_to_binary.f90
-  !> \version 0.4
-  !> \author msr
-  !
+
   !> \brief convert a integer i to binary b \n
   !! binary return as vector with length N
-  !
-  !>
-  !! input:
-  !!           - integer to convert
-  !!           - length of output vector
-  !!
-  !! output:
-  !!           - "binary" vector
-  !!
-  !! = log ======================================================================================
-  !! \n
-  !! 07/11/16 - switch to v0.4
-  ! ********************************************************************************************
-
+  !! \details
+  !!\date 07/11/16 - switch to v0.4
   subroutine int_to_binary(i, N, b)
-
-  !---------------------------------------------------------------------------------------------
-  ! modules
 
       ! global parameters
       use module_params
-
-  !---------------------------------------------------------------------------------------------
-  ! variables
 
       implicit none
 
       !> integer to convert into binary
       integer(kind=ik), intent(in)    :: i
-
       !> length of binary output vector
       integer(kind=ik), intent(in)    :: N
-
       !> output vector
       integer(kind=ik), intent(out)   :: b(N)
-
       ! loop variables
-      integer(kind=ik)                :: j, k
+      integer(kind=ik)                :: j, k, tmp(N)
 
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
 
       j = 1
       b = 0
+      tmp=0
       k = i
 
-  !---------------------------------------------------------------------------------------------
-  ! main body
-
       do while (k > 0)
-          b(j) = mod(k, 2)
+          tmp(j) = mod(k, 2)
           k = int(k/2)
           j = j + 1
       end do
 
+      ! binary has to be flipped to the right order of the basis vectors (2^{N-1},...,2^1,2^0)
+      do j = 1, N
+       b(N+1-j) = tmp(j)
+     end do
   end subroutine int_to_binary
 
 

@@ -19,11 +19,15 @@ module module_globals
  use module_precision
 
   implicit none
-  !> global communicator for WABBIT! is capsuled with private
-  !> use setter and getter functions to change it
+  !> global communicator for WABBIT! Dont use MPI_COMM_WORLD!!!!!
   integer(kind=ik)       :: WABBIT_COMM
-
-
+  ! index of light data quantities lgt_data(block_index,max_treeleve+idx_<quantity>)
+  ! we define the global indices idx_<quantity> here, because it enables us to choose the order of indexing
+  ! if necessary
+  integer, parameter, public  :: idx_refine_sts      = 2 ! refinement status
+  integer, parameter, public  :: idx_tree_nr         = 3 ! number of the tree in the forest
+  integer, parameter, public  :: idx_mesh_lvl        = 1 ! current mesh level of the block
+  integer, parameter, public  :: extra_lgt_fields    = 3 ! number of data fields additionaly to treecode
   !subroutines of this module
   interface abort
       module procedure abort1, abort2, abort3

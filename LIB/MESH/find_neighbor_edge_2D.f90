@@ -83,7 +83,7 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
 ! variables initialization
 
     my_treecode     = lgt_block( light_id, 1:max_treelevel )
-    level           = lgt_block( light_id, max_treelevel + 1 )
+    level           = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
 
     neighborID_sameLevel    = -1
     virt_code1              = -1

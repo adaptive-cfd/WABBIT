@@ -84,7 +84,7 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
 ! variables initialization
 
     my_treecode     = lgt_block( light_id, 1:max_treelevel )
-    level           = lgt_block( light_id, max_treelevel + 1 )
+    level           = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
 
     lvl_down_neighbor = .false.
 

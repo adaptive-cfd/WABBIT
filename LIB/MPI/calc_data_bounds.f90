@@ -59,13 +59,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         ! when crossing the periodic boundary, x0 jumps. It may well happen that the block cannot have
         ! a coarser neighbor in the direction. In this case, we use the SHIFT variable to choose another
         ! one.
-        if (params%dim==3) then
-            call encoding_3D(send_treecode, shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
-            shifts(ishift,3)+(2**J)/2, (2**J)**params%dim, Jmax)
-        else
-            call encoding_2D(send_treecode, shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
-            2**J, 2**J, Jmax)
-        endif
+        call encoding(send_treecode, (/shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
+            shifts(ishift,3)+(2**J)/2/),params%dim, (2**J)**params%dim, J)
 
         ! fetch the neighbors treecode.
         call get_neighbor_treecode( send_treecode, recv_treecode, dir, &

@@ -62,6 +62,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! grid parameter, error variable
     integer(kind=ik)                    :: Bs, g
 
+    integer(kind=1)                    :: surface(3)=0
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -69,7 +70,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! grid parameter
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
-    
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -117,6 +118,14 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
       call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+      if (params%periodic_BC .eqv. .false.) then
+        ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+        call get_adjacent_boundary_surface_normal(lgt_id, lgt_block, params%max_treelevel, surface)
+      endif
+      if (surface(1).ne. 0 .or. surface(2).ne.0) then
+        write(*,*) "surface normal",lgt_block(lgt_id,1:params%max_treelevel)
+      endif
 
       call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
            x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )

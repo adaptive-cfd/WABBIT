@@ -33,6 +33,8 @@ module module_time_step
     ! to call RHS routines:
     use module_physics_metamodule, only : RHS_meta, STATISTICS_meta, FILTER_meta
 
+    use module_boundary_conditions, only: get_adjacent_boundary_surface_normal
+
 !---------------------------------------------------------------------------------------------
 ! variables
 

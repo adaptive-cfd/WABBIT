@@ -149,7 +149,7 @@ contains
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage )
+ subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage)
    implicit none
 
    character(len=*), intent(in) :: physics

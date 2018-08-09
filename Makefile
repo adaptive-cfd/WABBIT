@@ -17,7 +17,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_debug.
 	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
-	module_insects.f90
+	module_insects.f90 module_boundary_conditions.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -26,7 +26,7 @@ VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQ
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
-VPATH += :LIB/EQUATION/insects
+VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -128,6 +128,10 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_m
 	ini_file_to_params.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_boundary_conditions.o: module_boundary_conditions.f90 \
+		$(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
+		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -185,7 +189,7 @@ $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_mpi.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
-	statistics_wrapper.f90 filter_wrapper.f90
+	statistics_wrapper.f90 filter_wrapper.f90 $(OBJDIR)/module_boundary_conditions.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_operators.o \

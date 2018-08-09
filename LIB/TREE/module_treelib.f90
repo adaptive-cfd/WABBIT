@@ -1062,7 +1062,7 @@ end subroutine adjacent4
 
 
 
-  subroutine encoding(treearray, ix,dimension , block_num, treeN)
+  subroutine encoding(treearray, ix, dim , block_num, treeN)
   !---------------------------------------------------------------------------------------------
   ! modules
 
@@ -1074,9 +1074,9 @@ end subroutine adjacent4
 
       implicit none
       !> dimension (2 or 3)
-      integer(kind=ik), intent(in)    :: dimension
+      integer(kind=ik), intent(in)    :: dim
       !> block position coordinates
-      integer(kind=ik), intent(in)    :: ix(dimension)
+      integer(kind=ik), intent(in)    :: ix(dim)
       !> number of blocks
       integer(kind=ik), intent(in)    :: block_num
       !> treecode size
@@ -1092,7 +1092,7 @@ end subroutine adjacent4
       ! auxiliary vectors
       integer(kind=ik), allocatable   :: ix_binary(:)
       ! real treecode length
-      Jn = log(dble(block_num)) / log(2.0_rk**dimension)
+      Jn = log(dble(block_num)) / log(2.0_rk**dim)
       N  = nint(Jn)
       ! set N to 1, for one block decomposition
       if (N==0) N=1
@@ -1102,7 +1102,7 @@ end subroutine adjacent4
       allocate( ix_binary(N) )
 
       ! convert block coordinates into binary numbers
-      do d=1, dimension
+      do d=1, dim
           call int_to_binary(ix(d)-1, N, ix_binary)
           treearray  =     treearray+ix_binary(1:N)*2**(d-1)
       end do

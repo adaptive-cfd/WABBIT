@@ -292,7 +292,7 @@ program main
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
-        write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
+      !  write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call MPI_Barrier(WABBIT_COMM,ierr)

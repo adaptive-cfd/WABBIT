@@ -32,6 +32,8 @@ module module_params
 
     implicit none
 
+
+
     ! global user defined data structure for time independent variables
     type type_params
 
@@ -172,12 +174,16 @@ module module_params
         ! save filter strength sigma
         logical                                     :: save_filter_strength
 
+        ! -------------------------------------------------------------------------------------
+        ! different BC can be assigned to each block
+        ! -------------------------------------------------------------------------------------
+        logical                                     :: periodic_BC=.true.
+
     end type type_params
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
-!---------------------------------------------------------------------------------------------
+
+
 ! main body
 contains
 

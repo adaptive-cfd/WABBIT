@@ -61,15 +61,7 @@ subroutine ini_file_to_params( params, filename )
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
-
-    call read_param_mpi(FILE, 'Dimensionality', 'dim', params%dim, 2 )
-    ! domain size
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', params%Lx, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', params%Ly, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Lz', params%Lz, 1.0_rk )
-    ! saving options.
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
-
+    call ini_domain(params, FILE )
     call ini_blocks(params,FILE)
     call ini_time(params,FILE)
 
@@ -83,6 +75,8 @@ subroutine ini_file_to_params( params, filename )
     ! is set.
 
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
+    ! saving options.
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
     if (params%initial_cond == 'read_from_files') then
         ! read variable names
@@ -255,6 +249,47 @@ end subroutine ini_file_to_params
 
 
 !> @brief     reads parameters for initializing grid parameters
+  subroutine ini_domain(params, FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)     :: FILE
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+
+
+    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+
+
+    if (params%rank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Domain"
+      write(*,'(" -----------------")')
+    endif
+
+
+    call read_param_mpi(FILE, 'Domain', 'dim', params%dim, 2 )
+    if ( params%dim==2 ) then
+          params%threeD_case = .false.
+    elseif(params%dim==3) then
+          params%threeD_case = .true.
+    else
+         call abort(234534,"Hawking: ERROR! The idea of 10 dimensions might sound exciting, &
+         & but they would cause real problems if you forget where you parked your car. Tip: &
+         & Try dim=2 or dim=3 ")
+    endif
+    call read_param_mpi(FILE, 'Domain', 'domain_size', domain_size(1:params%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    params%Lx=domain_size(1)
+    params%Ly=domain_size(2)
+    params%Lz=domain_size(3)
+
+
+    call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
+
+  end subroutine ini_domain
+
+
+!> @brief     reads parameters for initializing grid parameters
   subroutine ini_blocks(params, FILE )
     implicit none
     !> pointer to inifile
@@ -299,7 +334,6 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
-    call read_param_mpi(FILE, 'Blocks', 'periodic_BC', params%periodic_BC, .true. )
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.

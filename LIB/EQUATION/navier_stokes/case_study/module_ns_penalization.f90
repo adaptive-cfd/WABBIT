@@ -49,7 +49,7 @@ module module_ns_penalization
   character(len=80),                 save        :: mask_geometry!273.15_rk
   logical           ,                save        :: smooth_mask, use_sponge
   real(kind=rk)                    , save        :: C_eta_inv,C_sp_inv,L_sponge
-  real(kind=rk),                     save        :: domain_size(3)
+  real(kind=rk),                     save        :: domain_size(3)=0.0_rk
   ! radius of domain (Ly/2)
   real(kind=rk),                     save        :: R_domain
   real(kind=rk),                     save        :: Rs,gamma_
@@ -179,8 +179,7 @@ subroutine init_penalization( params,FILE )
     ! -----------------------------------------------------------------------------
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', mask_geometry, "cylinder")
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', domain_size(1), 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', domain_size(2), 1.0_rk )
+    domain_size=params%domain_size
     call read_param_mpi(FILE,'Sponge', 'C_sponge', C_sp_inv, 0.01_rk )
         ! read adiabatic coefficient
     call read_param_mpi(FILE, 'Navier_Stokes', 'gamma_', gamma_, 0.0_rk )

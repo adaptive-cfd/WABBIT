@@ -90,6 +90,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs,boundary_flag)
     !  1: boundary in the direction +e_i
     ! -1: boundary in the direction - e_i
     ! currently only acessible in the local stage
+    
     integer(kind=1)          , intent(in):: boundary_flag(3)
 
 !---------------------------------------------------------------------------------------------

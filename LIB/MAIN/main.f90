@@ -163,15 +163,13 @@ program main
     ! unit test off
     params%unit_test    = .false.
 
-    ! are we running in 2D or 3D mode? Check that from the command line call.
-    call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
-    call get_command_argument( 2, filename )
+    call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed

@@ -296,6 +296,7 @@ contains
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in)       :: stage
+
     ! when implementing boundary conditions, it is necessary to now if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:

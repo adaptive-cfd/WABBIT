@@ -269,7 +269,7 @@ contains
   ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
   ! from that. Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
-  subroutine RHS_NStokes( time, u, g, x0, dx, rhs, stage )
+  subroutine RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -296,6 +296,16 @@ contains
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in)       :: stage
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=1)          , intent(in):: boundary_flag(3)
+
     ! Area of mean_density
     real(kind=rk)    ,save             :: integral(4),area
 
@@ -359,7 +369,7 @@ contains
 
         select case(params_ns%coordinates)
         case ("cartesian")
-          call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+          call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
         case("cylindrical")
           call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
         case default

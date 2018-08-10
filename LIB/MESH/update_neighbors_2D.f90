@@ -99,6 +99,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
             ! light id
             call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
+
             ! north
             call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
             ! east

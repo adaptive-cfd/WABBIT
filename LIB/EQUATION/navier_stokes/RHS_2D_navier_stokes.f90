@@ -39,7 +39,7 @@
 
 
 !>\brief main function of RHS_2D_navier_stokes
-subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
+subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs,boundary_flag)
 !---------------------------------------------------------------------------------------------
 !
     implicit none
@@ -82,7 +82,15 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
 
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g)
-
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=1)          , intent(in):: boundary_flag(3)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -146,21 +154,16 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
         div_U = div_U + dummy
 
         tau11 = tau11 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
         ! tau22
         tau22 = mu * 2.0_rk * v_y
         tau22 = tau22 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
         ! tau33
         tau33 = 0.0_rk
         tau33 = tau33 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
         ! tau12
         tau12 = mu * ( v_x + u_y )
-
         ! tau13
         tau13 = 0.0_rk
-
         ! tau23
         tau23 = 0.0_rk
 
@@ -254,6 +257,47 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs)
     rhs(:,:,3) = rhs(:,:,3) / phi(:,:,1)
 
     rhs(:,:,3) = rhs(:,:,3) + fric_v
+
+
+
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! NESTED FUNCTIONS
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  ! contains
+  !  IMPLEMENT!!!
+  !
+  !   subroutine  diff(q, dq, direction)
+  !       real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
+  !       real(kind=rk), intent(out)      :: dq(Bs+2*g, Bs+2*g)
+  !       integer                         :: e_i(2)=0_ik
+  !       integer                         :: i
+  !
+  !       e_i(direction) = 1
+  !
+  !
+  !
+  !       !dudx(1,:) = ( u(n-1,:) - 8.0_rk*u(n,:) + 8.0_rk*u(2,:) - u(3,:) ) / (12.0_rk*dx)
+  !       !dudx(2,:) = ( u(n,:)   - 8.0_rk*u(1,:) + 8.0_rk*u(3,:) - u(4,:) ) / (12.0_rk*dx)
+  !       dudx(1,:) = ( u(2,:) - u(1,:) ) / (dx)
+  !       dudx(2,:) = ( u(3,:) - u(1,:) ) / (2.0_rk*dx)
+  !
+  !       forall ( i = g+1 : Bs+g )
+  !          dudx(i,:) = ( u(i-2,:) - 8.0_rk*u(i-1,:) + 8.0_rk*u(i+1,:) - u(i+2,:) ) / (12.0_rk*dx)
+  !       end forall
+  !
+  !       !dudx(n-1,:) = ( u(n-3,:) - 8.0_rk*u(n-2,:) + 8.0_rk*u(n,:) - u(1,:) ) / (12.0_rk*dx)
+  !       !dudx(n,:)   = ( u(n-2,:) - 8.0_rk*u(n-1,:) + 8.0_rk*u(1,:) - u(2,:) ) / (12.0_rk*dx)
+  !       dudx(n-1,:) = ( u(n,:) - u(n-2,:) ) / (2.0_rk*dx)
+  !       dudx(n,:)   = ( u(n,:) - u(n-1,:) ) / (dx)
+  !
+  !   end subroutine diffx_c
+
+
+
+
+
+
 
 
 end subroutine RHS_2D_navier_stokes

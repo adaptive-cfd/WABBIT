@@ -123,12 +123,12 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
         ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
         call get_adjacent_boundary_surface_normal(lgt_id, lgt_block, params%max_treelevel, surface)
       endif
-      if (surface(1).ne. 0 .or. surface(2).ne.0) then
-        write(*,*) "surface normal",lgt_block(lgt_id,1:params%max_treelevel)
-      endif
+      ! if (surface(1).ne. 0 .or. surface(2).ne.0) then
+      !   write(*,*) "surface normal",lgt_block(lgt_id,1:params%max_treelevel)
+      ! endif
 
       call RHS_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
-           x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" )
+           x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" , surface)
     enddo
 
 

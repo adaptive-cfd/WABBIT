@@ -149,7 +149,7 @@ contains
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage)
+ subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage, boundary_flag)
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -178,6 +178,16 @@ contains
    ! use these integral qtys for the actual RHS evaluation.
    character(len=*), intent(in) :: stage
 
+   ! when implementing boundary conditions, it is necessary to now if the local field (block)
+   ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+   ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+   ! boundary_flag(i) can be either 0, 1, -1,
+   !  0: no boundary in the direction +/-e_i
+   !  1: boundary in the direction +e_i
+   ! -1: boundary in the direction - e_i
+   ! currently only acessible in the local stage
+   integer(kind=1),optional          , intent(in):: boundary_flag(3)
+
    select case(physics)
    case ("ACM-new")
      call RHS_ACM( time, u, g, x0, dx,  rhs, stage )
@@ -186,7 +196,7 @@ contains
      call RHS_convdiff( time, u, g, x0, dx, rhs, stage )
 
    case ("navier_stokes")
-     call RHS_NStokes( time, u, g, x0, dx, rhs, stage )
+     call RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
 
    case default
      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)

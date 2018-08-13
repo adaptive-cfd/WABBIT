@@ -109,7 +109,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
         if ( params%threeD_case ) then
             call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,k), block_contains_nan)
         else
-            call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,1,dF,k), block_contains_nan)
+            call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,:,dF,k), block_contains_nan)
         end if
         if (block_contains_nan) call abort(0200, "ERROR: Saved field"//get_dsetname(fname)//" contains NaNs!! I don't want to read from this file!")
     end do

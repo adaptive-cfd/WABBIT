@@ -63,6 +63,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     character(len=80)                               :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: t0, x0(1:3), dx(1:3)
+    logical                                         :: block_is_nan
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
@@ -100,11 +101,10 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! physics modules shall provide an interface for wabbit to know how to label
         ! the components to be stored to hard disk (in the work array)
         call FIELD_NAMES(params%physics_type, k, tmp)
-
         ! create filename
         write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
         ! actual writing
-        call write_field( fname, time, iteration, k, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n)
+        call write_field( fname, time, iteration, k, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n, hvy_active)
 
     enddo
 

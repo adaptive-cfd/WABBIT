@@ -37,7 +37,7 @@ module module_IO
     ! use physics modules to save the data
     use module_physics_metamodule
 
-    use module_helpers, only : check_file_exists
+    use module_helpers, only : check_file_exists, check_NaN
 
 !---------------------------------------------------------------------------------------------
 ! variables

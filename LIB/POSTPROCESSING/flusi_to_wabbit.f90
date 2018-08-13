@@ -122,7 +122,7 @@ subroutine flusi_to_wabbit(help, params)
 
         iteration = 0
         call write_field(file_out, time, iteration, 1, params, lgt_block,&
-            hvy_block, lgt_active, lgt_n, hvy_n)
+            hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
     end if
 
 end subroutine flusi_to_wabbit

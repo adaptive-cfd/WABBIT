@@ -112,7 +112,7 @@ character(len=80)                            :: geometry
                   parameters_delivery, myBridge%commonWorld,  ierr)
 
     !! - receive the domain parameters
-    Domain(:,1)=(/params%Lx,params%Ly,params%Lz/) !> Domain size
+    Domain(:,1)=(/params%domain_size(1),params%domain_size(2),params%domain_size(3)/) !> Domain size
     Domain(:,2)=(/0, 0, 0/)                         !> Domain origin
     call MPI_send(Domain, 6, MPI_double_precision, myBridge%minOtherWorldRank, &
                   parameters_delivery, myBridge%commonWorld, ierr)

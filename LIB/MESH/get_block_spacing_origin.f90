@@ -32,7 +32,7 @@ subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
   ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
   ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
-  dx = 2.0_rk**(-level) * (/params%Lx , params%Ly , params%Lz/) / real(bs-1, kind=rk)
+  dx = 2.0_rk**(-level) * (/params%domain_size(1) , params%domain_size(2) , params%domain_size(3)/) / real(bs-1, kind=rk)
   ! note zero based indexing:
   x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1) ,kind=rk) * dx
 

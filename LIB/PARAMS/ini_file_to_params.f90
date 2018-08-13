@@ -279,9 +279,9 @@ end subroutine ini_file_to_params
          & Try dim=2 or dim=3 ")
     endif
     call read_param_mpi(FILE, 'Domain', 'domain_size', domain_size(1:params%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    params%Lx=domain_size(1)
-    params%Ly=domain_size(2)
-    params%Lz=domain_size(3)
+    params%domain_size(1)=domain_size(1)
+    params%domain_size(2)=domain_size(2)
+    params%domain_size(3)=domain_size(3)
 
 
     call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )

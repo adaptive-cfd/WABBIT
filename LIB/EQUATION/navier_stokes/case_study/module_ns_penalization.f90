@@ -236,7 +236,7 @@ subroutine init_simple_sponge( params,FILE )
     if (use_sponge) then
       call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.1_rk )
       if ( L_sponge<1e-10 ) then
-        L_sponge=0.1*params%Lx
+        L_sponge=0.1*params%domain_size(1)
       end if
       call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_sp_inv, 1.0e-2_rk )
       C_sp_inv=1.0_rk/C_sp_inv

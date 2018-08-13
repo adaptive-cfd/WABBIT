@@ -78,14 +78,14 @@ subroutine flusi_to_wabbit(help, params)
 
         ! set important parameters
         params%max_treelevel=level
-        params%Lx = domain(2)
-        params%Ly = domain(3)
+        params%domain_size(1) = domain(2)
+        params%domain_size(2) = domain(3)
         params%number_block_nodes = Bs
         params%number_ghost_nodes = 1_ik
         params%order_predictor = 'multiresolution_4th'
         if (params%threeD_case) then
             lgt_n = 8_ik**params%max_treelevel
-            params%Lz = domain(1)
+            params%domain_size(3) = domain(1)
         else
             lgt_n = 4_ik**params%max_treelevel
         end if

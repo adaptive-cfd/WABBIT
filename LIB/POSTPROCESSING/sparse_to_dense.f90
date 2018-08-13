@@ -102,9 +102,9 @@ subroutine sparse_to_dense(help, params)
     params%max_treelevel = max(level, tc_length)
     params%min_treelevel = level
     params%number_block_nodes = bs
-    params%Lx = domain(1)
-    params%Ly = domain(2)
-    params%Lz = domain(3)
+    params%domain_size(1) = domain(1)
+    params%domain_size(2) = domain(2)
+    params%domain_size(3) = domain(3)
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case

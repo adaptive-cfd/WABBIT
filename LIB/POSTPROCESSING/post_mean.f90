@@ -70,9 +70,9 @@ subroutine post_mean(params, help)
   params%number_ghost_nodes = 0
   g = 0
   params%max_treelevel = tc_length
-  params%Lx = domain(1)
-  params%Ly = domain(2)
-  params%Lz = domain(3)
+  params%domain_size(1) = domain(1)
+  params%domain_size(2) = domain(2)
+  params%domain_size(3) = domain(3)
   params%number_blocks = 2_ik*lgt_n/params%number_procs
 
   call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
@@ -112,9 +112,9 @@ subroutine post_mean(params, help)
   call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
 
   if (params%threeD_case) then
-    meani = meani / (params%Lx*params%Ly*params%Lz)
+    meani = meani / (params%domain_size(1)*params%domain_size(2)*params%domain_size(3))
   else
-    meani = meani / (params%Lx*params%Ly)
+    meani = meani / (params%domain_size(1)*params%domain_size(2))
   endif
 
   if (rank == 0) then

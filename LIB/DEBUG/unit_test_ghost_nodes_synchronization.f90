@@ -71,9 +71,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     rank = params%rank
 
     ! grid parameter
-    Lx = params%Lx
-    Ly = params%Ly
-    Lz = params%Lz
+    Lx = params%domain_size(1)
+    Ly = params%domain_size(2)
+    Lz = params%domain_size(3)
 
     ! set data dimension
     if ( params%threeD_case ) then

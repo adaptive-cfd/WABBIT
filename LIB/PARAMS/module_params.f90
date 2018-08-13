@@ -105,7 +105,7 @@ module module_params
         character(len=80)                            :: physics_type=""
 
         ! domain length
-        real(kind=rk)                                :: Lx=0.0_rk, Ly=0.0_rk, Lz=0.0_rk
+        real(kind=rk)                                :: domain_size(3)=0.0_rk
 
         ! use third dimension
         logical                                     :: threeD_case=.false.
@@ -191,6 +191,6 @@ contains
     ! various structs holding them
     include "ini_file_to_params.f90"
 
-  
+
 
 end module module_params

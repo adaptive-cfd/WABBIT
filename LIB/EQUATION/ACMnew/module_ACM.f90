@@ -47,7 +47,7 @@ module module_acm
   type :: type_params
     real(kind=rk) :: CFL, T_end
     real(kind=rk) :: c_0
-    real(kind=rk) :: C_eta
+    real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu, Lx, Ly, Lz
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3)
@@ -154,6 +154,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
 
 
     ! initial condition
@@ -187,11 +188,18 @@ contains
       write(*,'(80("<"))')
       write(*,*) "Some information:"
       write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
+
       dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%Lx / real(params_acm%Bs-1, kind=rk)
       nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
       dt_min = params_acm%CFL*dx_min/params_acm%c_0
+
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
+
+      if (params_acm%penalization) then
+          write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+      endif
+
       write(*,'(80("<"))')
     endif
 
@@ -228,14 +236,27 @@ contains
 
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
+    ! temporary array. note this is just one block and hence not important for overall memory consumption
+    real(kind=rk), allocatable, save :: u_mag(:,:,:)
+    real(kind=rk) :: u_eigen
 
+    if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
 
-    ! ususal CFL, neglecting u
-    dt = minval( params_acm%CFL * dx(1:params_acm%dim) / params_acm%c_0 )
+    ! compute square of velocity magnitude
+    if (params_acm%dim == 2) then
+        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2)
+    else
+        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2) + u(:,:,:,3)*u(:,:,:,3)
+    endif
+    ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
+    u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
 
-    ! explicit diffusion (NOTE: valid only for RK4, other time steppers have more
+    ! ususal CFL condition
+    dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+
+    ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
-    if(params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
+    if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
 
     ! just for completeness...this condition should never be active (gamma ~ 1)
     if (params_acm%gamma_p>0) dt = min( dt, 0.99_rk*params_acm%gamma_p )

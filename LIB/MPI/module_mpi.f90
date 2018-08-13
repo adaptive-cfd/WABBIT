@@ -95,6 +95,7 @@ module module_MPI
     ! bounds on sender side. used to avoid one-sided interpolation if desired. They're
     ! global so we can save them easily to the ghosts_bounds.dat file
     integer(kind=ik) :: A, S
+    
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 

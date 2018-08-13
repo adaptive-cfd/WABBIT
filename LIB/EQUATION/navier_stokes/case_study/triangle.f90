@@ -10,7 +10,7 @@ subroutine init_triangle(params,FILE)
   ! read in the angle between the symmetry axis and the triangle side
   call read_param_mpi(FILE, 'VPM', 'angle', triangle%angle, 30.0_rk )
   call read_param_mpi(FILE, 'VPM', 'x_cntr', triangle%x_cntr, (/0.2_rk, 0.5_rk, 0.0_rk/) )
-  call read_param_mpi(FILE, 'VPM', 'length', triangle%length, 0.1*params%Lx )
+  call read_param_mpi(FILE, 'VPM', 'length', triangle%length, 0.1*params%domain_size(1) )
 
   ! convert degrees to radians
   if ( triangle%angle>0.0_rk .and. triangle%angle<90.0_rk ) then
@@ -36,9 +36,9 @@ subroutine init_triangle(params,FILE)
   if (triangle%x_cntr(2)>1.0_rk .or. triangle%x_cntr(2)<0.0_rk ) then
       triangle%x_cntr(2) =0.5_rk
   end if
-  triangle%x_cntr(1)=triangle%x_cntr(1)*params%Lx
-  triangle%x_cntr(2)=triangle%x_cntr(2)*params%Ly
-  triangle%x_cntr(3)=triangle%x_cntr(3)*params%Lz
+  triangle%x_cntr(1)=triangle%x_cntr(1)*params%domain_size(1)
+  triangle%x_cntr(2)=triangle%x_cntr(2)*params%domain_size(2)
+  triangle%x_cntr(3)=triangle%x_cntr(3)*params%domain_size(3)
 
 end subroutine init_triangle
 

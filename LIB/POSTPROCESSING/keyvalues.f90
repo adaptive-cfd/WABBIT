@@ -71,9 +71,9 @@ subroutine keyvalues(fname, params, help)
     params%max_treelevel = tc_length
     params%number_data_fields = 1
     params%number_ghost_nodes = 0
-    params%Lx = domain(1)
-    params%Ly = domain(2)
-    params%Lz = domain(3)
+    params%domain_size(1) = domain(1)
+    params%domain_size(2) = domain(2)
+    params%domain_size(3) = domain(3)
     ! make sure there is enough memory allocated
     params%number_blocks = (dim**2) * (lgt_n/params%number_procs)
 

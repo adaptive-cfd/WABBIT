@@ -2,7 +2,7 @@
 ! Note you must not have any dependencies for this module (other than precision)
 ! in order not to create makefile conflicts.
 module module_helpers
-    use module_precision
+    use module_globals
     use mpi
     implicit none
 

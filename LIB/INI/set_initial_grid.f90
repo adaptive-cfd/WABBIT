@@ -97,6 +97,25 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
+
+        ! even if we read the initial condition from file, we can still adapt it immediately
+        ! so the max error is eps. This is useful if we read a dense field where we already know that
+        ! it contains many zeros. Can be used for wavelet compression tests as well.
+        iter = 0
+        if (adapt) then
+            ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
+            ! adapt-mesh also performs neighbor and active lists updates
+            call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator,  hvy_work )
+
+            iter = iter + 1
+            if (params%rank == 0) then
+              write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') iter, lgt_n, &
+              min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
+            endif
+        endif
+
+
         ! Navier stokes has different statevector (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) then
         ! the statevector saved to file (rho,u,v,p)
         ! we therefore convert it once here

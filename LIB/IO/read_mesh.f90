@@ -59,7 +59,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     integer(kind=ik)      :: ierr
     integer(kind=ik)      :: treecode_size
     integer(hsize_t)      :: dims_treecode(2)
-    integer(kind=ik)      :: WABBIT_COMM
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -67,7 +66,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! set MPI parameters
     rank         = params%rank
     number_procs = params%number_procs
-    WABBIT_COMM  = params%WABBIT_COMM
     ! grid parameter
     Bs   = params%number_block_nodes
     g    = params%number_ghost_nodes
@@ -126,7 +124,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     allocate(block_treecode(1:dims_treecode(1), 1:hvy_n))
     block_treecode = -1
 
-    ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + 2]
+    ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + idx_refine_sts]
     ! array we want to hold, so that all CPU can read from the same file simultaneously
     ! (note zero-based offset):
     lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
@@ -144,9 +142,9 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         ! copy treecode
         lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level
-        lgt_block(lgt_id, params%max_treelevel+1) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+        lgt_block(lgt_id, params%max_treelevel+idx_mesh_lvl) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
-        lgt_block(lgt_id, params%max_treelevel+2) = 0
+        lgt_block(lgt_id, params%max_treelevel+idx_refine_sts) = 0
     end do
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.

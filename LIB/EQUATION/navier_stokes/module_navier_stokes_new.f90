@@ -269,7 +269,7 @@ contains
   ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
   ! from that. Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
-  subroutine RHS_NStokes( time, u, g, x0, dx, rhs, stage )
+  subroutine RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -296,6 +296,17 @@ contains
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in)       :: stage
+
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=1)          , intent(in):: boundary_flag(3)
+
     ! Area of mean_density
     real(kind=rk)    ,save             :: integral(4),area
 
@@ -359,7 +370,7 @@ contains
 
         select case(params_ns%coordinates)
         case ("cartesian")
-          call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+          call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
         case("cylindrical")
           call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
         case default
@@ -991,7 +1002,7 @@ end subroutine convert2format
 !> \brief reft and right shock values for 1D shock moving with mach to the right
 !> \detail This function converts with the Rankine-Hugoniot Conditions
 !>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
-!>  \f$\rho_R,u_R,p_R\f$ and \f$\u_L\f$ .
+!>  \f$\rho_R,u_R,p_R\f$ and \f$u_L\f$ .
 !> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
 !> author F.Toro
 subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)

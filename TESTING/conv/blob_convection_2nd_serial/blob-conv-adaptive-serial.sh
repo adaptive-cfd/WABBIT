@@ -17,7 +17,7 @@ times=(000000000000
 000000050000)
 
 # run actual test
-./wabbit 2D ${params} --memory=2.0GB ${ghosts}
+./wabbit ${params} --memory=2.0GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"

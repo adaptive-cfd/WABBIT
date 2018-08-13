@@ -31,6 +31,8 @@ module module_mesh
     use module_MPI
     ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
     use module_treelib
+    !
+    use module_boundary_conditions
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -132,7 +134,7 @@ contains
     ! routines for creation of an initial grid
     include "create_equidistant_grid.f90"
     include "create_random_grid.f90"
-    
+
     ! allocate and reset all memory required for the gird
     include "reset_grid.f90"
     include "allocate_grid.f90"

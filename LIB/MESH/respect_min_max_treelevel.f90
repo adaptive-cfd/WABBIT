@@ -58,14 +58,14 @@ subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     ! loop over all active blocks
     do k = 1, lgt_n
 
-        if ((lgt_block( lgt_active(k), Jmax+2 ) == +1).and.(lgt_block( lgt_active(k), Jmax+1 ) >= Jmax)) then
+        if ((lgt_block( lgt_active(k), Jmax + idx_refine_sts ) == +1).and.(lgt_block( lgt_active(k), Jmax + idx_mesh_lvl ) >= Jmax)) then
             ! can not refine (set flag to 0 = stay)
-            lgt_block( lgt_active(k), Jmax+2 ) = 0
+            lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
         end if
 
-        if ((lgt_block( lgt_active(k), Jmax+2 ) == -1).and.(lgt_block( lgt_active(k), Jmax+1 ) <= Jmin)) then
+        if ((lgt_block( lgt_active(k), Jmax + idx_refine_sts ) == -1).and.(lgt_block( lgt_active(k), Jmax + idx_mesh_lvl ) <= Jmin)) then
             ! can not coarsen
-            lgt_block( lgt_active(k), Jmax+2 ) = 0
+            lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
         end if
 
     end do

@@ -561,7 +561,7 @@ subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
     c_stencil = (/ -c2, -c1, c1, c2 /);
 
     ! hack: reset boundary nodes
- !   call set_boundary( Bs, g, block_data(:, :, 1, 1), block_data(:, :, 1, 2), block_data(:, :, 1, 3), block_data(:, :, 1, 4), xx0, ddx, params%Lx, params%Ly )
+ !   call set_boundary( Bs, g, block_data(:, :, 1, 1), block_data(:, :, 1, 2), block_data(:, :, 1, 3), block_data(:, :, 1, 4), xx0, ddx, params%domain_size(1), params%domain_size(2) )
     !> \todo make filter interface for different physics modules
     if (.true.) then
         !! CAUTION !!

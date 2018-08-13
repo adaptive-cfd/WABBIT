@@ -211,7 +211,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             endif
 
 
-            refinement_status(l) = lgt_block( lgt_active(k), params%max_treelevel+2 )
+            refinement_status(l) = lgt_block( lgt_active(k), params%max_treelevel+idx_refine_sts )
             lgt_ids(l) = lgt_active(k)
 
             ! next block
@@ -227,7 +227,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     if ( params%threeD_case ) then
         ! 3D data case
         call write_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
-        call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly, params%Lz/))
+        call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2), params%domain_size(3)/))
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%max_treelevel-1,ubounds3D(4)/), block_treecode)
@@ -237,7 +237,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     else
         ! 2D data case
         call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
-        call write_attribute(file_id, "blocks", "domain-size", (/params%Lx, params%Ly/))
+        call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2)/))
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%max_treelevel-1,ubounds2D(3)/), block_treecode)

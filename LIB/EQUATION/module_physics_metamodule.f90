@@ -1,14 +1,14 @@
 !----------------------------------------------------------------
 !> Interface between WABBIT and Physics Modules
-!> This module contains all functions which WABBIT provides to 
+!> This module contains all functions which WABBIT provides to
 !> implement your physics module
-!> \details 
+!> \details
 !> \version 0.5
 !> \author engels
 !----------------------------------------------------------------
 module module_physics_metamodule
 
-    use module_precision
+    use module_globals
     ! at this point, you bind all physics modules into one metamodule, so in the rest
     ! of the code, we just load that. as all other physics modules, it provides some
     ! public routines, at which the corresponding actual physics modules are called
@@ -25,16 +25,16 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,& 
+    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,&
               STATISTICS_meta,FILTER_meta
     !**********************************************************************************************
 
 contains
 
  !-----------------------------------------------------------------------------
- ! main level wrapper routine to read parameters in the physics module. It reads
- ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
- ! the parameter struct for wabbit is not available.
+ !> \brief main level wrapper routine to read parameters in the physics module. It reads
+ !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
+ !> the parameter struct for wabbit is not available.
  subroutine READ_PARAMETERS( physics, filename )
    implicit none
    character(len=*), intent(in) :: physics
@@ -149,7 +149,7 @@ contains
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage )
+ subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage, boundary_flag)
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -178,6 +178,16 @@ contains
    ! use these integral qtys for the actual RHS evaluation.
    character(len=*), intent(in) :: stage
 
+   ! when implementing boundary conditions, it is necessary to now if the local field (block)
+   ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+   ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+   ! boundary_flag(i) can be either 0, 1, -1,
+   !  0: no boundary in the direction +/-e_i
+   !  1: boundary in the direction +e_i
+   ! -1: boundary in the direction - e_i
+   ! currently only acessible in the local stage
+   integer(kind=1),optional          , intent(in):: boundary_flag(3)
+
    select case(physics)
    case ("ACM-new")
      call RHS_ACM( time, u, g, x0, dx,  rhs, stage )
@@ -186,7 +196,7 @@ contains
      call RHS_convdiff( time, u, g, x0, dx, rhs, stage )
 
    case ("navier_stokes")
-     call RHS_NStokes( time, u, g, x0, dx, rhs, stage )
+     call RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
 
    case default
      call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
@@ -349,7 +359,7 @@ contains
  !-----------------------------------------------------------------------------
  subroutine FILTER_meta( physics, time, u, g, x0, dx, work_array)
    implicit none
-   !> physics type 
+   !> physics type
    character(len=*), intent(in) :: physics
    !> time in physical units
    real(kind=rk), intent (in) :: time
@@ -358,7 +368,7 @@ contains
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-   !> number of ghost nodes 
+   !> number of ghost nodes
    integer, intent(in) :: g
 
    ! for each block, you'll need to know where it lies in physical space. The first

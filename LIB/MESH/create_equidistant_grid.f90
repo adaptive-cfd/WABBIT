@@ -125,9 +125,7 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
   !-----------------------------------------------------------------------------
   ! Generate and distribute the blocks
   !-----------------------------------------------------------------------------
-  ! allocate treecode
   allocate( treecode( params%max_treelevel ) )
-
   ! loop over blocks in x,y,z directions (in the 2d case, 3rd loop degenerates)
   ! NOTE: This ordering is necessary for POSTPROCESSING flusi to wabbit!
   do ix = nx, 1, -1
@@ -144,11 +142,8 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
             ! create the new block on that cpu.
             if (params%rank == icpu) then
               ! for this new block, compute the treecode
-              if (params%threeD_case) then
-                call encoding_3D( treecode, ix, iy, iz, num_blocks, params%max_treelevel )
-              else
-                call encoding_2D( treecode, ix, iy, 2**Jmin, 2**Jmin, params%max_treelevel )
-              endif
+
+              call encoding(treecode, (/ix,iy,iz/) ,d , num_blocks, Jmin)
 
               ! on my section of the global light data list, which is the first and last light id I hold?
               call hvy_id_to_lgt_id( lgt_id_first, 1, params%rank, params%number_blocks )
@@ -161,8 +156,9 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
 
               ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
               lgt_block( lgt_id, 1:params%max_treelevel ) = treecode
-              lgt_block( lgt_id, params%max_treelevel+1 ) = Jmin
-              lgt_block( lgt_id, params%max_treelevel+2 ) = 0
+              lgt_block( lgt_id, params%max_treelevel+idx_mesh_lvl ) = Jmin
+              lgt_block( lgt_id, params%max_treelevel+idx_refine_sts ) = 0
+              lgt_block( lgt_id, params%max_treelevel+idx_tree_nr ) = 1
 
               ! reset block data to zero
               hvy_block(:,:,:,:,heavy_id) = real(params%rank, kind=rk)

@@ -40,6 +40,52 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     u = 0.0_rk
 
     select case (params_acm%inicond)
+    case("pressure-blob")
+        if (params_acm%dim==2) then
+            ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
+            do iy = 1, Bs+2*g
+                do ix = 1, Bs+2*g
+                    ! compute x,y coordinates from spacing and origin
+                    x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%Lx/2.0_rk
+                    y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%Ly/2.0_rk
+
+                    if (x<-params_acm%Lx/2.0) x = x + params_acm%Lx
+                    if (x>params_acm%Lx/2.0) x = x - params_acm%Lx
+
+                    if (y<-params_acm%Ly/2.0) y = y + params_acm%Ly
+                    if (y>params_acm%Ly/2.0) y = y - params_acm%Ly
+
+                    ! set actual inicond gauss blob
+                    ! here only for the pressure.
+                    u(ix,iy,:,size(u,4)) = dexp( -( (x)**2 + (y)**2 ) / params_acm%beta )
+                end do
+            end do
+        else
+            ! create gauss pulse
+            do iz = 1, Bs+2*g
+                do iy = 1, Bs+2*g
+                    do ix = 1, Bs+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%Lx/2.0_rk
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%Ly/2.0_rk
+                        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%Lz/2.0_rk
+
+                        if (x<-params_acm%Lx/2.0) x = x + params_acm%Lx
+                        if (x>params_acm%Lx/2.0) x = x - params_acm%Lx
+
+                        if (y<-params_acm%Ly/2.0) y = y + params_acm%Ly
+                        if (y>params_acm%Ly/2.0) y = y - params_acm%Ly
+
+                        if (z<-params_acm%Lz/2.0) z = z + params_acm%Lz
+                        if (z>params_acm%Lz/2.0) z = z - params_acm%Lz
+
+                        ! set actual inicond gauss blob
+                        u(ix,iy,iz,size(u,4)) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_acm%beta )
+                    end do
+                end do
+            end do
+        end if
+
     case("meanflow")
         do idir = 1, params_acm%dim
             u(:,:,:,idir) = params_acm%u_mean_set(idir)

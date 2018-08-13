@@ -143,7 +143,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
     endif
 
     if (3*dx(1)<=0.1_rk*funnel%pump_diameter) then
-      pump_smooth_width = 0.05_rk*funnel%pump_diameter
+      pump_smooth_width = 0.025_rk*funnel%pump_diameter
     else
       pump_smooth_width = 3*h
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
@@ -195,7 +195,7 @@ subroutine add_funnel(penalization, x0, dx, Bs, g ,phi)
             if (chi>0.0_rk) then
               mask(ix,iy,2:3) = mask(ix,iy,2:3)+chi
               !compute velocity profile
-              v_ref=velocity_pump!*jet_stream(abs(x-funnel%pump_x_center),funnel%pump_diameter*0.5_rk,pump_smooth_width)
+              v_ref=velocity_pump*jet_stream(abs(x-funnel%pump_x_center),funnel%pump_diameter*0.5_rk,pump_smooth_width)
                Phi_ref(ix,iy,2) = 0
                C_inv=C_eta_inv
               if (y>R_domain) then

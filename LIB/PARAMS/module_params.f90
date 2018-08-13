@@ -32,11 +32,13 @@ module module_params
 
     implicit none
 
+
+
     ! global user defined data structure for time independent variables
     type type_params
 
         ! maximal time for main time loop
-        real(kind=rk)                                :: time_max=0.0_rk
+        real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
         real(kind=rk)                                :: CFL=0.0_rk
         ! dt
@@ -44,7 +46,7 @@ module module_params
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
         ! data writing frequency
-        integer(kind=ik)                             :: write_freq=0
+        integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
         ! data writing frequency
         character(len=80)                            :: write_method="fixed_time"
         ! data writing frequency
@@ -58,6 +60,7 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk
         logical                                      :: eps_normalized=.false.
+        logical :: force_maxlevel_dealiasing=.false.
         ! minimal level for blocks in data tree
         integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree
@@ -82,12 +85,11 @@ module module_params
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
-
         ! number of allocated heavy data fields per process
-        integer(kind=ik)                             :: number_blocks=0
+        integer(kind=ik)                             :: number_blocks=0_ik
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
-        integer(kind=ik)                             :: number_data_fields=0
+        integer(kind=ik)                             :: number_data_fields=0_ik
         integer(kind=ik)                             :: number_fields=0
 
         ! block distribution for load balancing (also used for start distribution)
@@ -96,9 +98,6 @@ module module_params
         ! debug flag
         logical                                      :: debug=.false.
 
-        ! use non-uniform mesh correction
-        logical                                      :: non_uniform_mesh_correction=.true.
-
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------
@@ -106,7 +105,7 @@ module module_params
         character(len=80)                            :: physics_type=""
 
         ! domain length
-        real(kind=rk)                                :: Lx=0.0_rk, Ly=0.0_rk, Lz=0.0_rk
+        real(kind=rk)                                :: domain_size(3)=0.0_rk
 
         ! use third dimension
         logical                                     :: threeD_case=.false.
@@ -125,9 +124,6 @@ module module_params
         integer(kind=ik)                            :: rank=-1
         ! number of processes
         integer(kind=ik)                            :: number_procs=-1
-        ! WABBIT communicator
-        integer(kind=ik)                            :: WABBIT_COMM
-
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
@@ -178,12 +174,16 @@ module module_params
         ! save filter strength sigma
         logical                                     :: save_filter_strength
 
+        ! -------------------------------------------------------------------------------------
+        ! different BC can be assigned to each block
+        ! -------------------------------------------------------------------------------------
+        logical                                     :: periodic_BC=.true.
+
     end type type_params
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
-!---------------------------------------------------------------------------------------------
+
+
 ! main body
 contains
 
@@ -191,41 +191,6 @@ contains
     ! various structs holding them
     include "ini_file_to_params.f90"
 
-    ! --------------------------------------------------------------------
-    ! currently, wabbit is called ./wabbit 2D params.ini so the decision if we're
-    ! running 2d or 3d is done in the command line call. here we figure that out
-    ! and save the result in the parameter structure.
-    ! --------------------------------------------------------------------
-    subroutine decide_if_running_2D_or_3D(params)
-      implicit none
-      !> user defined parameter structure
-      type (type_params), intent(inout) :: params
 
-      character(len=80) :: dim_number
-
-      ! read number of dimensions from command line
-      call get_command_argument(1, dim_number)
-
-      ! output dimension number
-      if (params%rank==0) then
-          write(*,'(80("_"))')
-          write(*, '("INIT: running ", a3, " case")') dim_number
-      end if
-
-      ! save case dimension in params struct
-      select case(dim_number)
-          case('2D')
-              params%threeD_case = .false.
-              params%dim = 2
-          case('3D')
-              params%threeD_case = .true.
-              params%dim = 3
-          case('--help')
-          case('--h')
-          case default
-              call abort(1,"ERROR: case dimension is wrong")
-      end select
-
-    end subroutine
 
 end module module_params

@@ -47,9 +47,6 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
         call init_ghost_nodes( params )
     endif
 
-    ! if this mpirank has no active blocks, it has nothing to do here.
-    if (hvy_n == 0) return
-
     ! reset status
     stop_status = .false.
 
@@ -87,7 +84,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 call lgt_id_to_hvy_id( hvy_id, neighbor_lgt_id, neighbor_rank, N )
 
                 ! define leveldiff: sender - receiver, so +1 means sender on higher level. sender is active block (me)
-                level_diff = lgt_block( lgt_id, params%max_treelevel+1 ) - lgt_block( neighbor_lgt_id, params%max_treelevel+1 )
+                level_diff = lgt_block( lgt_id, params%max_treelevel + idx_mesh_lvl ) - lgt_block( neighbor_lgt_id, params%max_treelevel + idx_mesh_lvl )
 
                 ijk = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, SENDER)
 
@@ -157,7 +154,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 ! compare data
                 call hvy_id_to_lgt_id( lgt_id, hvy_id, myrank, N )
                 call compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_status, level_diff, &
-                lgt_block(lgt_id, params%max_treelevel+2), treecode2int( lgt_block(lgt_id, 1:params%max_treelevel) ) )
+                lgt_block(lgt_id, params%max_treelevel + idx_refine_sts), treecode2int( lgt_block(lgt_id, 1:params%max_treelevel) ) )
 
                 l = l + 5
             end do

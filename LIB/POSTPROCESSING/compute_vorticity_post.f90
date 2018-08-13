@@ -86,12 +86,11 @@ subroutine compute_vorticity_post(help, params)
     call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, dim)
     params%max_treelevel = tc_length
     params%number_data_fields = dim
-    params%Lx = domain(1)
-    params%Ly = domain(2)
-    params%Lz = domain(3)
+    params%domain_size(1) = domain(1)
+    params%domain_size(2) = domain(2)
+    params%domain_size(3) = domain(3)
     params%number_block_nodes = Bs
     allocate(params%butcher_tableau(1,1))
-    params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case
     params%number_blocks = 4_ik*lgt_n/params%number_procs

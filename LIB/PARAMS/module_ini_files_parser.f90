@@ -16,7 +16,7 @@
 !! \details This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this
 !-------------------------------------------------------------------------------
 module module_ini_files_parser
-  use module_precision
+  use module_globals
 
   ! it sometimes is useful, for codes with equidistant resolution, to specify
   ! values as multiples of grid spacing, mostly for convergence tests and the like

@@ -59,13 +59,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         ! when crossing the periodic boundary, x0 jumps. It may well happen that the block cannot have
         ! a coarser neighbor in the direction. In this case, we use the SHIFT variable to choose another
         ! one.
-        if (params%dim==3) then
-            call encoding_3D(send_treecode, shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
-            shifts(ishift,3)+(2**J)/2, (2**J)**params%dim, Jmax)
-        else
-            call encoding_2D(send_treecode, shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
-            2**J, 2**J, Jmax)
-        endif
+        call encoding(send_treecode, (/shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
+            shifts(ishift,3)+(2**J)/2/),params%dim, (2**J)**params%dim, J)
 
         ! fetch the neighbors treecode.
         call get_neighbor_treecode( send_treecode, recv_treecode, dir, &
@@ -100,8 +95,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
 
             ! there's a very simple relation between sender and recver boundarys.
             ! we only need to define the recver bounds
-            i1 = floor( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
-            i2 = ceiling( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
+            i1 = nint( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
+            i2 = nint( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
             ijksend(1:2, i) = (/i1, i2/)
 
             ! NOTE at the moment, we really just computed the upper/lower bounds of the patch

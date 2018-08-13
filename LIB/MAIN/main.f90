@@ -65,8 +65,8 @@ program main
 
     ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
-    !                   -> column(max_treelevel+1): treecode length = mesh level
-    !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    !                   -> column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
+    !                   -> column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: lgt_block(:, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
@@ -119,9 +119,9 @@ program main
     integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, t4
+    real(kind=rk)                       :: sub_t0, t4, tstart
     ! decide if data is saved or not
-    logical                             :: it_is_time_to_save_data, test_failed
+    logical                             :: it_is_time_to_save_data, test_failed, keep_running=.true.
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -146,8 +146,8 @@ program main
     params%number_procs=number_procs
     allocate(blocks_per_rank(1:number_procs))
     ! output MPI status
-    params%WABBIT_COMM=MPI_COMM_WORLD
-    call set_mpi_comm_global(MPI_COMM_WORLD)
+    WABBIT_COMM=MPI_COMM_WORLD
+
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
@@ -157,20 +157,19 @@ program main
     ! start time
     sub_t0 = MPI_Wtime()
     call cpu_time(t0)
+    tstart = MPI_wtime()
 
 
     ! unit test off
     params%unit_test    = .false.
 
-    ! are we running in 2D or 3D mode? Check that from the command line call.
-    call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
-    call get_command_argument( 2, filename )
+    call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed
@@ -201,6 +200,8 @@ program main
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
         hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     endif
+    ! write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
+    ! call abort(25435432,"domain")
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
@@ -211,9 +212,9 @@ program main
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_work )
-
-    if (params%initial_cond /= "read_from_files") then
-        ! save initial condition to disk (unless we're reading from file in which case this makes no sense)
+    if (params%initial_cond /= "read_from_files" .or. params%adapt_inicond) then
+        ! save initial condition to disk (unless we're reading from file and do not adapt,
+        ! in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -222,12 +223,33 @@ program main
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
 
-    else
-        ! next write time for reloaded data
-        if (params%write_method .eq. 'fixed_time') then
-            params%next_write_time = time + params%next_write_time
-            params%next_stats_time = time + params%next_stats_time
-        end if
+    end if
+
+    if (rank==0 .and. iteration==0) then
+        open (77, file='meanflow.t', status='replace')
+        close(77)
+        open (77, file='forces.t', status='replace')
+        close(77)
+        open (77, file='e_kin.t', status='replace')
+        close(77)
+        open (77, file='enstrophy.t', status='replace')
+        close(77)
+        open (44, file='dt.t', status='replace')
+        close(44)
+        open (44, file='timesteps_info.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank.t', status='replace')
+        close(44)
+        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
+        close(44)
+        open (44, file='eps_norm.t', status='replace')
+        close(44)
+    endif
+
+    ! next write time for reloaded data
+    if (params%write_method == 'fixed_time') then
+        params%next_write_time = time + params%next_write_time
+        params%next_stats_time = time + params%next_stats_time
     end if
 
     ! max neighbor num
@@ -245,8 +267,9 @@ program main
     ! main time loop
     !---------------------------------------------------------------------------
     if (rank==0) write(*,*) "starting main time loop"
+    keep_running = .true.
 
-    do while ( time<params%time_max .and. iteration<params%nt)
+    do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
         t2 = MPI_wtime()
 
         ! new iteration
@@ -267,15 +290,14 @@ program main
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
-
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call MPI_Barrier(WABBIT_COMM,ierr)
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)
+            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, &
+                                    lgt_active, lgt_n, hvy_n,params)
             call MPI_Barrier(WABBIT_COMM,ierr)
         endif
-
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -348,18 +370,6 @@ program main
           ! we need to sync ghost nodes for some derived qtys, for sure
           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-          ! TODO make this nicer
-          if (iteration==1 .and. rank==0) then
-            open (77, file='meanflow.t', status='replace')
-            close(77)
-            open (77, file='forces.t', status='replace')
-            close(77)
-            open (77, file='e_kin.t', status='replace')
-            close(77)
-            open (77, file='enstrophy.t', status='replace')
-            close(77)
-          endif
-
           call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
           params%next_stats_time = params%next_stats_time + params%tsave_stats
         endif
@@ -403,6 +413,12 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
              close(14)
         end if
+
+        ! walltime limiter
+        if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
+            if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
+            keep_running = .false.
+        endif
 
 
     end do

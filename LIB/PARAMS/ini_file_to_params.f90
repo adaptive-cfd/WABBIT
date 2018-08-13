@@ -42,11 +42,10 @@ subroutine ini_file_to_params( params, filename )
     type(inifile)                                   :: FILE
     ! maximum memory available on all cpus
     real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
-    ! power used for dimensionality (d=2 or d=3)
-    integer(kind=ik)                                :: d,i, Nblocks_Jmax, Bs, g, Neqn, Nrk
-    real(kind=rk), dimension(:), allocatable        :: tmp
     ! string read from command line call
     character(len=80)                               :: memstring
+    !
+    integer(kind=ik)                                :: d,i, Nblocks_Jmax, Bs, g, Neqn, Nrk
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -62,94 +61,10 @@ subroutine ini_file_to_params( params, filename )
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
+    call ini_domain(params, FILE )
+    call ini_blocks(params,FILE)
+    call ini_time(params,FILE)
 
-    call read_param_mpi(FILE, 'Dimensionality', 'dim', params%dim, 2 )
-
-    !***************************************************************************
-    ! read BLOCK parameters
-    ! read number_block_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
-    ! read number_ghost_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
-    ! read number_blocks
-    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
-
-    ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
-    ! set number of fields in heavy work data
-    ! every datafield has 5 additional fields: old, k1, k2, k3, k4
-    params%number_fields = params%number_data_fields*5
-    ! read threshold value
-    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
-    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
-    ! read treelevel bounds
-    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
-    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
-    ! read switch to turn on|off mesh refinement
-    call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
-    call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
-    call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
-    ! block distribution
-    call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
-    ! use non-uniform mesh correction
-    call read_param_mpi(FILE, 'Blocks', 'non_uniform_mesh_correction', params%non_uniform_mesh_correction, .true. )
-    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
-
-    ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
-    ! use? in ACM, it can be good NOT to apply it to the pressure.
-    allocate(tmp(1:params%number_data_fields))
-    allocate(params%threshold_state_vector_component(1:params%number_data_fields))
-    ! as default, use ones (all components used for indicator)
-    tmp = 1.0_rk
-    call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
-    do i = 1, params%number_data_fields
-        if (tmp(i)>0.0_rk) then
-            params%threshold_state_vector_component(i) = .true.
-        else
-            params%threshold_state_vector_component(i) = .false.
-        endif
-    enddo
-    deallocate(tmp)
-
-    ! domain size
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', params%Lx, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', params%Ly, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Lz', params%Lz, 1.0_rk )
-
-    ! saving options.
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
-
-
-    !***************************************************************************
-    ! read TIME parameters
-    !
-    ! time to reach in simulation
-    call read_param_mpi(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
-    ! number of time steps to be performed. default value is very large, so if not set
-    ! the limit will not be reached
-    call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
-
-    ! read output write method
-    call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
-    ! read output write frequency
-    call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
-    ! read output write frequency
-    call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
-    ! assume start at time 0.0
-    params%next_write_time = 0.0_rk + params%write_time
-    ! read value of fixed time step
-    call read_param_mpi(FILE, 'Time', 'dt_fixed', params%dt_fixed, 0.0_rk )
-    ! read value of fixed time step
-    call read_param_mpi(FILE, 'Time', 'dt_max', params%dt_max, 0.0_rk )
-    ! read CFL number
-    call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
-    ! read butcher tableau (set default value to RK4)
-    call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, &
-    reshape((/ 0.0_rk, 0.5_rk, 0.5_rk, 1.0_rk, 0.0_rk, &
-    0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk, &
-    0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
-    0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
-    0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
     !**************************************************************************
     ! read INITIAL CONDITION parameters
@@ -160,6 +75,8 @@ subroutine ini_file_to_params( params, filename )
     ! is set.
 
     call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
+    ! saving options.
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
     if (params%initial_cond == 'read_from_files') then
         ! read variable names
@@ -221,7 +138,7 @@ subroutine ini_file_to_params( params, filename )
     ! read MPI parameters
     !
     ! data exchange method
-    call init_MPI(params, FILE )
+    call ini_MPI(params, FILE )
 
 
     ! NOTE: this routine initializes WABBIT AND NOT THE PHYSICS MODULES THEMSELVES!
@@ -296,27 +213,13 @@ subroutine ini_file_to_params( params, filename )
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
-    if (params%rank==0) then
-        write(*,'("INIT: resetting some *.t files.")')
-
-        open (44, file='dt.t', status='replace')
-        close(44)
-        open (44, file='timesteps_info.t', status='replace')
-        close(44)
-        open (44, file='blocks_per_mpirank.t', status='replace')
-        close(44)
-        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
-        close(44)
-        open (44, file='eps_norm.t', status='replace')
-        close(44)
-    endif
 end subroutine ini_file_to_params
 
 
 
 
 !> @brief     reads parameters for initializing a bridge from file
-  subroutine init_MPI(params, FILE )
+  subroutine ini_MPI(params, FILE )
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)     :: FILE
@@ -340,6 +243,163 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'BRIDGE', 'particleCommand', params%particleCommand, "---" )
     endif
 
-  end subroutine init_MPI
+  end subroutine ini_MPI
 
-!!!!-------------------------------------------------------------------------!!!!
+!-------------------------------------------------------------------------!!!!
+
+
+!> @brief     reads parameters for initializing grid parameters
+  subroutine ini_domain(params, FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)     :: FILE
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+
+
+    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+
+
+    if (params%rank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Domain"
+      write(*,'(" -----------------")')
+    endif
+
+
+    call read_param_mpi(FILE, 'Domain', 'dim', params%dim, 2 )
+    if ( params%dim==2 ) then
+          params%threeD_case = .false.
+    elseif(params%dim==3) then
+          params%threeD_case = .true.
+    else
+         call abort(234534,"Hawking: ERROR! The idea of 10 dimensions might sound exciting, &
+         & but they would cause real problems if you forget where you parked your car. Tip: &
+         & Try dim=2 or dim=3 ")
+    endif
+    call read_param_mpi(FILE, 'Domain', 'domain_size', domain_size(1:params%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    params%domain_size(1)=domain_size(1)
+    params%domain_size(2)=domain_size(2)
+    params%domain_size(3)=domain_size(3)
+
+
+    call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
+
+  end subroutine ini_domain
+
+
+!> @brief     reads parameters for initializing grid parameters
+  subroutine ini_blocks(params, FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)     :: FILE
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+    !> power used for dimensionality (d=2 or d=3)
+    integer(kind=ik)                                :: i
+    real(kind=rk), dimension(:), allocatable        :: tmp
+
+    if (params%rank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Blocks"
+      write(*,'(" -----------------")')
+    endif
+
+    ! read number_block_nodes
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
+    ! read number_ghost_nodes
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
+    ! read number_blocks
+    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
+
+    ! read number_data_fields
+    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
+    ! set number of fields in heavy work data
+    ! every datafield has 5 additional fields: old, k1, k2, k3, k4
+    params%number_fields = params%number_data_fields*5
+    ! read threshold value
+    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
+    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+    ! read treelevel bounds
+    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
+    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    ! read switch to turn on|off mesh refinement
+    call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
+    call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
+    ! block distribution
+    call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
+    call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+    call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
+
+    ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
+    ! use? in ACM, it can be good NOT to apply it to the pressure.
+    allocate(tmp(1:params%number_data_fields))
+    allocate(params%threshold_state_vector_component(1:params%number_data_fields))
+    ! as default, use ones (all components used for indicator)
+    tmp = 1.0_rk
+    call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
+    do i = 1, params%number_data_fields
+        if (tmp(i)>0.0_rk) then
+            params%threshold_state_vector_component(i) = .true.
+        else
+            params%threshold_state_vector_component(i) = .false.
+        endif
+    enddo
+    deallocate(tmp)
+
+  end subroutine ini_blocks
+
+  !-------------------------------------------------------------------------!!!!
+
+
+  !> @brief     reads parameters for time stepping
+    subroutine ini_time(params, FILE )
+      implicit none
+      !> pointer to inifile
+      type(inifile) ,intent(inout)     :: FILE
+      !> params structure of WABBIT
+      type(type_params),intent(inout)  :: params
+
+      if (params%rank==0) then
+        write(*,*)
+        write(*,*)
+        write(*,*) "PARAMS: Time"
+        write(*,'(" --------------")')
+      endif
+
+      ! time to reach in simulation
+      call read_param_mpi(FILE, 'Time', 'time_max', params%time_max, 1.0_rk )
+      ! maximum walltime before ending job
+      call read_param_mpi(FILE, 'Time', 'walltime_max', params%walltime_max, 24.0_rk*7-0_rk )
+      ! number of time steps to be performed. default value is very large, so if not set
+      ! the limit will not be reached
+      call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
+
+      ! read output write method
+      call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
+      ! read output write frequency
+      call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
+      ! read output write frequency
+      call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+      ! assume start at time 0.0
+      params%next_write_time = 0.0_rk + params%write_time
+      ! read value of fixed time step
+      call read_param_mpi(FILE, 'Time', 'dt_fixed', params%dt_fixed, 0.0_rk )
+      ! read value of fixed time step
+      call read_param_mpi(FILE, 'Time', 'dt_max', params%dt_max, 0.0_rk )
+      ! read CFL number
+      call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
+      ! read butcher tableau (set default value to RK4)
+      call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, &
+      reshape((/ 0.0_rk, 0.5_rk, 0.5_rk, 1.0_rk, 0.0_rk, &
+      0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk, &
+      0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
+      0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
+      0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
+
+
+    end subroutine ini_time

@@ -99,7 +99,7 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
                 end if
 
                 ! Ux
-                !u(ix, iy, 1, UxF) = 0.05_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params%Ly )
+                !u(ix, iy, 1, UxF) = 0.05_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params%domain_size(2) )
                 u(ix, iy, 1, UxF) = 0.1_rk * dsin( 2.0_rk * pi * ( y - muy  ) )
             end do
         end do

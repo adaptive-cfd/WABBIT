@@ -77,7 +77,6 @@ subroutine sparse_to_dense(help, params)
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
     ! we do not read an ini file, so defaults may not be set.
-    params%non_uniform_mesh_correction = .true. ! This is an important switch for the OLD ghost nodes.
     allocate(params%butcher_tableau(1,1))
     ! we read only one datafield in this routine
     params%number_data_fields  = 1
@@ -103,9 +102,9 @@ subroutine sparse_to_dense(help, params)
     params%max_treelevel = max(level, tc_length)
     params%min_treelevel = level
     params%number_block_nodes = bs
-    params%Lx = domain(1)
-    params%Ly = domain(2)
-    params%Lz = domain(3)
+    params%domain_size(1) = domain(1)
+    params%domain_size(2) = domain(2)
+    params%domain_size(3) = domain(3)
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
@@ -158,11 +157,11 @@ subroutine sparse_to_dense(help, params)
         ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
         do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
-                lgt_block(lgt_active(k), params%max_treelevel +2) = -1
+                lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = -1
         end do
         ! this might not be necessary since we start from an admissible grid
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
-        call ensure_completeness( params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n )
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
             hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -175,9 +174,10 @@ subroutine sparse_to_dense(help, params)
         ! check where refinement is actually needed
         do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                lgt_block(lgt_active(k), params%max_treelevel +2) = 1
+                lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = 1
         end do
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n )
         if ( params%threeD_case ) then
             ! 3D:
             call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )

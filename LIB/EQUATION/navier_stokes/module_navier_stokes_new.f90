@@ -36,12 +36,12 @@ module module_navier_stokes_new
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
-            CONVERT_STATEVECTOR2D, PACK_STATEVECTOR2D, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
+            CONVERT_STATEVECTOR, PACK_STATEVECTOR, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
             STATISTICS_NStokes,FILTER_NSTOKES,convert2format
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  real(kind=rk)        ,save:: dx_min,machspeed
+
 
 
 contains
@@ -52,6 +52,7 @@ contains
   include "RHS_2D_cylinder.f90"
   include "filter_block.f90"
   include "inicond_shear_layer.f90"
+  include "save_data_ns.f90"
 !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -101,33 +102,8 @@ contains
     call init_other_params(params_ns,     FILE )
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
-
-
-    dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly) / real(params_ns%Bs-1, kind=rk)
-
-    if (params_ns%mpirank==0) then
-      write(*,*)
-      write(*,*)
-      write(*,*) "Additional Information"
-      write(*,'(" -----------------------")')
-      nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
-      write(*,'("minimal lattice spacing:",T40,g12.4)') dx_min
-      write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
-
-
-      if (.not. params_ns%inicond=="read_from_files") then
-          machspeed = sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2&
-                      +params_ns%initial_velocity(3)**2) /&
-                      sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
-
-          write(*,'("initial speed of sound:", T40, f6.2)') &
-          sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
-          write(*,'("initial Machnumber:", T40, f6.2)') machspeed
-          write(*,'("Reynolds for Ly:", T40, f12.1)') &
-                    params_ns%initial_density*params_ns%Ly/params_ns%mu0*&
-                    sqrt(params_ns%initial_velocity(1)**2+params_ns%initial_velocity(2)**2+params_ns%initial_velocity(3)**2)
-      endif
-    endif
+    ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
+    call add_info(params_ns)
 
     ! set global parameters pF,rohF, UxF etc
     UzF=-1
@@ -148,119 +124,6 @@ contains
 
 
 
-  !-----------------------------------------------------------------------------
-  ! save data. Since you might want to save derived data, such as the vorticity,
-  ! the divergence etc., which are not in your state vector, this routine has to
-  ! copy and compute what you want to save to the work array.
-  !
-  ! In the main code, save_fields than saves the first N_fields_saved components of the
-  ! work array to file.
-  !
-  ! NOTE that as we have way more work arrays than actual state variables (typically
-  ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
-  !-----------------------------------------------------------------------------
-  subroutine PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work )
-    implicit none
-    ! it may happen that some source terms have an explicit time-dependency
-    ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
-
-    ! block data, containg the state vector. In general a 4D field (3 dims+components)
-    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
-
-    ! as you are allowed to compute the RHS only in the interior of the field
-    ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g
-
-    ! for each block, you'll need to know where it lies in physical space. The first
-    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    ! output in work array.
-    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
-
-    ! output in work array.
-    real(kind=rk), allocatable :: tmp_u(:,:,:,:)
-
-    ! local variables
-    integer(kind=ik) ::  Bs
-
-    Bs = size(u,1)-2*g
-
-
-
-    !
-    ! compute vorticity
-    allocate(tmp_u(size(u,1),size(u,2),size(u,3),size(u,4)))
-
-    if (size(u,3)==1) then
-          ! ---------------------------------
-          ! save all datafields in u
-          work(:,:,:,rhoF) = u(:,:,:,1)**2
-          work(:,:,:,UxF)  = u(:,:,:,2)/u(:,:,:,1)
-          work(:,:,:,UyF)  = u(:,:,:,3)/u(:,:,:,1)
-          work(:,:,:,pF)   = u(:,:,:,4)
-          ! ---------------------------------
-
-        ! only wx,wy (2D - case)
-        call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
-                                 u(:,:,:,UyF)/u(:,:,:,rhoF), &
-                                 0*u(:,:,:,rhoF), &
-                                 dx, Bs, g, params_ns%discretization, &
-                                 tmp_u)
-
-        work(:,:,:,5)=tmp_u(:,:,:,1)
-
-        !write out mask
-        if (params_ns%penalization) then
-          call get_mask(work(:,:,1,6), x0, dx, Bs, g )
-        else
-          work(:,:,1,6)=0.0_rk
-        endif
-
-        if (params_ns%filter%name=="bogey_shock" .and. params_ns%filter%save_filter_strength) then
-            tmp_u=u
-            call filter_block(params_ns%filter, time, tmp_u, Bs, g, x0, dx, work(:,:,:,7:(7+params_ns%N_fields_saved)))
-        endif
-    else
-      call abort(564567,"Error: [module_navier_stokes.f90] 3D case not implemented")
-        ! wx,wy,wz (3D - case)
-   !      call compute_vorticity(  u(:,:,:,UxF)/u(:,:,:,rhoF), &
-   !                               u(:,:,:,UyF)/u(:,:,:,rhoF), &
-   !                               u(:,:,:,UzF)/u(:,:,:,rhoF), &
-   !                               dx, Bs, g, params_ns%discretization, &
-   !                               tmp_u)
-   ! !     work(:,:,:,=tmp_u(:,:,:,1:3)
-    endif
-    deallocate(tmp_u)
-
-    ! mask
-
-  end subroutine
-
-
-  !-----------------------------------------------------------------------------
-  ! when savig to disk, WABBIT would like to know how you named you variables.
-  ! e.g. u(:,:,:,1) is called "ux"
-  !
-  ! the main routine save_fields has to know how you label the stuff you want to
-  ! store from the work array, and this routine returns those strings
-  !-----------------------------------------------------------------------------
-  subroutine FIELD_NAMES_NStokes( N, name )
-    implicit none
-    ! component index
-    integer(kind=ik), intent(in) :: N
-    ! returns the name
-    character(len=80), intent(out) :: name
-
-    if (allocated(params_ns%names)) then
-      name = params_ns%names(N)
-    else
-      call abort(5554,'Something ricked')
-    endif
-
-  end subroutine FIELD_NAMES_NStokes
 
 
   !-----------------------------------------------------------------------------
@@ -340,7 +203,7 @@ contains
       ! called for each block.
       if (params_ns%penalization .and. params_ns%geometry=="funnel") then
         rhs=u
-        call convert_statevector2D(rhs(:,:,1,:),'pure_variables')
+        call convert_statevector(rhs(:,:,:,:),'pure_variables')
         call integrate_over_pump_area(rhs(:,:,1,:),g,Bs,x0,dx,integral,area)
         rhs=0.0_rk
       endif
@@ -672,7 +535,7 @@ contains
     ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
     if ( params_ns%inicond=="read_from_files") then
         if (params_ns%dim==2) then
-        call pack_statevector2D(u(:,:,1,:),'pure_variables')
+        call pack_statevector(u(:,:,:,:),'pure_variables')
       endif
       return
     else
@@ -718,7 +581,7 @@ contains
         call shockVals(rho_init,u_init(1)*0.5_rk,p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
       else
         call moving_shockVals(rho_init,u_init(1),p_init, &
-                             tmp(1),tmp(2),tmp(3),params_ns%gamma_,machspeed)
+                             tmp(1),tmp(2),tmp(3),params_ns%gamma_,params_ns%machnumber)
         params_ns%initial_velocity(1)=u_init(1)
       end if
       ! check for usefull inital values
@@ -733,12 +596,12 @@ contains
       !   pL      | pR                    | pL
       ! 0-----------------------------------------Lx
       !           x0_inicond             x0_inicond+width
-      width       = params_ns%Lx*(1-params_ns%inicond_width-0.1)
-      x0_inicond  = params_ns%inicond_width*params_ns%Lx
+      width       = params_ns%domain_size(1)*(1-params_ns%inicond_width-0.1)
+      x0_inicond  = params_ns%inicond_width*params_ns%domain_size(1)
       max_R       = width*0.5_rk
       do ix=g+1, Bs+g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
-         call continue_periodic(x,params_ns%Lx)
+         call continue_periodic(x,params_ns%domain_size(1))
          ! left region
          radius=abs(x-x0_inicond-width*0.5_rk)
          b=0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
@@ -767,9 +630,9 @@ contains
       ! u  =0
       do ix=1, Bs+2*g
          x = dble(ix-(g+1)) * dx(1) + x0(1)
-         call continue_periodic(x,params_ns%Lx)
+         call continue_periodic(x,params_ns%domain_size(1))
          ! left region
-         if (x <= params_ns%Lx*0.5_rk) then
+         if (x <= params_ns%domain_size(1)*0.5_rk) then
            u( ix, :, :, rhoF) = 1.0_rk
            u( ix, :, :, pF)   = 1.0_rk
          else
@@ -801,7 +664,7 @@ contains
       if ( params_ns%geometry=="funnel" ) then
         do iy=g+1, Bs+g
             !initial y-velocity negative in lower half and positive in upper half
-            y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%Ly*0.5_rk
+            y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%domain_size(2)*0.5_rk
             b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
             u( :, iy, 1, UyF) = (1-u(:,iy,1,UyF))*b*u_init(2)*sqrt(rho_init)
         enddo
@@ -810,7 +673,7 @@ contains
       end if
     case ("pressure_blob")
 
-        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%Lx, params_ns%Ly, params_ns%Lz/), u(:,:,:,pF), x0, dx )
+        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%domain_size(1), params_ns%domain_size(2), params_ns%domain_size(3)/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
         u( :, :, :, pF) = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
         u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
@@ -867,8 +730,9 @@ contains
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
-    call filter_block(params_ns%filter, time, u, Bs, g, x0, dx, work_array)
-
+    work_array(:,:,:,1:params_ns%number_data_fields)=u
+    call filter_block(params_ns%filter, time, work_array, Bs, g, x0, dx)
+    u=work_array(:,:,:,1:params_ns%number_data_fields)
 
   end subroutine filter_NStokes
 
@@ -877,98 +741,122 @@ contains
 
 !> \brief convert the statevector \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
 !! to the desired format.
-subroutine convert_statevector2D(phi,convert2format)
+subroutine convert_statevector(phi,convert2format)
 
     implicit none
     ! convert to type "conservative","pure_variables"
     character(len=*), intent(in)   :: convert2format
     !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
-    real(kind=rk), intent(inout)      :: phi(1:,1:,1:)
+    real(kind=rk), intent(inout)      :: phi(1:,1:,1:,1:)
     ! vector containing the variables in the desired format
-    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
+    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3),size(phi,4))
 
 
     select case( convert2format )
     case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
       ! density
-      converted_vector(:,:,1)=phi(:,:,rhoF)**2
+      converted_vector(:,:,:,rhoF)  =phi(:,:,:,rhoF)**2
       ! rho u
-      converted_vector(:,:,2)=phi(:,:,UxF)*phi(:,:,rhoF)
+      converted_vector(:,:,:,UxF)   =phi(:,:,:,UxF)*phi(:,:,:,rhoF)
       ! rho v
-      converted_vector(:,:,3)=phi(:,:,UyF)*phi(:,:,rhoF)
-      ! kinetic energie
-      converted_vector(:,:,4)=phi(:,:,UxF)**2+phi(:,:,UyF)**2
-      converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
+      converted_vector(:,:,:,UyF)   =phi(:,:,:,UyF)*phi(:,:,:,rhoF)
+
+      if ( params_ns%dim==3 ) then
+        ! rho w
+        converted_vector(:,:,:,UzF)=phi(:,:,:,UzF)*phi(:,:,:,rhoF)
+        !kinetic energie
+        converted_vector(:,:,:,pF)=phi(:,:,:,UxF)**2+phi(:,:,:,UyF)**2+phi(:,:,:,UzF)**2
+      else
+        ! kinetic energie
+        converted_vector(:,:,:,pF)=phi(:,:,:,UxF)**2+phi(:,:,:,UyF)**2
+      end if
+      converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)*0.5_rk
+      ! total energie
       ! e_tot=e_kin+p/(gamma-1)
-      converted_vector(:,:,4)=converted_vector(:,:,4)+phi(:,:,pF)/(params_ns%gamma_-1)
+      converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)+phi(:,:,:,pF)/(params_ns%gamma_-1)
     case ("pure_variables")
       ! add ambient pressure
       !rho
-      converted_vector(:,:,1)= phi(:,:,rhoF)**2
+      converted_vector(:,:,:,rhoF)= phi(:,:,:,rhoF)**2
       !u
-      converted_vector(:,:,2)= phi(:,:, UxF)/phi(:,:,rhoF)
+      converted_vector(:,:,:,UxF)= phi(:,:,:, UxF)/phi(:,:,:,rhoF)
       !v
-      converted_vector(:,:,3)= phi(:,:, UyF)/phi(:,:,rhoF)
+      converted_vector(:,:,:,UyF)= phi(:,:,:, UyF)/phi(:,:,:,rhoF)
+      !w
+      if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:, UzF)/phi(:,:,:,rhoF)
       !p
-      converted_vector(:,:,4)= phi(:,:, pF)
+      converted_vector(:,:,:,4)= phi(:,:,:, pF)
     case default
         call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
     end select
 
     phi=converted_vector
 
-end subroutine convert_statevector2D
+end subroutine convert_statevector
 
 
 !> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from
 !>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$ or pure variables (rho,u,v,p)
-subroutine pack_statevector2D(phi,format)
+subroutine pack_statevector(phi,format)
     implicit none
     ! convert to type "conservative","pure_variables"
     character(len=*), intent(in)   :: format
     !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
-    real(kind=rk), intent(inout)      :: phi(1:,1:,1:)
+    real(kind=rk), intent(inout)   :: phi(1:,1:,1:,1:)
     ! vector containing the variables in the desired format
-    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
+    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3),size(phi,4))
 
 
 
     select case( format )
     case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
       ! sqrt(rho)
-      if ( minval(phi(:,:,1))<0 ) then
-        write(*,*) "minval=", minval(phi(:,:,1))
+      if ( minval(phi(:,:,:,rhoF))<0 ) then
+        write(*,*) "minval=", minval(phi(:,:,:,rhoF))
         call abort(457881,"ERROR [module_navier_stokes.f90]: density smaller then 0!!")
       end if
-      converted_vector(:,:,1)=sqrt(phi(:,:,1))
+      converted_vector(:,:,:,rhoF)=sqrt(phi(:,:,:,rhoF))
       ! sqrt(rho) u
-      converted_vector(:,:,2)=phi(:,:,2)/converted_vector(:,:,1)
+      converted_vector(:,:,:,UxF)=phi(:,:,:,UxF)/converted_vector(:,:,:,rhoF)
       ! sqrt(rho) v
-      converted_vector(:,:,3)=phi(:,:,3)/converted_vector(:,:,1)
-      ! kinetic energie
-      converted_vector(:,:,4)=converted_vector(:,:,2)**2+converted_vector(:,:,3)**2
-      converted_vector(:,:,4)=converted_vector(:,:,4)*0.5_rk
+      converted_vector(:,:,:,UyF)=phi(:,:,:,UyF)/converted_vector(:,:,:,rhoF)
+
+      if ( params_ns%dim==3 ) then
+        converted_vector(:,:,:,UzF)=phi(:,:,:,UzF)/converted_vector(:,:,:,rhoF)
+        ! kinetic energie
+        converted_vector(:,:,:,pF)=converted_vector(:,:,:,UxF)**2 &
+                                  +converted_vector(:,:,:,UyF)**2 &
+                                  +converted_vector(:,:,:,UzF)**2
+      else
+        ! kinetic energie
+        converted_vector(:,:,:,pF)=converted_vector(:,:,:,UxF)**2 &
+                                  +converted_vector(:,:,:,UyF)**2
+      end if
+      converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)*0.5_rk
       ! p=(e_tot-e_kin)(gamma-1)/rho
-      converted_vector(:,:,4)=(phi(:,:,4)-converted_vector(:,:,4))*(params_ns%gamma_-1)
+      converted_vector(:,:,:,pF)=(phi(:,:,:,pF)-converted_vector(:,:,:,pF))*(params_ns%gamma_-1)
     case ("pure_variables") !phi=(rho,u,v,p)
       ! add ambient pressure
       ! sqrt(rho)
-      converted_vector(:,:,1)= sqrt(phi(:,:,1))
+      converted_vector(:,:,:,rhoF)= sqrt(phi(:,:,:,rhoF))
       ! sqrt(rho) u
-      converted_vector(:,:,2)= phi(:,:, 2)*converted_vector(:,:,1)
+      converted_vector(:,:,:,UxF)= phi(:,:,:,UxF)*converted_vector(:,:,:,rhoF)
       ! sqrt(rho)v
-      converted_vector(:,:,3)= phi(:,:, 3)*converted_vector(:,:,1)
+      converted_vector(:,:,:,UyF)= phi(:,:,:,UyF)*converted_vector(:,:,:,rhoF)
+      ! sqrt(rho)w
+      if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:,UzF)*converted_vector(:,:,:,rhoF)
       !p
-      converted_vector(:,:,4)= phi(:,:, 4)
+      converted_vector(:,:,:,pF)= phi(:,:,:,pF)
     case default
         call abort(7771,"the format is unkown: "//trim(adjustl(format)))
     end select
 
-    phi(:,:,rhoF) =converted_vector(:,:,1)
-    phi(:,:,UxF)  =converted_vector(:,:,2)
-    phi(:,:,UyF)  =converted_vector(:,:,3)
-    phi(:,:,pF)   =converted_vector(:,:,4)
-end subroutine pack_statevector2D
+    phi(:,:,:,rhoF) =converted_vector(:,:,:,rhoF)
+    phi(:,:,:,UxF)  =converted_vector(:,:,:,UxF )
+    phi(:,:,:,UyF)  =converted_vector(:,:,:,UyF )
+    if ( params_ns%dim==3 ) phi(:,:,:,UzF) = converted_vector(:,:,:,UzF)
+    phi(:,:,:,pF)   =converted_vector(:,:,:,pF)
+end subroutine pack_statevector
 
 
 
@@ -977,23 +865,23 @@ subroutine convert2format(phi_in,format_in,phi_out,format_out)
     ! convert to type "conservative","pure_variables"
     character(len=*), intent(in)   ::  format_in, format_out
     !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
-    real(kind=rk), intent(in)      :: phi_in(1:,1:,1:)
+    real(kind=rk), intent(in)      :: phi_in(1:,1:,1:,1:)
     ! vector containing the variables in the desired format
-    real(kind=rk), intent(inout)   :: phi_out(:,:,:)
+    real(kind=rk), intent(inout)   :: phi_out(:,:,:,:)
 
     ! convert phi_in to skewsymetric variables  \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
     if (format_in=="skew") then
       phi_out  =  phi_in
     else
       phi_out  =  phi_in
-      call pack_statevector2D(phi_out,format_in)
+      call pack_statevector(phi_out,format_in)
     endif
 
     ! form skewsymetric variables convert to any other scheme
     if (format_out=="skew") then
       !do nothing because format is skew already
     else
-      call convert_statevector2D(phi_out,format_out)
+      call convert_statevector(phi_out,format_out)
     endif
 end subroutine convert2format
 

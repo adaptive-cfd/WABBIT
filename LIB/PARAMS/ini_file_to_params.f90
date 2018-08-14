@@ -257,9 +257,6 @@ end subroutine ini_file_to_params
     type(type_params),intent(inout)  :: params
 
 
-    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
-
-
     if (params%rank==0) then
       write(*,*)
       write(*,*)
@@ -278,11 +275,8 @@ end subroutine ini_file_to_params
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")
     endif
-    call read_param_mpi(FILE, 'Domain', 'domain_size', domain_size(1:params%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    params%domain_size(1)=domain_size(1)
-    params%domain_size(2)=domain_size(2)
-    params%domain_size(3)=domain_size(3)
-
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
+    (/ 1.0_rk, 1.0_rk, 0.0_rk /) )
 
     call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
 

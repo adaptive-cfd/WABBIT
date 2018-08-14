@@ -90,7 +90,7 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
             y = dble(iy-(g+1)) * dx(2) + x0(2)
             z = dble(iz-(g+1)) * dx(3) + x0(3)
             ! shift to new gauss blob center
-            ! call shift_x_y( x, y, params%domain_size(1),params%domain_size(2) )
+            ! call shift_x_y( x, y, params_ns%domain_size(1),params_ns%domain_size(2) )
             ! set actual inicond gauss blob
             u(ix,iy,iz) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / sigma )
           end do

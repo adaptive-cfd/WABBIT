@@ -60,13 +60,13 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
 ! main body
 
     ! place layer
-    mux1 = params_ns%Lx/2.0_rk - 0.25_rk
-    mux2 = params_ns%Lx/2.0_rk + 0.25_rk
+    mux1 = params_ns%domain_size(1)/2.0_rk - 0.25_rk
+    mux2 = params_ns%domain_size(1)/2.0_rk + 0.25_rk
 
-    muy  = 0.5_rk * params_ns%Ly
+    muy  = 0.5_rk * params_ns%domain_size(2)
 
     ! boundary layer width
-    sigma = params_ns%inicond_width * params_ns%Lx
+    sigma = params_ns%inicond_width * params_ns%domain_size(1)
 
     ! shear layer width
     w = params_ns%inicond_width
@@ -86,20 +86,20 @@ subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
                 ! ensure that coordinates are continued periodicaly
                 ! otherwise problems in redudant nodes.
-                call continue_periodic(x,params_ns%Lx)
-                call continue_periodic(y,params_ns%Ly)
+                call continue_periodic(x,params_ns%domain_size(1))
+                call continue_periodic(y,params_ns%domain_size(2))
                 ! shear layer, setup [1]
                 ! Uy
-                if ( x <= 0.5_rk*params_ns%Lx ) then
-                    u(ix, iy, 1, UyF) = dtanh( w/params_ns%Lx * ( x - mux1 ) ) + u0
+                if ( x <= 0.5_rk*params_ns%domain_size(1) ) then
+                    u(ix, iy, 1, UyF) = dtanh( w/params_ns%domain_size(1) * ( x - mux1 ) ) + u0
                     u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( x - mux1 ) ) ) / 2.0_rk + rho0
                 else
-                    u(ix, iy, 1, UyF) = dtanh( w/params_ns%Lx * ( mux2 - x ) ) + u0
+                    u(ix, iy, 1, UyF) = dtanh( w/params_ns%domain_size(1) * ( mux2 - x ) ) + u0
                     u(ix, iy, 1, rhoF) = ( rho0 + dtanh( w * ( mux2 - x ) ) ) / 2.0_rk + rho0
                 end if
 
                 ! Ux
-                !u(ix, iy, 1, UxF) = 0.05_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params%domain_size(2) )
+                !u(ix, iy, 1, UxF) = 0.05_rk * dsin( 8.0_rk * pi * ( y - muy  ) / params_ns%domain_size(2) )
                 u(ix, iy, 1, UxF) = 0.1_rk * dsin( 2.0_rk * pi * ( y - muy  ) )
             end do
         end do

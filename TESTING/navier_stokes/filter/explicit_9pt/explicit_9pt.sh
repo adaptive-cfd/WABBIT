@@ -16,7 +16,7 @@ prefixes=(rho Ux p)
 times=(000000010000)
 
 # run actual test
-${mpi_command} ./wabbit 2D ${params} --memory=2GB ${ghosts}
+${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"

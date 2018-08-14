@@ -51,7 +51,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     mpirank = params%rank
     mpisize = params%number_procs
     N = params%number_blocks
-    R = params%max_treelevel+2
+    R = params%max_treelevel + idx_refine_sts
 
     if (.not.allocated(proc_lgt_num)) allocate( proc_lgt_num(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -134,7 +134,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
         ! you have to ensure every proc does the same Jmax)
         Jmax = 0
         do k = lgt_start, lgt_end
-           Jmax = max(Jmax, lgt_block(k, params%max_treelevel+1) )
+           Jmax = max(Jmax, lgt_block(k, params%max_treelevel + idx_mesh_lvl) )
         end do
         call MPI_ALLREDUCE(MPI_IN_PLACE, Jmax, 1, MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
 
@@ -147,7 +147,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
         enddo
 
         ! ...and their block level and refinement status
-        do k = params%max_treelevel+1, params%max_treelevel+2
+        do k = params%max_treelevel + idx_mesh_lvl, params%max_treelevel + idx_refine_sts
             call MPI_allgatherv( lgt_block(lgt_start, k), lgt_num, MPI_INTEGER4, &
             my_lgt_block_recv_buffer(1, k), proc_lgt_num, proc_lgt_start, MPI_INTEGER4, &
             WABBIT_COMM, ierr)
@@ -155,7 +155,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
 
         ! if we do not transfer all levels, then mark the level after the last transfered
         ! one as inactive.
-        do k = Jmax+1, params%max_treelevel
+        do k = Jmax + idx_mesh_lvl, params%max_treelevel
             my_lgt_block_recv_buffer(1:buffer_size, k) = -1
         enddo
     endif

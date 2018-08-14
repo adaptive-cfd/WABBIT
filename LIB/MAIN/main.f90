@@ -65,8 +65,8 @@ program main
 
     ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
-    !                   -> column(max_treelevel+1): treecode length = mesh level
-    !                   -> column(max_treelevel+2):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    !                   -> column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
+    !                   -> column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: lgt_block(:, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
@@ -146,8 +146,8 @@ program main
     params%number_procs=number_procs
     allocate(blocks_per_rank(1:number_procs))
     ! output MPI status
-    params%WABBIT_COMM=MPI_COMM_WORLD
-    call set_mpi_comm_global(MPI_COMM_WORLD)
+    WABBIT_COMM=MPI_COMM_WORLD
+
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
@@ -163,15 +163,13 @@ program main
     ! unit test off
     params%unit_test    = .false.
 
-    ! are we running in 2D or 3D mode? Check that from the command line call.
-    call decide_if_running_2D_or_3D(params)
 
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
-    call get_command_argument( 2, filename )
+    call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed
@@ -202,6 +200,8 @@ program main
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
         hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     endif
+    ! write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
+    ! call abort(25435432,"domain")
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
@@ -212,7 +212,6 @@ program main
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_work )
-
     if (params%initial_cond /= "read_from_files" .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
@@ -291,15 +290,14 @@ program main
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
-
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call MPI_Barrier(WABBIT_COMM,ierr)
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n,params)
+            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, &
+                                    lgt_active, lgt_n, hvy_n,params)
             call MPI_Barrier(WABBIT_COMM,ierr)
         endif
-
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

@@ -40,13 +40,14 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! process rank
     integer(kind=ik)                    :: rank
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: Bs, g, k
     ! offset variables
     integer(kind=ik), dimension(4)      :: ubounds3D, lbounds3D
     integer(kind=ik), dimension(3)      :: ubounds2D, lbounds2D
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
+    logical                             :: block_contains_nan
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -103,5 +104,13 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
-
+    ! check if field contains NaNs
+    do k=1,hvy_n
+        if ( params%threeD_case ) then
+            call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,k), block_contains_nan)
+        else
+            call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,:,dF,k), block_contains_nan)
+        end if
+        if (block_contains_nan) call abort(0200, "ERROR: Saved field"//get_dsetname(fname)//" contains NaNs!! I don't want to read from this file!")
+    end do
 end subroutine read_field

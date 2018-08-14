@@ -1,3 +1,4 @@
+
 !===========================================================================
 !> Module for all debug subroutines
 !-------------------------------------------------------------------------!!!!
@@ -131,7 +132,7 @@ contains
             debug%comp_time(:,1) = 0.0_rk
             debug%comp_time(:,2) = 0.0_rk
         end if
-        
+
     end subroutine timing_next_timestep
 
 end module module_debug

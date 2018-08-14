@@ -78,8 +78,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), allocatable, save :: sfc_com_list(:,:), sfc_sorted_list(:,:)
     ! hilbert code
     integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
-    ! communicator
-    integer(kind=ik)                    :: WABBIT_COMM
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -97,7 +95,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! MPI_parameters
     rank = params%rank
     number_procs = params%number_procs
-    WABBIT_COMM  = params%WABBIT_COMM
     ! allocate block to proc lists
     if (.not.allocated(opt_dist_list)) allocate( opt_dist_list(1:number_procs))
     if (.not.allocated(dist_list)) allocate( dist_list(1:number_procs))

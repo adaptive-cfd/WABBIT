@@ -102,9 +102,9 @@ subroutine sparse_to_dense(help, params)
     params%max_treelevel = max(level, tc_length)
     params%min_treelevel = level
     params%number_block_nodes = bs
-    params%Lx = domain(1)
-    params%Ly = domain(2)
-    params%Lz = domain(3)
+    params%domain_size(1) = domain(1)
+    params%domain_size(2) = domain(2)
+    params%domain_size(3) = domain(3)
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
@@ -157,7 +157,7 @@ subroutine sparse_to_dense(help, params)
         ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
         do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
-                lgt_block(lgt_active(k), params%max_treelevel +2) = -1
+                lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = -1
         end do
         ! this might not be necessary since we start from an admissible grid
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
@@ -174,7 +174,7 @@ subroutine sparse_to_dense(help, params)
         ! check where refinement is actually needed
         do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                lgt_block(lgt_active(k), params%max_treelevel +2) = 1
+                lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = 1
         end do
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
@@ -199,7 +199,7 @@ subroutine sparse_to_dense(help, params)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
-        hvy_block, lgt_active, lgt_n, hvy_n)
+        hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
 
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &

@@ -78,14 +78,14 @@ subroutine flusi_to_wabbit(help, params)
 
         ! set important parameters
         params%max_treelevel=level
-        params%Lx = domain(2)
-        params%Ly = domain(3)
+        params%domain_size(1) = domain(2)
+        params%domain_size(2) = domain(3)
         params%number_block_nodes = Bs
         params%number_ghost_nodes = 1_ik
         params%order_predictor = 'multiresolution_4th'
         if (params%threeD_case) then
             lgt_n = 8_ik**params%max_treelevel
-            params%Lz = domain(1)
+            params%domain_size(3) = domain(1)
         else
             lgt_n = 4_ik**params%max_treelevel
         end if
@@ -115,14 +115,14 @@ subroutine flusi_to_wabbit(help, params)
             else
                 start_z = 0_ik
             end if
-            lgt_block(lgt_active(k), params%max_treelevel+2) = status(start_x, start_y, start_z, nxyz(2), Bs)
+            lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = status(start_x, start_y, start_z, nxyz(2), Bs)
         end do
 
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         iteration = 0
         call write_field(file_out, time, iteration, 1, params, lgt_block,&
-            hvy_block, lgt_active, lgt_n, hvy_n)
+            hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
     end if
 
 end subroutine flusi_to_wabbit

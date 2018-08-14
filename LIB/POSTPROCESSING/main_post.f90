@@ -50,9 +50,7 @@ program main_post
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
-    params%WABBIT_COMM  = MPI_COMM_WORLD
-
-    call set_mpi_comm_global(MPI_COMM_WORLD)
+    WABBIT_COMM         = MPI_COMM_WORLD
     ! output MPI status
     if (rank==0) then
         write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
@@ -127,3 +125,41 @@ program main_post
     call MPI_Finalize(ierr)
 
 end program main_post
+
+! --------------------------------------------------------------------
+! currently, wabbit-post is called ./wabbit-post params.ini so the decision if we're
+! running 2d or 3d is done in the command line call. here we figure that out
+! and save the result in the parameter structure.
+! --------------------------------------------------------------------
+subroutine decide_if_running_2D_or_3D(params)
+  use module_params
+  implicit none
+  !> user defined parameter structure
+  type (type_params), intent(inout) :: params
+
+  character(len=80) :: dim_number
+
+  ! read number of dimensions from command line
+  call get_command_argument(1, dim_number)
+
+  ! output dimension number
+  if (params%rank==0) then
+      write(*,'(80("_"))')
+      write(*, '("INIT: running ", a3, " case")') dim_number
+  end if
+
+  ! save case dimension in params struct
+  select case(dim_number)
+      case('2D')
+          params%threeD_case = .false.
+          params%dim = 2
+      case('3D')
+          params%threeD_case = .true.
+          params%dim = 3
+      case('--help')
+      case('--h')
+      case default
+          call abort(1,"ERROR: case dimension is wrong")
+  end select
+
+end subroutine

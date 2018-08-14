@@ -112,7 +112,7 @@ character(len=80)                            :: geometry
                   parameters_delivery, myBridge%commonWorld,  ierr)
 
     !! - receive the domain parameters
-    Domain(:,1)=(/params%Lx,params%Ly,params%Lz/) !> Domain size
+    Domain(:,1)=(/params%domain_size(1),params%domain_size(2),params%domain_size(3)/) !> Domain size
     Domain(:,2)=(/0, 0, 0/)                         !> Domain origin
     call MPI_send(Domain, 6, MPI_double_precision, myBridge%minOtherWorldRank, &
                   parameters_delivery, myBridge%commonWorld, ierr)
@@ -146,7 +146,7 @@ integer                              :: n,m
     ! number of blocks
     n      = size(lgt_block,1)
     ! number of columns in matrix
-    m        = params%max_treelevel+2
+    m        = params%max_treelevel + idx_refine_sts
 
     ! send number of active and maximal number of blocks
     call MPI_send((/lgt_n/), 1, MPI_integer, &
@@ -294,7 +294,7 @@ integer                                     :: ierr
        write(*,*) 'Modus: BRIDGE'
        write(*,*) '-----------------'
     end if
-    params%bridge%myWorld=params%WABBIT_COMM
+    params%bridge%myWorld=WABBIT_COMM
     call init_bridge(params%bridge,params)                              ! initialization using split
   else                                                              ! if there are different WABBIT_COMM
      call MPI_comm_dup(WABBIT_COMM, params%bridge%myWorld, ierr)
@@ -302,10 +302,9 @@ integer                                     :: ierr
      call MPI_comm_rank(params%bridge%myWorld, params%bridge%myWorldRank, ierr)
   end if
   ! after communicator is created set it to the global communicator of WABBIT
-  call set_mpi_comm_global(params%bridge%myWorld)
+  WABBIT_COMM         = params%bridge%myWorld
   params%rank         = params%bridge%myWorldRank
   params%number_procs = params%bridge%myWorldSize
-  params%WABBIT_COMM  = params%bridge%myWorld
 end subroutine initialize_communicator
 
 !===========================================================================
@@ -436,7 +435,7 @@ position_to_lgt_id=-999999
        !                    x0(1) -------------------------- x1(1)
        !                         |                           |
        !                         |         lgt_id            |
-       !                         |               *            |
+       !                         |               *           |
        !                         |               (position)  |
        !                         |                           |
        !                    x0(2) -------------------------- x1(2)

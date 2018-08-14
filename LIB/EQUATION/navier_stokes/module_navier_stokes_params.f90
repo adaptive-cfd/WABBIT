@@ -68,7 +68,7 @@ module module_navier_stokes_params
         ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
         ! spatial domain%number_data_fields
-        real(kind=rk)                               :: Lx, Ly, Lz, R_max
+        real(kind=rk)                               :: Lx, Ly, Lz, R_max, domain_size(3)=0.0_rk
         ! number data fields
         integer(kind=ik)                            :: number_data_fields
         ! number of block nodes
@@ -147,6 +147,8 @@ contains
     type(inifile) ,intent(inout)     :: FILE
     !> params structure of navier stokes
     type(type_params_ns),intent(inout)  :: params_ns
+    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+
 
     if (params_ns%mpirank==0) then
       write(*,*)
@@ -157,16 +159,17 @@ contains
     ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
     ! dimension
-    call read_param_mpi(FILE, 'Dimensionality', 'dim', params_ns%dim, 2 )
+    call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
     !
     call read_param_mpi(FILE, 'Navier_Stokes', 'Coordinate_system', params_ns%coordinates, &
                                                                     params_ns%coordinates )
     ! spatial domain size
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', params_ns%Lx, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', params_ns%Ly, 1.0_rk )
-    if ( params_ns%dim==3 ) then
-      call read_param_mpi(FILE, 'DomainSize', 'Lz', params_ns%Lz, 0.0_rk )
-    end if
+    call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    params_ns%Lx=params_ns%domain_size(1)
+    params_ns%Ly=params_ns%domain_size(2)
+    params_ns%Lz=params_ns%domain_size(3)
+
     if ( params_ns%coordinates=="cylindrical" ) then
       params_ns%R_max=params_ns%Ly*0.5_rk
       if ( params_ns%mpirank==0 ) write(*,'("maximal Radius" ,T30,"R_max",T60,"=",TR1, e10.2 )') params_ns%R_max

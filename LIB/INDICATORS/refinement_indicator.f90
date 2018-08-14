@@ -62,8 +62,8 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
     ! status indicates that the block is on Jmax and has not been interpolated.
     ! NOTE: resetting the refinement status is in fact not necessary.
     do k = 1, lgt_n
-        if (lgt_block( lgt_active(k), Jmax+2 ) /= 11) then
-            lgt_block( lgt_active(k), Jmax+2 ) = 0
+        if (lgt_block( lgt_active(k), Jmax+idx_refine_sts ) /= 11) then
+            lgt_block( lgt_active(k), Jmax+idx_refine_sts ) = 0
         endif
     enddo
 
@@ -81,8 +81,8 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
           do k = 1, lgt_n
               ! do not refine blocks with +11 status, as they are on the maxlevel
               ! already (so no refinement allowed)
-              if ( lgt_block( lgt_active(k), params%max_treelevel+2 ) /= 11 ) then
-                  lgt_block( lgt_active(k), params%max_treelevel+2 ) = +1
+              if ( lgt_block( lgt_active(k), Jmax + idx_refine_sts ) /= 11 ) then
+                  lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = +1
               end if
           end do
 
@@ -103,7 +103,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
           call init_random_seed()
 
           ! unset all refinement flags
-          lgt_block( :,Jmax+2 ) = 0
+          lgt_block( :, Jmax + idx_refine_sts ) = 0
 
           ! only root rank sets the flag, then we sync. It is messy if all procs set a
           ! random value which is not sync'ed
@@ -112,15 +112,15 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
               ! random number
               call random_number(r)
               ! set refinement status to refine
-              if ( r <= ref_chance .and. sum(lgt_block(:, Jmax+2)) <= max_blocks) then
-                  lgt_block( lgt_active(k), Jmax+2 ) = 1
+              if ( r <= ref_chance .and. sum(lgt_block(:, Jmax+ idx_refine_sts)) <= max_blocks) then
+                  lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 1
               else
-                  lgt_block( lgt_active(k), Jmax+2 ) = 0
+                  lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
               end if
             end do
           endif
           ! sync light data, as only root sets random refinement
-          call MPI_BCAST( lgt_block(:,params%max_treelevel+2), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
+          call MPI_BCAST( lgt_block(:, Jmax + idx_refine_sts), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
 
       case default
           call abort("ERROR: refine_mesh: the refinement indicator is unkown")

@@ -98,11 +98,11 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
         ! block wants to refine
-        if ( (lgt_block( lgt_id, params%max_treelevel+2) == +1) ) then
+        if ( (lgt_block( lgt_id, params%max_treelevel + idx_refine_sts) == +1) ) then
 
             ! treecode and mesh level
             treecode = lgt_block( lgt_id, 1:params%max_treelevel )
-            level    = lgt_block( lgt_id, params%max_treelevel+1 )
+            level    = lgt_block( lgt_id, params%max_treelevel + idx_mesh_lvl )
 
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
@@ -128,9 +128,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 0
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -148,9 +148,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 1
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -168,9 +168,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 2
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -188,9 +188,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 3
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -208,9 +208,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 4
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -228,9 +228,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 5
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -248,9 +248,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 6
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields
@@ -269,9 +269,9 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "1" block
             lgt_block( lgt_free_id, level+1 )                = 7
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel+1 ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel+2 ) = 0
+            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
             do dF = 1, params%number_data_fields

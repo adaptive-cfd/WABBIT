@@ -40,7 +40,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> user defined parameter structure
     type (type_params), intent(inout)                   :: params
     !> light data array
-    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
+    integer(kind=ik), allocatable, intent(out)       :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy work array
@@ -55,7 +55,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
     integer(kind=ik)                                    :: Bs, g, N_dF, number_blocks,&
-                                                      rank, number_procs
+                                                      rank, number_procs,number_trees
     !> do we have to allocate everything?
     logical, intent(in) :: simulation
     integer(kind=ik)    :: rk_steps
@@ -68,13 +68,12 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !---------------------------------------------------------------------------------------------
     ! variables initialization
     ! set parameters for readability
-    rank         = params%rank
+    rank            = params%rank
     number_blocks   = params%number_blocks
     Bs              = params%number_block_nodes
     g               = params%number_ghost_nodes
     N_dF            = params%number_data_fields
     number_procs    = params%number_procs
-
 
     !---------------------------------------------------------------------------------------------
     ! main body
@@ -150,8 +149,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     end if
 
-    !---------------------------------------------------------------------------
-    allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+2) )
+    !---------------------------------------------------------------------------)
+    allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+extra_lgt_fields) )
+    call reset_lgt_data(lgt_block,lgt_active,params%max_treelevel)
+
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)
@@ -164,13 +165,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
     endif
 
-    ! reset data:
-    ! all blocks are inactive, reset treecode
-    lgt_block(:, 1:params%max_treelevel) = -1
-    ! all blocks are inactive, reset treelevel
-    lgt_block(:, params%max_treelevel+1) = -1
-    ! set refinement to 0
-    lgt_block(:, params%max_treelevel+2) = 0
+    ! is not really needed here because it will be reseted in reset_grid!!!
+    !call reset_lgt_data(lgt_block, lgt_active, lgt_n, lgt_sortednumlist)
 
     !---------------------------------------------------------------------------
     allocate( lgt_active( size(lgt_block, 1) ) )

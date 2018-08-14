@@ -76,11 +76,11 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
         write(*,'("Bs=",i4," dim=", i1, " tc_length=", i2)') Bs, dim, tc_length
         write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
         ! if the domain size doesn't match, proceed, but yell.
-        if ((abs(params%Lx-domain(1))>1e-12_rk).or.(abs(params%Ly-domain(2))>1e-12_rk) &
-            .or.(abs(params%Lz-domain(3))>1e-12_rk)) then
+        if ((abs(params%domain_size(1)-domain(1))>1e-12_rk).or.(abs(params%domain_size(2)-domain(2))>1e-12_rk) &
+            .or.(abs(params%domain_size(3)-domain(3))>1e-12_rk)) then
             write (*,'(A)') " WARNING! Domain size mismatch."
             write (*,'("in memory:   Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') &
-                params%Lx, params%Ly, params%Lz
+                params%domain_size(1), params%domain_size(2), params%domain_size(3)
             write (*,'("but in file: Lx=",es12.4,"Ly=",es12.4,"Lz=",es12.4)') domain
             write (*,'(A)') "proceed, with fingers crossed."
         end if

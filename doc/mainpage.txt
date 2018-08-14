@@ -1,4 +1,4 @@
-!> \mainpage (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nsects in (T)urbulence
+!> \mainpage (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nteractions with (T)urbulence
 !> \section intro_sec Introduction
 !> \image html rhs.svg  width=600
 !> \section install_sec Installation
@@ -8,16 +8,16 @@
 !!
 !> \subsection step2 Run make
 !! 	  1. choose compiler with FC option (to v0.2): \n
-!! 
+!!
 !!                 $ make FC=[gfortran|ifort]
 !!
 !!	  2. choose compiler with FC option (from v0.3): \n
-!! 
+!!
 !!                 $ make FC=[mpif90]
 !!
 !> \subsection step3 Run WABBIT
 !! customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name:
-!! 
+!!
 !!		   $ wabbit [2D|3D] [your_filename.ini]
 !!
 !> \subsection ste4p HDF5 Libary
@@ -86,10 +86,10 @@
 ----------------------------------------------------------------------------------------------------------------
 !> \page postprocessing Wabbit Postprocessing Tools
 !! The existing postprocessing tools can be found in /LIB/POSTPROCESSING \n
-!! 
+!!
 !! Type:
 !!
-!!     $ ./wabbit-post --help or wabbit-post --help --[one of the listed tools] 
+!!     $ ./wabbit-post --help or wabbit-post --help --[one of the listed tools]
 !!
 !! to get more information from WABBIT
 !!
@@ -105,7 +105,7 @@
 !!
 !! where source.h5 is the input file, target.h5 is the file where the user
 !! wants the output to be saved, target_treelevel is the desired level and
-!! order-predictor the interpolation order (for upsampling) 
+!! order-predictor the interpolation order (for upsampling)
 !! \subsection Implementation
 !!     1. Get blocksize and maximal treelevel of the saved datafield
 !!     2. Compare maximal treelevel to desired treelevel and set
@@ -121,7 +121,7 @@
 !! \section keys Keyvalues
 !! This tool can be used for testing. It reads a datafield from an existing
 !! hdf5-file, generates a .key file containing several keyvalues and can then
-!! be used to compare to two .key files 
+!! be used to compare to two .key files
 !! \subsection gen Generate keyvalues
 !! \subsubsection Description
 !! Loads the specified *.h5 file and creates a *.key file that contains
@@ -134,7 +134,7 @@
 !! \subsection com Compare keyvalues
 !! Compares two .key files, prints out the error on the screen and gives back
 !! an exit code
-!! \subsubsection Run 
+!! \subsubsection Run
 !!
 !!     $ ./wabbit-post 2[3]D --compare-keys old.key new.key
 !!
@@ -144,7 +144,7 @@
 !! \image html vor.jpg "Vorticity field" width=400
 !!
 !! \subsection run Run
-!! 
+!!
 !!     $ ./wabbit-post 2D --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)
 !!     $ ./wabbit-post 3D --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)
 !!
@@ -155,15 +155,15 @@
 
 !> \page testing Wabbit Testing Tools
 !! \section Description
-!! The existing tests can be found in /TESTING. \n 
+!! The existing tests can be found in /TESTING. \n
 !!
 !! For each test, we have an .ini file (with values set as time, physics etc.) and
 !! .ref files where the keyvalues of these simulations are stored as reference
 !! values. To check whether the current version of the code still gives the
 !! same results we generate new .key files and compare them to the old ones. \n
-!!  
 !!
-!! To add a new test you may create a folder in one of the existing physics 
+!!
+!! To add a new test you may create a folder in one of the existing physics
 !! folders (TESTING/acm, TESTING/navier-stokes, ...) or - for a new right hand
 !! side - you may create a new physics folder. You can then put your .ini file
 !! and your reference files (containing the keyvalues, see also \ref keys)

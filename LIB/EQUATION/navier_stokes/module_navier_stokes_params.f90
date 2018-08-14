@@ -68,7 +68,7 @@ module module_navier_stokes_params
         ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
         ! spatial domain%number_data_fields
-        real(kind=rk)                               :: Lx, Ly, Lz, R_max, domain_size(3)=0.0_rk
+        real(kind=rk)                               :: R_max, domain_size(3)=0.0_rk
         ! number data fields
         integer(kind=ik)                            :: number_data_fields
         ! number of block nodes
@@ -129,6 +129,18 @@ module module_navier_stokes_params
         !---------------------------------------------------------
         ! filter structure containing all parameters of the filter
         type(type_params_filter)                    :: filter
+        ! --------------------------------------------------------------------------------
+        ! dimensionless scales (see function add_info)
+        ! --------------------------------------------------------------------------------
+        ! reynolds number is computed from intial conditions and Ly as characteristic length scales
+        real(kind=rk)                               :: Reynolds
+        ! speed of sound computed from inicond density, pressure
+        real(kind=rk)                               :: c0
+        ! machnumber
+        real(kind=rk)                               :: machnumber
+        ! smallest lattice spacing
+        real(kind=rk)                               :: dx_min
+
   end type type_params_ns
 
   ! statevector index
@@ -166,12 +178,9 @@ contains
     ! spatial domain size
     call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    params_ns%Lx=params_ns%domain_size(1)
-    params_ns%Ly=params_ns%domain_size(2)
-    params_ns%Lz=params_ns%domain_size(3)
 
     if ( params_ns%coordinates=="cylindrical" ) then
-      params_ns%R_max=params_ns%Ly*0.5_rk
+      params_ns%R_max=params_ns%domain_size(2)*0.5_rk
       if ( params_ns%mpirank==0 ) write(*,'("maximal Radius" ,T30,"R_max",T60,"=",TR1, e10.2 )') params_ns%R_max
     end if
 
@@ -216,7 +225,7 @@ contains
         return
       end if
       call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%Lx*0.1_rk )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%domain_size(1)*0.1_rk )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
@@ -233,6 +242,8 @@ contains
 
 
 subroutine init_other_params(params_ns, FILE )
+
+    use module_helpers , only: list_contains_name
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)        :: FILE
@@ -251,8 +262,18 @@ subroutine init_other_params(params_ns, FILE )
     params_ns%names = "---"
     ! read file
     call read_param_mpi(FILE, 'Saving', 'field_names', params_ns%names, params_ns%names )
+    if (  list_contains_name(params_ns%names,'sigmax')>0 ) then
+      params_ns%filter%save_filter_strength=.true.
+    end if
 
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
+    if ( params_ns%dim==3 .and. params_ns%number_data_fields<5 ) then
+      if ( params_ns%mpirank==0 ) then
+        write(*,*)"WARNING number of data fields increased to the minimum of 5 fileds"
+      end if
+      params_ns%number_data_fields=5
+    end if
+
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
@@ -281,7 +302,7 @@ subroutine init_other_params(params_ns, FILE )
           x=L+x
         endif
 
-        min_dx = 2.0_rk**(-params_ns%Jmax) * min(params_ns%Lx,params_ns%Ly)&
+        min_dx = 2.0_rk**(-params_ns%Jmax) * min(params_ns%domain_size(1),params_ns%domain_size(2))&
                           / real(params_ns%Bs-1, kind=rk)
         ! u(x=0) should be set equal to u(x=L)
         if ( abs(x-L)<min_dx*0.5_rk ) then
@@ -290,6 +311,48 @@ subroutine init_other_params(params_ns, FILE )
 
   end subroutine continue_periodic
 
+
+!> \brief Add additional info to navier stokes (initial Mach, Reynolds and speed of sound)
+  subroutine add_info(params_ns )
+      implicit none
+      !> params structure of navier stokes
+      type(type_params_ns),intent(inout)  :: params_ns
+          integer(kind=ik)                :: nx_max
+      ! compute min(dx,dy,dz)
+      if ( params_ns%dim==2 ) then
+        params_ns%dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%domain_size(1),params_ns%domain_size(2)) &
+                                                          / real(params_ns%Bs-1, kind=rk)
+      else
+        params_ns%dx_min = 2.0_rk**(-params_ns%Jmax) * minval(params_ns%domain_size) &
+                                                          / real(params_ns%Bs-1, kind=rk)
+      end if
+
+      ! initial speed of sound, Mach number, reynolds number
+      params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+      params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
+                                +params_ns%initial_velocity(2)**2 &
+                                +params_ns%initial_velocity(3)**2)/params_ns%c0
+      params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
+                            params_ns%machnumber*params_ns%c0/params_ns%mu0
+
+      if (params_ns%mpirank==0) then
+        write(*,*)
+        write(*,*)
+        write(*,*) "Additional Information"
+        write(*,'(" -----------------------")')
+        nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
+        write(*,'("minimal lattice spacing:",T40,g12.4)') params_ns%dx_min
+        write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
+
+        if (.not. params_ns%inicond=="read_from_files") then
+            write(*,'("initial speed of sound:", T40, f6.2)') params_ns%c0
+            write(*,'("initial Machnumber:", T40, f6.2)')     params_ns%machnumber
+            write(*,'("Reynolds for Ly:", T40, f12.1)')       params_ns%Reynolds
+
+        endif
+      endif
+
+    end subroutine add_info
 
 
 

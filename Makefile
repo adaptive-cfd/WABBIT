@@ -136,7 +136,7 @@ $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o\
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o\
 	initial_conditions.f90 filter_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -145,7 +145,7 @@ $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
-	 RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90
+	RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90 save_data_ns.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
@@ -221,7 +221,7 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
 	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
-	save_data.f90 write_field.f90 write_vorticity.f90 read_field.f90 \
+	save_data.f90 write_field.f90 read_field.f90 \
 	read_mesh.f90 read_attributes.f90 read_file_flusi.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

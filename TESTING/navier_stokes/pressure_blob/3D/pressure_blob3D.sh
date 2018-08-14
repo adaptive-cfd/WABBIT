@@ -4,14 +4,14 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/navier_stokes/pressure_blob/"
-params=${dir}"ns_test.ini"
+dir="./TESTING/navier_stokes/pressure_blob/3D/"
+params=${dir}"pressure_blob3D.ini"
 happy=0
 sad=0
-echo "testing navier stokes pressure blob"
+echo "testing navier stokes pressure blob in 3 dimensions"
 
 # list of prefixes the test generates
-prefixes=(Ux Uy p rho)
+prefixes=(Ux Uy Uz p rho)
 # list of possible times (no need to actually have them)
 times=(000000001000)
 
@@ -37,10 +37,10 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ${mpi_serial} ./wabbit-post 2D --keyvalues ${file}
+        ${mpi_serial} ./wabbit-post 3D --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
-            ${mpi_serial} ./wabbit-post 2D --compare-keys $keyfile $reffile
+            ${mpi_serial} ./wabbit-post 3D --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
               echo -e ":) Happy, this looks okay!" $keyfile $reffile

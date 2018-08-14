@@ -131,35 +131,18 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
         mu_d = 0.0_rk
 
         ! thermal conductivity
-        lambda  = Cp * mu/Pr
+        lambda= Cp * mu/Pr
+        div_U = u_x+v_y+w_z
 
-        ! tau11
+        !stress tensor
         tau11 = mu * 2.0_rk * u_x
-
-        call diff1x_zentral_3D( Bs, g, dx, u, dummy)
-        div_U = dummy
-        call diff1y_zentral_3D( Bs, g, dy, v, dummy)
-        div_U = div_U + dummy
-        call diff1z_zentral_3D( Bs, g, dz, w, dummy)
-        div_U = div_U + dummy
-
         tau11 = tau11 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
-        ! tau22
         tau22 = mu * 2.0_rk * v_y
         tau22 = tau22 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
-        ! tau33
         tau33 = mu * 2.0_rk * w_z
         tau33 = tau33 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
-        ! tau12
         tau12 = mu * ( v_x + u_y )
-
-        ! tau13
         tau13 = mu * ( w_x + u_z )
-
-        ! tau23
         tau23 = mu * ( w_y + v_z )
 
         ! Friction terms for Momentum equation = div(tau_i*)/(J*srho)

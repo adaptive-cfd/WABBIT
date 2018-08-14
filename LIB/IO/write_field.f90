@@ -96,7 +96,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3)
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
-    logical       :: block_contains_nan
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -129,8 +128,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! first: check if field contains NaNs
     do k=1,hvy_n
-        call check_NaN(hvy_block(:,:,:,dF,hvy_active(k)), block_contains_nan)
-        if (block_contains_nan) call abort(0201, "ERROR: Field"//get_dsetname(fname)//" contains NaNs!! We should not save this...")
+        if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_active(k)))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
     end do
 
     ! output on screen

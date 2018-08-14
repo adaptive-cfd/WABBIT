@@ -47,7 +47,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
-    logical                             :: block_contains_nan
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -107,10 +106,11 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! check if field contains NaNs
     do k=1,hvy_n
         if ( params%threeD_case ) then
-            call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,k), block_contains_nan)
+            if (block_contains_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,k))) &
+                call abort(0200, "ERROR: Saved field "//get_dsetname(fname)//" contains NaNs!! I don't want to read from this file!")
         else
-            call check_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,:,dF,k), block_contains_nan)
+            if (block_contains_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,:,dF,k))) &
+                call abort(0200, "ERROR: Saved field "//get_dsetname(fname)//" contains NaNs!! I don't want to read from this file!")
         end if
-        if (block_contains_nan) call abort(0200, "ERROR: Saved field"//get_dsetname(fname)//" contains NaNs!! I don't want to read from this file!")
     end do
 end subroutine read_field

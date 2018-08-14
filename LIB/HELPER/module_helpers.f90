@@ -254,24 +254,23 @@ contains
         if (.not. (x.eq.x)) is_nan=.true.
     end function is_nan
 
-    subroutine check_NaN(data, block_contains_nan)
+    logical function block_contains_NaN(data)
         ! check for one block if a certain datafield contains NaNs
         implicit none
         real(kind=rk), intent(in)       :: data(:,:,:)
-        logical, intent(out)            :: block_contains_nan
         integer(kind=ik)                :: nx, ny, nz, ix, iy, iz
 
         nx = size(data,1)
         ny = size(data,2)
         nz = size(data,3)
-        block_contains_nan = .false.
+        block_contains_NaN = .false.
 
         do iz=1,nz
             do iy=1,ny
                 do ix=1,nx
-                    if (is_nan(data(ix,iy,iz))) block_contains_nan=.true.
+                    if (is_nan(data(ix,iy,iz))) block_contains_NaN=.true.
                 end do
             end do
         end do
-    end subroutine check_NaN
+    end function block_contains_NaN
 end module module_helpers

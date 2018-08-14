@@ -130,7 +130,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     do k=1,hvy_n
         if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_active(k)))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
     end do
-    
+
     ! output on screen
     if (rank == 0) then
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i5," sparsity=(",f5.1,"% / ",f5.1,"%)")') &

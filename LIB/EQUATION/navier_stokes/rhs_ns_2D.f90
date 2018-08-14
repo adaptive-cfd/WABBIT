@@ -367,13 +367,13 @@ subroutine get_sponge(sponge, x0, dx, Bs, g)
     sponge = 0.0_rk
 !---------------------------------------------------------------------------------------------
 ! main body
-    ddx = 0.1_rk*params_ns%Lx
+    ddx = 0.1_rk*params_ns%domain_size(1)
 
     do iy=1, Bs+2*g
        do ix=1, Bs+2*g
            x = dble(ix-(g+1)) * dx(1) + x0(1)
-           if ((params_ns%Lx-x) <= ddx) then
-               sponge(ix,iy) = (x-(params_ns%Lx-ddx))**2
+           if ((params_ns%domain_size(1)-x) <= ddx) then
+               sponge(ix,iy) = (x-(params_ns%domain_size(1)-ddx))**2
            elseif (x <= ddx) then
                sponge(ix,iy) = (x-ddx)**2
            else

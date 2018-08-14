@@ -89,11 +89,11 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
     dissipation = params_ns%dissipation
 
     ! variables
-    rho         = phi(:,:,:,1)**2
-    u           = phi(:,:,:,2)/phi(:,:,:,1)
-    v           = phi(:,:,:,3)/phi(:,:,:,1)
-    w           = phi(:,:,:,4)/phi(:,:,:,1)
-    p           = phi(:,:,:,5)
+    rho         = phi(:,:,:,rhoF)**2
+    u           = phi(:,:,:,UxF)/phi(:,:,:,rhoF)
+    v           = phi(:,:,:,UyF)/phi(:,:,:,rhoF)
+    w           = phi(:,:,:,UzF)/phi(:,:,:,rhoF)
+    p           = phi(:,:,:,pF)
 
     ! rhs
     rhs         = 0.0_rk
@@ -388,7 +388,7 @@ subroutine  diffx_c_3D( Bs, g, dx, u, dudx)
 
     integer                         :: i, n
 
-    n = size(u,1)
+    n = size(u,2)
 
     dudx(1,:,:) = ( u(n-1,:,:) - 8.0_rk*u(n,:,:) + 8.0_rk*u(2,:,:) - u(3,:,:) ) / (12.0_rk*dx)
     dudx(2,:,:) = ( u(n,:,:)   - 8.0_rk*u(1,:,:) + 8.0_rk*u(3,:,:) - u(4,:,:) ) / (12.0_rk*dx)
@@ -413,7 +413,7 @@ subroutine  diffy_c_3D( Bs, g, dy, u, dudy)
 
     integer                         :: i, n
 
-    n = size(u,1)
+    n = size(u,3)
 
     dudy(:,1,:) = ( u(:,n-1,:) - 8.0_rk*u(:,n,:) + 8.0_rk*u(:,2,:) - u(:,3,:) ) / (12.0_rk*dy)
     dudy(:,2,:) = ( u(:,n,:)   - 8.0_rk*u(:,1,:) + 8.0_rk*u(:,3,:) - u(:,4,:) ) / (12.0_rk*dy)
@@ -437,7 +437,7 @@ subroutine  diffz_c_3D( Bs, g, dz, u, dudz)
     real(kind=rk), intent(out)      :: dudz(Bs+2*g, Bs+2*g, Bs+2*g)
 
     integer                         :: i, n
-    
+
     n = size(u,1)
 
     dudz(:,:,1) = ( u(:,:,n-1) - 8.0_rk*u(:,:,n) + 8.0_rk*u(:,:,2) - u(:,:,3) ) / (12.0_rk*dz)

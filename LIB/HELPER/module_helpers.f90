@@ -313,7 +313,6 @@ contains
         ny = size(data,2)
         nz = size(data,3)
         block_contains_nan = .false.
-
         do iz=1,nz
             do iy=1,ny
                 do ix=1,nx

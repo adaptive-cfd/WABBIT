@@ -470,14 +470,7 @@ contains
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
     if ( minval(u(:,:,:,pF))<0 ) then
       write(*,*)"minval=",minval(u(:,:,:,pF))
-      do ix=g+1, Bs+g
-        x = dble(ix-(g+1)) * dx(1) + x0(1)
-        do iy=g+1,Bs+g
-           y= dble(iy-(g+1))* dx(2)*x0(2)
-           if (u(ix,iy,1,pF)<0.0_rk) write(*,*) "minval=",u(ix,iy,1,pF),"at (x,y)=",x,y
-        end do
-      end do
-      !call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
+      call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
     end if
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
 
@@ -534,25 +527,21 @@ contains
 
     ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
     if ( params_ns%inicond=="read_from_files") then
-        if (params_ns%dim==2) then
         call pack_statevector(u(:,:,:,:),'pure_variables')
-      endif
-      return
+        return
     else
-      u = 0.0_rk
+        u = 0.0_rk
     endif
 
 
     if (p_init<=0.0_rk .or. rho_init <=0.0) then
-      call abort(6032, "Error [module_navier_stokes_new.f90]: initial pressure and density must be larger then 0")
+      call abort(6032,  "Error [module_navier_stokes_new.f90]: initial pressure and density"//&
+                        "must be larger then 0")
     endif
 
 
 
     select case( params_ns%inicond )
-    case ("sinus_2d","sinus2d","sin2d")
-      !> \todo implement sinus_2d inicondition
-      call abort(7771,"inicond is not implemented yet: "//trim(adjustl(params_ns%inicond)))
     case("shear_layer")
       if (params_ns%dim==2) then
         call inicond_shear_layer(  u, x0, dx ,Bs, g)
@@ -562,18 +551,12 @@ contains
 
     case ("zeros")
       ! add ambient pressure
-      u( :, :, :, pF) = params_ns%initial_pressure
-      ! set rho
+      u( :, :, :, pF)   = params_ns%initial_pressure
       u( :, :, :, rhoF) = sqrt(rho_init)
-      ! set Ux
-      u( :, :, :, UxF) = 0.0_rk
-      ! set Uy
-      u( :, :, :, UyF) = 0.0_rk
+      u( :, :, :, UxF)  = 0.0_rk
+      u( :, :, :, UyF)  = 0.0_rk
+      if (params_ns%dim==3)  u( :, :, :, UzF) = 0.0_rk
 
-      if (size(u,3).ne.1) then
-          ! set Uz to zero
-          u( :, :, :, UzF) = 0.0_rk
-      endif
     case ("standing-shock","moving-shock")
       ! chooses values such that shock should not move
       ! in space according to initial conditions
@@ -603,12 +586,12 @@ contains
          x = dble(ix-(g+1)) * dx(1) + x0(1)
          call continue_periodic(x,params_ns%domain_size(1))
          ! left region
-         radius=abs(x-x0_inicond-width*0.5_rk)
-         b=0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
-         u( ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
-         u(ix, : , :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
-         u(ix, : , :, UyF)  = 0.0_rk
-         u( ix, :, :, pF)   = p_init-b*(p_init - tmp(3))
+         radius = abs(x-x0_inicond-width*0.5_rk)
+         b      = 0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
+         u(ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
+         u(ix, :, :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
+         u(ix, :, :, UyF)  = 0.0_rk
+         u(ix, :, :, pF)   = p_init-b*(p_init - tmp(3))
       end do
 
     case ("sod_shock_tube")
@@ -675,16 +658,11 @@ contains
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%domain_size(1), params_ns%domain_size(2), params_ns%domain_size(3)/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF) = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
-        u( :, :, :, rhoF) = sqrt(params_ns%initial_density)
+        u( :, :, :, pF)  = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
+        u( :, :, :, rhoF)= sqrt(params_ns%initial_density)
         u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
-        ! set Uy
         u( :, :, :, UyF) = params_ns%initial_velocity(2)*sqrt(params_ns%initial_density)
-
-        if (size(u,3).ne.1) then
-            ! set Uz to zero
-            u( :, :, :, UzF) = 0.0_rk
-        endif
+        if (params_ns%dim==3)  u( :, :, :, UzF) = params_ns%initial_velocity(3)*sqrt(params_ns%initial_density)
     case default
         call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))
     end select
@@ -785,7 +763,7 @@ subroutine convert_statevector(phi,convert2format)
       !w
       if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:, UzF)/phi(:,:,:,rhoF)
       !p
-      converted_vector(:,:,:,4)= phi(:,:,:, pF)
+      converted_vector(:,:,:,pF)= phi(:,:,:, pF)
     case default
         call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
     end select

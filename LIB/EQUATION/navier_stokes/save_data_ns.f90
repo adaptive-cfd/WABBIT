@@ -36,12 +36,11 @@
 
     Bs                  = size(u,1)-2*g   ! number of block sides
     nvar                = size(u,4)       ! number of variables describing the state of the fluid
-
     ! allocate temporary field
     if ( .not. allocated(tmp_u) )  allocate(tmp_u(size(u,1),size(u,2),size(u,3),nvar))
     tmp_u  = u(:,:,:,:)
-    call convert_statevector(tmp_u,'pure_variables')
 
+    call convert_statevector(tmp_u,'pure_variables')
     ! compute vorticity
     if (  list_contains_name(params_ns%names,'vortx')>0 .or. &
           list_contains_name(params_ns%names,'vort') >0 ) then
@@ -60,7 +59,7 @@
 
     ! save pure state variables (rho, u, v, w, p)
     work(:,:,:,1:nvar)=tmp_u(:,:,:,:)
-
+    
     ! save additional variables
     do k = nvar+1, params_ns%N_fields_saved
         name = params_ns%names(k)

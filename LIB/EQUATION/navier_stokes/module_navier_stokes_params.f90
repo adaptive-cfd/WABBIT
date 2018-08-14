@@ -267,6 +267,13 @@ subroutine init_other_params(params_ns, FILE )
     end if
 
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
+    if ( params_ns%dim==3 .and. params_ns%number_data_fields<5 ) then
+      if ( params_ns%mpirank==0 ) then
+        write(*,*)"WARNING number of data fields increased to the minimum of 5 fileds"
+      end if
+      params_ns%number_data_fields=5
+    end if
+
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )

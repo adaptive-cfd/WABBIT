@@ -249,8 +249,8 @@ program main
 
     ! next write time for reloaded data
     if (params%write_method == 'fixed_time') then
-        params%next_write_time = time + params%next_write_time
-        params%next_stats_time = time + params%next_stats_time
+        params%next_write_time = floor(time/params%next_write_time)*params%next_write_time + params%next_write_time
+        params%next_stats_time = floor(time/params%next_stats_time)*params%next_stats_time + params%next_stats_time
     end if
 
     ! max neighbor num

@@ -134,13 +134,13 @@ subroutine compute_vorticity_post(help, params)
     end do
     write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
     call write_field(fname, time, iteration, 1, params, lgt_block,&
-    hvy_work, lgt_active, lgt_n, hvy_n)
+    hvy_work, lgt_active, lgt_n, hvy_n, hvy_active )
     if (params%threeD_case) then
         write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 2, params, lgt_block,&
-        hvy_work, lgt_active, lgt_n, hvy_n)
+        hvy_work, lgt_active, lgt_n, hvy_n,  hvy_active)
         write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 3, params, lgt_block, &
-        hvy_work, lgt_active, lgt_n, hvy_n)
+        hvy_work, lgt_active, lgt_n, hvy_n, hvy_active)
     end if
 end subroutine compute_vorticity_post

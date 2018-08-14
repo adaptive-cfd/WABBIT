@@ -199,7 +199,7 @@ subroutine sparse_to_dense(help, params)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
-        hvy_block, lgt_active, lgt_n, hvy_n)
+        hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
 
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &

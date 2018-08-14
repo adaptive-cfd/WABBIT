@@ -35,7 +35,7 @@
 !
 ! ********************************************************************************************
 
-subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n)
+subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -63,7 +63,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
 
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
+    integer(kind=ik), intent(in)        :: lgt_active(:), hvy_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     !> number of active blocks (heavy data)
@@ -96,6 +96,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3)
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
+    logical       :: block_contains_nan
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -126,6 +127,12 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 !---------------------------------------------------------------------------------------------
 ! main body
 
+    ! first: check if field contains NaNs
+    do k=1,hvy_n
+        call check_NaN(hvy_block(:,:,:,1,hvy_active(k)), block_contains_nan)
+        if (block_contains_nan) call abort(0201, "ERROR: Field"//get_dsetname(fname)//" contains NaNs!! We should not save this...")
+    end do
+    
     ! output on screen
     if (rank == 0) then
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i5," sparsity=(",f5.1,"% / ",f5.1,"%)")') &

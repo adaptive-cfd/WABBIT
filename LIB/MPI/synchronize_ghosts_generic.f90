@@ -1,4 +1,3 @@
-
 subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
     implicit none
@@ -75,17 +74,17 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         ! this rank has with all other ranks (it is thus an array of mpisize)
         communication_counter(:, istage) = 0
         ! reset integer send buffer position
-        int_pos(:, istage) = 2       ! TODO JR why 2? , the first filed contains the size of the XXX
-        ! reset first in send buffer position
-        int_send_buffer(1, :, istage) = 0
-        int_send_buffer(2, :, istage) = -99
+        int_pos(:, istage) = 1
+        ibuffer_position(:, istage) = 0
+        int_send_buffer(1, :, istage) = -99
 
         ! compute, locally from the grid info, how much data I recv from and sent to all
         ! other mpiranks. this gives us the start indices of each rank in the send/recv buffers. Note
         ! we do not count our internal nodes (.false. as last argument), as they are not put in the
         ! buffer at any time.
         call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
-        recv_counter(:, istage), send_counter(:, istage), INCLUDE_REDUNDANT, .false.)
+        recv_counter(:, istage), send_counter(:, istage), &
+        int_recv_counter(:, istage), int_send_counter(:, istage), INCLUDE_REDUNDANT, .false.)
 
 
         !***************************************************************************
@@ -395,7 +394,7 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, neighb
     integer(kind=ik), intent(in)        :: currentSortInRound
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), intent(inout) :: communication_counter(:,:)
+    integer(kind=ik), intent(inout)     :: communication_counter(:,:)
 
     integer(kind=ik) :: l, hvy_id_receiver, neighborhood, level_diff_indicator, entrySortInRound
     integer(kind=ik) :: level_diff, bounds_type, buffer_position, buffer_size
@@ -404,7 +403,7 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, neighb
     ! did I recv something from this rank?
     if ( (communication_counter(neighbor_rank, istage_buffer) /= 0) ) then
 
-        l = 2  ! first field is size of data
+        l = 1
 
         do while ( int_recv_buffer(l, neighbor_rank, istage_buffer) /= -99 )
             ! unpack the description of the next data chunk
@@ -481,7 +480,7 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
 
 
 
-    l = 2  ! first field is size of data
+    l = 1
     do while ( int_send_buffer(l, neighbor_rank, istage_buffer) /= -99 )
         ! unpack the description of the next data chunk
         ! required info:  sender_hvy_id, hvy_id_receiver, neighborhood, level_diff, bounds_type, entrySortInRound
@@ -919,7 +918,7 @@ subroutine AppendLineToBuffer( int_send_buffer, new_send_buffer, buffer_size, ne
 
     ! fill real buffer
     ! position in real buffer is stored in int buffer
-    buffer_position = int_send_buffer( 1, neighbor_rank, istage ) + 1
+    buffer_position = ibuffer_position(neighbor_rank, istage) + 1
 
     i0 = sum(send_counter(0:neighbor_rank-1-1, istage)) + buffer_position
 
@@ -930,7 +929,7 @@ subroutine AppendLineToBuffer( int_send_buffer, new_send_buffer, buffer_size, ne
 
     ! fill int buffer
     ! sum size of single buffers on first element
-    int_send_buffer(1  , neighbor_rank, istage ) = int_send_buffer(1  , neighbor_rank, istage ) + buffer_size
+    ibuffer_position(neighbor_rank, istage) = ibuffer_position(neighbor_rank, istage) + buffer_size
 
     ! save: neighbor id, neighborhood, level difference, buffer size
     int_send_buffer( int_pos(neighbor_rank, istage),   neighbor_rank, istage ) = hvy_id
@@ -938,6 +937,7 @@ subroutine AppendLineToBuffer( int_send_buffer, new_send_buffer, buffer_size, ne
     int_send_buffer( int_pos(neighbor_rank, istage)+2, neighbor_rank, istage ) = level_diff
     int_send_buffer( int_pos(neighbor_rank, istage)+3, neighbor_rank, istage ) = buffer_position
     int_send_buffer( int_pos(neighbor_rank, istage)+4, neighbor_rank, istage ) = buffer_size
+
     ! mark end of buffer with -99, will be overwritten by next element if it is not the last one
     int_send_buffer( int_pos(neighbor_rank, istage)+5, neighbor_rank, istage ) = -99
 
@@ -971,21 +971,20 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
     integer(kind=ik), intent(in)          :: istage
 
     ! process rank
-    integer(kind=ik)                    :: rank
+    integer(kind=ik) :: rank
     ! MPI error variable
-    integer(kind=ik)                    :: ierr
+    integer(kind=ik) :: ierr
 
     ! MPI message tag
-    integer(kind=ik)                    :: tag
+    integer(kind=ik) :: tag
     ! MPI request
-    integer(kind=ik)                    :: send_request(params%number_procs), recv_request(params%number_procs)
+    integer(kind=ik) :: send_request(2*params%number_procs)
+    integer(kind=ik) :: recv_request(2*params%number_procs)
 
     ! column number of send buffer, column number of receive buffer, real data buffer length
-    integer(kind=ik)                    :: length_realBuffer, int_length, mpirank_partner
-
+    integer(kind=ik) :: length_realBuffer, int_length, mpirank_partner
     ! loop variable
-    integer(kind=ik)                    :: k, i, i0
-
+    integer(kind=ik) :: k, i, i0
 
     rank = params%rank
 
@@ -1042,15 +1041,15 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
 
 
     do k = 1, params%number_procs
-        ! communication between proc rank and proc k-1
+        ! communication between proc "rank" and proc "k-1"
         if ( communication_counter(k, istage) > 0 ) then
             mpirank_partner = k-1 ! zero based
 
             ! increase communication counter
             i = i + 1
 
-            ! real buffer length is stored as the first entry in the integer buffer,
-            ! hence we know how much data we'll receive
+            ! the amount of data is pre-computed in get_my_sendrecv_amount_with_ranks
+            ! hence we do know how much data we will receive
             length_realBuffer = recv_counter(mpirank_partner, istage)
 
             i0 = sum(recv_counter(0:mpirank_partner-1, istage)) + 1 ! note exclude k of course do not run 0:mpirank_partner
@@ -1060,8 +1059,8 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
             call MPI_Irecv( new_recv_buffer(i0:i0+length_realBuffer-1, istage), length_realBuffer, MPI_REAL8, &
             mpirank_partner, MPI_ANY_TAG, WABBIT_COMM, recv_request(i), ierr)
 
-            ! real buffer length is stored as the first entry in the integer buffer,
-            ! hence we know how much data we'll send
+            ! the amount of data is pre-computed in get_my_sendrecv_amount_with_ranks
+            ! hence we do know how much data we will receive
             length_realBuffer = send_counter(mpirank_partner, istage)
 
             i0 = sum(send_counter(0:mpirank_partner-1, istage)) + 1 ! note exclude k of course do not run 0:mpirank_partner
@@ -1083,10 +1082,10 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
 end subroutine isend_irecv_data_2
 
 
-! returns two lists with numbers of points I send ot all other procs and how much I
+! returns two lists with numbers of points I send to all other procs and how much I
 ! receive from each proc. note: strictly locally computed, NO MPI comm involved here
 subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active,&
-     hvy_n, recv_list, send_list, bounds_type, count_internal)
+     hvy_n, recv_list, send_list, int_recv_list, int_send_list, bounds_type, count_internal)
 
     implicit none
 
@@ -1101,6 +1100,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n, bounds_type
     integer(kind=ik), intent(inout)     :: recv_list(0:), send_list(0:)
+    integer(kind=ik), intent(inout)     :: int_recv_list(0:), int_send_list(0:)
     logical, intent(in)                 :: count_internal
 
     integer(kind=ik) :: k, sender_hvy_id, sender_lgt_id, myrank, N, neighborhood, neighbor_rank
@@ -1114,6 +1114,8 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     ! this would be good since no comm involved.
     recv_list(:) = 0
     send_list(:) = 0
+    int_recv_list(:) = 0
+    int_send_list(:) = 0
 
     do k = 1, hvy_n
         ! calculate light id
@@ -1146,6 +1148,10 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
 
                     send_list(neighbor_rank) = send_list(neighbor_rank) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
+
+                    ! counter for integer buffer
+                    int_recv_list(neighbor_rank) = int_recv_list(neighbor_rank) + 5
+                    int_send_list(neighbor_rank) = int_send_list(neighbor_rank) + 5
                 endif
 
             end if ! neighbor exists
@@ -1155,4 +1161,4 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
     recv_list(:) = recv_list(:) * params%number_data_fields
     send_list(:) = send_list(:) * params%number_data_fields
-end subroutine
+end subroutine get_my_sendrecv_amount_with_ranks

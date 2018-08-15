@@ -49,7 +49,9 @@ module module_MPI
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
     integer(kind=ik), allocatable :: int_send_buffer(:,:,:), int_recv_buffer(:,:,:)
+    integer(kind=ik), allocatable :: int_recv_counter(:,:), int_send_counter(:,:)
     integer(kind=ik), allocatable :: recv_counter(:,:), send_counter(:,:)
+    integer(kind=ik), allocatable :: ibuffer_position(:,:)
     real(kind=rk), allocatable    :: new_send_buffer(:,:), new_recv_buffer(:,:)
 
     ! an array to count how many messages we send to the other mpiranks.
@@ -95,7 +97,7 @@ module module_MPI
     ! bounds on sender side. used to avoid one-sided interpolation if desired. They're
     ! global so we can save them easily to the ghosts_bounds.dat file
     integer(kind=ik) :: A, S
-    
+
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
@@ -238,8 +240,10 @@ subroutine init_ghost_nodes( params )
         ! this is a list of communications with all other procs
         allocate( communication_counter(1:Ncpu, 1:Nstages) )
         allocate( int_pos(1:Ncpu, 1:Nstages) )
+        allocate( ibuffer_position(1:Ncpu, 1:Nstages) )
         allocate( line_buffer( Neqn*(Bs+2*g)**(dim) ) )
         allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
+        allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
 
         !-----------------------------------------------------------------------
         ! set up constant arrays

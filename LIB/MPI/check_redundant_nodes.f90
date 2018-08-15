@@ -62,16 +62,16 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     communication_counter(:, stage) = 0_ik
 
 
-    int_pos(:, stage) = 2
-    ! reset first in send buffer position
-    int_send_buffer( 1, :, stage ) = 0
-    int_send_buffer( 2, :, stage ) = -99
+    int_pos(:, stage) = 1
+    ibuffer_position(:, stage) = 0
+    int_send_buffer(1, :, stage ) = -99
 
     ! in this routine we treat internal and external neighbors identically, therefore we need to
     ! count also my own neighorhood relations. this is not highly efficient (involves copying)
     ! but this routine is meant for testing, not production.
     call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
-    recv_counter(:, stage), send_counter(:, stage), INCLUDE_REDUNDANT, .true.)
+    recv_counter(:, stage), send_counter(:, stage), &
+    int_recv_counter(:, stage), int_send_counter(:, stage), INCLUDE_REDUNDANT, .true.)
 
     do k = 1, hvy_n
         do neighborhood = 1, size(hvy_neighbor, 2)
@@ -133,8 +133,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! loop over all mpiranks
     do k = 1, params%number_procs
         if ( communication_counter(k, stage) /= 0 ) then
-            ! first element in int buffer is real buffer size
-            l = 2
+            l = 1
             ! -99 marks end of data
             do while ( int_recv_buffer(l, k, stage) /= -99 )
 

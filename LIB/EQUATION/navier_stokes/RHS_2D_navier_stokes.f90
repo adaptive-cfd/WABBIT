@@ -90,7 +90,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs,boundary_flag)
     !  1: boundary in the direction +e_i
     ! -1: boundary in the direction - e_i
     ! currently only acessible in the local stage
-    
+
     integer(kind=1)          , intent(in):: boundary_flag(3)
 
 !---------------------------------------------------------------------------------------------
@@ -143,29 +143,18 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs,boundary_flag)
         mu_d = 0.0_rk
 
         ! thermal conductivity
-        lambda  = Cp * mu/Pr
+        lambda= Cp * mu/Pr
+        div_U = u_x+v_y
 
-        ! tau11
+        !stress tensor
         tau11 = mu * 2.0_rk * u_x
-
-        !> \todo why not just simply div_U= u_x + v_y ?
-        call diff1x_zentral( Bs, g, dx, u, dummy)
-        div_U = dummy
-        call diff1y_zentral( Bs, g, dy, v, dummy)
-        div_U = div_U + dummy
-
         tau11 = tau11 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-        ! tau22
         tau22 = mu * 2.0_rk * v_y
         tau22 = tau22 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-        ! tau33
         tau33 = 0.0_rk
         tau33 = tau33 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-        ! tau12
         tau12 = mu * ( v_x + u_y )
-        ! tau13
         tau13 = 0.0_rk
-        ! tau23
         tau23 = 0.0_rk
 
         ! Friction terms for Momentum equation = div(tau_i*)/(J*srho)

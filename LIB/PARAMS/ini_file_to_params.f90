@@ -181,7 +181,7 @@ subroutine ini_file_to_params( params, filename )
 
             mem_per_block = real(Neqn) * real(Nrk) * (real(Bs+2*g))**d & ! hvy_work+hvy_block
             + 2.0 * nstages * real(Neqn) * real((Bs+2*g)**d - Bs**d) &  ! real buffer ghosts
-            + 2.0 * nstages * max_neighbors * 3 * real(params%number_procs) / 2.0 ! int bufer (4byte hence /2)
+            + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
 
             ! in GB:
             mem_per_block = mem_per_block * 8.0e-9

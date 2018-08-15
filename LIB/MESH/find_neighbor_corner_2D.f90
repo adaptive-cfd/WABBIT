@@ -141,10 +141,10 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
     ! non periodic B
     ! +++++++++++++++
     ! is a boundary of the domain in this direction? If yes then please dont comunicate in this direction
-    if (  params%periodic_BC .eqv. .false. .and. &
-          block_is_adjacent_to_boundary(dir,my_treecode,neighbor,max_treelevel) ) then
-
-         neighbor_light_id=-1
+    if ( params%periodic_BC .eqv. .false. ) then
+        if ( block_is_adjacent_to_boundary(dir,my_treecode,neighbor,max_treelevel) ) then
+            neighbor_light_id = -1
+        end if
     end if
     ! +++++++++++++
 

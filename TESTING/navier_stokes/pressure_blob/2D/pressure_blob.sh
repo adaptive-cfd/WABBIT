@@ -4,11 +4,11 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/navier_stokes/pressure_blob/"
+dir="./TESTING/navier_stokes/pressure_blob/2D/"
 params=${dir}"ns_test.ini"
 happy=0
 sad=0
-echo "testing navier stokes pressure blob"
+echo "testing navier stokes pressure blob in 2 dimensions"
 
 # list of prefixes the test generates
 prefixes=(Ux Uy p rho)

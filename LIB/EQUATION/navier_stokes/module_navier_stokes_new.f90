@@ -636,14 +636,15 @@ contains
       u( :, :, :, rhoF) = sqrt(rho_init)
 
       ! set velocity field u(x)=1 for x in mask
-      if (size(u,3)==1 .and. params_ns%penalization) then
+      if (params_ns%penalization) then
         call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
         call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
+        if (params_ns%dim==3) call get_mask(u( :, :, 1, UzF), x0, dx, Bs, g )
+
       endif
 
       ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
       u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
-
       if ( params_ns%geometry=="funnel" ) then
         do iy=g+1, Bs+g
             !initial y-velocity negative in lower half and positive in upper half

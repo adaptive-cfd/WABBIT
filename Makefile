@@ -130,7 +130,7 @@ $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_m
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_boundary_conditions.o: module_boundary_conditions.f90 \
-		$(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
+		$(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_treelib.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o

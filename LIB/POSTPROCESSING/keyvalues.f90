@@ -11,7 +11,7 @@
 !! \version 4/4/18 - add space filling curve test commit 47b4c1e24eabd112c950928e77e134046fc05d9a
 !*********************************************************************************************
 
-subroutine keyvalues(fname, params, help)
+subroutine keyvalues(fname, params)
 
     use module_IO
     use module_precision
@@ -24,8 +24,6 @@ subroutine keyvalues(fname, params, help)
     character(len=*), intent(in)            :: fname
     !> parameter struct
     type (type_params), intent(inout)       :: params
-    !> help flag
-    logical, intent(in)                     :: help
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
@@ -52,10 +50,10 @@ subroutine keyvalues(fname, params, help)
     curves(1) = 'sfc_hilbert'
     curves(2) = 'sfc_z'
     !-----------------------------------------------------------------------------------------------------
-    if (help) then
+    if (fname=='--help' .or. fname=='--h') then
         if (rank==0) then
             write(*,*) "WABBIT postprocessing routine to load a specified *.h5 file and create a *.key file that contains  min / max / mean / L2 norm of the field data."
-            write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --keyvalues filename.h5"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --keyvalues filename.h5"
         end if
         return
     endif
@@ -66,7 +64,11 @@ subroutine keyvalues(fname, params, help)
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
-
+    if (dim==3) then
+        params%threeD_case = .true.
+    else
+        params%threeD_case = .false.
+    end if
     params%number_block_nodes = Bs
     params%max_treelevel = tc_length
     params%number_data_fields = 1

@@ -10,7 +10,7 @@
 !> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 !-----------------------------------------------------------------------------------------------------
 
-subroutine compute_vorticity_post(help, params)
+subroutine compute_vorticity_post(params)
     use module_precision
     use module_mesh
     use module_params
@@ -20,8 +20,6 @@ subroutine compute_vorticity_post(help, params)
 
     implicit none
 
-    !> help flag
-    logical, intent(in)                :: help
     !> parameter struct
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_ux, file_uy, file_uz
@@ -40,29 +38,37 @@ subroutine compute_vorticity_post(help, params)
     real(kind=rk), dimension(3)        :: domain
 
     !-----------------------------------------------------------------------------------------------------
-
-    if (help) then
+    ! get values from command line (filename and level for interpolation)
+    call get_command_argument(2, file_ux)
+    ! does the user need help?
+    if (file_ux=='--help' .or. file_ux=='--h') then
         if (params%rank==0) then
             write(*,*) "wabbit postprocessing routine for subsequent vorticity calculation"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post 3D --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
         end if
         return
     endif
 
-    ! get values from command line (filename and level for interpolation)
-    call get_command_argument(3, file_ux)
     call check_file_exists(trim(file_ux))
 
-    call get_command_argument(4, file_uy)
+    call get_command_argument(3, file_uy)
     call check_file_exists(trim(file_uy))
 
-    if (params%threeD_case) then
-        call get_command_argument(5, file_uz)
-        call check_file_exists(trim(file_uz))
-        call get_command_argument(6, order)
+    ! get some parameters from one of the files (they should be the same in all of them)
+    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, dim)
+    if (dim==3) then
+        params%threeD_case = .true.
     else
+        params%threeD_case = .false.
+    end if
+
+    if (params%threeD_case) then
+        call get_command_argument(4, file_uz)
+        call check_file_exists(trim(file_uz))
         call get_command_argument(5, order)
+    else
+        call get_command_argument(4, order)
     end if
 
     ! decide which order for discretization and predictor is used. Note predictor
@@ -82,8 +88,6 @@ subroutine compute_vorticity_post(help, params)
 
     end if
 
-    ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, dim)
     params%max_treelevel = tc_length
     params%number_data_fields = dim
     params%domain_size(1) = domain(1)

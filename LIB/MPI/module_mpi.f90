@@ -48,10 +48,10 @@ module module_MPI
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
-    integer(kind=ik), allocatable :: int_send_buffer(:,:,:), int_recv_buffer(:,:,:)
+    integer(kind=ik), allocatable :: int_send_buffer(:,:), int_recv_buffer(:,:)
     integer(kind=ik), allocatable :: int_recv_counter(:,:), int_send_counter(:,:)
     integer(kind=ik), allocatable :: recv_counter(:,:), send_counter(:,:)
-    integer(kind=ik), allocatable :: ibuffer_position(:,:)
+    integer(kind=ik), allocatable :: real_pos(:,:)
     real(kind=rk), allocatable    :: new_send_buffer(:,:), new_recv_buffer(:,:)
 
     ! an array to count how many messages we send to the other mpiranks.
@@ -162,7 +162,9 @@ subroutine init_ghost_nodes( params )
             !---3d---3d---
             ! space dimensions: used in the static arrays as index
             dim = 3
-            buffer_N_int = number_blocks * 56 * 3
+            ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
+            ! at most, we can have 56 neighbors ACTIVE per block
+            buffer_N_int = number_blocks * 56 * 5
             ! how many possible neighbor relations are there?
             Nneighbor = 74
 
@@ -171,7 +173,9 @@ subroutine init_ghost_nodes( params )
             !---2d---2d---
             ! space dimensions: used in the static arrays as index
             dim = 2
-            buffer_N_int = number_blocks * 12 * 3
+            ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
+            ! at most, we can have 12 neighbors ACTIVE per block
+            buffer_N_int = number_blocks * 12 * 5
             ! how many possible neighbor relations are there?
             Nneighbor = 16
 
@@ -203,8 +207,8 @@ subroutine init_ghost_nodes( params )
         ! wait now so that if allocation fails, we get at least the above info
         call MPI_barrier( WABBIT_COMM, status(1))
 
-        allocate( int_send_buffer( 1:buffer_N_int, 1:Ncpu, 1:Nstages), stat=status(1) )
-        allocate( int_recv_buffer( 1:buffer_N_int, 1:Ncpu, 1:Nstages), stat=status(2) )
+        allocate( int_send_buffer( 1:buffer_N_int, 1:Nstages), stat=status(1) )
+        allocate( int_recv_buffer( 1:buffer_N_int, 1:Nstages), stat=status(2) )
         allocate( new_send_buffer( 1:buffer_N, 1:Nstages), stat=status(3) )
         allocate( new_recv_buffer( 1:buffer_N, 1:Nstages), stat=status(4) )
 
@@ -240,8 +244,9 @@ subroutine init_ghost_nodes( params )
         ! this is a list of communications with all other procs
         allocate( communication_counter(1:Ncpu, 1:Nstages) )
         allocate( int_pos(1:Ncpu, 1:Nstages) )
-        allocate( ibuffer_position(1:Ncpu, 1:Nstages) )
+        allocate( real_pos(1:Ncpu, 1:Nstages) )
         allocate( line_buffer( Neqn*(Bs+2*g)**(dim) ) )
+
         allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
         allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
 

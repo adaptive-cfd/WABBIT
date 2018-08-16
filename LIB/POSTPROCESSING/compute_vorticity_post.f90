@@ -24,7 +24,7 @@ subroutine compute_vorticity_post(params)
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_ux, file_uy, file_uz
     real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, Bs, tc_length, dim
+    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, Bs, tc_length
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
@@ -56,8 +56,8 @@ subroutine compute_vorticity_post(params)
     call check_file_exists(trim(file_uy))
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, dim)
-    if (dim==3) then
+    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
+    if (params%dim==3) then
         params%threeD_case = .true.
     else
         params%threeD_case = .false.
@@ -89,7 +89,7 @@ subroutine compute_vorticity_post(params)
     end if
 
     params%max_treelevel = tc_length
-    params%number_data_fields = dim
+    params%number_data_fields = params%dim
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)

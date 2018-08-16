@@ -36,10 +36,16 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
 
   integer(kind=ik) :: i, hvy_id, owner_rank, myrank, npoints
   integer(kind=ik) :: lgt_free_id, tag, hvy_free_id, ierr
-  integer :: status(MPI_STATUS_SIZE)
+  ! MPI request
+  integer(kind=ik) :: send_request(size(lgt_blocks_to_gather)), n_send
+  integer(kind=ik) :: recv_request(size(lgt_blocks_to_gather)), n_recv
 
   myrank = params%rank
 
+  n_send = 0_ik
+  n_recv = 0_ik
+  recv_request = MPI_REQUEST_NULL
+  send_request = MPI_REQUEST_NULL
   ! look at all blocks in the gather list
   do i = 1, size(lgt_blocks_to_gather)
       ! which mpirank owns the block?
@@ -62,9 +68,11 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               !------------------------
               ! get hvy id where to store the data
               call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, myrank, params%number_blocks )
-
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-              call MPI_recv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, tag, WABBIT_COMM, status, ierr)
+              ! increment the list of recv_requests
+              n_recv  = n_recv + 1
+              call MPI_irecv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, &
+                              tag, WABBIT_COMM, recv_request(n_recv), ierr)
 
           elseif ( myrank == owner_rank) then
               ! Am I the owner of this block, so will I have to send data?
@@ -75,11 +83,18 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               call lgt_id_to_hvy_id( hvy_id, lgt_blocks_to_gather(i), owner_rank, params%number_blocks )
 
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-              call MPI_send( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, WABBIT_COMM, ierr)
+              ! increment the list of send_requests
+              n_recv  = n_recv + 1
+              call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, &
+                              WABBIT_COMM,send_request(n_send), ierr)
 
               ! delete old heavy data
               hvy_block(:,:,:,:,hvy_id) = 4.0e11_rk
           endif
+
+          ! wait until everything is received and sended
+          if (n_send > 0 ) call MPI_Waitall( i, send_request(1:n_send), MPI_STATUSES_IGNORE, ierr)
+          if (n_recv > 0 ) call MPI_Waitall( i, recv_request(1:n_recv), MPI_STATUSES_IGNORE, ierr)
 
           ! even if I am not concerned with sending or recv, the light data changes, assuming the copy went through.
           ! if it did not, code hangs anyways. so here assume it worked and on all CPU just copy the light data

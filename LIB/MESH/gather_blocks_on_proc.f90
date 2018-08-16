@@ -1,15 +1,8 @@
-!> \file
-!> \callgraph
 ! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name gather_blocks_on_proc.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief Gather a specified list of blocks on one specified CPU. Used for e.g. for block merging.
 !
 !> \details
+!> \author engels
 !! This routine gathers all block specified in the list "lgt_blocks_to_gather" on one CPU, namely the CPU
 !! "gather_rank". It does not hurt if some or all block are already on the CPU, nothing is done in that case.
 !! Ghost nodes are transferred as well, works for 2D/3D data of any size and for any number of blocks to be transferred
@@ -17,7 +10,7 @@
 !! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
 !!
-!! Uses blocking communication.
+!! Uses non- blocking communication.
 ! ********************************************************************************************
 subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt_blocks_to_gather )
   implicit none
@@ -84,7 +77,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
 
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
               ! increment the list of send_requests
-              n_recv  = n_recv + 1
+              n_send  = n_send + 1
               call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, &
                               WABBIT_COMM,send_request(n_send), ierr)
 

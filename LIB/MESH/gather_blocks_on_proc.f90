@@ -12,7 +12,7 @@
 !!
 !! Uses non- blocking communication.
 ! ********************************************************************************************
-subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt_blocks_to_gather )
+subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt_blocks_to_gather,request, n_req )
   implicit none
 
   !> user defined parameter structure
@@ -26,19 +26,15 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
   integer(kind=ik), intent(inout)     :: lgt_blocks_to_gather(:)
   !> on which MPIRANK will be gather the desired blocks?
   integer(kind=ik), intent(in)        :: gather_rank
+  integer(kind=ik), intent(inout)     :: request(:), n_req
 
   integer(kind=ik) :: i, hvy_id, owner_rank, myrank, npoints
   integer(kind=ik) :: lgt_free_id, tag, hvy_free_id, ierr
   ! MPI request
-  integer(kind=ik) :: send_request(size(lgt_blocks_to_gather)), n_send
-  integer(kind=ik) :: recv_request(size(lgt_blocks_to_gather)), n_recv
+
 
   myrank = params%rank
 
-  n_send = 0_ik
-  n_recv = 0_ik
-  recv_request = MPI_REQUEST_NULL
-  send_request = MPI_REQUEST_NULL
   ! look at all blocks in the gather list
   do i = 1, size(lgt_blocks_to_gather)
       ! which mpirank owns the block?
@@ -62,10 +58,10 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               ! get hvy id where to store the data
               call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, myrank, params%number_blocks )
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-              ! increment the list of recv_requests
-              n_recv  = n_recv + 1
+              ! increment the list of requests
+              n_req  = n_req + 1
               call MPI_irecv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, &
-                              tag, WABBIT_COMM, recv_request(n_recv), ierr)
+                              tag, WABBIT_COMM, request(n_req), ierr)
 
           elseif ( myrank == owner_rank) then
               ! Am I the owner of this block, so will I have to send data?
@@ -76,17 +72,11 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               call lgt_id_to_hvy_id( hvy_id, lgt_blocks_to_gather(i), owner_rank, params%number_blocks )
 
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-              ! increment the list of send_requests
-              n_send  = n_send + 1
+              ! increment the list of requests
+              n_req = n_req + 1
               call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, &
-                              WABBIT_COMM, send_request(n_send), ierr)
-
+                              WABBIT_COMM, request(n_req), ierr)
           endif
-
-          ! wait until everything is received and sended
-          if (n_send > 0 ) call MPI_Waitall( i, send_request(1:n_send), MPI_STATUSES_IGNORE, ierr)
-          if (n_recv > 0 ) call MPI_Waitall( i, recv_request(1:n_recv), MPI_STATUSES_IGNORE, ierr)
-
           ! even if I am not concerned with sending or recv, the light data changes, assuming the copy went through.
           ! if it did not, code hangs anyways. so here assume it worked and on all CPU just copy the light data
           lgt_block( lgt_free_id, : ) = lgt_block( lgt_blocks_to_gather(i), : )
@@ -95,6 +85,8 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
           ! we return the new index of the blocks we moved
           lgt_blocks_to_gather(i) = lgt_free_id
       endif
+      ! make all gathered blocks inactive until they are merged 
+      lgt_block( lgt_blocks_to_gather(i), params%max_treelevel + idx_refine_sts ) = 0
   enddo
 
 ! NOTE; even though light data is synched, active lists etc have to be created afterwards!

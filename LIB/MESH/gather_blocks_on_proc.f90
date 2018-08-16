@@ -79,10 +79,8 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               ! increment the list of send_requests
               n_send  = n_send + 1
               call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, &
-                              WABBIT_COMM,send_request(n_send), ierr)
+                              WABBIT_COMM, send_request(n_send), ierr)
 
-              ! delete old heavy data
-              hvy_block(:,:,:,:,hvy_id) = 4.0e11_rk
           endif
 
           ! wait until everything is received and sended

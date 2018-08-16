@@ -85,7 +85,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
           ! we return the new index of the blocks we moved
           lgt_blocks_to_gather(i) = lgt_free_id
       endif
-      ! make all gathered blocks inactive until they are merged 
+      ! make all gathered blocks inactive until they are merged
       lgt_block( lgt_blocks_to_gather(i), params%max_treelevel + idx_refine_sts ) = 0
   enddo
 

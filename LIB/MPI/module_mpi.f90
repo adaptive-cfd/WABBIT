@@ -197,7 +197,7 @@ subroutine init_ghost_nodes( params )
             buffer_N_int, buffer_N, Nstages
 
             write(*,'("GHOSTS-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N_int)*dble(Ncpu)*dble(Nstages)*8e-9
+                2.0*dble(buffer_N_int)*dble(Nstages)*8e-9
 
             write(*,'("GHOSTS-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
                 2.0*dble(buffer_N)*dble(Nstages)*8e-9

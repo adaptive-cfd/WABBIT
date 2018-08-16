@@ -1038,27 +1038,6 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
 
     end do
 
-
-    !> \todo Please check if waiting twice is really necessary
-    ! synchronize non-blocking communications
-    ! note: single status variable do not work with all compilers, so use MPI_STATUSES_IGNORE instead
-    if (i>0) then
-        call MPI_Waitall( i, send_request(1:i), MPI_STATUSES_IGNORE, ierr)
-        call MPI_Waitall( i, recv_request(1:i), MPI_STATUSES_IGNORE, ierr)
-    end if
-
-
-
-    ! ----------------------------------------------------------------------------------------
-    ! second: real data
-    ! reset communication couter
-    i = 0
-
-    ! reset request arrays
-    recv_request = MPI_REQUEST_NULL
-    send_request = MPI_REQUEST_NULL
-
-
     do k = 1, params%number_procs
         ! communication between proc "rank" and proc "k-1"
         if ( communication_counter(k, istage) > 0 ) then

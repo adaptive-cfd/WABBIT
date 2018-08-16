@@ -39,6 +39,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
   n_recv = 0_ik
   recv_request = MPI_REQUEST_NULL
   send_request = MPI_REQUEST_NULL
+  
   ! look at all blocks in the gather list
   do i = 1, size(lgt_blocks_to_gather)
       ! which mpirank owns the block?
@@ -84,8 +85,8 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
           endif
 
           ! wait until everything is received and sended
-          if (n_send > 0 ) call MPI_Waitall( i, send_request(1:n_send), MPI_STATUSES_IGNORE, ierr)
-          if (n_recv > 0 ) call MPI_Waitall( i, recv_request(1:n_recv), MPI_STATUSES_IGNORE, ierr)
+          if (n_send > 0 ) call MPI_Waitall(n_send, send_request(1:n_send), MPI_STATUSES_IGNORE, ierr)
+          if (n_recv > 0 ) call MPI_Waitall(n_recv, recv_request(1:n_recv), MPI_STATUSES_IGNORE, ierr)
 
           ! even if I am not concerned with sending or recv, the light data changes, assuming the copy went through.
           ! if it did not, code hangs anyways. so here assume it worked and on all CPU just copy the light data

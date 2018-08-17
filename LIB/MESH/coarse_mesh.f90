@@ -42,7 +42,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank,  n_req, ierr,n_merge
     ! non blocking send receives use communication requests
-    integer(kind=ik),save,allocatable   :: request(:),status(:)
+    integer(kind=ik),save,allocatable   :: request(:)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -56,13 +56,11 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     endif
 
     ! at worst every block is on a different rank
-    if (.not. allocated(request)) allocate(request(N*lgt_n))
-    if (.not. allocated(status)) allocate(status(N*lgt_n))
+    if (.not. allocated(request)) allocate(request(N*size(lgt_block,1)))
 !---------------------------------------------------------------------------------------------
 ! main body
     n_req   = 0_ik
     n_merge = 0_ik
-    request = MPI_REQUEST_NULL
     ! loop over all active light data
     do k = 1, lgt_n
       ! FIRST condition: only work on light data, if block is active. Usually, you would do that just with
@@ -92,7 +90,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
       ! In gather_block_on_proc we have initiated communications with irecv and isend, to get the
       ! block information for sisters on different ranks.
       ! Before the sisters can be merged we have to make sure, that sending and receiving is done!
-      if (n_req > 0_ik ) call MPI_Waitall( n_req, request, status, ierr)
+      if (n_req > 0_ik ) call MPI_Waitall( n_req, request, MPI_STATUSES_IGNORE, ierr)
 
       ! After we have gathered all n_merge*N sister blocks, we merge them into n_merge parent blocks
       do k = 1, n_merge

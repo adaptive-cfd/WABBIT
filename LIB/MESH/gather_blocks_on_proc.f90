@@ -60,6 +60,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
               ! increment the list of requests
               n_req  = n_req + 1
+              request(n_req) = MPI_REQUEST_NULL
               call MPI_irecv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, &
                               tag, WABBIT_COMM, request(n_req), ierr)
 
@@ -74,6 +75,7 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
               ! increment the list of requests
               n_req = n_req + 1
+              request(n_req) = MPI_REQUEST_NULL
               call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, &
                               WABBIT_COMM, request(n_req), ierr)
           endif

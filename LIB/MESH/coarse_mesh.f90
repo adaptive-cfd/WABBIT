@@ -1,21 +1,15 @@
-!> \file
-!> \callgraph
 ! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name coarse_mesh.f90
-!> \version 0.5
-!> \author engels, msr
-!
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 !
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 22/05/2017 Rewrite using modular subroutines, works for 2/3d cases
-!! 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
-!            subroutines
+!> \details
+!> \author engels, msr, Pkrah
+!! \date 17/08/18   - non blocking mpi communication for sending and receiving blocks during
+!!                    gather (PKrah, commit d48299f4231040f619b2f2af5f56bf4f72994ff5  )
+!! \date 22/05/2017 - Rewrite using modular subroutines, works for 2/3d cases
+!! \date 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
+!!            subroutines
+!! \todo it would be faster if the merging would allready start, after all sisters are recieved
+!! on the gather rank
 ! ********************************************************************************************
 
 subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
@@ -100,6 +94,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
       ! Before the sisters can be merged we have to make sure, that sending and receiving is done!
       if (n_req > 0_ik ) call MPI_Waitall( n_req, request, status, ierr)
 
+      ! After we have gathered all n_merge*N sister blocks, we merge them into n_merge parent blocks
       do k = 1, n_merge
           ! merge the four blocks into one new block. Merging is done in two steps,
           ! first for light data (which all CPUS do redundantly, so light data is kept synched)

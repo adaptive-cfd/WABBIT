@@ -2,13 +2,61 @@
 ! Note you must not have any dependencies for this module (other than precision)
 ! in order not to create makefile conflicts.
 module module_helpers
-    use module_precision
+    use module_globals
     use mpi
     implicit none
 
 contains
 
     include "rotation_matrices.f90"
+
+    !-----------------------------------------------------------------------------
+    !> This function computes the factorial of n
+    !-----------------------------------------------------------------------------
+    function factorial (n) result (res)
+
+      implicit none
+      integer, intent (in) :: n
+      integer :: res
+      integer :: i
+
+      res = product ((/(i, i = 1, n)/))
+
+    end function factorial
+
+    !-----------------------------------------------------------------------------
+    !> This function computes the binomial coefficients
+    !-----------------------------------------------------------------------------
+    function choose (n, k) result (res)
+
+      implicit none
+      integer, intent (in) :: n
+      integer, intent (in) :: k
+      integer :: res
+
+      res = factorial (n) / (factorial (k) * factorial (n - k))
+
+    end function choose
+
+    !-----------------------------------------------------------------------------
+    !> This function returns 0 if name is not contained in list, otherwise the index for which
+    !> a substring
+    !-----------------------------------------------------------------------------
+    function list_contains_name (list, name) result (index)
+
+      implicit none
+      character(len=*), intent (in) :: list(:)
+      character(len=*), intent (in) :: name
+      integer :: index
+
+      do index = 1, size(list)
+        if (trim(list(index))==trim(name))  return
+      end do
+      index=0
+    end function list_contains_name
+
+
+
 
     !-----------------------------------------------------------------------------
     ! This function returns, to a given filename, the corresponding dataset name
@@ -244,5 +292,33 @@ contains
         endif
 
     end subroutine check_file_exists
+    !---------------------------------------------------------------------------
+    ! wrapper for NaN checking (this may be compiler dependent)
+    !---------------------------------------------------------------------------
+    logical function is_nan( x )
+        implicit none
+        real(kind=rk) :: x
+        is_nan = .false.
+        if (.not. (x.eq.x)) is_nan=.true.
+    end function is_nan
 
+    logical function block_contains_NaN(data)
+        ! check for one block if a certain datafield contains NaNs
+        implicit none
+        real(kind=rk), intent(in)       :: data(:,:,:)
+        integer(kind=ik)                :: nx, ny, nz, ix, iy, iz
+
+        nx = size(data,1)
+        ny = size(data,2)
+        nz = size(data,3)
+
+        block_contains_NaN = .false.
+        do iz=1,nz
+            do iy=1,ny
+                do ix=1,nx
+                    if (is_nan(data(ix,iy,iz))) block_contains_NaN=.true.
+                end do
+            end do
+        end do
+    end function block_contains_NaN
 end module module_helpers

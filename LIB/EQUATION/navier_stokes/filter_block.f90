@@ -93,8 +93,6 @@ subroutine init_filter(filter, FILE )
                 call read_param_mpi(FILE, 'Discretization', 'switch', filter%sigma_switch, 'tanh' )
                 ! bogey shock detection method (p,divU)
                 call read_param_mpi(FILE, 'Discretization', 'detector_method', filter%detector_method, 'divU' )
-                ! boolean save bogey filter strength
-                call read_param_mpi(FILE, 'Discretization', 'save_filter_strength', filter%save_filter_strength, .false. )
 
             case default
                 call abort(4564,"ERROR [filter_block.f90]: filter type is not known!")
@@ -152,15 +150,13 @@ end subroutine init_filter
 !!              with \f$d_j\f$ being the filter coeffficient
 !!          + wavelet filter
 !!          + bogey shock filter
-subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
+subroutine filter_block(filter,time,  work_array, Bs, g, x0, dx)
 
     implicit none
      !> params structure of navier stokes
     type(type_params_filter),intent(in) :: filter
     !> time loop parameters
     real(kind=rk), intent(in)           :: time
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: u(:,:,:,:)
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: work_array(:, :, :, :)
     !> grid parameter
@@ -170,31 +166,30 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
 
 
     ! loop variables
-    integer(kind=ik)                    :: i, j, l, dF, N_dF, stencil_size
+    integer(kind=ik)                    :: i, j, l, dF, N_dF,dF_old, stencil_size
 
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, sub_t1, time_sum
 
-
     ! filtered values and array for old block data
     real(kind=rk)                       :: phi_tilde(3)
-    real(kind=rk), allocatable          :: block_old(:, :, :)
 
     stencil_size            =filter%stencil_size
     N_dF                    =filter%number_data_fields
 
-    if (size(u,3)==1) then
+    if (params_ns%dim==2) then
         !2D
-        call convert_statevector2D(u(:,:,1,:),'conservative')
+        call convert_statevector(work_array(:,:,:,:),'conservative')
     else
         !3D
         call abort(5326,"ERROR [filter_block]: 3D case not implemented yet")
     endif
-    work_array(:,:,:,1:N_dF)= u
-
     ! loop over all datafields
+    work_array(:,:,:,N_dF+1:2*N_dF)=work_array(:,:,:,1:N_dF)
+
     do dF = 1, N_dF
+        dF_old=dF+N_dF
         ! switch case
         ! explicit filter -> stencil_size /= 0
         ! wavelet filter -> stencil_size == 0
@@ -203,20 +198,20 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
             ! save old block data
             !block_old = hvy_block(:, :, :, dF, hvy_active(k) )
             ! 3D or 2D case
-            if ( size(u,3) > 1 ) then
+            if (params_ns%dim==3 ) then
                 ! 3D
                 ! loop over block data
                 do i = g+1, Bs+g
                     do j = g+1, Bs+g
                         do l = g+1, Bs+g
                             ! x direction
-                            call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l,dF ), phi_tilde(1), filter%stencil(1:stencil_size) )
+                            call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l,dF_old ), phi_tilde(1), filter%stencil(1:stencil_size) )
                             ! y direction
-                            call filter_1D( work_array(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), l,dF ), phi_tilde(2), filter%stencil(1:stencil_size) )
+                            call filter_1D( work_array(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), l,dF_old ), phi_tilde(2), filter%stencil(1:stencil_size) )
                             ! z direction
-                            call filter_1D( work_array(i, j, l-( (stencil_size+1)/2-1):l+( (stencil_size+1)/2-1),dF ), phi_tilde(3), filter%stencil(1:stencil_size) )
+                            call filter_1D( work_array(i, j, l-( (stencil_size+1)/2-1):l+( (stencil_size+1)/2-1),dF_old ), phi_tilde(3), filter%stencil(1:stencil_size) )
                             ! filter
-                            u(i, j, l, dF ) = u(i, j, l, dF ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
+                            work_array(i, j, l, dF ) = work_array(i, j, l, dF_old ) + phi_tilde(1) + phi_tilde(2) + phi_tilde(3)
                         end do
                     end do
                 end do
@@ -226,11 +221,11 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
                 do i = g+1, Bs+g
                     do j = g+1, Bs+g
                         ! x direction
-                        call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1, dF ), phi_tilde(1), filter%stencil(1:stencil_size) )
+                        call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1, dF_old ), phi_tilde(1), filter%stencil(1:stencil_size) )
                         ! y direction
-                        call filter_1D( work_array(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), 1, dF ), phi_tilde(2), filter%stencil(1:stencil_size) )
+                        call filter_1D( work_array(i, j-( (stencil_size+1)/2-1):j+( (stencil_size+1)/2-1), 1, dF_old ), phi_tilde(2), filter%stencil(1:stencil_size) )
                         ! filter
-                        u(i, j, 1, dF ) = u(i, j, 1, dF) + phi_tilde(1) + phi_tilde(2)
+                        work_array(i, j, 1, dF ) = work_array(i, j, 1, dF_old) + phi_tilde(1) + phi_tilde(2)
                     end do
                 end do
             end if
@@ -238,21 +233,17 @@ subroutine filter_block(filter,time, u,Bs, g, x0, dx, work_array)
             select case(filter%name)
                 case('wavelet')
                     ! wavelet filter
-                    call wavelet_filter(filter,Bs,g, u(:, :, :, dF))
+                    call wavelet_filter(filter,Bs,g, work_array(:, :, :, dF))
                 case('bogey_shock')
                     ! shock filter
                     if ( dF == 1 ) then
-                        call bogey_filter(filter, Bs, g, N_dF ,u,x0,dx,work_array)
+                        call bogey_filter(filter, Bs, g, N_dF ,work_array,x0,dx)
                     end if
             end select
         end if
     end do
 
-    if (size(u,3)==1) then
-        call pack_statevector2D(u(:,:,1,:),'conservative')
-    else
-        call abort(9820,"3D not implemented yet")
-    endif
+    call pack_statevector(work_array(:,:,:,:),'conservative')
 
 end subroutine filter_block
 
@@ -479,7 +470,8 @@ end subroutine wavelet_filter
 !! \date 21/09/17 - create
 !! \date 29/04/18 - update for new physics branch (pKrah)
 
-subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
+
+subroutine bogey_filter(filter, Bs, g, N_dF, hvy_work, xx0, ddx)
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -489,22 +481,22 @@ subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
     type(type_params_filter),intent(in) :: filter
     !> grid parameter
     integer(kind=ik), intent(in)        :: g, Bs, N_dF
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    !> heavy work
+    ! !> heavy work
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
     ! spacing and origin of a block
     real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3)
 
 
+    ! !> heavy data array - block data
+    ! real(kind=rk),                      :: block_data(:, :, :, :)
     ! loop parameter
     integer(kind=ik)                    :: i, j, l, dF
 
     ! filtered values and array for old block data
     real(kind=rk)                       :: phi_tilde(3), r_xyz(3), r_th, eps, c1, c2, c_stencil(4)
-!    real(kind=rk), allocatable          :: block_old(:, :, :, :), r_x(:,:), r_y(:,:), sigma_x(:,:), sigma_y(:,:), theta(:,:), u_x(:,:), v_y(:,:), Dtheta_x(:,:), &
-!                                           Dtheta_y(:,:), Dthetamag_x(:,:), Dthetamag_y(:,:), c_2(:,:), rho(:,:), u(:,:), v(:,:), p(:,:)
-    real(kind=rk)          :: block_old(Bs+2*g, Bs+2*g, Bs+2*g, N_dF), r_x(Bs+2*g, Bs+2*g), r_y(Bs+2*g, Bs+2*g), sigma_x(Bs+2*g, Bs+2*g), sigma_y(Bs+2*g, Bs+2*g), theta(Bs+2*g, Bs+2*g), &
+    real(kind=rk)                      :: block_old(size(hvy_work,1), size(hvy_work,2), size(hvy_work,3), N_dF)!, r_x(:,:), r_y(:,:), sigma_x(:,:), sigma_y(:,:), theta(:,:), u_x(:,:), v_y(:,:), Dtheta_x(:,:), &
+!                                           Dtheta_y(:,:), Dthetamag_x(:,:), Dthetamag_y(:,:), c_2(:,:), rho(:,:), work_array(:,:), v(:,:), p(:,:)
+    real(kind=rk)          :: r_x(Bs+2*g, Bs+2*g), r_y(Bs+2*g, Bs+2*g), sigma_x(Bs+2*g, Bs+2*g), sigma_y(Bs+2*g, Bs+2*g), theta(Bs+2*g, Bs+2*g), &
               u_x(Bs+2*g, Bs+2*g),v_y(Bs+2*g, Bs+2*g), Dtheta_x(Bs+2*g, Bs+2*g), Dtheta_y(Bs+2*g, Bs+2*g), Dthetamag_x(Bs+2*g, Bs+2*g), &
               Dthetamag_y(Bs+2*g, Bs+2*g), c_2(Bs+2*g, Bs+2*g), rho(Bs+2*g, Bs+2*g), u(Bs+2*g, Bs+2*g), v(Bs+2*g, Bs+2*g), p(Bs+2*g, Bs+2*g)
 
@@ -559,25 +551,16 @@ subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
     c2 = 0.030617_rk;
 
     c_stencil = (/ -c2, -c1, c1, c2 /);
+    block_old=hvy_work(:,:,:,1:N_dF)
+    call convert2format(block_old    ,'conservative',&
+                        hvy_work(:,:,:,1:N_dF)  ,'pure_variables')
 
-    ! hack: reset boundary nodes
- !   call set_boundary( Bs, g, block_data(:, :, 1, 1), block_data(:, :, 1, 2), block_data(:, :, 1, 3), block_data(:, :, 1, 4), xx0, ddx, params%Lx, params%Ly )
-    !> \todo make filter interface for different physics modules
-    if (.true.) then
-        !! CAUTION !!
-        ! conservative variables are asumed here (rho,rho u, rho v, e)
-        call convert2format(block_data(:,:,1,:)    ,'conservative',&
-                            hvy_WORK(:,:,1,1:N_dF) ,'pure_variables')
 
-        rho = hvy_WORK(:, :, 1, 1)
-        u   = hvy_work(:, :, 1, 2)
-        v   = hvy_work(:, :, 1, 3)
-        p   = hvy_work(:, :, 1, 4)
-        gamma_=params_ns%gamma_
-
-    else
-        call abort(13463,'Error [bogey_filter]: only ns supported: everything else not implemented yet!')
-    endif
+    rho = hvy_work(:, :, 1, rhoF)
+    u   = hvy_work(:, :, 1, UxF)
+    v   = hvy_work(:, :, 1, UyF)
+    p   = hvy_work(:, :, 1, pF)
+    gamma_=params_ns%gamma_
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -586,7 +569,7 @@ subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
     ! detector input
     select case (detector_method)
         case("p")
-            theta = block_data(:, :, 1, 4)
+            theta = p
 
         case("divU")
             u_x = 0.0_rk
@@ -681,20 +664,17 @@ subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
 
     end select
 
-    ! fourth - filter fields
-    block_old(:,:,1,:) = block_data(:,:,1,:)
     do dF = 1, N_dF
         do i = g+1,Bs+g
             do j = g+1,Bs+g
+                hvy_work(i,j,1,dF) = block_old(i,j,1,dF)
 
-                block_data(i,j,1,dF) = block_old(i,j,1,dF)
-
-                block_data(i,j,1,dF) = block_data(i,j,1,dF) - ( 0.5_rk * (sigma_x(i+1,j) + sigma_x(i,j)) &
+                hvy_work(i,j,1,dF) = hvy_work(i,j,1,dF) - ( 0.5_rk * (sigma_x(i+1,j) + sigma_x(i,j)) &
                                                                        * sum( c_stencil * block_old(i-1:i+2,j,1,dF) ) &
                                                             -   0.5_rk * (sigma_x(i-1,j) + sigma_x(i,j)) &
                                                                        * sum( c_stencil * block_old(i-2:i+1,j,1,dF) ) )
 
-                block_data(i,j,1,dF) = block_data(i,j,1,dF) - ( 0.5_rk * (sigma_y(i,j+1) + sigma_y(i,j)) &
+                hvy_work(i,j,1,dF) = hvy_work(i,j,1,dF) - ( 0.5_rk * (sigma_y(i,j+1) + sigma_y(i,j)) &
                                                                        * sum( c_stencil * block_old(i,j-1:j+2,1,dF) ) &
                                                             -   0.5_rk * (sigma_y(i,j-1) + sigma_y(i,j)) &
                                                                        * sum( c_stencil * block_old(i,j-2:j+1,1,dF) ) )
@@ -705,9 +685,9 @@ subroutine bogey_filter(filter, Bs, g, N_dF, block_data, xx0, ddx, hvy_work)
 
     if (filter%save_filter_strength) then
         ! save filter strength in x direction
-        hvy_WORK(:,:,1,1)=sigma_x(:,:)
+        hvy_WORK(:,:,1,N_dF+1)=sigma_x(:,:)
         ! save filter strength in y direction
-        hvy_WORK(:,:,1,2)=sigma_y(:,:)
+        hvy_WORK(:,:,1,N_dF+2)=sigma_y(:,:)
     endif
 
 end subroutine bogey_filter

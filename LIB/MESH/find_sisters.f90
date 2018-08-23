@@ -74,7 +74,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   ! be on the highest level)
   all_treecodes = -1
 
-  my_level = lgt_block( lgt_my_id, params%max_treelevel+1 )
+  my_level = lgt_block( lgt_my_id, params%max_treelevel + idx_mesh_lvl )
 
   lgt_sisters_id = -1
 

@@ -70,7 +70,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n
-        lgt_block( lgt_active(k), Jmax+2 ) = 0
+        lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
     enddo
 
     !---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         ! evaluate the criterion on this block.
         call block_coarsening_indicator( params, hvy_block(:,:,:,1:neq,hvy_active(k)), &
         hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
-        lgt_block(lgt_id, Jmax+2), norm )
+        lgt_block(lgt_id, Jmax + idx_refine_sts), norm )
     enddo
 
     !---------------------------------------------------------------------------
@@ -167,9 +167,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     !---------------------------------------------------------------------------
     if (params%force_maxlevel_dealiasing) then
         do k = 1, lgt_n
-            if (lgt_block(lgt_active(k), Jmax+1) == params%max_treelevel) then
+            if (lgt_block(lgt_active(k), Jmax + idx_mesh_lvl) == params%max_treelevel) then
                 ! force blocks on maxlevel to coarsen
-                lgt_block(lgt_active(k), Jmax+2) = -1
+                lgt_block(lgt_active(k), Jmax + idx_refine_sts) = -1
             endif
         enddo
     endif

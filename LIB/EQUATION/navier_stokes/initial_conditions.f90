@@ -55,10 +55,10 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
     muy = 0.5_rk * L(2)
     muz = 0.5_rk * L(3)
 
-    ! pulse width
-    sigma = width * L(1) * L(2)
 
     if (size(u,3)==1) then
+      ! pulse width
+      sigma = width * L(1) * L(2)
       ! 2D case
       ! create gauss pulse
       do ix = g+1,Bs+g
@@ -75,24 +75,19 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
       end do
 
     else
-      sigma = width*L(1)
+      sigma = width*minval(L)
       ! 3D case
       ! create gauss pulse
       do ix = g+1,Bs+g
         do iy = g+1,Bs+g
           do iz = g+1,Bs+g
-            ! compute x,y coordinates from spacing and origin
-            call continue_periodic(x,L(1))
-            call continue_periodic(y,L(2))
-            call continue_periodic(z,L(3))
 
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             y = dble(iy-(g+1)) * dx(2) + x0(2)
             z = dble(iz-(g+1)) * dx(3) + x0(3)
             ! shift to new gauss blob center
-            ! call shift_x_y( x, y, params%Lx,params%Ly )
             ! set actual inicond gauss blob
-            u(ix,iy,iz) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / sigma )
+            u(ix,iy,iz) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / (2*sigma)**2 )
           end do
         end do
       end do

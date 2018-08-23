@@ -84,7 +84,7 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
 ! variables initialization
 
     my_treecode     = lgt_block( light_id, 1:max_treelevel )
-    level           = lgt_block( light_id, max_treelevel + 1 )
+    level           = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
 
     lvl_down_neighbor = .false.
 
@@ -135,6 +135,19 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
     call adjacent_block_2D( my_treecode, neighbor, dir, level, max_treelevel)
     ! check existence of neighbor block
     call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+
+
+    ! +++++++++++++++
+    ! non periodic B
+    ! +++++++++++++++
+    ! is a boundary of the domain in this direction? If yes then please dont comunicate in this direction
+    if ( params%periodic_BC .eqv. .false. ) then
+        if ( block_is_adjacent_to_boundary(dir,my_treecode,neighbor,max_treelevel) ) then
+            neighbor_light_id = -1
+        end if
+    end if
+    ! +++++++++++++
+
 
     if (exists) then
 

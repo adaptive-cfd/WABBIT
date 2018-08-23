@@ -16,7 +16,7 @@
 !! \details This module is not MPI-aware. use the mpi layer in ini_files_parser_mpi for this
 !-------------------------------------------------------------------------------
 module module_ini_files_parser
-  use module_precision
+  use module_globals
 
   ! it sometimes is useful, for codes with equidistant resolution, to specify
   ! values as multiples of grid spacing, mostly for convergence tests and the like
@@ -349,7 +349,7 @@ end subroutine read_intarray_from_ascii_file
       endif
     else
       ! no value red, use default value
-      write (value,'(g10.3," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
+      write (value,'(g10.3," (default!)")') defaultvalue
       params_real = defaultvalue
     endif
 
@@ -402,7 +402,7 @@ end subroutine read_intarray_from_ascii_file
       endif
     else
       ! no value red, use default value
-      write (value,'(g10.3," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
+      write (value,'(g10.3," (default!)")') defaultvalue
       params_real = defaultvalue
     endif
 
@@ -439,7 +439,7 @@ end subroutine read_intarray_from_ascii_file
     if (value .ne. '') then
       params_string = value
     else
-      value = trim(adjustl(defaultvalue))//" (THIS IS THE DEFAULT VALUE!)"
+      value = trim(adjustl(defaultvalue))//" (default!)"
       params_string = defaultvalue
     endif
 
@@ -499,7 +499,7 @@ end subroutine read_intarray_from_ascii_file
       if (present(defaultvalue)) then
         ! return default
         write (value,formatstring) defaultvalue
-        value = trim(adjustl(value))//" (THIS IS THE DEFAULT VALUE!)"
+        value = trim(adjustl(value))//" (default!)"
         params_vector = defaultvalue
       else
         ! return zeros
@@ -560,7 +560,7 @@ end subroutine read_intarray_from_ascii_file
       !params_vector = value
     else
       write (value,formatstring) defaultvalue
-      value = trim(adjustl(value))//" (THIS IS THE DEFAULT VALUE!)"
+      value = trim(adjustl(value))//" (default!)"
       params_vector = defaultvalue
     endif
 
@@ -598,7 +598,7 @@ end subroutine read_intarray_from_ascii_file
       read (value, *) params_int
       write (value,'(i9)') params_int
     else
-      write (value,'(i9," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
+      write (value,'(i9," (default!)")') defaultvalue
       params_int = defaultvalue
     endif
 
@@ -642,7 +642,7 @@ end subroutine read_intarray_from_ascii_file
 
       write (value,'(L1)') params_bool
     else
-      write (value,'(L1," (THIS IS THE DEFAULT VALUE!)")') defaultvalue
+      write (value,'(L1," (default!)")') defaultvalue
       params_bool = defaultvalue
     endif
 
@@ -774,8 +774,8 @@ end subroutine read_intarray_from_ascii_file
   ! section not found, use default value
   if (.not. allocated(matrix)) then
       allocate ( matrix(size(defaultvalue,1),size(defaultvalue,2)))
-      !value = trim(adjustl(defaultvalue))//" (THIS IS THE DEFAULT VALUE!)"
-      defaultmessage = " (THIS IS THE DEFAULT VALUE!)"
+      !value = trim(adjustl(defaultvalue))//" (default!)"
+      defaultmessage = " (default!)"
       matrix = defaultvalue
   else
       defaultmessage = ''

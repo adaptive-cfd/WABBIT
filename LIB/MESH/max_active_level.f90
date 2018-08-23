@@ -36,7 +36,7 @@ function max_active_level( lgt_block, lgt_active, lgt_n )
     ! loop variables
     integer(kind=ik)                    :: k, Jmax, max_treelevel
 
-    max_treelevel = size( lgt_block, 2) - 2
+    max_treelevel = size( lgt_block, 2) - extra_lgt_fields
     !---------------------------------------------------------------------------------------------
     ! main body
     Jmax = 0
@@ -45,13 +45,13 @@ function max_active_level( lgt_block, lgt_active, lgt_n )
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n
-            Jmax = max(Jmax, lgt_block( lgt_active(k), max_treelevel+1))
+            Jmax = max(Jmax, lgt_block( lgt_active(k), max_treelevel+idx_mesh_lvl))
         end do
 
     else
         ! call without active lists
         do k = 1, size(lgt_block, 1)
-            Jmax = max(Jmax, lgt_block( k, max_treelevel+1))
+            Jmax = max(Jmax, lgt_block( k, max_treelevel+idx_mesh_lvl))
         end do
     end if
 

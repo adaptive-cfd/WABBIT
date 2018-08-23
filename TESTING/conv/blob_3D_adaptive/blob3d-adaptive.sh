@@ -15,7 +15,7 @@ prefixes=(phi)
 times=(000000000000 000000045105)
 
 # run actual test
-${mpi_command} ./wabbit 3D ${params} --memory=5.0GB ${ghosts}
+${mpi_command} ./wabbit ${params} --memory=5.0GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"
@@ -36,10 +36,10 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ${mpi_serial} ./wabbit-post 3D --keyvalues ${file}
+        ${mpi_command} ./wabbit-post --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
-            ${mpi_serial} ./wabbit-post 3D --compare-keys $keyfile $reffile
+            ${mpi_serial} ./wabbit-post --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
               echo -e " :) Happy, this looks ok!" $keyfile $reffile

@@ -108,7 +108,7 @@ subroutine find_neighbor_corner_3D(params, heavy_id, light_id, lgt_block, max_tr
 ! variables initialization
 
     my_treecode     = lgt_block( light_id, 1:max_treelevel )
-    level           = lgt_block( light_id, max_treelevel + 1 )
+    level           = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
 
     ! it is not always possible to have a corner neighbor on a coarser level, because
     ! the 4/8 sister blocks are complete. That means, a block cannot have all neighbors

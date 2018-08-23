@@ -36,7 +36,7 @@ function min_active_level( lgt_block, lgt_active, lgt_n )
     ! loop variables
     integer(kind=ik)                    :: k, Jmin, max_treelevel
 
-    max_treelevel = size( lgt_block, 2) - 2
+    max_treelevel = size( lgt_block, 2) - extra_lgt_fields
     !---------------------------------------------------------------------------------------------
     ! main body
     Jmin = max_treelevel
@@ -45,15 +45,15 @@ function min_active_level( lgt_block, lgt_active, lgt_n )
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n
-            Jmin = min(Jmin, lgt_block( lgt_active(k), max_treelevel+1))
+            Jmin = min(Jmin, lgt_block( lgt_active(k), max_treelevel + idx_mesh_lvl))
         end do
 
     else
         ! call without active lists
         do k = 1, size(lgt_block, 1)
-            if (lgt_block( k, max_treelevel+1)>=0) then
+            if (lgt_block( k, max_treelevel + idx_mesh_lvl)>=0) then
                 ! skip blocks marked with -1 (they are inactive)
-                Jmin = min(Jmin, lgt_block( k, max_treelevel+1))
+                Jmin = min(Jmin, lgt_block( k, max_treelevel+idx_mesh_lvl))
             endif
         end do
     end if

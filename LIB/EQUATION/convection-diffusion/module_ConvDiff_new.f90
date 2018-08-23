@@ -71,7 +71,7 @@ contains
     implicit none
 
     character(len=*), intent(in) :: filename
-
+    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     ! inifile structure
     type(inifile) :: FILE
 
@@ -107,10 +107,11 @@ contains
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'gauss_blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
 
-    call read_param_mpi(FILE, 'Dimensionality', 'dim', params_convdiff%dim, 2 )
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', params_convdiff%Lx, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', params_convdiff%Ly, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Lz', params_convdiff%Lz, 0.0_rk )
+    call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
+    call read_param_mpi(FILE, 'Domain', 'domain_size', domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    params_convdiff%Lx=domain_size(1)
+    params_convdiff%Ly=domain_size(2)
+    params_convdiff%Lz=domain_size(3)
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_convdiff%discretization, "FD_2nd_central")
 

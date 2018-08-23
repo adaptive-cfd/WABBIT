@@ -10,7 +10,7 @@
 !! \version 10/1/18 - create commit b2719e1aa2339f4f1f83fb29bd2e4e5e81d05a2a
 !*********************************************************************************************
 
-subroutine post_mean(params, help)
+subroutine post_mean(params)
 
   use module_IO
   use module_precision
@@ -23,8 +23,6 @@ subroutine post_mean(params, help)
   character(len=80)            :: fname
   !> parameter struct
   type (type_params), intent(inout)       :: params
-  !> help flag
-  logical, intent(in)                     :: help
   integer(kind=ik), allocatable           :: lgt_block(:, :)
   real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
   integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
@@ -50,29 +48,34 @@ subroutine post_mean(params, help)
   !-----------------------------------------------------------------------------------------------------
   rank = params%rank
   !-----------------------------------------------------------------------------------------------------
-  if (help) then
+  call get_command_argument(2,fname)
+  if (fname =='--help' .or. fname=='--h') then
     if (rank==0) then
       write(*,*) "WABBIT postprocessing "
-      write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --mean filename.h5"
+      write(*,*) "mpi_command -n number_procs ./wabbit-post --mean filename.h5"
     end if
     return
   endif
 
-  call get_command_argument(3,fname)
   write (*,*) "Computing spatial mean of file: "//trim(adjustl(fname))
   call check_file_exists( fname )
 
-  ! et some parameters from the file
+  ! add some parameters from the file
   call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
+  if (dim==3) then
+      params%threeD_case = .true.
+  else
+      params%threeD_case = .false.
+  end if
 
   params%number_block_nodes = Bs
   params%number_data_fields = 1
   params%number_ghost_nodes = 0
   g = 0
   params%max_treelevel = tc_length
-  params%Lx = domain(1)
-  params%Ly = domain(2)
-  params%Lz = domain(3)
+  params%domain_size(1) = domain(1)
+  params%domain_size(2) = domain(2)
+  params%domain_size(3) = domain(3)
   params%number_blocks = 2_ik*lgt_n/params%number_procs
 
   call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
@@ -112,9 +115,9 @@ subroutine post_mean(params, help)
   call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
 
   if (params%threeD_case) then
-    meani = meani / (params%Lx*params%Ly*params%Lz)
+    meani = meani / (params%domain_size(1)*params%domain_size(2)*params%domain_size(3))
   else
-    meani = meani / (params%Lx*params%Ly)
+    meani = meani / (params%domain_size(1)*params%domain_size(2))
   endif
 
   if (rank == 0) then

@@ -1,39 +1,18 @@
+! ----------------------------------------------------------------------------------------
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name init_data.f90
+!> \brief Reset hvy and ligth data arrays
 !> \version 0.5
 !> \author msr
-!
+!! \details
+!! \date 04/11/16 - switch to v0.4, now run complete initialization
+!!            within these subroutine and return initialized block data to main program
+!! \date 07/12/16 - now uses heavy work data array
+!! \date 25/01/17 - switch to 3D, v0.5
+! ----------------------------------------------------------------------------------------
+
 !> \brief reset grid, set all blocks to empty
-!
-!>
-!! input:
-!!           - parameter array
-!!           - light data array
-!!           - heavy data array
-!!           - neighbor data array
-!!           - light and heavy active block list
-!!
-!! output:
-!!           - filled user defined data structure for global params
-!!           - initialized light and heavy data arrays
-!!
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
-!            initialized block data to main program \n
-!! 07/12/16 - now uses heavy work data array \n
-!! 25/01/17 - switch to 3D, v0.5
-!
-! ********************************************************************************************
 subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n,&
      hvy_active, hvy_n, lgt_sortednumlist, verbosity )
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
@@ -59,30 +38,14 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
     !> write output
     logical, intent(in)                     :: verbosity
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
+! ----------------------------------------------------------------------------------------
 
     if ( (params%rank == 0) .and. verbosity ) then
       write(*,'(A)') "RESET-GRID: resetting grid to empty (deactivate all blocks)."
     endif
 
-    ! reset data:
-    ! all blocks are inactive, reset treecode
-    lgt_block(:, 1:params%max_treelevel) = -1
-    ! all blocks are inactive, reset treelevel
-    lgt_block(:, params%max_treelevel+1) = -1
-    ! set refinement to 0
-    lgt_block(:, params%max_treelevel+2) = 0
+    call reset_lgt_data(lgt_block, lgt_active, params%max_treelevel, lgt_n, lgt_sortednumlist)
 
-    ! reset sorted list of numerical treecodes
-    lgt_sortednumlist = -1
 
     ! reset data
     hvy_block = 9.99e99_rk
@@ -98,3 +61,45 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
          hvy_n, lgt_sortednumlist, .true. )
 
 end subroutine reset_grid
+
+
+
+
+!> Resets the light data. After calling this function
+!> only one tree is left in the forest, and all blocks are inactive with
+!> refinement status 0
+subroutine reset_lgt_data(lgt_block, lgt_active,max_treelevel, lgt_n, lgt_sortednumlist)
+
+    implicit none
+
+    !> light data array
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
+    !> list of active blocks (light data)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:)
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(inout),optional:: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout),optional :: lgt_sortednumlist(:,:)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik)  , intent(in)         :: max_treelevel
+
+
+    ! reset data:
+    ! all blocks are inactive, reset treecode
+    lgt_block(:,1:max_treelevel)   = -1
+    ! start with only one tree in the forest (i.e. all blocks are associated with only one tree)
+    lgt_block(:, max_treelevel+idx_tree_nr) = 1
+    ! all blocks are inactive, reset mesh level
+    lgt_block(:, max_treelevel+idx_mesh_lvl) = -1
+    ! set refinement to 0
+    lgt_block(:, max_treelevel+idx_refine_sts) = 0
+
+    ! reset sorted list of numerical treecodes
+    if ( present(lgt_sortednumlist) ) then
+      lgt_sortednumlist = -1
+    end if
+    if ( present(lgt_n) ) then
+      lgt_n = size(lgt_active,1)
+    end if
+
+end subroutine reset_lgt_data

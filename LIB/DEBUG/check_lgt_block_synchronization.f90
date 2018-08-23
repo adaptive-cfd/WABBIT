@@ -44,8 +44,7 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
     integer(kind=ik)                    :: ierr
     ! loop variables
     integer(kind=ik)                    :: k, l, lgt_start, a
-    !> MPI communicator
-    integer(kind=ik)                    :: WABBIT_COMM
+    ! lgt data
     integer(kind=ik), allocatable, save :: lgt_all(:,:,:), lgt_all2(:,:,:)
 
     !---------------------------------------------------------------------------------------------
@@ -55,9 +54,6 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
         allocate(lgt_all2(1:params%number_procs, size(lgt_block,1), size(lgt_block,2)))
     endif
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
-    WABBIT_COMM = params%WABBIT_COMM
 
     lgt_all = 0
     lgt_all(params%rank+1,:,:) = lgt_block

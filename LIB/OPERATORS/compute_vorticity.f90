@@ -1,27 +1,9 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name write_vorticity.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief compute vorticity for time step t (for saving it on disk)
 !
-!>
-!! input:
-!!           - parameter array
-!!           - light data array
-!!           - heavy data array
-!!
-!! output:
-!!           -
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 24/07/17 - create
+!>\details
+!> \version 0.5
+!> \author sm
+!!\date 24/07/17 - create
 !
 ! ********************************************************************************************
 subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)

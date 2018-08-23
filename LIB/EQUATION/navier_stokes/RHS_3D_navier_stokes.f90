@@ -89,11 +89,11 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
     dissipation = params_ns%dissipation
 
     ! variables
-    rho         = phi(:,:,:,1)**2
-    u           = phi(:,:,:,2)/phi(:,:,:,1)
-    v           = phi(:,:,:,3)/phi(:,:,:,1)
-    w           = phi(:,:,:,4)/phi(:,:,:,1)
-    p           = phi(:,:,:,5)
+    rho         = phi(:,:,:,rhoF)**2
+    u           = phi(:,:,:,UxF)/phi(:,:,:,rhoF)
+    v           = phi(:,:,:,UyF)/phi(:,:,:,rhoF)
+    w           = phi(:,:,:,UzF)/phi(:,:,:,rhoF)
+    p           = phi(:,:,:,pF)
 
     ! rhs
     rhs         = 0.0_rk
@@ -131,35 +131,18 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
         mu_d = 0.0_rk
 
         ! thermal conductivity
-        lambda  = Cp * mu/Pr
+        lambda= Cp * mu/Pr
+        div_U = u_x+v_y+w_z
 
-        ! tau11
+        !stress tensor
         tau11 = mu * 2.0_rk * u_x
-
-        call diff1x_zentral_3D( Bs, g, dx, u, dummy)
-        div_U = dummy
-        call diff1y_zentral_3D( Bs, g, dy, v, dummy)
-        div_U = div_U + dummy
-        call diff1z_zentral_3D( Bs, g, dz, w, dummy)
-        div_U = div_U + dummy
-
         tau11 = tau11 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
-        ! tau22
         tau22 = mu * 2.0_rk * v_y
         tau22 = tau22 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
-        ! tau33
         tau33 = mu * 2.0_rk * w_z
         tau33 = tau33 + ( mu_d - 2.0_rk/3.0_rk * mu ) * div_U
-
-        ! tau12
         tau12 = mu * ( v_x + u_y )
-
-        ! tau13
         tau13 = mu * ( w_x + u_z )
-
-        ! tau23
         tau23 = mu * ( w_y + v_z )
 
         ! Friction terms for Momentum equation = div(tau_i*)/(J*srho)
@@ -388,7 +371,7 @@ subroutine  diffx_c_3D( Bs, g, dx, u, dudx)
 
     integer                         :: i, n
 
-    n = size(u,1)
+    n = size(u,2)
 
     dudx(1,:,:) = ( u(n-1,:,:) - 8.0_rk*u(n,:,:) + 8.0_rk*u(2,:,:) - u(3,:,:) ) / (12.0_rk*dx)
     dudx(2,:,:) = ( u(n,:,:)   - 8.0_rk*u(1,:,:) + 8.0_rk*u(3,:,:) - u(4,:,:) ) / (12.0_rk*dx)
@@ -413,7 +396,7 @@ subroutine  diffy_c_3D( Bs, g, dy, u, dudy)
 
     integer                         :: i, n
 
-    n = size(u,1)
+    n = size(u,3)
 
     dudy(:,1,:) = ( u(:,n-1,:) - 8.0_rk*u(:,n,:) + 8.0_rk*u(:,2,:) - u(:,3,:) ) / (12.0_rk*dy)
     dudy(:,2,:) = ( u(:,n,:)   - 8.0_rk*u(:,1,:) + 8.0_rk*u(:,3,:) - u(:,4,:) ) / (12.0_rk*dy)
@@ -437,7 +420,7 @@ subroutine  diffz_c_3D( Bs, g, dz, u, dudz)
     real(kind=rk), intent(out)      :: dudz(Bs+2*g, Bs+2*g, Bs+2*g)
 
     integer                         :: i, n
-    
+
     n = size(u,1)
 
     dudz(:,:,1) = ( u(:,:,n-1) - 8.0_rk*u(:,:,n) + 8.0_rk*u(:,:,2) - u(:,:,3) ) / (12.0_rk*dz)

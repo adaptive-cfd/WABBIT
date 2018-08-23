@@ -16,7 +16,7 @@ prefixes=(Ux Uy p mask vor)
 times=(000000000000 000000002000)
 
 # run actual test
-${mpi_command} ./wabbit 2D ${params} --memory=2GB ${ghosts}
+${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"
@@ -37,10 +37,10 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ${mpi_serial} ./wabbit-post 2D --keyvalues ${file}
+        ${mpi_serial} ./wabbit-post --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
-            ${mpi_serial} ./wabbit-post 2D --compare-keys $keyfile $reffile
+            ${mpi_serial} ./wabbit-post --compare-keys $keyfile $reffile
             result=$(cat return); rm return
             if [ $result == "0" ]; then
               echo -e " :) Happy, this looks ok!" $keyfile $reffile

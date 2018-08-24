@@ -35,7 +35,9 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us )
 
         ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
         ! know that the first g points are in fact ghost nodes...
-        call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask, mask_color, us)
+        call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
+        mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3))
+        ! call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask, mask_color, us)
 
     case ('none')
       mask = 0.0_rk

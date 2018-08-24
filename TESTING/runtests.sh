@@ -26,6 +26,7 @@ end_color=$'\033[0m'
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=(
        "---navier-stokes---"
+	"TESTING/acm/bumblebee_adaptive/bumblebee_adaptive.sh"
        "TESTING/navier_stokes/pressure_blob/2D/pressure_blob.sh"
        "TESTING/navier_stokes/pressure_blob/3D/pressure_blob3D.sh"
        "TESTING/navier_stokes/funnel/ion_funnel_light.sh"

@@ -92,7 +92,8 @@ end subroutine gather_blocks_on_proc
 
 
 
-! subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt_blocks_to_gather,request, n_req )
+! subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, &
+!     lgt_blocks_to_gather, request, n_req )
 !   implicit none
 !
 !   !> user defined parameter structure
@@ -114,6 +115,9 @@ end subroutine gather_blocks_on_proc
 !
 !
 !   myrank = params%rank
+!   ! size of one block, in points
+!   npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
+!
 !
 !   ! look at all blocks in the gather list
 !   do i = 1, size(lgt_blocks_to_gather)
@@ -131,20 +135,19 @@ end subroutine gather_blocks_on_proc
 !           call get_free_local_light_id( params, gather_rank, lgt_block, lgt_free_id)
 !
 !           ! Am I the target rank who receives all the data?
-!           if ( myrank == gather_rank) then
+!           if (myrank == gather_rank) then
 !               !------------------------
 !               ! RECV CASE
 !               !------------------------
 !               ! get hvy id where to store the data
 !               call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, myrank, params%number_blocks )
-!               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 !               ! increment the list of requests
 !               n_req  = n_req + 1
-!               request(n_req) = MPI_REQUEST_NULL
+!               ! open channel to receive one block
 !               call MPI_irecv( hvy_block(:,:,:,:,hvy_free_id), npoints, MPI_REAL8, owner_rank, &
 !                               tag, WABBIT_COMM, request(n_req), ierr)
 !
-!           elseif ( myrank == owner_rank) then
+!           elseif (myrank == owner_rank) then
 !               ! Am I the owner of this block, so will I have to send data?
 !               !------------------------
 !               ! SEND CASE
@@ -152,13 +155,13 @@ end subroutine gather_blocks_on_proc
 !               ! what heavy ID (on this proc) does the block have?
 !               call lgt_id_to_hvy_id( hvy_id, lgt_blocks_to_gather(i), owner_rank, params%number_blocks )
 !
-!               npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 !               ! increment the list of requests
 !               n_req = n_req + 1
-!               request(n_req) = MPI_REQUEST_NULL
+!               ! send the block to the receiver
 !               call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_REAL8, gather_rank, tag, &
 !                               WABBIT_COMM, request(n_req), ierr)
 !           endif
+!
 !           ! even if I am not concerned with sending or recv, the light data changes, assuming the copy went through.
 !           ! if it did not, code hangs anyways. so here assume it worked and on all CPU just copy the light data
 !           lgt_block( lgt_free_id, : ) = lgt_block( lgt_blocks_to_gather(i), : )

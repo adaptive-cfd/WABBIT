@@ -57,7 +57,7 @@ subroutine post_mean(params)
         return
     endif
 
-    write (*,*) "Computing spatial mean of file: "//trim(adjustl(fname))
+    if (rank==0) write (*,*) "Computing spatial mean of file: "//trim(adjustl(fname))
     call check_file_exists( fname )
 
     ! add some parameters from the file
@@ -106,9 +106,9 @@ subroutine post_mean(params)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (params%threeD_case) then
-            meanl = meanl + sum( hvy_block(g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
+            meanl = meanl + sum( hvy_block(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
         else
-            meanl = meanl + sum( hvy_block(g+1:Bs+g, g+1:Bs+g, 1, 1, hvy_active(k)))*dx(1)*dx(2)
+            meanl = meanl + sum( hvy_block(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
         endif
     end do
 

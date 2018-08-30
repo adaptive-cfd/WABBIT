@@ -52,7 +52,15 @@ subroutine mult_mask(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(fname_input, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
 
-    write(*,*) fname_input, fname_mask, fname_result
+    if (params%rank==0) then
+        write(*,*) "------------------------------------------------------------------"
+        write(*,*) "Mutliplying field with 1-mask: result = (1.0-mask)*input"
+        write(*,*) "------------------------------------------------------------------"
+        write(*,*) "input= ", trim(adjustl(fname_input))
+        write(*,*) "mask=  ", trim(adjustl(fname_mask))
+        write(*,*) "result=", trim(adjustl(fname_result))
+        write(*,*) "------------------------------------------------------------------"
+    endif
 
     if (params%dim==3) then
         params%threeD_case = .true.

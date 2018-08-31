@@ -49,8 +49,8 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   g  = params%number_ghost_nodes
   maxtL = params%max_treelevel
   ! level of merged block
-  level = lgt_block( lgt_blocks_to_merge(1), maxtL+1 )
-
+  level = lgt_block( lgt_blocks_to_merge(1), maxtL + idx_mesh_lvl )
+!  write(*,*) "level= ",level
   if ( N_merge /= 4 .and. N_merge /= 8) then
     call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
   endif
@@ -90,8 +90,8 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   ! create light data entry for the new block
   lgt_block( lgt_merge_id, : ) = -1
   lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
-  lgt_block( lgt_merge_id, maxtl+1 ) = level-1
-  lgt_block( lgt_merge_id, maxtl+2 ) = 0
+  lgt_block( lgt_merge_id, maxtl+ idx_mesh_lvl ) = level-1
+  lgt_block( lgt_merge_id, maxtl+ idx_refine_sts ) = 0
 
 
   ! b) heavy data merging (individual operation)

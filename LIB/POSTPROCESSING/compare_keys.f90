@@ -10,24 +10,22 @@
 !! \version 10/1/18 - create commit b2719e1aa2339f4f1f83fb29bd2e4e5e81d05a2a
 !*********************************************************************************************
 
-subroutine compare_keys(help, key1, key2)
+subroutine compare_keys(key1, key2)
     use module_helpers, only: check_file_exists
     use module_precision
 
     implicit none
     !> name of the file
     character(len=*), intent(in)            :: key1, key2
-    !> help flag
-    logical, intent(in)                     :: help
 
     integer(kind=ik) :: i
     real(kind=rk) :: data1(1:6), data2(1:6), error(1:6)
     integer(kind=ik) :: curves1(1:2), curves2(1:2), error_curve(1:2)
     !-----------------------------------------------------------------------------------------------------
-
-    if (help) then
+    ! does the user need help?
+    if (key1 == '--help' .or. key1 == '--h') then
         write(*,*) "wabbit postprocessing routine to compare keyvalues of two .key files"
-        write(*,*) "mpi_command -n number_procs ./wabbit-post 2[3]D --compare-keys old.key new.key"
+        write(*,*) "mpi_command -n number_procs ./wabbit-post --compare-keys old.key new.key"
     else
 
         call check_file_exists(key1)

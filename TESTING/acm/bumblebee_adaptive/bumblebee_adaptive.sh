@@ -4,19 +4,21 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/acm/acm_cyl_nonequi/"
-params=${dir}"acm_test.ini"
+dir="./TESTING/acm/bumblebee_adaptive/"
+params=${dir}"insect.ini"
 happy=0
 sad=0
 echo "testing artificial compressibility"
 
 # list of prefixes the test generates
-prefixes=(Ux Uy p mask vor)
+prefixes=(ux uy uz p mask)
 # list of possible times (no need to actually have them)
-times=(000000000000 000000002000)
+times=(000000000000 000000050000)
 
 # run actual test
-${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
+cp $dir/bumblebee_new_kinematics.ini .
+${mpi_command} ./wabbit ${params} --memory=5GB ${ghosts}
+rm bumblebee_new_kinematics.ini
 
 echo "============================"
 echo "run done, analyzing data now"

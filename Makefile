@@ -4,8 +4,8 @@
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 \
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 \
-compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90
+startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 mult_mask.f90 \
+compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -62,8 +62,10 @@ endif
 #-------------------------------------------------------------------------------
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
-PPFLAG= -fpp
-FFLAGS = -FR -O3 -warn all,nounused -traceback -check bounds -debug all -check all,noarg_temp_created
+PPFLAG = -fpp
+FFLAGS += -FR -O3 -heap-arrays
+# debug flags: attention they might disable all optimization!
+# FFLAGS += -warn all,nounused -traceback -check bounds -debug all -check all,noarg_temp_created
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled

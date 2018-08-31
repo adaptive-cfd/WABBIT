@@ -10,7 +10,7 @@
 !> \date  31/01/18 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 !-----------------------------------------------------------------------------------------------------
 
-subroutine sparse_to_dense(help, params)
+subroutine sparse_to_dense(params)
     use module_precision
     use module_mesh
     use module_params
@@ -19,8 +19,6 @@ subroutine sparse_to_dense(help, params)
 
     implicit none
 
-    !> help flag
-    logical, intent(in)                :: help
     !> parameter struct
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_in
@@ -33,7 +31,7 @@ subroutine sparse_to_dense(help, params)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length, dim
+    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
     real(kind=rk), dimension(3)             :: domain
@@ -41,19 +39,21 @@ subroutine sparse_to_dense(help, params)
     integer(kind=ik)                        :: treecode_size, number_dense_blocks
 !-----------------------------------------------------------------------------------------------------
 
-    if (help .and. params%rank==0 ) then
-        write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-        write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)"
+    call get_command_argument(2, file_in)
+    if (file_in == '--help' .or. file_in == '--h') then
+        if ( params%rank==0 ) then
+            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)"
+        end if
         return
     end if
 
     ! get values from command line (filename and level for interpolation)
-    call get_command_argument(3, file_in)
     call check_file_exists(trim(file_in))
-    call get_command_argument(4, file_out)
-    call get_command_argument(5, level_in)
+    call get_command_argument(3, file_out)
+    call get_command_argument(4, level_in)
     read(level_in,*) level
-    call get_command_argument(6, order)
+    call get_command_argument(5, order)
     if (order == "4") then
         params%order_predictor = "multiresolution_4th"
         params%number_ghost_nodes = 4_ik
@@ -62,15 +62,6 @@ subroutine sparse_to_dense(help, params)
         params%number_ghost_nodes = 2_ik
     else
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
-    end if
-
-    if (params%threeD_case) then
-        ! how many blocks do we need for the desired level?
-        number_dense_blocks = 8_ik**level
-        max_neighbors = 74
-    else
-        number_dense_blocks = 4_ik**level
-        max_neighbors = 12
     end if
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
@@ -82,6 +73,21 @@ subroutine sparse_to_dense(help, params)
     params%number_data_fields  = 1
     params%block_distribution="sfc_hilbert"
 
+    ! read attributes from file. This is especially important for the number of
+    ! blocks the file contains: this will be the number of active blocks right
+    ! after reading.
+    call read_attributes(file_in, lgt_n, time, iteration, domain, bs, tc_length, params%dim)
+    if (params%dim==3) then
+        params%threeD_case = .true.
+        ! how many blocks do we need for the desired level?
+        number_dense_blocks = 8_ik**level
+        max_neighbors = 74
+    else
+        params%threeD_case = .false.
+        number_dense_blocks = 4_ik**level
+        max_neighbors = 12
+    end if
+
     if (params%rank==0) then
         write(*,'(80("-"))')
         write(*,*) "Wabbit sparse-to-dense. Will read a wabbit field and return a"
@@ -92,11 +98,6 @@ subroutine sparse_to_dense(help, params)
         write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
         write(*,'(80("-"))')
     endif
-
-    ! read attributes from file. This is especially important for the number of
-    ! blocks the file contains: this will be the number of active blocks right
-    ! after reading.
-    call read_attributes(file_in, lgt_n, time, iteration, domain, bs, tc_length, dim)
 
     ! set max_treelevel for allocation of hvy_block
     params%max_treelevel = max(level, tc_length)
@@ -111,7 +112,7 @@ subroutine sparse_to_dense(help, params)
     params%number_blocks = ceiling( 4.0*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
 
     if (params%rank==0) then
-        write(*,'("Data dimension: ",i1,"D")') dim
+        write(*,'("Data dimension: ",i1,"D")') params%dim
         write(*,'("File contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, bs
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("Time=",g12.4," it=",i9)') time, iteration

@@ -12,7 +12,7 @@
 !> \date 20/7/2018 - add read_field_flusi_MPI for parallel reading, commit 03b933e706b988828a0b0321baedb2dc9f76773d
 !-----------------------------------------------------------------------------------------------------
 !
-subroutine flusi_to_wabbit(help, params)
+subroutine flusi_to_wabbit(params)
     use module_precision
     use module_mesh
     use module_params
@@ -22,8 +22,6 @@ subroutine flusi_to_wabbit(help, params)
 
     implicit none
 
-    !> help flag
-    logical, intent(in)                :: help
     !> parameter struct
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_in
@@ -47,25 +45,29 @@ subroutine flusi_to_wabbit(help, params)
 !-----------------------------------------------------------------------------------------------------
     params%number_data_fields  = 1
 !----------------------------------------------
-    if (help .eqv. .true.) then
+    call get_command_argument(2, file_in)
+    ! does the user need help?
+    if (file_in=='--help' .or. file_in=='--h') then
         if (params%rank==0) then
             write(*,*) "postprocessing subroutine to read a file from flusi and convert it to wabbit format. command line:"
-            write(*,*) "mpi_command -n number_of_processes ./wabbit-post 2D/3D --flusi-to-wabbit source.h5 target.h5 target_blocksize"
+            write(*,*) "mpi_command -n number_of_processes ./wabbit-post --flusi-to-wabbit source.h5 target.h5 target_blocksize"
         end if
     else
         if (params%rank==0) write(*,*) "ATTENTION: this routine works in parallel only with ghost nodes synchronization --generic-sequence (default)"
         ! get values from command line (filename and desired blocksize)
-        call get_command_argument(3, file_in)
         call check_file_exists(trim(file_in))
-        call get_command_argument(4, file_out)
-        call get_command_argument(5, Bs_read)
+        call get_command_argument(3, file_out)
+        call get_command_argument(4, Bs_read)
         read(Bs_read,*) Bs
         if (mod(Bs,2)==0) call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
 
         ! read attributes such as number of discretisation points, time, domain size
         call get_attributes_flusi(file_in, nxyz, time, domain)
-        if (.not. params%threeD_case .and. nxyz(1)/=1) &
-            call abort(8714, "ERROR: saved datafield is 3D, WABBIT expects 2D")
+        if (nxyz(1)/=1) then
+            params%threeD_case = .true.
+        else       
+            params%threeD_case = .false.
+        end if
 
         level_tmp = log(dble(nxyz(2))/dble(Bs-1)) / log(2.0_rk)
         level = int(level_tmp)

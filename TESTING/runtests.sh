@@ -44,6 +44,7 @@ tests=(
        "TESTING/conv/blob_convection_2nd/blob-convection-adaptive-2nd.sh"
        "TESTING/conv/blob_convection_2nd_zcurve/blob-conv-adaptive-2nd-zcurve.sh"
        "---acm---"
+       "TESTING/acm/bumblebee_adaptive/bumblebee_adaptive.sh"
        "TESTING/acm/acm_cyl_equi/acm_cylinder_equi.sh"
        "TESTING/acm/acm_cyl_nonequi/acm_cylinder_nonequi.sh"
        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"

@@ -20,10 +20,10 @@ module module_boundary_conditions
     PUBLIC :: get_adjacent_boundary_surface_normal,block_is_adjacent_to_boundary
     !**********************************************************************************************
 
-    character(len=3),  parameter,dimension(16)  :: dir_2D  = [ character(len=3):: '__N', '__E', &
+    character(len=3), parameter, dimension(16)  :: dir_2D  = (/ '__N', '__E', &
                                                           '__S', '__W', '_NE', '_NW', '_SE', &
                                                           '_SW', 'NNE', 'NNW', 'SSE', 'SSW', &
-                                                          'ENE', 'ESE', 'WNW', 'WSW']
+                                                          'ENE', 'ESE', 'WNW', 'WSW' /)
 
     !
 
@@ -78,14 +78,13 @@ contains
 
 
 
-recursive function block_is_adjacent_to_boundary(dir,my_treecode,neighbor,max_treelevel) result(is_adjacent)
+recursive logical function block_is_adjacent_to_boundary(dir,my_treecode,neighbor,max_treelevel) result(is_adjacent)
    implicit none
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   integer(kind=ik)       , intent(in) :: max_treelevel
-   integer(kind=ik)       , intent(in) :: neighbor(max_treelevel),my_treecode(max_treelevel)
-   character(len=3)       , intent(in) :: dir
+   integer(kind=ik), intent(in) :: max_treelevel
+   integer(kind=ik), intent(in) :: neighbor(max_treelevel), my_treecode(max_treelevel)
+   character(len=3), intent(in) :: dir
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   logical                             ::is_adjacent
 
    if (  (neighbor(1)-my_treecode(1) == 2 .and. dir == dir_2D(1)) .or. & !north
          (neighbor(1)-my_treecode(1) ==-1 .and. dir == dir_2D(2)) .or. & !east

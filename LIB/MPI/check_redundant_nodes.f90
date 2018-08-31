@@ -34,7 +34,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! data buffer size
     integer(kind=ik)                    :: buffer_size, buffer_position
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g, i0
+    integer(kind=ik)                    :: Bs, g, i0, ii0, ii1
     ! number of datafields
     integer(kind=ik)                    :: NdF
     logical                             :: test2
@@ -62,16 +62,24 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     communication_counter(:, stage) = 0_ik
 
 
-    int_pos(:, stage) = 2
-    ! reset first in send buffer position
-    int_send_buffer( 1, :, stage ) = 0
-    int_send_buffer( 2, :, stage ) = -99
+    int_pos(:, stage) = 1
+    real_pos(:, stage) = 0
 
     ! in this routine we treat internal and external neighbors identically, therefore we need to
     ! count also my own neighorhood relations. this is not highly efficient (involves copying)
     ! but this routine is meant for testing, not production.
     call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
-    recv_counter(:, stage), send_counter(:, stage), INCLUDE_REDUNDANT, .true.)
+    recv_counter(:, stage), send_counter(:, stage), &
+    int_recv_counter(:, stage), int_send_counter(:, stage), INCLUDE_REDUNDANT, .true.)
+
+
+    ! reset int_send_buffer, but only the parts that will actually be treated.
+    do k = 1, params%number_procs
+        ii0 = sum(int_recv_counter(0:(k-1)-1, stage)) + 1
+        ii1 = ii0 + int_recv_counter(k-1, stage)
+        int_send_buffer(ii0:ii1, stage) = -99
+    enddo
+
 
     do k = 1, hvy_n
         do neighborhood = 1, size(hvy_neighbor, 2)
@@ -133,16 +141,18 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! loop over all mpiranks
     do k = 1, params%number_procs
         if ( communication_counter(k, stage) /= 0 ) then
-            ! first element in int buffer is real buffer size
-            l = 2
-            ! -99 marks end of data
-            do while ( int_recv_buffer(l, k, stage) /= -99 )
 
-                hvy_id          = int_recv_buffer(l,   k, stage)
-                neighborhood    = int_recv_buffer(l+1, k, stage)
-                level_diff      = int_recv_buffer(l+2, k, stage)
-                buffer_position = int_recv_buffer(l+3, k, stage)
-                buffer_size     = int_recv_buffer(l+4, k, stage)
+            ! start index of this mpirank in the int_buffer
+            l = sum(int_recv_counter(0:k-1-1, stage)) +1
+
+            ! -99 marks end of data
+            do while ( int_recv_buffer(l, stage) > -99 )
+
+                hvy_id          = int_recv_buffer(l,   stage)
+                neighborhood    = int_recv_buffer(l+1, stage)
+                level_diff      = int_recv_buffer(l+2, stage)
+                buffer_position = int_recv_buffer(l+3, stage)
+                buffer_size     = int_recv_buffer(l+4, stage)
 
                 !line_buffer(1:buffer_size) = real_receive_buffer( buffer_position : buffer_position-1 + buffer_size, k, 1 )
                 i0 = sum(recv_counter(0:k-1-1, stage)) + buffer_position

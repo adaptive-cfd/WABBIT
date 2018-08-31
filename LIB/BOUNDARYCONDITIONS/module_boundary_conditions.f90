@@ -42,11 +42,11 @@ contains
    !> light data
    integer(kind=ik)       , intent(in) :: lgt_id,lgt_block(:,:),max_treelevel
    !> surface normal of the adjacent boundary wall
-   integer(kind=1)          , intent(out):: surface(3)
+   integer(kind=2)          , intent(out):: surface(3)
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++
    integer(kind=ik)                   :: neighbor(max_treelevel),my_treecode(max_treelevel),level,i
 
-   !integer(kind=1)                    :: normal_vec
+   !integer(kind=2)                    :: normal_vec
    surface      =0
    my_treecode  =lgt_block(lgt_id,1:max_treelevel)
    level        =lgt_block(lgt_id,max_treelevel+idx_mesh_lvl)

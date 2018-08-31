@@ -14,7 +14,7 @@ module module_physics_metamodule
     ! public routines, at which the corresponding actual physics modules are called
     use module_ConvDiff_new
     use module_acm
-    use module_navier_stokes_new
+    use module_navier_stokes
 
     implicit none
 
@@ -186,7 +186,7 @@ contains
    !  1: boundary in the direction +e_i
    ! -1: boundary in the direction - e_i
    ! currently only acessible in the local stage
-   integer(kind=1),optional          , intent(in):: boundary_flag(3)
+   integer(kind=2),optional          , intent(in):: boundary_flag(3)
 
    select case(physics)
    case ("ACM-new")

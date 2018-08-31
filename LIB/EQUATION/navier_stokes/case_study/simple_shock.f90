@@ -54,8 +54,8 @@ subroutine draw_simple_shock(mask, x0, dx, Bs, g, boundary_type )
     ! reset mask array
     mask = 0.0_rk
     ! left and right boundary of shock tube
-    x_boundary(1)   =0.1_rk*domain_size(1)
-    x_boundary(2)   =domain_size(1)*0.9_rk
+    x_boundary(1)   =0.1_rk*params_ns%domain_size(1)
+    x_boundary(2)   =params_ns%domain_size(1)*0.9_rk
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
@@ -74,9 +74,7 @@ end subroutine draw_simple_shock
 
 subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
 
-
     implicit none
-
     ! grid
     integer(kind=ik), intent(in)                     :: Bs, g
     !> penalization term including mask
@@ -89,14 +87,15 @@ subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
     real(kind=rk)                                    :: mask
 
     ! auxiliary variables
-    real(kind=rk)                                    :: x, y, h
+    real(kind=rk)                                    :: x, y, h,domain_size(3)
     ! preasure,density velocities
     real(kind=rk)                                    :: p(Bs+2*g,Bs+2*g),rho(Bs+2*g,Bs+2*g), &
                                                         u(Bs+2*g,Bs+2*g),v(Bs+2*g,Bs+2*g)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy,n
     ! left and right boundary
-    real(kind=rk)                                    :: u_ref,u_R,u_L,rho_R,rho_L,p_L,p_R,x_L,x_R,rho_ref,p_ref
+    real(kind=rk)                                    :: u_ref,u_R,u_L,rho_R,rho_L,p_L,p_R, &
+                                                        x_L,x_R,rho_ref,p_ref
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -113,22 +112,20 @@ subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
     u           = phi(:,:,2)/phi(:,:,1)
     v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
-
-    ! penalization term
-    !-------------------
+    domain_size = params_ns%domain_size
 
     ! left boundary
-
     x_L      =0.1_rk*domain_size(1)
     p_L      = shock_params%p_left
     rho_L    =  shock_params%rho_left
     u_L      =  shock_params%u_left
-    ! right boundary
 
+    ! right boundary
     x_R      =domain_size(1)*0.9_rk
     p_R      = shock_params%p_right
     rho_R    =  shock_params%rho_right
     u_R      =  shock_params%u_right
+
     ! parameter for smoothing function (width)
 
     do ix=1, Bs+2*g
@@ -158,26 +155,3 @@ subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
 
 
 end subroutine add_simple_shock
-
-
-!> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
-!> values \f$\rho_2,u_2,p_2\f$ on the ohter side
-!> of the shock
-subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
-    implicit none
-    !> one side of the shock (density, velocity, pressure)
-    real(kind=rk), intent(in)      ::rho1,u1,p1
-    !> other side of the shock (density, velocity, pressure)
-    real(kind=rk), intent(out)      ::rho2,u2,p2
-    !> heat capacity ratio
-    real(kind=rk), intent(in)      ::gamma
-
-    real(kind=rk)                ::cstar_sq
-
-
-    cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
-    !sqrt(cstar_sq)
-    u2 = cstar_sq /u1;
-    rho2 = (rho1*u1)/u2;
-    p2= (p1+ rho1*u1**2 )-rho2*u2**2;
-end subroutine shockVals

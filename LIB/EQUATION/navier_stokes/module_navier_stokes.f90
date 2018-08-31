@@ -18,13 +18,14 @@
 
 !> \brief Implementation of Navier Stokes Physiscs Interface for
 !! WABBIT
-module module_navier_stokes_new
+module module_navier_stokes
 
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_navier_stokes_params
   use module_operators, only : compute_vorticity
   use module_ns_penalization
+  use module_navier_stokes_cases
 
   implicit none
 
@@ -37,7 +38,7 @@ module module_navier_stokes_new
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
             CONVERT_STATEVECTOR, PACK_STATEVECTOR, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
-            STATISTICS_NStokes,FILTER_NSTOKES,convert2format
+            STATISTICS_NStokes,FILTER_NSTOKES,convert2format,shockvals
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
@@ -102,11 +103,12 @@ contains
     call init_other_params(params_ns,     FILE )
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
+    ! initialice parameters and fields of the specific case study
+    call set_case_parameters( params_ns , FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
     call add_info(params_ns)
 
     ! set global parameters pF,rohF, UxF etc
-    UzF=-1
     do dF = 1, params_ns%number_data_fields
                 if ( params_ns%names(dF) == "p" ) pF = dF
                 if ( params_ns%names(dF) == "rho" ) rhoF = dF
@@ -114,6 +116,8 @@ contains
                 if ( params_ns%names(dF) == "Uy" ) UyF = dF
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
+
+    call check_parameters(params_ns)
 
     call clean_ini_file_mpi( FILE )
 
@@ -133,6 +137,7 @@ contains
   ! from that. Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
   subroutine RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
+    use module_funnel, only:mean_quantity, integrate_over_pump_area
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -168,7 +173,7 @@ contains
     !  1: boundary in the direction +e_i
     ! -1: boundary in the direction - e_i
     ! currently only acessible in the local stage
-    integer(kind=1)          , intent(in):: boundary_flag(3)
+    integer(kind=2)          , intent(in):: boundary_flag(3)
 
     ! Area of mean_density
     real(kind=rk)    ,save             :: integral(4),area
@@ -201,7 +206,7 @@ contains
       ! them nicer, two RHS stages have to be defined: integral / local stage.
       !
       ! called for each block.
-      if (params_ns%penalization .and. params_ns%geometry=="funnel") then
+      if (params_ns%penalization .and. params_ns%case=="funnel") then
         rhs=u
         call convert_statevector(rhs(:,:,:,:),'pure_variables')
         call integrate_over_pump_area(rhs(:,:,1,:),g,Bs,x0,dx,integral,area)
@@ -228,9 +233,7 @@ contains
       ! operators etc.
 
       ! called for each block.
-      if (size(u,3)==1) then
-
-
+      if (params_ns%dim==2) then
         select case(params_ns%coordinates)
         case ("cartesian")
           call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
@@ -240,14 +243,13 @@ contains
           call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
         end select
         !call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-
-        if (params_ns%penalization) then
-        ! add volume penalization
-          call add_constraints(rhs(:,:,1,:),Bs, g, x0,(/dx(1),dx(2)/),u(:,:,1,:))
-        endif
-
       else
          call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
+      endif
+
+      if (params_ns%penalization) then
+        ! add volume penalization
+        call add_constraints(rhs, Bs, g, x0, dx, u)
       endif
 
     case default
@@ -293,7 +295,7 @@ contains
     ! local variables
     integer(kind=ik)            :: Bs, mpierr,ix,iy
     real(kind=rk),save          :: area
-    real(kind=rk), allocatable  :: mask(:,:)
+    real(kind=rk), allocatable  :: mask(:,:,:)
     real(kind=rk)               :: eta_inv,tmp(5),y,x,r
 
     ! compute the size of blocks
@@ -322,16 +324,19 @@ contains
         call abort(6661,"ns fail: very very large values in state vector.")
       endif
       ! compute mean density and pressure
-      if(.not. allocated(mask)) allocate(mask(Bs+2*g, Bs+2*g))
+      if(.not. allocated(mask)) then
+       if (params_ns%dim==2) allocate(mask(Bs+2*g, Bs+2*g, 1))
+       if (params_ns%dim==3) allocate(mask(Bs+2*g, Bs+2*g, Bs+2*g))
+     endif
       if ( params_ns%penalization ) then
-        call get_mask(mask, x0, dx, Bs, g)
+        call get_mask(x0, dx, Bs, g , mask)
       else
         mask=0.0_rk
       end if
 
       eta_inv                 = 1.0_rk/params_ns%C_eta
 
-      if (size(u,3)==1) then
+      if (params_ns%dim==2) then
         ! compute density and pressure only in physical domain
         tmp(1:5) =0.0_rk
         ! we do not want to sum over redudant points so exclude Bs+g!!!
@@ -339,16 +344,16 @@ contains
           y = dble(iy-(g+1)) * dx(2) + x0(2)
           do ix=g+1, Bs+g-1
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-            if (mask(ix,iy)<1e-10) then
+            if (mask(ix,iy,1)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
                   tmp(2) = tmp(2)   + u(ix,iy, 1, pF)
                   tmp(5) = tmp(5)   + 1.0_rk
             endif
             ! force on obstacle (see Boiron)
             !Fx=1/Ceta mask*rho*u
-            tmp(3) = tmp(3)   + u(ix,iy, 1, rhoF)*u(ix,iy, 1, UxF)*mask(ix,iy)
+            tmp(3) = tmp(3)   + u(ix,iy, 1, rhoF)*u(ix,iy, 1, UxF)*mask(ix,iy,1)
             !Fy=1/Ceta mask*rho*v
-            tmp(4) = tmp(4)   + u(ix,iy, 1, rhoF)*u(ix,iy, 1, UyF)*mask(ix,iy)
+            tmp(4) = tmp(4)   + u(ix,iy, 1, rhoF)*u(ix,iy, 1, UyF)*mask(ix,iy,1)
 
           enddo
         enddo
@@ -449,7 +454,7 @@ contains
 
 
     if (maxval(abs(u))>1.0e7) then
-        call abort(65761,"ERROR [module_navier_stokes_new.f90]: very large values in statevector")
+        call abort(65761,"ERROR [module_navier_stokes.f90]: very large values in statevector")
     endif
     ! get smallest spatial seperation
     if(size(u,3)==1) then
@@ -470,7 +475,7 @@ contains
     ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
     if ( minval(u(:,:,:,pF))<0 ) then
       write(*,*)"minval=",minval(u(:,:,:,pF))
-      call abort(23456,"Error [module_navier_stokes_new] in GET_DT: pressure is smaller then 0!")
+      call abort(23456,"Error [module_navier_stokes] in GET_DT: pressure is smaller then 0!")
     end if
     v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
 
@@ -516,6 +521,7 @@ contains
     integer(kind=ik)          :: Bs,ix,iy
     real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
                                 radius,max_R,width
+    real(kind=rk),allocatable:: mask(:,:,:)
 
     p_init    =params_ns%initial_pressure
     rho_init  =params_ns%initial_density
@@ -535,7 +541,7 @@ contains
 
 
     if (p_init<=0.0_rk .or. rho_init <=0.0) then
-      call abort(6032,  "Error [module_navier_stokes_new.f90]: initial pressure and density"//&
+      call abort(6032,  "Error [module_navier_stokes.f90]: initial pressure and density"//&
                         "must be larger then 0")
     endif
 
@@ -570,7 +576,7 @@ contains
       ! check for usefull inital values
       if ( tmp(1)<0 .or. tmp(3)<0 ) then
         write(*,*) "rho_right=",tmp(1), "p_right=",tmp(3)
-        call abort(3572,"ERROR [module_navier_stokes_new.f90]: initial values are insufficient for simple-shock")
+        call abort(3572,"ERROR [module_navier_stokes.f90]: initial values are insufficient for simple-shock")
       end if
       ! following values are imposed and smoothed with tangens:
       ! ------------------------------------------
@@ -637,29 +643,27 @@ contains
 
       ! set velocity field u(x)=1 for x in mask
       if (params_ns%penalization) then
-        call get_mask(u( :, :, 1, UxF), x0, dx, Bs, g )
-        call get_mask(u( :, :, 1, UyF), x0, dx, Bs, g )
-        if (params_ns%dim==3) call get_mask(u( :, :, 1, UzF), x0, dx, Bs, g )
-
+        call get_mask(x0, dx, Bs, g , mask)
       endif
 
       ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
-      u( :, :, :, UxF) = (1-u(:,:,:,UxF))*u_init(1)*sqrt(rho_init) !flow in x
+      u( :, :, :, UxF) = ( 1 - mask ) * u_init(1)*sqrt(rho_init) !flow in x
       if ( params_ns%geometry=="funnel" ) then
         do iy=g+1, Bs+g
             !initial y-velocity negative in lower half and positive in upper half
             y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%domain_size(2)*0.5_rk
             b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
-            u( :, iy, 1, UyF) = (1-u(:,iy,1,UyF))*b*u_init(2)*sqrt(rho_init)
+            u( :, iy, 1, UyF) = (1-mask(:,iy,1))*b*u_init(2)*sqrt(rho_init)
         enddo
       else
-        u( :, :, :, UyF) = (1-u(:,:,:,UyF))*u_init(2)*sqrt(rho_init) !flow in y
+        u( :, :, :, UyF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in y
       end if
+
     case ("pressure_blob")
 
         call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%domain_size(1), params_ns%domain_size(2), params_ns%domain_size(3)/), u(:,:,:,pF), x0, dx )
         ! add ambient pressure
-        u( :, :, :, pF)  = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
+         u( :, :, :, pF)  = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
         u( :, :, :, rhoF)= sqrt(params_ns%initial_density)
         u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
         u( :, :, :, UyF) = params_ns%initial_velocity(2)*sqrt(params_ns%initial_density)
@@ -895,7 +899,27 @@ subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)
      uL    = (1-rhoR/rhoL)*mach*c_R
 end subroutine moving_shockVals
 
+!> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
+!> values \f$\rho_2,u_2,p_2\f$ on the ohter side
+!> of the shock
+subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
+    implicit none
+    !> one side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(in)      ::rho1,u1,p1
+    !> other side of the shock (density, velocity, pressure)
+    real(kind=rk), intent(out)      ::rho2,u2,p2
+    !> heat capacity ratio
+    real(kind=rk), intent(in)      ::gamma
+    real(kind=rk)                ::cstar_sq
+
+    cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
+    !sqrt(cstar_sq)
+    u2 = cstar_sq /u1;
+    rho2 = (rho1*u1)/u2;
+    p2= (p1+ rho1*u1**2 )-rho2*u2**2;
+end subroutine shockVals
 
 
 
-end module module_navier_stokes_new
+
+end module module_navier_stokes

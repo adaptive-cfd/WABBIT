@@ -63,8 +63,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     character(len=80)                               :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: t0, x0(1:3), dx(1:3)
-    logical                                         :: block_is_nan
-
+  
     !---------------------------------------------------------------------------------------------
     ! variables initialization
     ! start time

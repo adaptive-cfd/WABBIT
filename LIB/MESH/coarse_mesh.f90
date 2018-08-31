@@ -49,6 +49,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik)                    :: data_rank
 
 
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -62,7 +63,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
+    mesh_has_changed=.false.
     ! loop over all active light data
     do k = 1, lgt_n
       ! FIRST condition: only work on light data, if block is active. Usually, you would do that just with
@@ -89,8 +90,16 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
           ! first for light data (which all CPUS do redundantly, so light data is kept synched)
           ! Then only the responsible rank will perform the heavy data merging.
           call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N) )
+          mesh_has_changed=.true.
         endif
     end do
 
 
 end subroutine coarse_mesh
+
+
+logical function mesh_adapted()
+    implicit none
+
+    mesh_adapted=mesh_has_changed
+end function

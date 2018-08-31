@@ -62,7 +62,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
     ! grid parameter, error variable
     integer(kind=ik)                    :: Bs, g
 
-    integer(kind=1)                    :: surface(3)=0
+    integer(kind=2)                    :: surface(3)=0
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

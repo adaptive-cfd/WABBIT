@@ -275,8 +275,10 @@ end subroutine ini_file_to_params
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")
     endif
+    
+    params%domain_size=(/ 1.0_rk, 1.0_rk, 0.0_rk /) !default
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
-    (/ 1.0_rk, 1.0_rk, 0.0_rk /) )
+                                                       params%domain_size(1:params%dim) )
 
     call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
 

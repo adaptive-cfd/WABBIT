@@ -9,11 +9,9 @@
 !
 !> \brief module for all init subroutines
 !
-!>
-!! = log ======================================================================================
-!! \n
-!! 24/11/16 - create \n
-!! 04/04/17 - rename to module_initialization (as specific iniconds are in the module module_initital_conditions.f90)
+!!\details
+!! \date 24/11/16 - create
+!! \date 04/04/17 - rename to module_initialization (as specific iniconds are in the module module_initital_conditions.f90)
 !!            here we provide interfaces for mesh creation and inicond setting
 ! ********************************************************************************************
 

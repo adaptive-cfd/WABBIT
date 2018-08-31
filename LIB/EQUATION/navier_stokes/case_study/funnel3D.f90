@@ -199,43 +199,22 @@ subroutine draw_funnel3D(x0, dx, Bs, g, mask, mask_color)
        r = sqrt((y-R_domain)**2+(z-R_domain)**2)
        do ix=g+1, Bs+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-            ! Outlet flow: PUMPS
-            ! ------------------
-            ! pump volume flow
-            ! compute mask
-            chi=  draw_pumps_volume_flow(x,r,funnel,h)
+
+            ! plates
+            ! ------
+            chi = draw_funnel_plates(x,r,funnel,h)
             if (chi>0.0_rk) then
-              mask_color(ix,iy,iz) = color_pumps
-              mask(ix,iy,iz,UxF)    = mask(ix,iy,iz,UxF)+chi
-              mask(ix,iy,iz,UyF)    = mask(ix,iy,iz,UyF)+chi
-            endif
-            ! mass and energy sink
-            chi=  draw_pumps_sink(x,r,funnel,h)
-            if (chi>0.0_rk) then
-              mask_color(ix,iy,iz) = color_pumps_sink
-              mask(ix,iy,iz,rhoF) = mask(ix,iy,iz,rhoF)+chi
-              mask(ix,iy,iz,pF) = mask(ix,iy,iz,pF)+chi
-            endif
+              mask_color(ix,iy,iz)  = color_plates
+              mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
+            endif                                           ! the temperature of the funnel
 
-
-
-            ! Inlet flow: Capillary
-            ! ---------------------
-            chi=  draw_jet(x,r,funnel,h)
-            if (chi>0.0_rk) then
-              mask_color(ix,iy,iz) = color_capillary
-              mask(ix,iy,iz,:)  =  mask(ix,iy,iz,:)+chi
-            endif
-
-
-            ! ! Outlet flow: Transition to 2pump
-            ! ! ---------------------
-            chi=  draw_outlet(x,r,funnel,h)
-              if (chi>0.0_rk) then
-                mask_color(ix,iy,iz) = color_outlet
-                mask(ix,iy,iz,rhoF) = mask(ix,iy,iz,rhoF)+chi
-                mask(ix,iy,iz,pF) = mask(ix,iy,iz,pF)+chi
-              endif
+            ! ! Walls
+            ! ! -----
+            ! chi = draw_walls(x,r,funnel,h)
+            ! if (chi>0.0_rk) then                       ! default values on the walls
+            !   mask_color(ix,iy,iz)  = color_walls
+            !   mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
+            ! endif
        end do !ix
     end do !iy
   end do !iz

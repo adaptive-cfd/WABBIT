@@ -2,6 +2,7 @@
 !> \details
 !> \author sm
 !> \date 18/04/17 - create
+!> \date 03/09/18 - removed unused variables (P.Krah) commit 0b79d945422eedda70fa5f874cd2889a10ef8287
 subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
 
     use module_physics_metamodule, only : GET_DT_BLOCK
@@ -16,11 +17,8 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     real(kind=rk), intent(out)    :: dt                         !< time step dt
     !--------------------------------------------------------------
     ! MPI error variable
-    integer(kind=ik) :: ierr, Jmax
-
+    integer(kind=ik) :: ierr, Jmax, k, lgt_id
     reaL(kind=rk ) :: ddx(1:3), xx0(1:3), dt_tmp
-    integer(kind=ik) :: k, lgt_id
-
 
     dt = 9.0e9_rk
 

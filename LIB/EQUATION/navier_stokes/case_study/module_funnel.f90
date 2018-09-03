@@ -309,13 +309,13 @@ end subroutine init_funnel
       real(kind=rk),intent(inout) :: integral(1:)
 
       ! temporary values
-      real(kind=rk),allocatable   :: tmp(:)
-      real(kind=rk)               :: A
-      integer(kind=ik)            :: mpierr,Nq
+      real(kind=rk),allocatable,save :: tmp(:)
+      real(kind=rk)                  :: A
+      integer(kind=ik)               :: mpierr,Nq
 
 
       Nq = size(integral,1)
-      allocate(tmp(Nq))
+      if ( .not. allocated(tmp) ) allocate(tmp(Nq))
 
       tmp=integral
 
@@ -323,13 +323,12 @@ end subroutine init_funnel
       call MPI_ALLREDUCE(tmp  ,integral, Nq , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       call MPI_ALLREDUCE(area ,A       , 1  , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
-      if ( abs(A) <= 1.0e-13_rk) then
+      if ( .not. abs(A) > 0) then
         call abort(24636,"Error [funnel.f90]: only chuck norris can devide by zero!!")
       endif
 
       !devide by the area of the region
       integral = integral / A
-
       funnel%pump_density = integral(rhoF)
       funnel%pump_pressure = integral(pF)
   end subroutine mean_quantity

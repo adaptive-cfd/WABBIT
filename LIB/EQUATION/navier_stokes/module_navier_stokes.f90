@@ -23,6 +23,7 @@ module module_navier_stokes
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_navier_stokes_params
+  use module_helpers, only: block_contains_NaN
   use module_operators, only : compute_vorticity
   use module_ns_penalization
   use module_navier_stokes_cases
@@ -180,7 +181,7 @@ contains
 
 
     ! local variables
-    integer(kind=ik) :: Bs
+    integer(kind=ik) :: Bs,dF
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
@@ -192,8 +193,8 @@ contains
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
       ! performs initializations in the RHS module, such as resetting integrals
-      integral= 0
-      area    = 0
+      integral= 0.0_rk
+      area    = 0.0_rk
 
     case ("integral_stage")
       !-------------------------------------------------------------------------
@@ -211,9 +212,7 @@ contains
         rhs=u
         call convert_statevector(rhs(:,:,:,:),'pure_variables')
         call integrate_over_pump_area(rhs(:,:,:,:),g,Bs,x0,dx,integral,area)
-        rhs=0.0_rk
       endif
-
 
     case ("post_stage")
       !-------------------------------------------------------------------------
@@ -502,7 +501,7 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik)          :: Bs,ix,iy
+    integer(kind=ik)          :: Bs,ix,iy,dF
     real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
                                 radius,max_R,width
     real(kind=rk),allocatable:: mask(:,:,:)
@@ -657,6 +656,13 @@ contains
         call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))
     end select
 
+    !check if initial conditions are set properly
+    do dF=1,params_ns%number_data_fields
+      if (  block_contains_NaN(u(:,:,:,dF)) ) then
+        call abort(46924,"ERROR [module_navier_stokes]: NaN in inicond!"//&
+        " Computer says NOOOOOOOOOOOOOOOO!")
+      endif
+    enddo
   end subroutine INICOND_NStokes
 
 

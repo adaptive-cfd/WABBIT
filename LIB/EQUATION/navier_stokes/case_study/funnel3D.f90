@@ -36,14 +36,16 @@ end subroutine  funnel_penalization3D
 
 
 subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
+  use module_helpers, only: block_contains_NaN
     implicit none
+
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)  :: Bs, g            !< grid parameter
     real(kind=rk), intent(in)     :: x0(3), dx(3)     !< coordinates of block and block spacinf
     integer(kind=2), intent(inout):: mask_color(:,:,:)!< identifyers of mask parts (plates etc)
     real(kind=rk), intent(in)     ::mask(:,:,:,:)     !< mask function
     real(kind=rk), intent(in)     ::phi(:,:,:,:)     !< state vector
-    real(kind=rk), intent(inout)  ::penalization(:,:,:,:) !<
+    real(kind=rk), intent(inout)  ::penalization(:,:,:,:) !<penalization term of NStokes equations
     ! -----------------------------------------------------------------
     ! auxiliary variables
     real(kind=rk)     :: x, y, r, z, h,velocity,C_inv
@@ -68,6 +70,7 @@ subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
     pressure_pump     =funnel%pump_pressure
     p_2nd_pump_stage  =funnel%outlet_pressure
     rho_2nd_pump_stage=funnel%outlet_density
+
     ! parameter for smoothing function (width)
     h  = 1.5_rk*maxval(dx(1:params_ns%dim))
 
@@ -85,14 +88,14 @@ subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
     endif
 
+  phi_ref=0.0_rk
 
-
-  do iz=1, Bs+2*g
+  do iz=g+1, Bs+g
     z = dble(iz - (g+1)) * dx(3) + x0(3)
-    do iy=1, Bs+2*g
+    do iy=g+1, Bs+g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-       do ix=1, Bs+2*g
+       do ix=g+1, Bs+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             rho             = phi(ix,iy,iz,rhoF)**2
             u   = phi(ix,iy,iz,UxF)/phi(ix,iy,iz,rhoF)
@@ -167,6 +170,7 @@ subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
        end do
     end do
   end do
+
 end subroutine compute_penal3D
 
 

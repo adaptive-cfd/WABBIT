@@ -185,49 +185,47 @@ subroutine draw_funnel3D(x0, dx, Bs, g, mask, mask_color)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy, iz, n
 
-
-    ! reset mask array
-    mask        = 0.0_rk
-    mask_color  = 0
+    if (size(mask,1) /= Bs+2*g) call abort(77559,"wrong array size of mask function")
 
     h  = 1.5_rk*maxval(dx(1:params_ns%dim))
 
-  do iz=g+1, Bs+g
-    z = dble(iz - (g+1)) * dx(3) + x0(3)
-    do iy=g+1, Bs+g
-       y = dble(iy-(g+1)) * dx(2) + x0(2)
-       r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-       do ix=g+1, Bs+g
-            x = dble(ix-(g+1)) * dx(1) + x0(1)
+    do iz=g+1, Bs+g
+      z = dble(iz - (g+1)) * dx(3) + x0(3)
+      do iy=g+1, Bs+g
+         y = dble(iy-(g+1)) * dx(2) + x0(2)
+         r = sqrt((y-R_domain)**2+(z-R_domain)**2)
+         do ix=g+1, Bs+g
+              x = dble(ix-(g+1)) * dx(1) + x0(1)
 
-            ! plates
-            ! ------
-            chi = draw_funnel_plates(x,r,funnel,h)
-            if (chi>0.0_rk) then
-              mask_color(ix,iy,iz)  = color_plates
-              mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
-            endif                                           ! the temperature of the funnel
+              ! plates
+              ! ------
 
-            ! ! Walls
-            ! ! -----
-            ! chi = draw_walls(x,r,funnel,h)
-            ! if (chi>0.0_rk) then                       ! default values on the walls
-            !   mask_color(ix,iy,iz)  = color_walls
-            !   mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
-            ! endif
-       end do !ix
-    end do !iy
-  end do !iz
+              chi = draw_funnel_plates(x,r,funnel,h)
+              if (chi>0.0_rk) then
+                mask_color(ix,iy,iz)  = color_plates
+                mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
+              endif                                           ! the temperature of the funnel
+
+               ! Walls
+               ! -----
+               chi = draw_walls(x,r,funnel,h)
+               if (chi>0.0_rk) then                       ! default values on the walls
+                 mask_color(ix,iy,iz)  = color_walls
+                 mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
+               endif
+         end do !ix
+      end do !iy
+    end do !iz
 end subroutine draw_funnel3D
 
 
 subroutine draw_sponge3D(x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g                             !< grid parameter
-    real(kind=rk), intent(in)     :: x0(3), dx(3)                      !< coordinates of block and block spacinf
-    real(kind=rk), intent(inout)  :: mask(:,:,:,:)                     !< mask function
-    integer(kind=2), intent(inout):: mask_color(:,:,:)                 !< identifyers of mask parts (plates etc)
+    integer(kind=ik), intent(in)  :: Bs, g             !< grid parameter
+    real(kind=rk), intent(in)     :: x0(3), dx(3)      !< coordinates of block and block spacinf
+    real(kind=rk), intent(inout)  :: mask(:,:,:,:)     !< mask function
+    integer(kind=2), intent(inout):: mask_color(:,:,:) !< identifyers of mask parts (plates etc)
     ! -----------------------------------------------------------------
     ! auxiliary variables
     real(kind=rk)                     :: x, y, z, r, h
@@ -286,3 +284,55 @@ subroutine draw_sponge3D(x0, dx, Bs, g, mask, mask_color)
     end do !iy
   end do !iz
 end subroutine draw_sponge3D
+
+
+
+
+!==========================================================================
+  !> Integrates the flow field close to the pump outlet,
+  !> and computes the volume of the intagration region.
+  subroutine integrate_over_pump_area3D(u,g,Bs,x0,dx,integral,volume)
+      implicit none
+      ! -----------------------------------------------------------------
+      integer(kind=ik), intent(in)         :: Bs, g         !< grid parameter (g ghostnotes,Bs Bulk)
+      real(kind=rk), intent(in)            :: u(:,:,:,:)    !< vector of state in pure format
+      real(kind=rk), intent(in)            :: x0(3), dx(3)  !< spacing and origin of block
+      real(kind=rk),intent(out)            :: integral(params_ns%number_data_fields)  !< mean statevector
+      real(kind=rk),intent(out)            :: volume        !< volume of the integration domain
+      ! -----------------------------------------------------------------
+      integer(kind=ik)                   :: ix,iy,iz,neq
+      real(kind=rk)                      :: h,r,y,x,z,r0,width
+      real(kind=rk),allocatable,save     :: tmp(:)
+
+      neq=params_ns%number_data_fields
+
+      if (.not. allocated(tmp) ) allocate(tmp(1:neq+1))
+      ! calculate mean density close to the pump
+      width =funnel%wall_thickness
+      tmp   =  0.0_rk
+      r0    =(R_domain-2*funnel%wall_thickness)
+      do iz=g+1, Bs+g
+       ! relative coordinates z=z-Lz/2
+       z = dble(iz-(g+1)) * dx(3) + x0(3) - R_domain
+       do iy=g+1, Bs+g
+         ! relative coordinates y=y-Ly/2
+         y = dble(iy-(g+1)) * dx(2) + x0(2)-R_domain
+         ! radius
+         r = dsqrt(y**2+z**2)
+         do ix=g+1, Bs+g
+              !this is the absolut coordinate
+              x = dble(ix-(g+1)) * dx(1) + x0(1)
+              if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
+                  r>r0 .and. r<r0+width) then
+                tmp(1:neq)  = tmp(1:neq)+ u(ix,iy,iz,:)
+                tmp(neq+1)  = tmp(neq+1)  + 1.0_rk
+              endif
+          enddo
+        enddo
+      enddo
+        ! integral of all quantities and the volume
+        integral  = integral + tmp(1:neq) * product(dx)
+        volume    = volume   + tmp(neq+1) * product(dx)
+
+  end subroutine integrate_over_pump_area3D
+  !==========================================================================

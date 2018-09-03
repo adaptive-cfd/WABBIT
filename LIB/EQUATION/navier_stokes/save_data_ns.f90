@@ -67,7 +67,7 @@
     ! +++++++++++++++++++++++++++++++++
     if (  list_contains_name(params_ns%names,'mask')>0 ) then
       if ( .not. allocated(mask) ) allocate(mask(size(u,1),size(u,2),size(u,3)))
-          call get_mask(x0, dx, Bs, g, mask)
+          call get_mask(x0, dx, Bs, g, mask, .true.)
     end if
 
     ! save pure state variables (rho, u, v, w, p)

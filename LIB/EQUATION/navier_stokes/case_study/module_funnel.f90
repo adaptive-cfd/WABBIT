@@ -60,12 +60,12 @@ module module_funnel
 ! identifyers of the different parts of the funnel
 ! they are used in the array mask_color
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  integer(kind=2),save :: color_plates     =1
-  integer(kind=2),save :: color_walls      =2
-  integer(kind=2),save :: color_capillary  =3
-  integer(kind=2),save :: color_pumps      =4
-  integer(kind=2),save :: color_pumps_sink =5
-  integer(kind=2),save :: color_outlet     =6
+  integer(kind=2),save :: color_capillary  =5
+  integer(kind=2),save :: color_outlet     =4
+  integer(kind=2),save :: color_plates     =3
+  integer(kind=2),save :: color_pumps      =2
+  integer(kind=2),save :: color_pumps_sink =1
+  integer(kind=2),save :: color_walls      =-1
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -129,12 +129,13 @@ contains
         ! -----------------------------------------------------------------
         integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
         real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
-        real(kind=rk), intent(inout),allocatable  :: mask(:,:,:)    !< mask function
+        real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
         logical, optional, intent(in) :: mask_is_colored
         integer(kind=2),allocatable   :: mask_color(:,:,:)!< identifyers of mask parts (plates etc)
         logical, save :: is_colored =.false.
         real(kind=rk), allocatable  :: mask_tmp(:,:,:,:)    !< mask function for the statevector
         ! -----------------------------------------------------------------
+        if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size!")
         ! if variable is present the default (false) is overwritten by the input
         if( present(mask_is_colored)) is_colored=mask_is_colored
         ! allocate and compute mask and colored mask
@@ -144,6 +145,7 @@ contains
             mask_tmp    = 0.0_rk
             mask_color  = 0
             call  draw_funnel3D(x0, dx, Bs, g, mask_tmp, mask_color)
+            call  draw_sponge3D(x0,dx,Bs,g,mask_tmp,mask_color)
         else
             if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
             if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1,4))
@@ -155,11 +157,10 @@ contains
         ! mask coloring is optional, which is mainly used for plotting the different parts
         ! of the funnel in paraview
         if (is_colored) then
-          mask= 0.0_rk*mask_tmp(:,:,:,1)
-          mask= real(mask_color(:,:,:),kind=rk)
+          mask(:,:,:)= real(mask_color(:,:,:),kind=rk)
         else
           ! if the mask is not colored we use the mask of the solid obstacles
-          mask = mask_tmp(:,:,:,UxF)
+          mask(:,:,:) = mask_tmp(:,:,:,UxF)
         endif
 
     end subroutine draw_funnel
@@ -282,43 +283,57 @@ end subroutine init_funnel
 
   subroutine integrate_over_pump_area(u,g,Bs,x0,dx,integral,area)
       implicit none
+      !---------------------------------------------------------------
+      integer(kind=ik), intent(in):: Bs, g            !< grid parameter (g ghostnotes,Bs Bulk)
+      real(kind=rk), intent(in)   :: u(:,:,:,:)       !< statevector in PURE VARIABLES \f$ (rho,u,v,w,p) \f$
+      real(kind=rk),  intent(in)  :: x0(3), dx(3)     !< spacing and origin of block
+      real(kind=rk),intent(out)   :: integral(5), area!< mean values
+      !---------------------------------------------------------------
 
-      !> grid parameter (g ghostnotes,Bs Bulk)
-      integer(kind=ik), intent(in)                     :: Bs, g
-      !> density,pressure
-      real(kind=rk), dimension(1:,1:,1:), intent(in)   :: u
-      !> spacing and origin of block
-      real(kind=rk), dimension(2), intent(in)          :: x0, dx
-      !> mean density
-      real(kind=rk),intent(out)                      :: integral(4), area
-
-      real(kind=rk)                                    :: h,r,y,x,r0,width
-      !temporal data field
-      real(kind=rk),dimension(5)                       :: tmp
-
-      integer(kind=ik)                                 :: ix,iy
-
-       h  = 1.5_rk*max(dx(1), dx(2))
-      ! calculate mean density close to the pump
-      width =funnel%wall_thickness
-      tmp   =  0.0_rk
-      r0    =(R_domain-2*funnel%wall_thickness)
-       do iy=g+1, Bs+g
-         y = dble(iy-(g+1)) * dx(2) + x0(2)
-         r = abs(y-R_domain)
-         do ix=g+1, Bs+g
-              x = dble(ix-(g+1)) * dx(1) + x0(1)
-              if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
-                  r>r0 .and. r<r0+width) then
-                tmp(1:4)  = tmp(1:4)+ u(ix,iy,:)
-                tmp(5)    = tmp(5)  + 1.0_rk
-              endif
-          enddo
-        enddo
-        integral  = integral + tmp(1:4) *dx(1)*dx(2)
-        area      = area     + tmp(5)   *dx(1)*dx(2)
+      if ( params_ns%dim==2 ) then
+        call integrate_over_pump_area2D(u(:,:,1,:),g,Bs,x0(1:2),dx(1:2),integral(1:4),area)
+      else
+        call integrate_over_pump_area3D(u,g,Bs,x0,dx,integral,area)
+      end if
 
   end subroutine integrate_over_pump_area
+
+
+
+
+
+  subroutine mean_quantity(integral,area)
+      !> area of taking the mean
+      real(kind=rk),intent(in)    :: area
+      !> integral over the area
+      real(kind=rk),intent(inout) :: integral(1:)
+
+      ! temporary values
+      real(kind=rk),allocatable   :: tmp(:)
+      real(kind=rk)               :: A
+      integer(kind=ik)            :: mpierr,Nq
+
+
+      Nq = size(integral,1)
+      allocate(tmp(Nq))
+
+      tmp=integral
+
+      ! integrate over all procs
+      call MPI_ALLREDUCE(tmp  ,integral, Nq , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+      call MPI_ALLREDUCE(area ,A       , 1  , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+      if ( abs(A) <= 1.0e-13_rk) then
+        call abort(24636,"Error [funnel.f90]: only chuck norris can devide by zero!!")
+      endif
+
+      !devide by the area of the region
+      integral = integral / A
+
+      funnel%pump_density = integral(rhoF)
+      funnel%pump_pressure = integral(pF)
+  end subroutine mean_quantity
+
 
 
 

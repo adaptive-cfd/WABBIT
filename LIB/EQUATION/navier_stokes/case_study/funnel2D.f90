@@ -276,45 +276,6 @@ end subroutine  compute_penal2D
 
 
 
-subroutine mean_quantity(integral,area)
-    !> area of taking the mean
-    real(kind=rk),intent(in)    :: area
-    !> integral over the area
-    real(kind=rk),intent(inout) :: integral(1:)
-
-    ! temporary values
-    real(kind=rk),allocatable   :: tmp(:)
-    real(kind=rk)               :: A
-    integer(kind=ik)            :: mpierr,Nq
-
-
-    Nq = size(integral,1)
-    allocate(tmp(Nq))
-
-    tmp=integral
-
-    ! integrate over all procs
-    call MPI_ALLREDUCE(tmp  ,integral, Nq , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-    call MPI_ALLREDUCE(area ,A       , 1  , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
-    if ( abs(A) <= 1.0e-13_rk) then
-      call abort(24636,"Error [funnel.f90]: only chuck norris can devide by zero!!")
-    endif
-
-    !devide by the area of the region
-    integral = integral / A
-
-    funnel%pump_density = integral(1)
-    funnel%pump_pressure = integral(4)
-end subroutine mean_quantity
-
-
-
-
-
-
-
-
 
 !> \brief Compute mask term for stacked rings of the ion funnel
 function draw_funnel_plates(x,r,funnel,h)
@@ -543,3 +504,49 @@ end function draw_sink
 
     end subroutine init_plates
 !==========================================================================
+
+
+
+!==========================================================================
+  !> Integrates the flow field close to the pump outlet,
+  !> and computes the area of the intagration region.
+  subroutine integrate_over_pump_area2D(u,g,Bs,x0,dx,integral,area)
+      implicit none
+
+      !> grid parameter (g ghostnotes,Bs Bulk)
+      integer(kind=ik), intent(in)                     :: Bs, g
+      !> density,pressure
+      real(kind=rk), dimension(1:,1:,1:), intent(in)   :: u
+      !> spacing and origin of block
+      real(kind=rk), dimension(2), intent(in)          :: x0, dx
+      !> mean density
+      real(kind=rk),intent(out)                      :: integral(4), area
+
+      real(kind=rk)                                    :: h,r,y,x,r0,width
+      !temporal data field
+      real(kind=rk),dimension(5)                       :: tmp
+
+      integer(kind=ik)                                 :: ix,iy
+
+       h  = 1.5_rk*max(dx(1), dx(2))
+      ! calculate mean density close to the pump
+      width =funnel%wall_thickness
+      tmp   =  0.0_rk
+      r0    =(R_domain-2*funnel%wall_thickness)
+       do iy=g+1, Bs+g
+         y = dble(iy-(g+1)) * dx(2) + x0(2)
+         r = abs(y-R_domain)
+         do ix=g+1, Bs+g
+              x = dble(ix-(g+1)) * dx(1) + x0(1)
+              if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
+                  r>r0 .and. r<r0+width) then
+                tmp(1:4)  = tmp(1:4)+ u(ix,iy,:)
+                tmp(5)    = tmp(5)  + 1.0_rk
+              endif
+          enddo
+        enddo
+        integral  = integral + tmp(1:4) *dx(1)*dx(2)
+        area      = area     + tmp(5)   *dx(1)*dx(2)
+
+  end subroutine integrate_over_pump_area2D
+  !==========================================================================

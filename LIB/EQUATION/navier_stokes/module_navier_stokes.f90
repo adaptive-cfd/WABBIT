@@ -176,7 +176,7 @@ contains
     integer(kind=2)          , intent(in):: boundary_flag(3)
 
     ! Area of mean_density
-    real(kind=rk)    ,save             :: integral(4),area
+    real(kind=rk)    ,save             :: integral(5),area
 
 
     ! local variables
@@ -206,10 +206,11 @@ contains
       ! them nicer, two RHS stages have to be defined: integral / local stage.
       !
       ! called for each block.
-      if (params_ns%penalization .and. params_ns%case=="funnel") then
+      if (params_ns%case=="funnel") then
+        ! since rhs was not computed yet we can use it as a temporary storage
         rhs=u
         call convert_statevector(rhs(:,:,:,:),'pure_variables')
-        call integrate_over_pump_area(rhs(:,:,1,:),g,Bs,x0,dx,integral,area)
+        call integrate_over_pump_area(rhs(:,:,:,:),g,Bs,x0,dx,integral,area)
         rhs=0.0_rk
       endif
 
@@ -219,10 +220,9 @@ contains
       ! 3rd stage: post_stage.
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
-      if (params_ns%penalization .and. params_ns%geometry=="funnel") then
+      if (params_ns%geometry=="funnel") then
         ! reduce sum on each block to global sum
         call mean_quantity(integral,area)
-
       endif
 
     case ("local_stage")
@@ -445,45 +445,29 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! local variables
-    real(kind=rk),allocatable  :: v_physical(:,:,:)
-    real(kind=rk) :: deltax,x,y
-    integer(kind=ik)::ix,iy
+    real(kind=rk),allocatable,save  :: v_physical(:,:,:)
+    real(kind=rk)                   :: dx_min
+
 
     dt = 9.9e9_rk
+    dx_min=minval(dx(1:params_ns%dim))
 
-
-
-    if (maxval(abs(u))>1.0e7) then
-        call abort(65761,"ERROR [module_navier_stokes.f90]: very large values in statevector")
+    if (maxval(abs(u))>1.0e7 .OR. minval(u(:,:,:,pF))<0 ) then
+         call abort(65761,"ERROR [module_navier_stokes.f90]: statevector values out of physical range")
     endif
-    ! get smallest spatial seperation
-    if(size(u,3)==1) then
-        deltax=minval(dx(1:2))
+    if(params_ns%dim==2) then
       if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs,2*g+Bs,1))
+      v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
-        deltax=minval(dx)
       if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
+      v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
 
-    ! calculate norm of velocity at every spatial point
-    if (size(u,3)==1) then
-        v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
-    else
-        v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
-    endif
-
-    ! maximal characteristical velocity is u+c where c = sqrt(gamma*p/rho) (speed of sound)
-    if ( minval(u(:,:,:,pF))<0 ) then
-      write(*,*)"minval=",minval(u(:,:,:,pF))
-      call abort(23456,"Error [module_navier_stokes] in GET_DT: pressure is smaller then 0!")
-    end if
-    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF))
-
-    v_physical = v_physical/u(:,:,:,rhoF)
+    v_physical = sqrt(v_physical)+sqrt(params_ns%gamma_*u(:,:,:,pF)) ! v= sqrt(rho u^2) + sqrt(gamma p)
+    v_physical = v_physical/u(:,:,:,rhoF)                            ! v= (sqrt(rho u^2) + sqrt (gamma p))/sqrt(rho)
 
     ! CFL criteria CFL=v_physical/v_numerical where v_numerical=dx/dt
-     dt = min(dt, params_ns%CFL * deltax / maxval(v_physical))
-
+     dt = min(dt, params_ns%CFL * dx_min / maxval(v_physical))
     ! penalization requiers dt <= C_eta
     if (params_ns%penalization ) then
         dt=min(dt,params_ns%C_eta)
@@ -643,6 +627,7 @@ contains
 
       ! set velocity field u(x)=1 for x in mask
       if (params_ns%penalization) then
+        if (.not. allocated(mask))        allocate(mask(size(u,1), size(u,2), size(u,3)))
         call get_mask(x0, dx, Bs, g , mask)
       endif
 

@@ -1,3 +1,4 @@
+
 !----------------------------------------------------------------
 !> Implementation of all the case studies in Navier Stokes
 !> \details
@@ -116,19 +117,22 @@ end subroutine set_case_parameters
  !> \details Many routines depend on the geometry and need to know the
  !>          mask function. For example for calculation of the force on an obstacle or the
  !>          density within the obstacle, as well as outside the obstacle.
-  subroutine get_mask(x0, dx, Bs, g, mask)
+  subroutine get_mask(x0, dx, Bs, g, mask,mask_is_colored)
       implicit none
       ! -----------------------------------------------------------------
       integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
       real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
       real(kind=rk), intent(inout), allocatable  :: mask(:,:,:)    !< mask function
+      logical, optional, intent(in) :: mask_is_colored
+      logical, save :: is_colored =.false.
       ! -----------------------------------------------------------------
+      if( present(mask_is_colored)) is_colored=mask_is_colored
 
       select case(CASE)
       case('simple_geometry')
         call draw_geometry(x0, dx, Bs, g, mask)
       case('funnel')
-        call draw_funnel(x0, dx, Bs, g, mask,.false.)
+        call draw_funnel(x0, dx, Bs, g, mask,is_colored)
       case('shock_tube')
         call draw_simple_shock(mask(:,:,1), x0, dx, Bs, g,'boundary' )
       case default

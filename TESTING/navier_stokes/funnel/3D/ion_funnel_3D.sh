@@ -4,18 +4,18 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="TESTING/navier_stokes/funnel/"
-params=${dir}"ion_funnel_light.ini"
+dir="TESTING/navier_stokes/funnel/3D/"
+params=${dir}"ion_funnel_3D.ini"
 happy=0
 sad=0
 echo "testing ion funnel"
 # list of prefixes the test generates
-prefixes=(rho Ux Uy p vort mask sigmax sigmay)
+prefixes=(rho Ux Uy p mask)
 # list of possible times (no need to actually have them)
-times=(000000000010)
+times=(000000000001)
 
 # run actual test
-${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
+${mpi_command} ./wabbit ${params} --memory=12GB ${ghosts}
 
 echo "============================"
 echo "run done, analyzing data now"

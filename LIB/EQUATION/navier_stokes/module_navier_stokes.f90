@@ -704,10 +704,9 @@ contains
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
-    work_array(:,:,:,1:params_ns%number_data_fields)=u
-    call filter_block(params_ns%filter, time, work_array, Bs, g, x0, dx)
+    call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
     u=work_array(:,:,:,1:params_ns%number_data_fields)
-
+    
   end subroutine filter_NStokes
 
 

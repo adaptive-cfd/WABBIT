@@ -41,8 +41,9 @@
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)
     tmp_u  = u(:,:,:,:)
-
     call convert_statevector(tmp_u,'pure_variables')
+
+
     ! +++++++++++++++++
     ! compute vorticity
     ! +++++++++++++++++
@@ -59,20 +60,24 @@
     if (params_ns%filter%name=="bogey_shock" .and. params_ns%filter%save_filter_strength ) then
       if ( .not. allocated(sigma) ) allocate(sigma(size(u,1),size(u,2),size(u,3),3))
       work(:,:,:,1:nvar)=u
-      call filter_block(params_ns%filter, time, work(:,:,:,:), Bs, g, x0, dx)
+      tmp_u=u
+      call filter_block(params_ns%filter, time, tmp_u, g, Bs, x0, dx, work)
       sigma(:,:,:,1:params_ns%dim)=work(:,:,:,nvar+1:nvar+params_ns%dim)
     endif
+
     ! +++++++++++++++++++++++++++++++++
     ! compute mask and reference values
     ! +++++++++++++++++++++++++++++++++
     if (  list_contains_name(params_ns%names,'mask')>0 ) then
       if ( .not. allocated(mask) ) allocate(mask(size(u,1),size(u,2),size(u,3)))
-          call get_mask(x0, dx, Bs, g, mask, .true.)
+          call get_mask(x0, dx, Bs, g, mask, .true.)   ! the true boolean stands for: make mask colored if possible
     end if
 
+    !+++++++++++++++++++
     ! save pure state variables (rho, u, v, w, p)
-    work(:,:,:,1:nvar)=tmp_u(:,:,:,:)
-
+    !++++++++++++++++++
+    work(:,:,:,1:nvar)=u
+    call convert_statevector(work(:,:,:,1:nvar),'pure_variables')
     ! save additional variables
     do k = nvar+1, params_ns%N_fields_saved
         name = params_ns%names(k)

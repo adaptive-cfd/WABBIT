@@ -9,7 +9,7 @@
 
 module module_shock_tube
 
-    use module_navier_stokes
+    use module_navier_stokes, only: shockVals
     use module_navier_stokes_params
     use module_precision
     use module_ini_files_parser_mpi

@@ -1,6 +1,6 @@
 !> \brief reads parameters for mask function from file
 subroutine init_simple_shock(params,FILE)
-  use module_navier_stokes_params
+
   implicit none
   !> params structure of navier stokes
    type(type_params_ns),intent(in)  :: params

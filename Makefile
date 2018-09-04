@@ -143,10 +143,6 @@ $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDI
 	initial_conditions.f90 filter_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
-	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90 save_data_ns.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_ini_files_parser_mpi.o\
  	vortex_street.f90 sod_shock_tube.f90 simple_shock.f90 RHS_2D_cylinder.f90 triangle.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -155,10 +151,6 @@ $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJD
 	funnel2D.f90 funnel3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_shock_tube.o: module_shock_tube.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o $(OBJDIR)/module_navier_stokes.o \
-		sod_shock_tube.f90
-		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
 		vortex_street.f90 triangle.f90
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -166,6 +158,14 @@ $(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_
 $(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)/module_funnel.o $(OBJDIR)/module_ns_penalization.o\
 	$(OBJDIR)/module_shock_tube.o $(OBJDIR)/module_simple_geometry.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
+	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90 save_data_ns.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_shock_tube.o: module_shock_tube.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+		$(OBJDIR)/module_navier_stokes.o sod_shock_tube.f90
+		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o \

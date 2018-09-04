@@ -39,7 +39,7 @@ module module_navier_stokes
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
             CONVERT_STATEVECTOR, PACK_STATEVECTOR, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
-            STATISTICS_NStokes,FILTER_NSTOKES,convert2format,shockvals
+            STATISTICS_NStokes,FILTER_NSTOKES,convert2format
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
@@ -706,7 +706,7 @@ contains
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
     u=work_array(:,:,:,1:params_ns%number_data_fields)
-    
+
   end subroutine filter_NStokes
 
 
@@ -859,55 +859,6 @@ subroutine convert2format(phi_in,format_in,phi_out,format_out)
 end subroutine convert2format
 
 
-
-!> \brief reft and right shock values for 1D shock moving with mach to the right
-!> \detail This function converts with the Rankine-Hugoniot Conditions
-!>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
-!>  \f$\rho_R,u_R,p_R\f$ and \f$u_L\f$ .
-!> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
-!> author F.Toro
-subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)
-    implicit none
-    !> one side of the shock (density, pressure)
-    real(kind=rk), intent(in)      ::rhoL,pL
-    !> shock speed
-    real(kind=rk), intent(in)      :: mach
-    !> speed on
-    real(kind=rk), intent(inout)      :: uL
-    !> other side of the shock (density, velocity, pressure)
-    real(kind=rk), intent(out)      ::rhoR,uR,pR
-    !> heat capacity ratio
-    real(kind=rk), intent(in)      ::gamma
-
-    real(kind=rk)                ::c_R
-
-
-     uR    =   0
-     rhoR  =   ((gamma-1)*mach**2+2)/((gamma+1)*mach**2)*rhoL
-     pR    = (gamma+1)/(2*gamma*mach**2-gamma+1)*pL
-     c_R   = sqrt(gamma*pR/rhoR)
-     uL    = (1-rhoR/rhoL)*mach*c_R
-end subroutine moving_shockVals
-
-!> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
-!> values \f$\rho_2,u_2,p_2\f$ on the ohter side
-!> of the shock
-subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
-    implicit none
-    !> one side of the shock (density, velocity, pressure)
-    real(kind=rk), intent(in)      ::rho1,u1,p1
-    !> other side of the shock (density, velocity, pressure)
-    real(kind=rk), intent(out)      ::rho2,u2,p2
-    !> heat capacity ratio
-    real(kind=rk), intent(in)      ::gamma
-    real(kind=rk)                ::cstar_sq
-
-    cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
-    !sqrt(cstar_sq)
-    u2 = cstar_sq /u1;
-    rho2 = (rho1*u1)/u2;
-    p2= (p1+ rho1*u1**2 )-rho2*u2**2;
-end subroutine shockVals
 
 
 

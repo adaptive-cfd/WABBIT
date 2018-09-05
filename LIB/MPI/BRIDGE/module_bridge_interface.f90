@@ -72,7 +72,7 @@ character(10)                            :: nbParticleProcesses
 
   ! Read out the total number of particle processes
   !to start from the given command line
-  call get_command_argument(3, nbParticleProcesses)
+  call get_command_argument(2, nbParticleProcesses)
 
   ! Assign this number in the first value of processesParticle (1 otherwise)
   processesParticle = 1

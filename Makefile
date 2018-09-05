@@ -164,7 +164,7 @@ $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_shock_tube.o: module_shock_tube.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
-		$(OBJDIR)/module_navier_stokes.o sod_shock_tube.f90
+		$(OBJDIR)/module_navier_stokes_params.o sod_shock_tube.f90
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \

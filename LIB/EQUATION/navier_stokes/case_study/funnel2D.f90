@@ -128,8 +128,8 @@ subroutine draw_sponge2D(x0, dx, Bs, g, mask, mask_color)
               mask(ix,iy,1:4)   =  mask(ix,iy,1:4)+chi
             endif
 
-            ! ! Outlet flow: Transition to 2pump
-            ! ! ---------------------
+            ! Outlet flow: Transition to 2pump
+            ! ---------------------
             chi=  draw_outlet(x,r,funnel,h)
             !   chi=  draw_sink(x,y,funnel,h)
               if (chi>0.0_rk) then
@@ -321,7 +321,7 @@ function draw_walls(x,r,funnel,h)
 
   mask=0.0_rk
 
-  ! wall in south and north
+  ! wall in south and north (i.e. in radial direction)
   if (abs(x-funnel%pump_x_center)> funnel%pump_diameter*0.5_rk) then
     ! mask for r>R_domain-wall_thickness   (outer wall)
          !mask=mask+smoothstep(R_domain-funnel%wall_thickness-r,h)

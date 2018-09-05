@@ -120,6 +120,7 @@ subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
             if (mask_color(ix,iy,iz) == color_pumps) then
               !compute velocity profile
               Phi_ref(UxF) = 0
+              Phi_ref(UzF) = 0
               v_ref=velocity_pump*jet_stream(abs(x-funnel%pump_x_center),funnel%pump_diameter*0.5_rk,pump_smooth_width)
               if (y>R_domain) then
                 phi_ref(UyF) = rho*v_ref
@@ -130,8 +131,8 @@ subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
             !energy sink
             if ( mask_color(ix,iy,iz) == color_pumps_sink) then
               Phi_ref(rhoF) = rho_pump
-              Phi_ref(pF) = pressure_pump
-              C_inv=C_eta_inv
+              Phi_ref(pF)   = pressure_pump
+              C_inv         =C_eta_inv
             endif
 
             if (mask_color(ix,iy,iz) == color_capillary) then
@@ -163,7 +164,7 @@ subroutine compute_penal3D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
               ! y-velocity
               penalization(ix,iy,iz,UyF)=C_inv*mask(ix,iy,iz,UyF)*(rho*v-  Phi_ref(UyF) )
               ! z-velocity
-              penalization(ix,iy,iz,UzF)=C_inv*mask(ix,iy,iz,UzF)*(rho*v-  Phi_ref(UzF) )
+              penalization(ix,iy,iz,UzF)=C_inv*mask(ix,iy,iz,UzF)*(rho*w-  Phi_ref(UzF) )
               ! preasure
               penalization(ix,iy,iz,pF)=C_inv*mask(ix,iy,iz,pF)*(p- Phi_ref(pF) )
 
@@ -212,7 +213,7 @@ subroutine draw_funnel3D(x0, dx, Bs, g, mask, mask_color)
 
                ! Walls
                ! -----
-               chi = draw_walls(x,r,funnel,h)
+               chi = draw_walls3D(x,y,z,r,funnel,h)
                if (chi>0.0_rk) then                       ! default values on the walls
                  mask_color(ix,iy,iz)  = color_walls
                  mask(ix,iy,iz,2:5)    = mask(ix,iy,iz,2:5) + chi
@@ -251,14 +252,15 @@ subroutine draw_sponge3D(x0, dx, Bs, g, mask, mask_color)
             ! ------------------
             ! pump volume flow
             ! compute mask
-            chi=  draw_pumps_volume_flow(x,r,funnel,h)
+            chi=  draw_pumps_volume_flow3D(x,y,z,r,funnel,h)
             if (chi>0.0_rk) then
               mask_color(ix,iy,iz) = color_pumps
               mask(ix,iy,iz,UxF)    = mask(ix,iy,iz,UxF)+chi
               mask(ix,iy,iz,UyF)    = mask(ix,iy,iz,UyF)+chi
+              mask(ix,iy,iz,UzF)    = mask(ix,iy,iz,UzF)+chi
             endif
             ! mass and energy sink
-            chi=  draw_pumps_sink(x,r,funnel,h)
+            chi=  draw_pumps_sink3D(x,y,z,r,funnel,h)
             if (chi>0.0_rk) then
               mask_color(ix,iy,iz) = color_pumps_sink
               mask(ix,iy,iz,rhoF) = mask(ix,iy,iz,rhoF)+chi
@@ -339,4 +341,104 @@ end subroutine draw_sponge3D
         volume    = volume   + tmp(neq+1) * product(dx)
 
   end subroutine integrate_over_pump_area3D
+  !==========================================================================
+
+
+
+  !==========================================================================
+  function draw_walls3D(x,y,z,r,funnel,h)
+    implicit none
+    !---------------------------------------------
+    real(kind=rk),    intent(in)   :: x, y, z, r, h
+    type(type_funnel),intent(in)   ::funnel
+    !---------------------------------------------
+    real(kind=rk)                  ::  mask, draw_walls3D,r2_rel
+
+    !relative distance (squared) from pump center in the z/x plane
+    r2_rel=(x-funnel%pump_x_center)**2+(z-R_domain)**2 ! squaring is cheaper then taking the root
+
+    ! wall in radial direction
+    mask = hardstep(R_domain-funnel%wall_thickness-r) &
+         * hardstep((funnel%pump_diameter*0.5_rk)**2 - r2_rel)
+    mask = mask + hardstep(r2_rel - (funnel%pump_diameter*0.5_rk)**2 ) &
+         * hardstep(R_domain-0.333_rk*funnel%wall_thickness-abs(y-R_domain))
+
+
+    ! wall in east
+    !mask=mask+smoothstep(x-funnel%wall_thickness,h)
+    if ( r > funnel%jet_radius) then
+        mask=mask+hardstep(x-funnel%wall_thickness)
+    else
+        mask=mask+hardstep(x-funnel%wall_thickness*0.5_rk)
+    endif
+    ! attach cappilary to wall in EAST
+    if (  r > funnel%jet_radius  ) then
+        mask=mask+hardstep(x-funnel%plate(1)%x0(1))*hardstep(r-funnel%r_out_cappilary)
+
+           !mask=mask+smoothstep(x-funnel%plate(1)%x0(1),h)*smoothstep(r-funnel%r_out_cappilary,h)
+    endif
+
+
+    ! wall in WEST
+    if ( r > funnel%min_inner_diameter*0.5_rk) then
+          !  mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+
+           mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness)
+    else
+          mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk)
+          ! mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
+    endif
+
+     ! is needed because mask off walls overlap
+    if (mask>1) then
+           mask=1
+    endif
+
+    draw_walls3D=mask
+  end function draw_walls3D
+  !==========================================================================
+
+
+  !==========================================================================
+
+  function draw_pumps_volume_flow3D(x,y,z,r,funnel,h)
+    implicit none
+    !-------------------------------------------------
+    real(kind=rk),    intent(in)          :: x, y, z, r, h
+    type(type_funnel),intent(in)          ::funnel
+    !-------------------------------------------------
+    real(kind=rk) ::  mask, draw_pumps_volume_flow3D,r0,width,r2_rel,R2_pump
+
+    mask  =0
+    width =funnel%wall_thickness*0.333_rk
+    r0    =(R_domain-funnel%wall_thickness)
+    r2_rel=(x-funnel%pump_x_center)**2+(z-R_domain)**2 ! squaring is cheaper then taking the root
+    R2_pump=(funnel%pump_diameter*0.5_rk)**2 !squared pump diameter
+
+    mask = smoothstep(r0-r,h)*smoothstep(r2_rel-(R2_pump-h),h) &
+         * smoothstep(abs(y-R_domain)-(R_domain-0.666_rk*funnel%wall_thickness),h)
+
+
+    draw_pumps_volume_flow3D=mask
+  end function draw_pumps_volume_flow3D
+  !==========================================================================
+
+
+
+  !==========================================================================
+  function draw_pumps_sink3D(x,y,z,r,funnel,h)
+    implicit none
+    !-------------------------------------------------
+    real(kind=rk),    intent(in)          :: x, y, z, r, h
+    type(type_funnel),intent(in)          ::funnel
+    !-------------------------------------------------
+    real(kind=rk) ::r0, draw_pumps_sink3D,width,depth,R2_pump,r2_rel
+
+    r0    =(R_domain-funnel%wall_thickness*0.666_rk)
+    depth =funnel%wall_thickness*0.333_rk
+    r2_rel=(x-funnel%pump_x_center)**2+(z-R_domain)**2 ! squaring is cheaper then taking the root
+    R2_pump=(funnel%pump_diameter*0.5_rk)**2 !squared pump diameter
+
+    draw_pumps_sink3D = smoothstep(r2_rel-(R2_pump-h),h) * soft_bump2(abs(y-R_domain),r0,depth,h)
+  end function draw_pumps_sink3D
   !==========================================================================

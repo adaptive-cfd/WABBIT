@@ -60,12 +60,12 @@ module module_funnel
 ! identifyers of the different parts of the funnel
 ! they are used in the array mask_color
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  integer(kind=2),save :: color_capillary  =5
-  integer(kind=2),save :: color_outlet     =4
-  integer(kind=2),save :: color_plates     =3
+  integer(kind=2),save :: color_capillary  =6
+  integer(kind=2),save :: color_outlet     =5
+  integer(kind=2),save :: color_plates     =4
+  integer(kind=2),save :: color_walls      =3
   integer(kind=2),save :: color_pumps      =2
   integer(kind=2),save :: color_pumps_sink =1
-  integer(kind=2),save :: color_walls      =-1
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -248,9 +248,11 @@ contains
     funnel%outlet_density=funnel%outlet_pressure/(params_ns%Rs*funnel%temperatur)
     if (funnel%length         >domain_size(1)-2.0_rk*funnel%wall_thickness .or. &
     funnel%outer_diameter >domain_size(2)-2.0_rk*funnel%wall_thickness) then
-    call abort(5032,"ERROR [funnel.f90]:funnel is larger then simulation domain!")
-  endif
-
+      call abort(5032,"ERROR [funnel.f90]:funnel is larger then simulation domain!")
+    endif
+    if ( funnel%pump_diameter>domain_size(2)-2*funnel%wall_thickness ) then
+        call abort(3464,"ERROR [module_funnel]: your pump diameter is larger then the vacuum chamber!!")
+    end if
   !initialice geometry of ion funnel plates
   call init_plates(funnel)
 end subroutine init_funnel

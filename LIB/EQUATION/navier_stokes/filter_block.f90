@@ -183,8 +183,8 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
       if (params_ns%dim==3) then
         call bogey_filter3D(filter, u, g, Bs, N_dF, x0, dx, work_array)
       else
-        call bogey_filter2D_(filter, u, g, Bs, N_dF, x0, dx, work_array)
-      !  call bogey_filter2D(filter, Bs, g, N_dF ,work_array,x0,dx)
+        call bogey_filter2D_(filter, u, g, Bs, N_dF, x0, dx, work_array) !new bogey_filter
+      !  call bogey_filter2D(filter, Bs, g, N_dF ,work_array,x0,dx) !old bogey filter
       endif
     else ! explicit filtering
       do dF = 1, N_dF
@@ -734,7 +734,7 @@ subroutine bogey_filter3D(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
     do iy = g+1, Bs+g
       do ix = g+1, Bs+g
         do i=1,7 !shift the stencil loop
-          !This loop shifts the stencil in every direction   direction shift(1)=-1,shift(2)=0,shift(3)=1
+          !This loop shifts the stencil in every direction   direction shift(1)=-3,shift(2)=-2,...shift(6)=3
 
           ! compute the divergence
           ! divergence shifted in x

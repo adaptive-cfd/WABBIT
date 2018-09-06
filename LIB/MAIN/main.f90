@@ -200,8 +200,6 @@ program main
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
         hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     endif
-    ! write(*,*)"lgt_data",lgt_block(1,params%max_treelevel+idx_mesh_lvl)
-    ! call abort(25435432,"domain")
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 

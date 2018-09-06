@@ -31,21 +31,14 @@ subroutine write_debug_times( iteration, params )
 
     !> iteration
     integer(kind=ik), intent(in)        :: iteration
-    
+
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
 
     ! process rank
     integer(kind=ik)                    :: rank
-
-    ! file existence variable
-    logical                             :: file_exists
-    ! file IO error variable
-    integer(kind=ik)                    :: io_error
-
     ! loop variable
     integer(kind=ik)                    :: k
-
     ! file name
     character(len=80)                   :: fname
 
@@ -64,16 +57,10 @@ subroutine write_debug_times( iteration, params )
     ! file name
     write( fname,'(i5.5, "times.dat")') rank
 
-    ! check file existence, if not create file
-    inquire(file=fname, exist=file_exists)
+    ! we always destroy existing data and re-create the file - those files otherwise
+    ! get really big (TB range)
+    open(unit=99,file=fname, status='replace')
 
-    if (file_exists) then
-        ! open for append
-        open(unit=99,file=fname,status='old', position="append", action='write', iostat=io_error)
-    else
-        ! first opening
-        open(unit=99,file=fname,status='new',action='write', iostat=io_error)
-    end if
 
     ! write data
 

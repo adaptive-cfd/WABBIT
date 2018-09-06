@@ -1,58 +1,5 @@
 
 
-
-!==========================================================================
-!> \brief Compute mask function of sod shock tube
-!> \detail
-!>      +For boundary_type=='left'
-!>             -> mask will be generatet for 0<x<0.1*Lx
-!>      +For boundary_type=='rigth'
-!>             -> mask will be generatet for 0.9Lx<x<Lx
-!>      +For boundary_type else
-!>             -> mask will be generatet for both sides
-subroutine draw_sod_shock_tube(mask, x0, dx, Bs, g, boundary_type )
-
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(out)     :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-    !> boundary_type={'left','rigth'}
-     character(len=*),          intent(in)                    :: boundary_type
-    ! auxiliary variables
-    real(kind=rk)                                             :: x, h, x_boundary(2),boundary_width
-    ! loop variables
-    integer(kind=ik)                                          :: ix
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
-
-    ! reset mask array
-    mask = 0.0_rk
-    ! left and right boundary of shock tube
-    x_boundary(1)   =0.1_rk*domain_size(1)
-    x_boundary(2)   =domain_size(1)*0.9_rk
-    ! parameter for smoothing function (width)
-    h = 1.5_rk*max(dx(1), dx(2))
-
-       do ix=1, Bs+2*g
-           x = dble(ix-(g+1)) * dx(1) + x0(1)
-
-              mask(ix,:) = smoothstep(x-x_boundary(1),h) &
-                         + smoothstep(x_boundary(2)-x,h)
-
-       end do
-
-end subroutine draw_sod_shock_tube
-!==========================================================================
-
-
-
 subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
 
 
@@ -70,7 +17,7 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
     real(kind=rk)                                    :: mask
 
     ! auxiliary variables
-    real(kind=rk)                                    :: x, y, h
+    real(kind=rk)                                    :: x, y, h, domain_size(3)
     ! preasure,density velocities
     real(kind=rk)                                    :: p(Bs+2*g,Bs+2*g),rho(Bs+2*g,Bs+2*g), &
                                                         u(Bs+2*g,Bs+2*g),v(Bs+2*g,Bs+2*g)
@@ -94,9 +41,7 @@ subroutine add_sod_shock_tube(penalization, x0, dx, Bs, g ,phi)
     u           = phi(:,:,2)/phi(:,:,1)
     v           = phi(:,:,3)/phi(:,:,1)
     p           = phi(:,:,4)
-
-    ! penalization term
-    !-------------------
+    domain_size = params_ns%domain_size
 
     ! left boundary
 

@@ -128,7 +128,7 @@ subroutine add_triangle(penalization, x0, dx, Bs, g ,phi)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy,n
     ! outlets and inlets
-    real(kind=rk)                                    :: T0,rho0,u0,p0
+    real(kind=rk)                                    :: T0,rho0,u0,p0,Rs
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -143,6 +143,8 @@ subroutine add_triangle(penalization, x0, dx, Bs, g ,phi)
     rho0    = params_ns%initial_density
     p0      =  params_ns%initial_pressure
     u0      =  params_ns%initial_velocity(1)
+    Rs      =  params_ns%Rs
+
 
     ! parameter for smoothing function (width)
     h       = 1.5_rk*max(dx(1), dx(2))

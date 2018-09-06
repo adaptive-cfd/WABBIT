@@ -1,32 +1,19 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name inicond_gauss_blob.f90
-!> \version 0.5
-!> \author engels, msr
-!
+
 !> \brief initialize gauss pulse for 2D case \n
 !> \note field phi is 3D, but third dimension is not used
 !
 !> \details
-!! input:    - params \n
-!! output:   - light and heavy data arrays \n
 !!
-!!
-!! = log ======================================================================================
-!! \n
-!! 04/11/16
+!! \date 04/11/16
 !!          - switch to v0.4
 !!
-!! 26/01/17
+!! \date 26/01/17
 !!          - use process rank from params struct
 !!          - use v0.5 hvy data array
 !!
-!! 04/04/17
+!! \date 04/04/17
 !!          - rewrite to work only on blocks, no large datafield required
-!! 03/02/18
+!! \date 03/02/18
 !!          - included into new physics modules
 ! ********************************************************************************************
 
@@ -42,7 +29,7 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
     integer(kind=ik),intent(in)    :: Bs, g
 
     ! auxiliary variable for gauss pulse
-    real(kind=rk)                           :: mux, muy, muz, x, z ,y, sigma
+    real(kind=rk)                           :: x_cntr(3), x, z ,y, sigma
     ! loop variables
     integer(kind=ik)                        :: ix, iy, iz
 
@@ -50,10 +37,7 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! place pulse in the center of the domain
-    mux = 0.5_rk * L(1)
-    muy = 0.5_rk * L(2)
-    muz = 0.5_rk * L(3)
+    x_cntr = 0.5_rk * L
 
 
     if (size(u,3)==1) then
@@ -70,7 +54,7 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
           call continue_periodic(x,L(1))
           call continue_periodic(y,L(2))
           ! set actual inicond gauss blob
-          u(ix,iy,1) = dexp( -( (x-mux)**2 + (y-muy)**2 ) / sigma )
+          u(ix,iy,1) = dexp( -( (x-x_cntr(1))**2 + (y-x_cntr(2))**2 ) / sigma )
         end do
       end do
 
@@ -87,8 +71,10 @@ subroutine inicond_gauss_blob(width, Bs, g, L, u, x0, dx )
             z = dble(iz-(g+1)) * dx(3) + x0(3)
             ! shift to new gauss blob center
             ! set actual inicond gauss blob
-            u(ix,iy,iz) = dexp( -( (x-mux)**2 + (y-muy)**2 +(z-muz)**2 ) / (2*sigma)**2 )
+            u(ix,iy,iz) = dexp( -( (x-x_cntr(1))**2 + (y-x_cntr(2))**2 +(z-x_cntr(3))**2 ) / (2*sigma)**2 )
           end do
+
+
         end do
       end do
 

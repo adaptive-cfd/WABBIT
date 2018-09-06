@@ -42,7 +42,7 @@ do
 
     if [ -f $file ]; then
         # get four characteristic values describing the field
-        ${mpi_command} ./wabbit-post --keyvalues ${file}
+        ${mpi_serial} ./wabbit-post --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then
             ${mpi_serial} ./wabbit-post --compare-keys $keyfile $reffile

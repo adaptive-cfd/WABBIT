@@ -39,7 +39,7 @@ module module_convdiff_new
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl
-    real(kind=rk) :: Lx, Ly, Lz
+    real(kind=rk)                               :: domain_size(3)=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
     character(len=80), allocatable :: names(:), inicond(:), velocity(:)
@@ -93,7 +93,6 @@ contains
     allocate( params_convdiff%velocity(1:params_convdiff%N_scalars))
 
     allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
-
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0x', params_convdiff%u0x )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0y', params_convdiff%u0y )
@@ -108,10 +107,10 @@ contains
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
-    call read_param_mpi(FILE, 'Domain', 'domain_size', domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    params_convdiff%Lx=domain_size(1)
-    params_convdiff%Ly=domain_size(2)
-    params_convdiff%Lz=domain_size(3)
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    ! params_convdiff%domain_size(1)=domain_size(1)
+    ! params_convdiff%domain_size(2)=domain_size(2)
+    ! params_convdiff%domain_size(3)=domain_size(3)
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_convdiff%discretization, "FD_2nd_central")
 
@@ -426,11 +425,11 @@ contains
                       x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                       y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-                      if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
-                      if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
+                      if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+                      if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
 
-                      if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
-                      if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
+                      if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+                      if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
 
                       ! set actual inicond gauss blob
                       u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
@@ -446,14 +445,14 @@ contains
                           y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
                           z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
 
-                          if (x<-params_convdiff%Lx/2.0) x = x + params_convdiff%Lx
-                          if (x>params_convdiff%Lx/2.0) x = x - params_convdiff%Lx
+                          if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+                          if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
 
-                          if (y<-params_convdiff%Ly/2.0) y = y + params_convdiff%Ly
-                          if (y>params_convdiff%Ly/2.0) y = y - params_convdiff%Ly
+                          if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+                          if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
 
-                          if (z<-params_convdiff%Lz/2.0) z = z + params_convdiff%Lz
-                          if (z>params_convdiff%Lz/2.0) z = z - params_convdiff%Lz
+                          if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
+                          if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
 
                           ! set actual inicond gauss blob
                           u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )

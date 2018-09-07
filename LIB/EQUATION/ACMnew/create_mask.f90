@@ -184,12 +184,12 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
   ! main body
 
   ! center of the first cylinder
-  cx1 = 0.5884_rk*params_acm%Lx
-  cy1 = 0.4116_rk*params_acm%Ly
+  cx1 = 0.5884_rk*params_acm%domain_size(1)
+  cy1 = 0.4116_rk*params_acm%domain_size(2)
 
   ! center of the second cylinder
-  cx2 = 0.4116_rk*params_acm%Lx
-  cy2 = 0.5884_rk*params_acm%Ly
+  cx2 = 0.4116_rk*params_acm%domain_size(1)
+  cy2 = 0.5884_rk*params_acm%domain_size(2)
 
   ! radius of the cylinders
   R = params_acm%R_cyl

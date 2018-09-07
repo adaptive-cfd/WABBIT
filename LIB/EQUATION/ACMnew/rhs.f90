@@ -90,11 +90,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         if (params_acm%dim == 2) then
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
-            params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly)
+            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
+            params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2))
         else
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-            params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
+            params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
         endif
 
     case ("local_stage")
@@ -339,8 +339,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
                         do ix = g+1, Bs+g
                             x = x0(1) + dble(ix-g-1) * dx(1)
                             y = x0(2) + dble(iy-g-1) * dx(2)
-                            call continue_periodic(x,params_acm%Lx)
-                            call continue_periodic(y,params_acm%Ly)
+                            call continue_periodic(x,params_acm%domain_size(1))
+                            call continue_periodic(y,params_acm%domain_size(2))
                             term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
                             forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) * dcos(y - params_acm%u_mean_set(2)*time) *term_2
                             forcing(2) = -dcos(x - params_acm%u_mean_set(1)*time) * dsin(y - params_acm%u_mean_set(2) * time) *term_2

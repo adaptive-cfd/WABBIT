@@ -50,7 +50,7 @@ module module_acm
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
     ! nu
-    real(kind=rk) :: nu, Lx, Ly, Lz
+    real(kind=rk) :: nu
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3)
     ! gamma_p
     real(kind=rk) :: gamma_p
@@ -65,6 +65,7 @@ module module_acm
     real(kind=rk) :: C_sponge, L_sponge
 
     integer(kind=ik) :: dim, N_fields_saved
+    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     character(len=80) :: inicond, discretization, geometry="cylinder"
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
@@ -132,10 +133,10 @@ contains
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'Dimensionality', 'dim', params_acm%dim, 2 )
-
-    call read_param_mpi(FILE, 'DomainSize', 'Lx', params_acm%Lx, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Ly', params_acm%Ly, 1.0_rk )
-    call read_param_mpi(FILE, 'DomainSize', 'Lz', params_acm%Lz, 0.0_rk )
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    ! call read_param_mpi(FILE, 'DomainSize', 'Lx', params_acm%domain_size(1), 1.0_rk )
+    ! call read_param_mpi(FILE, 'DomainSize', 'Ly', params_acm%domain_size(2), 1.0_rk )
+    ! call read_param_mpi(FILE, 'DomainSize', 'Lz', params_acm%domain_size(3), 0.0_rk )
 
     ! --- saving ----
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_acm%N_fields_saved, 3 )
@@ -167,7 +168,7 @@ contains
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0e-3_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
-    call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%Lx, 0.5*params_acm%Ly, 0.5*params_acm%Lz/)  )
+    call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
 
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
@@ -190,7 +191,7 @@ contains
       write(*,*) "Some information:"
       write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
 
-      dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%Lx / real(params_acm%Bs-1, kind=rk)
+      dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)
       nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
       dt_min = params_acm%CFL*dx_min/params_acm%c_0
 
@@ -206,7 +207,7 @@ contains
 
     ! if used, setup insect
     if (params_acm%geometry == "Insect") then
-        call insect_init( 0.0_rk, filename, insect, .false.,"" , (/params_acm%Lx, params_acm%Ly, params_acm%Lz/), params_acm%nu)
+        call insect_init( 0.0_rk, filename, insect, .false.,"" , (/params_acm%domain_size(1), params_acm%domain_size(2), params_acm%domain_size(3)/), params_acm%nu)
     endif
   end subroutine READ_PARAMETERS_ACM
 
@@ -287,7 +288,7 @@ contains
         x=L+x
       endif
 
-      min_dx = 2.0_rk**(-params_acm%Jmax) * min(params_acm%Lx,params_acm%Ly)&
+      min_dx = 2.0_rk**(-params_acm%Jmax) * min(params_acm%domain_size(1),params_acm%domain_size(2))&
                         / real(params_acm%Bs-1, kind=rk)
       ! u(x=0) should be set equal to u(x=L)
       if ( abs(x-L)<min_dx*0.5_rk ) then

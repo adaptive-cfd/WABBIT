@@ -132,7 +132,7 @@ contains
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
-    call read_param_mpi(FILE, 'Dimensionality', 'dim', params_acm%dim, 2 )
+    call read_param_mpi(FILE, 'Domain', 'dim', params_acm%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
     ! call read_param_mpi(FILE, 'DomainSize', 'Lx', params_acm%domain_size(1), 1.0_rk )
     ! call read_param_mpi(FILE, 'DomainSize', 'Ly', params_acm%domain_size(2), 1.0_rk )
@@ -207,7 +207,7 @@ contains
 
     ! if used, setup insect
     if (params_acm%geometry == "Insect") then
-        call insect_init( 0.0_rk, filename, insect, .false.,"" , (/params_acm%domain_size(1), params_acm%domain_size(2), params_acm%domain_size(3)/), params_acm%nu)
+        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu)
     endif
   end subroutine READ_PARAMETERS_ACM
 

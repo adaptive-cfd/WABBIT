@@ -85,6 +85,9 @@ subroutine init_filter(filter, FILE )
                 ! bogey shock detection method (p,divU)
                 call read_param_mpi(FILE, 'Discretization', 'detector_method', filter%detector_method, 'divU' )
 
+            case('wavelet')
+              call read_param_mpi(FILE, 'Discretization', 'order_predictor', filter%order_predictor, "multiresolution_4th")
+
             case('no_filter')
                 ! do nothing..
                 return
@@ -235,7 +238,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
 
     end select
     ! pack statevector from conservative form !!!
-    call pack_statevector(work_array(:,:,:,:),'conservative')
+    call pack_statevector(work_array,'conservative')
 
 
 end subroutine filter_block

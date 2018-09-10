@@ -164,6 +164,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
+    call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
 
     ! penalization:

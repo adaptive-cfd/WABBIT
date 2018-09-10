@@ -41,7 +41,7 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array )
       do i = 1, size(u,4)
           call wavelet_filter(params_acm%order_predictor, Bs, g, u(:,:,:,i))
       enddo
-      
+
   end select
 
 
@@ -64,12 +64,12 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
     integer(kind=ik), intent(in) :: g
     !> heavy data array - block data
     real(kind=rk), intent(inout) :: block_data(:, :, :)
-
-    real(kind=rk) :: u3((Bs+1)/2+g,(Bs+1)/2+g,(Bs+1)/2+g)
+    real(kind=rk), allocatable, save :: u3(:,:,:)
 
 
     if ( size(block_data,3)>1 ) then
         ! ********** 3D **********
+        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,(Bs+1)/2+g))
         ! now, coarsen array u1 (restriction)
         call restriction_3D( block_data, u3 )  ! fine, coarse
         ! then, re-interpolate to the initial level (prediciton)
@@ -77,6 +77,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
 
     else
         ! ********** 2D **********
+        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,1))
         ! now, coarsen array u1 (restriction)
         call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
         ! then, re-interpolate to the initial level (prediciton)

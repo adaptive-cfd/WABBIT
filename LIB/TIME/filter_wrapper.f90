@@ -55,8 +55,6 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
     Bs    = params%number_block_nodes
     g     = params%number_ghost_nodes
 
-    hvy_work=0.0_rk
-
 
     do k = 1, hvy_n
       ! convert given hvy_id to lgt_id for block spacing routine
@@ -65,7 +63,7 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
       call filter_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
-          hvy_work(:,:,:,:,hvy_active(k)))       
+          hvy_work(:,:,:,:,hvy_active(k)))
     enddo
 
     !update state vector

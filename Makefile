@@ -169,7 +169,7 @@ $(OBJDIR)/module_shock_tube.o: module_shock_tube.f90 $(OBJDIR)/module_precision.
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \

@@ -40,7 +40,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -66,7 +66,7 @@ module module_acm
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
-    character(len=80) :: inicond, discretization, geometry="cylinder"
+    character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p
@@ -102,6 +102,7 @@ contains
   include "sponge.f90"
   include "save_data_ACM.f90"
   include "statistics_ACM.f90"
+  include "filter_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -162,7 +163,9 @@ contains
     ! initial condition
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
 
-    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm %discretization, "FD_2nd_central")
+    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
+    call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
+
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0e-3_rk)

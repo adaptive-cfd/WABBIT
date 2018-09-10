@@ -133,7 +133,7 @@ contains
 
   !-----------------------------------------------------------------------------
   ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid any an MPI formalism, neighboring relations and the like.
+  ! independent of the grid and any MPI formalism, neighboring relations and the like.
   ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
   ! from that. Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
@@ -670,11 +670,11 @@ contains
 
 
 
- !-----------------------------------------------------------------------------
-  ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid any an MPI formalism, neighboring relations and the like.
-  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
-  ! from that. Ghost nodes are assumed to be sync'ed.
+  !-----------------------------------------------------------------------------
+  ! main level wrapper to filter a block. Note this is completely
+  ! independent of the grid and any MPI formalism, neighboring relations and the like.
+  ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
+  ! Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
   subroutine filter_NStokes( time, u, g, x0, dx, work_array )
     implicit none

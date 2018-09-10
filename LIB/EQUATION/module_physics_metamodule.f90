@@ -145,7 +145,7 @@ contains
 
  !-----------------------------------------------------------------------------
  ! main level wrapper to set the right hand side on a block. Note this is completely
- ! independent of the grid any an MPI formalism, neighboring relations and the like.
+ ! independent of the grid and any MPI formalism, neighboring relations and the like.
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
@@ -356,8 +356,12 @@ contains
 
  !-----------------------------------------------------------------------------
  ! wrapper for filter u -> u_tilde
+ ! Note this function is completely
+ ! independent of the grid and any MPI formalism, neighboring relations and the like.
+ ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
+ ! Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine FILTER_meta( physics, time, u, g, x0, dx, work_array)
+ subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array)
    implicit none
    !> physics type
    character(len=*), intent(in) :: physics
@@ -381,16 +385,16 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     !call filter_ACM( time, u, g, x0, dx,  work_array)
+     call filter_ACM( time, u, g, x0, dx,  work_array)
 
    case ("ConvDiff-new")
-     !call filter_convdiff( time, u, g, x0, dx, work_array)
+     call abort(1009181817, "filter not implemented for convection-diffusion.")
 
    case ("navier_stokes")
      call filter_NStokes( time, u, g, x0, dx, work_array)
 
    case default
-     call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown"//physics)
+     call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown "//trim(adjustl(physics)))
 
    end select
 

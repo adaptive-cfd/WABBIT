@@ -1,7 +1,7 @@
 !===========================================================================
 !> this module implements the MPI_bridge between fluid and particle on the side
 !> of the fluid
-!> @todo
+!> \details
 !> 1. it initializes the bridge see init_bridge()
 !> 2. it provides a routine which sends the treecode and further information
 !>    to the particle side of the bridge. This is needed to map the
@@ -107,7 +107,6 @@ character(len=80)                            :: geometry
                             params%max_treelevel,       &
                             params%dim,                 &
                             params%number_procs/)
-
     call MPI_send(discretizationParams, 5, MPI_integer, myBridge%minOtherWorldRank, &
                   parameters_delivery, myBridge%commonWorld,  ierr)
 
@@ -146,18 +145,17 @@ integer                              :: n,m
     ! number of blocks
     n      = size(lgt_block,1)
     ! number of columns in matrix
-    m        = params%max_treelevel + idx_refine_sts
-
+    m        = params%max_treelevel + extra_lgt_fields-1
     ! send number of active and maximal number of blocks
     call MPI_send((/lgt_n/), 1, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld,  ierr )
-    ! send list of active blocks
+                  ! send list of active blocks
     call MPI_send(lgt_active, lgt_n, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld,  ierr )
     ! send light data
-    call MPI_send(lgt_block, n*m, MPI_integer, &
+    call MPI_send(lgt_block(:,1:m), n*m, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld, ierr )
   end if
@@ -204,13 +202,12 @@ character(1)                                    :: buf ! Message sent to the flu
 !!          -> interpolate fluid data to requestet position
 !!          -> send fluid data back to the sender (i.e. particle rank)
 !!    - if \c MPI_TAG is \c end_communication stop waiting for requests
-
 maxpoints=100000
 k=0
 
 allocate(distributedParticles(4,maxpoints))
 distributedParticles=-99
-allocate(requests(params%bridge%otherWorldSize))
+allocate(requests(params%bridge%otherWorldSize+1))
 do
     call MPI_probe(MPI_ANY_SOURCE,MPI_ANY_TAG,params%bridge%otherWorld,status,ierr)
 

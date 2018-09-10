@@ -290,11 +290,9 @@ program main
 
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
-            call MPI_Barrier(WABBIT_COMM,ierr)
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
             call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, &
                                     lgt_active, lgt_n, hvy_n,params)
-            call MPI_Barrier(WABBIT_COMM,ierr)
         endif
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

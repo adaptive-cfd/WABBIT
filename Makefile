@@ -177,8 +177,7 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_interpolation.o $(OBJDIR)/module_treelib.o \
-	check_lgt_block_synchronization.f90 write_debug_times.f90 write_block_distribution.f90 \
-	allocate_init_debugging.f90
+	check_lgt_block_synchronization.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
@@ -264,6 +263,10 @@ doc:
 test:
 	@cd TESTING/;  ./runtests.sh
 
+check-environment:
+ifndef PKG_CONFIG_PATH
+$(error Please export PKG_CONFIG_PATH before compiling PiG)
+endif
 # If the object directory doesn't exist, create it.
 .PHONY: directories
 

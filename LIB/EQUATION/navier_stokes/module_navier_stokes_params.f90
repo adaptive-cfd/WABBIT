@@ -371,12 +371,14 @@ subroutine init_other_params(params_ns, FILE )
       end if
 
       ! initial speed of sound, Mach number, reynolds number
-      params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
-      params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
-                                +params_ns%initial_velocity(2)**2 &
-                                +params_ns%initial_velocity(3)**2)/params_ns%c0
-      params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
-                            params_ns%machnumber*params_ns%c0/params_ns%mu0
+      if ( params_ns%initial_density>0 ) then
+        params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+        params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
+                                  +params_ns%initial_velocity(2)**2 &
+                                  +params_ns%initial_velocity(3)**2)/params_ns%c0
+        params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
+                              params_ns%machnumber*params_ns%c0/params_ns%mu0
+      endif
 
       if (params_ns%mpirank==0) then
         write(*,*)

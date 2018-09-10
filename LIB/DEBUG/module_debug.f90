@@ -52,31 +52,138 @@ module module_debug
     type (type_debug), save                                 :: debug
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 
     ! lgt_block synchronization
     include "check_lgt_block_synchronization.f90"
 
-    ! check ghost nodes
-    include "check_ghost_nodes.f90"
 
-    ! write time measurements
-    include "write_debug_times.f90"
+!========================================================================================
+    !> \brief write time measurements
+    subroutine write_debug_times( iteration, params )
+        implicit none
+        !-----------------------------------------------------------
+        integer(kind=ik), intent(in)        :: iteration !< iteration
+        type (type_params), intent(in)      :: params !< user defined parameter structure
+        !------------------------------------------------------------
+        ! process rank
+        integer(kind=ik)                    :: k
+        ! file name
+        character(len=80)                   :: fname
 
-    ! write block distribution
-    include "write_block_distribution.f90"
+        write( fname,'(i5.5, "times.dat")') params%rank
 
-    ! use this to initalize the memory for debugging:
-    include "allocate_init_debugging.f90"
+        ! we always destroy existing data and re-create the file - those files otherwise
+        ! get really big (TB range)
+        open(unit=99,file=fname, status='replace')
 
-    ! For a given NAME, increase the function call counter by one and store the
-    ! elapsed time in the global arrays.
+        ! write file header
+        write(99,'(80("_"))')
+        write(99, '(42x, "calls", 2x, "sum", 5x, "time", 6x, "sum")', advance='no')
+        write(99,*)
+
+        ! write times
+        k = 1
+        do while ( debug%name_comp_time(k) /= "---" )
+            ! write name
+            write(99, '(a)', advance='no') debug%name_comp_time(k)
+            ! write number of calls
+            write(99, '(2x,i5)', advance='no') int(debug%comp_time(k,1))
+            ! write global number of calls
+            write(99, '(2x,i7)', advance='no') int(debug%comp_time(k,3))
+            ! write time
+            write(99, '(2x,f12.6)', advance='no') debug%comp_time(k,2)
+            ! write global time
+            write(99, '(2x,f12.6)', advance='no') debug%comp_time(k,4)
+            ! next line
+            write(99,*)
+            ! loop variable
+            k = k + 1
+        end do
+
+        write(99,'(80("-"))')
+        write(99, '("iteration: ", i7)', advance='no') iteration
+        write(99,*)
+        ! close file
+        close(unit=99)
+
+    end subroutine write_debug_times
+!========================================================================================
+
+
+!========================================================================================
+    !> \brief write current block distribution to file
+    subroutine write_block_distribution( dist_list, params )
+        implicit none
+
+       !---------------------------------------------------------------
+        integer(kind=ik), intent(in)        :: dist_list(:)   !< iteration
+        type (type_params), intent(in)      :: params         !< user defined parameter structure
+        !---------------------------------------------------------------
+
+        ! file existence variable
+        logical                             :: file_exists
+        ! file IO error variable, counter, and process rank
+        integer(kind=ik)                    :: io_error, k,rank
+
+        rank = params%rank
+        ! check file existence, if not create file
+        inquire(file="block_dist.dat", exist=file_exists)
+
+        if ( rank == 0 ) then
+            if (file_exists) then
+                ! open for append
+                open(unit=99,file="block_dist.dat",status='old', position="append", action='write', iostat=io_error)
+            else
+                ! first opening
+                open(unit=99,file="block_dist.dat",status='new',action='write', iostat=io_error)
+            end if
+        end if
+
+        ! write data
+        if (rank == 0) then
+            do k = 1, size(dist_list)
+                write(99, '(i3,1x)', advance='no') dist_list(k)
+            end do
+            ! next line
+            write(99,*)
+            ! close file
+            close(unit=99)
+        end if
+
+    end subroutine write_block_distribution
+!========================================================================================
+
+
+
+!========================================================================================
+    !> allocates the arrays for profiling subroutines and parts of the code
+    subroutine allocate_init_debugging(params)
+      implicit none
+        type (type_params), intent(in)          :: params
+
+      ! note: fix size of time measurements array
+      if ( params%debug ) then
+
+          ! allocate array for time measurements - data
+          allocate( debug%comp_time( 150, 4 )  )
+          ! reset times
+          debug%comp_time = 0.0_rk
+          ! allocate array for time measurements - names
+          allocate( debug%name_comp_time( 150 )  )
+          ! reset names
+          debug%name_comp_time = "---"
+      end if
+
+    end subroutine allocate_init_debugging
+!========================================================================================
+
+
+
+!========================================================================================
+    !> For a given NAME, increase the function call counter by one and store the
+    !> elapsed time in the global arrays.
     subroutine toc( params, name, t_elapsed_this, call_counter )
         implicit none
         type (type_params), intent(in) :: params
@@ -112,10 +219,13 @@ contains
         end if
 
     end subroutine toc
+!========================================================================================
 
 
-    ! at the end of a time step, we increase the total counters/timers for all measurements
-    ! by what has been done in the last time step, then we flush the current timing to disk.
+
+!========================================================================================
+    !> at the end of a time step, we increase the total counters/timers for all measurements
+    !> by what has been done in the last time step, then we flush the current timing to disk.
     subroutine timing_next_timestep( params, iteration )
         implicit none
         type (type_params), intent(in) :: params
@@ -134,5 +244,6 @@ contains
         end if
 
     end subroutine timing_next_timestep
+!========================================================================================
 
 end module module_debug

@@ -343,7 +343,7 @@ program main
         call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
         if (rank==0) then
              open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,1024(i4,1x))') time, iteration, lgt_n, &
+             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
              min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
              close(14)
@@ -404,7 +404,7 @@ program main
              close(14)
 
              open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,1024(i4,1x))') time, iteration, lgt_n, &
+             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
              min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
              close(14)

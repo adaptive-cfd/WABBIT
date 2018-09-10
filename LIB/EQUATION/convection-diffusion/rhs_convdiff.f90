@@ -287,8 +287,8 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
     u0 = 0.0_rk
 
 
-    c0x = 0.5_rk*params_convdiff%Lx
-    c0y = 0.5_rk*params_convdiff%Ly
+    c0x = 0.5_rk*params_convdiff%domain_size(1)
+    c0y = 0.5_rk*params_convdiff%domain_size(2)
     T = params_convdiff%T_swirl
 
 

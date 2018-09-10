@@ -185,29 +185,23 @@ contains
 
     call clean_ini_file_mpi( FILE )
 
+    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)
+    nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
+    dt_min = params_acm%CFL*dx_min/params_acm%c_0
 
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
       write(*,*) "Some information:"
       write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
-
-      dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)
-      nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
-      dt_min = params_acm%CFL*dx_min/params_acm%c_0
-
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
-
-      if (params_acm%penalization) then
-          write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
-      endif
-
+      write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
       write(*,'(80("<"))')
     endif
 
     ! if used, setup insect
     if (params_acm%geometry == "Insect") then
-        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu)
+        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min)
     endif
   end subroutine READ_PARAMETERS_ACM
 

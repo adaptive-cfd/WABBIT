@@ -30,6 +30,14 @@ module module_debug
 ! variables
     implicit none
 
+    PRIVATE
+
+    !**********************************************************************************************
+    ! These are the important routines that are visible to other modules:
+    !**********************************************************************************************
+    PUBLIC :: write_debug_times,toc,timing_next_timestep,summarize_profiling,write_block_distribution, &
+              write_neighbors, write_lgt_data
+    !*********************************************************************************************
     !> global user defined debug structure
     type type_debug
 
@@ -64,20 +72,26 @@ contains
     subroutine write_debug_times( iteration, params )
         implicit none
         !-----------------------------------------------------------
-        integer(kind=ik), intent(in)        :: iteration !< iteration
-        type (type_params), intent(in)      :: params !< user defined parameter structure
+        integer(kind=ik), intent(in)     :: iteration !< iteration
+        type (type_params), intent(in)   :: params !< user defined parameter structure
         !------------------------------------------------------------
         ! process rank
-        integer(kind=ik)                    :: k
+        integer(kind=ik)      :: k,file_size
+        integer(kind=ik),save ::counter
         ! file name
-        character(len=80)                   :: fname
+        character(len=80)     :: fname
 
         write( fname,'(i5.5, "times.dat")') params%rank
 
-        ! we always destroy existing data and re-create the file - those files otherwise
-        ! get really big (TB range)
-        open(unit=99,file=fname, status='replace')
-
+        ! filesize in byte
+        INQUIRE(FILE=fname, SIZE=file_size)
+        ! if file is larger then 100MB or this function is called for the first time
+        ! we replace the old file by a new file, otherwise we append the iterations
+        if ( file_size/1e6> 100 .or. counter == 0 ) then
+          open(unit=99,file=fname, status='replace')
+        else
+          open(unit=99,file=fname,  status='old', position='append', action='write')
+        end if
         ! write file header
         write(99,'(80("_"))')
         write(99, '(42x, "calls", 2x, "sum", 5x, "time", 6x, "sum")', advance='no')
@@ -198,7 +212,7 @@ contains
 
             ! check if allocate_init_debbuging was called before
             if (.not. allocated(debug%name_comp_time)) then
-                call abort(5946,'ERROR [module_debug]: debug arrays are not allocated yet')
+                call allocate_init_debugging(params)
             endif
 
             ! find free or corresponding line
@@ -245,5 +259,74 @@ contains
 
     end subroutine timing_next_timestep
 !========================================================================================
+
+!========================================================================================
+    !> This function summarizes the profile of the Simulation.
+    !> It should be called on the end of the program, when the statistics of
+    !> the profiled functions is large.
+    !> \details
+    !> The function displays the total sum of the cpu time spend
+    !> in the profiled part of your program and its standard deviation in a tabel.
+    subroutine summarize_profiling( params, comm )
+        implicit none
+        !---------------------------------------
+        type (type_params), intent(in) :: params
+        integer         , intent(in)   :: comm        !< MPI communicator
+        !---------------------------------------
+        integer :: rank,k,number_procs,ierr
+
+        call MPI_Comm_rank(comm, rank, ierr)
+        call MPI_Comm_size(comm, number_procs, ierr)
+        ! debug info output
+        if ( params%debug ) then
+            ! sum times
+            debug%comp_time(:,2) = 0.0_rk
+            call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), &
+                                MPI_REAL8, MPI_SUM,  comm, ierr)
+            ! MPI Barrier before program ends
+            call MPI_Barrier(comm, ierr)
+
+            ! average times
+            debug%comp_time(:,2) = debug%comp_time(:,2) / number_procs
+            ! standard deviation
+            debug%comp_time(:,3) = 0.0_rk
+            debug%comp_time(:,4) = (debug%comp_time(:,4) - debug%comp_time(:,2))**2.0_rk
+            call MPI_Allreduce( debug%comp_time(:,4), debug%comp_time(:,3), &
+                                size(debug%comp_time,1), MPI_REAL8, MPI_SUM, comm, ierr)
+            ! MPI Barrier before program ends
+            call MPI_Barrier(comm, ierr)
+
+            if (number_procs == 1) then
+                debug%comp_time(:,3) = 0.0_rk
+            else
+                debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( number_procs - 1 ))
+            end if
+
+            ! output
+            if (rank==0) then
+                write(*,'(80("_"))')
+                write(*, '("time (average value +- standard deviation) :")')
+                k = 1
+                do while ( debug%name_comp_time(k) /= "---" )
+                    ! write name
+                    write(*, '(a)', advance='no') debug%name_comp_time(k)
+                    ! write average time
+                    write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,2)
+                    ! write standard deviation
+                    write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,3)
+                    ! next line
+                    write(*,*)
+                    ! loop variable
+                    k = k + 1
+                end do
+                write(*,'(80("_"))')
+                write(*, '("sum: ", 2x,f12.3)', advance='yes') sum(debug%comp_time(:,2))
+            end if
+        end if
+
+    end subroutine summarize_profiling
+!========================================================================================
+
+
 
 end module module_debug

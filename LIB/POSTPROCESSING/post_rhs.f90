@@ -52,9 +52,6 @@ subroutine post_rhs(params)
     call ini_file_to_params( params, fname_ini )
     ! have the pysics module read their own parameters
     call init_physics_modules( params, fname_ini )
-    ! initalize debugging ( this is mainly time measurements )
-    call allocate_init_debugging( params )
-
 
 
     ! get some parameters from one of the files (they should be the same in all of them)

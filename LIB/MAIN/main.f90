@@ -332,12 +332,14 @@ program main
         endif
 
         ! filter
+        t4 = MPI_wtime()
         if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
             .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
             call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
         end if
+        call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
 
         ! it is useful to save the number of blocks per rank into a log file.
         call blocks_per_mpirank( params, blocks_per_rank, hvy_n)

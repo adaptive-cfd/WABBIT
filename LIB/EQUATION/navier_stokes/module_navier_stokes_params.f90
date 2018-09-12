@@ -117,7 +117,7 @@ module module_navier_stokes_params
         ! penalization parameter and sponge parameter
         real(kind=rk)                               :: C_eta,C_sp
         ! geometry to display
-        character(len=80)                           :: geometry="cylinder"
+        character(len=80)                           :: geometry="cylinder",case='--'
         ! geometric parameters for cylinder (x_0,r)
         real(kind=rk)                               :: x_cntr(1:3), R_cyl
         ! mean variables on domain
@@ -144,7 +144,7 @@ module module_navier_stokes_params
   end type type_params_ns
 
   ! statevector index
-  integer(kind=ik) ,save,public :: rhoF,UxF,UyF,UzF,pF
+  integer(kind=ik) ,save,public :: rhoF=-1,UxF=-1,UyF=-1,UzF=-1,pF=-1
 
   type(type_params_ns)          :: params_ns
 
@@ -152,6 +152,55 @@ contains
 
   include "initial_conditions.f90"
 
+
+  !> \brief reft and right shock values for 1D shock moving with mach to the right
+  !> \detail This function converts with the Rankine-Hugoniot Conditions
+  !>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
+  !>  \f$\rho_R,u_R,p_R\f$ and \f$u_L\f$ .
+  !> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
+  !> author F.Toro
+  subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)
+      implicit none
+      !> one side of the shock (density, pressure)
+      real(kind=rk), intent(in)      ::rhoL,pL
+      !> shock speed
+      real(kind=rk), intent(in)      :: mach
+      !> speed on
+      real(kind=rk), intent(inout)      :: uL
+      !> other side of the shock (density, velocity, pressure)
+      real(kind=rk), intent(out)      ::rhoR,uR,pR
+      !> heat capacity ratio
+      real(kind=rk), intent(in)      ::gamma
+
+      real(kind=rk)                ::c_R
+
+
+       uR    =   0
+       rhoR  =   ((gamma-1)*mach**2+2)/((gamma+1)*mach**2)*rhoL
+       pR    = (gamma+1)/(2*gamma*mach**2-gamma+1)*pL
+       c_R   = sqrt(gamma*pR/rhoR)
+       uL    = (1-rhoR/rhoL)*mach*c_R
+  end subroutine moving_shockVals
+
+  !> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
+  !> values \f$\rho_2,u_2,p_2\f$ on the ohter side
+  !> of the shock
+  subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
+      implicit none
+      !> one side of the shock (density, velocity, pressure)
+      real(kind=rk), intent(in)      ::rho1,u1,p1
+      !> other side of the shock (density, velocity, pressure)
+      real(kind=rk), intent(out)      ::rho2,u2,p2
+      !> heat capacity ratio
+      real(kind=rk), intent(in)      ::gamma
+      real(kind=rk)                ::cstar_sq
+
+      cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
+      !sqrt(cstar_sq)
+      u2 = cstar_sq /u1;
+      rho2 = (rho1*u1)/u2;
+      p2= (p1+ rho1*u1**2 )-rho2*u2**2;
+  end subroutine shockVals
 
   subroutine init_navier_stokes_eq(params_ns, FILE )
     implicit none
@@ -227,7 +276,7 @@ contains
       call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
       call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%domain_size(1)*0.1_rk )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init, u_init )
+      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init(1:params_ns%dim), u_init(1:params_ns%dim) )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
       call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
       params_ns%initial_density=rho_init
@@ -267,17 +316,11 @@ subroutine init_other_params(params_ns, FILE )
     end if
 
     call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
-    if ( params_ns%dim==3 .and. params_ns%number_data_fields<5 ) then
-      if ( params_ns%mpirank==0 ) then
-        write(*,*)"WARNING number of data fields increased to the minimum of 5 fileds"
-      end if
-      params_ns%number_data_fields=5
-    end if
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_ns%CFL, 1.0_rk   )
-    call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk   )
+    call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk)
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_ns%Bs, 1   )
@@ -353,6 +396,43 @@ subroutine init_other_params(params_ns, FILE )
       endif
 
     end subroutine add_info
+
+
+    !> \brief Add additional info to navier stokes (initial Mach, Reynolds and speed of sound)
+      subroutine check_parameters(params_ns )
+          implicit none
+          !> params structure of navier stokes
+          type(type_params_ns),intent(inout)  :: params_ns
+
+
+          if ( params_ns%dim==3 ) then
+            if( params_ns%number_data_fields<5 ) call abort(9898,'Please increase number of data fields (min 5)')
+            if( min(pF,UxF,UyF,UzF,rhoF)<0 )  call abort(9898,'Check names of data fields [p,Ux,Uy,Uz,rho]!')
+          else
+            if( params_ns%number_data_fields<4 ) call abort(9898,'Please increase number of data fields (min 4)')
+            if( min(pF,UxF,UyF,rhoF)<0 )      call abort(9898,'Check names of data fields [p,Ux,Uy,rho]!')
+          end if
+
+
+    end subroutine check_parameters
+
+
+    !> This function allocates a statevector like quantite.
+    !> Hence a 2D(3D) array with 4(5) data fields
+    subroutine allocate_statevector_ns(data,Bs,g)
+        implicit none
+        !data=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+        real(kind=rk), allocatable, intent(inout) :: data(:,:,:,:)
+        integer(kind=ik),              intent(in) :: Bs,g
+
+        if (.not.allocated(data)) then
+          if (params_ns%dim==3) then
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%number_data_fields))
+          else
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%number_data_fields))
+        endif
+      endif
+    end subroutine allocate_statevector_ns
 
 
 

@@ -42,13 +42,15 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: shockVals,init_penalization,add_constraints,get_mask,mean_quantity,integrate_over_pump_area
+  PUBLIC :: init_penalization,smoothstep,hardstep,soft_bump,&
+            soft_bump2,hard_bump,jet_stream,add_penalization_term, &
+            transition,simple_sponge,draw_free_outlet_wall,init_simple_sponge
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
   character(len=80),                 save        :: mask_geometry!273.15_rk
   logical           ,                save        :: smooth_mask, use_sponge
-  real(kind=rk)                    , save        :: C_eta_inv,C_sp_inv,L_sponge
+  real(kind=rk),public             , save        :: C_eta_inv,C_sp_inv,L_sponge
   real(kind=rk),                     save        :: domain_size(3)=0.0_rk
   ! radius of domain (Ly/2)
   real(kind=rk),                     save        :: R_domain
@@ -85,64 +87,13 @@ module module_ns_penalization
 
 
 
-  type :: type_funnel_plate
-    real(kind=rk) :: x0(1:2)
-    real(kind=rk) :: width
-    real(kind=rk) :: r_in
-    real(kind=rk) :: r_out
-  end type type_funnel_plate
-
-
-  type :: type_funnel
-      real(kind=rk)       ::outer_diameter         ! outer diameter
-      real(kind=rk)       ::max_inner_diameter     ! maximal inner diameter
-      real(kind=rk)       ::min_inner_diameter    =-1.0_rk ! minimal inner diameter
-      integer(kind=ik)    ::nr_plates             =0_ik ! Number of plates
-      real(kind=rk)       ::plates_distance       =-1.0_rk ! distance between origin of plates
-      real(kind=rk)       ::plates_thickness      =-1.0_rk !
-      real(kind=rk)       ::first_plate_thickness =-1.0_rk
-      real(kind=rk)       ::temperatur            =-1.0_rk ! temperatur of plates
-
-      real(kind=rk)       ::length                =-1.0_rk ! total length of funnel
-      real(kind=rk)       ::slope                 =-1.0_rk ! slope of funnel
-      real(kind=rk)       ::offset(2)             =-1.0_rk ! offset of funnel in x and y
-
-      ! parameters of flow inlet outlet
-      real(kind=rk)       ::pump_diameter  =-1.0_rk
-      real(kind=rk)       ::pump_x_center  =-1.0_rk
-      real(kind=rk)       ::jet_radius     =-1.0_rk        ! cappilary inner Radius
-      real(kind=rk)       ::r_out_cappilary=-1.0_rk         ! cappilary outer Radus
-      real(kind=rk)       ::wall_thickness =-1.0_rk           !
-
-      real(kind=rk)       ::inlet_velocity(2)       !
-      real(kind=rk)       ::inlet_density       !
-      real(kind=rk)       ::inlet_pressure       !
-      real(kind=rk)       ::outlet_pressure       !
-      real(kind=rk)       ::outlet_density
-      real(kind=rk)       ::pump_speed       !
-      real(kind=rk)       ::pump_density      !
-      real(kind=rk)       ::pump_pressure     !
-
-
-      type(type_funnel_plate), allocatable:: plate(:)
-  end type type_funnel
-
-
   !------------------------------------------------
-  type(type_funnel)   , save :: funnel
   type(type_cylinder) , save :: cyl
   type(type_triangle) , save :: triangle
   type(type_shock_params) , save :: shock_params
   !------------------------------------------------
 
 contains
-
-include "funnel.f90"
-include "vortex_street.f90"
-include "sod_shock_tube.f90"
-include "simple_shock.f90"
-include "triangle.f90"
-
 
 
 !> \brief reads parameters for mask function from file
@@ -190,24 +141,6 @@ subroutine init_penalization( params,FILE )
     C_sp_inv =1.0_rk/C_sp_inv
     R_domain =domain_size(2)*0.5_rk
 
-    select case(mask_geometry)
-    case ('triangle','rhombus')
-      call init_simple_sponge(params,FILE)
-      call init_triangle(params,FILE)
-    case ('moving-shock')
-      call init_simple_shock(params,FILE)
-    case('sod_shock_tube')
-      ! nothing to do
-    case ('vortex_street','cylinder')
-      call init_simple_sponge(params,FILE)
-      call init_vortex_street(FILE)
-    case ('funnel')
-      call init_funnel(params,FILE)
-    case default
-      call abort(8546501,"[module_ns_penalization.f90] ERROR: geometry for VPM is unknown"//mask_geometry)
-
-    end select
-
 end subroutine init_penalization
 
 
@@ -249,110 +182,33 @@ end subroutine init_simple_sponge
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-subroutine get_mask(mask, x0, dx, Bs, g )
-
-
-    ! grid
-    integer(kind=ik), intent(in) :: Bs, g
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(inout) :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in) :: x0, dx
-
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-    select case(mask_geometry)
-    case('moving-shock','sod_shock_tube')
-     call draw_sod_shock_tube(mask, x0, dx, Bs, g,'boundary')
-    case('vortex_street','cylinder')
-      call draw_cylinder(mask, x0, dx, Bs, g )
-    case('rhombus','triangle')
-      call draw_triangle(mask,x0,dx,Bs,g)
-    case('funnel')
-      call draw_funnel(mask, x0, dx, Bs, g)
-    case default
-      call abort(120601,"ERROR: geometry for VPM is unknown"//mask_geometry)
-    end select
-
-end subroutine get_mask
-
-
-
-
-
-
-
-
 !==========================================================================
-!> \brief This function computes a penalization term for different geometries
-!! in Navier Stokes physics
-subroutine add_constraints(rhs ,Bs , g, x0, dx, phi)
+!> This function adds a penalization term
+!> to navier stokes equations
+subroutine add_penalization_term(rhs,penalization,phi)
 
     !-------------------------------------------------------
-    !> grid parameter
-    integer(kind=ik), intent(in)    :: g, Bs
-    !> rhs
-    real(kind=rk), intent(inout)    :: rhs(Bs+2*g, Bs+2*g,4)
-    !> state variables
-    real(kind=rk), intent(in)       :: phi(Bs+2*g, Bs+2*g,4)
-    !> spacing and origin of block
-    real(kind=rk), intent(in)       :: x0(2), dx(2)
+    !> discrete spatial operator
+    real(kind=rk), intent(inout)    :: rhs(:,:,:,:)
+    !> state variables and penalizationtem
+    real(kind=rk), intent(in)       :: phi(:,:,:,:),penalization(:,:,:,:)
     !--------------------------------------------------------
-     real(kind=rk)                  :: penalization(Bs+2*g, Bs+2*g,4)
 
-    ! 1. compute volume penalization term for the different case studies
+    ! preasure
+    rhs(:,:,:,pF)  =rhs(:,:,:,pF) -                         penalization(:,:,:,pF)
+   ! density
+   rhs(:,:,:,rhoF)=rhs(:,:,:,rhoF)- 0.5_rk/ phi(:,:,:,rhoF)*penalization(:,:,:,rhoF)
+   ! x-velocity
+   rhs(:,:,:,UxF) =rhs(:,:,:,UxF) - 1.0_rk/phi(:,:,:,rhoF)* penalization(:,:,:,UxF)
+   ! y-velocity
+   rhs(:,:,:,UyF) =rhs(:,:,:,UyF) - 1.0_rk/phi(:,:,:,rhoF)* penalization(:,:,:,UyF)
+   ! z-velocity
+   if ( params_ns%dim==3 ) then
+     rhs(:,:,:,UzF) =rhs(:,:,:,UzF) -1.0_rk/phi(:,:,:,rhoF)*penalization(:,:,:,UzF)
+   end if
 
-    select case(mask_geometry)
-    case('sod_shock_tube')
-      call add_sod_shock_tube(penalization, x0, dx, Bs, g, phi )
-    case('moving-shock')
-      call add_simple_shock(penalization,x0,dx,Bs,g,phi)
-    case('vortex_street','cylinder')
-      call add_cylinder(penalization, x0, dx, Bs, g, phi )
-    case('rhombus','triangle')
-      call add_triangle(penalization,x0,dx,Bs,g,phi)
-    case('funnel')
-      call add_funnel(  penalization, x0, dx, Bs, g, phi )
-    case default
-      call abort(120401,"ERROR: geometry for VPM is unknown"//mask_geometry)
-    end select
-
-
-
-    ! 2. add penalty to the right hand side
-
-    ! sqrt(rho) component (density)
-    rhs(:,:,1)=rhs(:,:,1) - 0.5_rk/phi(:,:,1)*penalization( :,:,1)
-    ! sqrt(rho)u component (momentum)
-    rhs(:,:,2)=rhs(:,:,2) - 1.0_rk/phi(:,:,1)*penalization( :,:,2)
-    ! sqrt(rho)v component (momentum)
-    rhs(:,:,3)=rhs(:,:,3) - 1.0_rk/phi(:,:,1)*penalization( :, :,3)
-    ! p component (preasure/energy)
-    rhs(:,:,4)=rhs(:,:,4) -                   penalization( :, :,4)
-
-end subroutine add_constraints
+end subroutine add_penalization_term
 !==========================================================================
-
 
 
 
@@ -542,9 +398,6 @@ subroutine simple_sponge(sponge, x0, dx, Bs, g)
      end do
 
 end subroutine simple_sponge
-
-
-
 
 
 

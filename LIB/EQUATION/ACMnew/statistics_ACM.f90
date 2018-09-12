@@ -171,9 +171,9 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         tmp(1:3) = params_acm%mean_flow
         call MPI_ALLREDUCE(tmp(1:3), params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         if (params_acm%dim == 2) then
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
+            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
         else
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
         endif
 
         !-------------------------------------------------------------------------
@@ -219,7 +219,7 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
             tmp = params_acm%error
             call MPI_REDUCE(tmp, params_acm%error, 6, MPI_DOUBLE_PRECISION, MPI_SUM, 0, WABBIT_COMM,mpierr)
             !params_acm%error(1:3) = params_acm%error(1:3)/params_acm%error(4:6)
-            params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%Lx*params_acm%Ly)
+            params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%domain_size(1)*params_acm%domain_size(2))
 
             if (params_acm%mpirank == 0) then
                 ! write error to disk...

@@ -63,6 +63,12 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
+    case("--compute-rhs")
+        call post_rhs(params)
+
+    case("--mult-mask")
+        call mult_mask(params)
+
     case("--mean")
         call post_mean(params)
 

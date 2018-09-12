@@ -37,8 +37,9 @@ This is a short example (/working practice) of how to install hdf5 libary (Teste
 
 1. download source code from [hdf5](https://www.hdfgroup.org/downloads/hdf5/source-code/ "HDF5 Source Code")
 
-2. open terminal and follow
-
+2. open terminal and follow  
+  (mind that *path_2_build_dir* has to be replaced by the path of the directory of your choice.)
+  
 ```
 gunzip < hdf5-X.Y.Z.tar.gz | tar xf -
 cd hdf5-X.Y.Z
@@ -57,6 +58,7 @@ export HDF_ROOT
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
 export LD_RUN_PATH=$LD_LIBRARY_PATH
 ```
+   Recommendtaion: Add the lines to export the variables to your bashrc-file.
 
 ### run WABBIT
 
@@ -69,11 +71,16 @@ wabbit [2D|3D] [your_filename.ini] --memory=2.0GB
 where the --memory options allows you to approximately control how much memory is globally allocated, i.e., on all ranks. Note that WABBIT does not free memory which is once allocated again during runtime. This is because we intent to use clusters, where the globally available memory is reserved for the exectution.
 
 ## Additional Information
+If you are new to WABBIT it is recommended to read the [information for newcomers](https://github.com/adaptive-cfd/WABBIT/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+the+newcomers%22 "newcomer issues")!  
+
 For further Information see the documentation. Therefor it is necessary to have [Doxygen](http://www.stack.nl/~dimitri/doxygen/ "Doxygen") installed.
 
 ```
 make doc
 ```
+## Publications
+
+* ["An Open and Parallel Multiresolution Framework Using Block-Based Adaptive Grids"](https://link.springer.com/chapter/10.1007%2F978-3-319-98177-2_19 "Sroka2018"); Sroka, Engels, Krah, Mutzel, Schneider, Reiss; Active Flow and Combustion Control 2018
 
 ## History
 

@@ -4,8 +4,8 @@
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 \
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
-startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 \
-compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90
+startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 mult_mask.f90 \
+compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -14,10 +14,11 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_debug.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
-	module_indicators.f90 module_operators.f90 module_navier_stokes_new.f90 module_ns_penalization.f90 \
+	module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
-	module_insects.f90 module_boundary_conditions.f90
+	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
+	module_simple_geometry.f90 module_shock_tube.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -143,16 +144,32 @@ $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_ini_files_parser_mpi.o\
-	funnel.f90 vortex_street.f90 sod_shock_tube.f90 simple_shock.f90 RHS_2D_cylinder.f90 triangle.f90
+ 	vortex_street.f90 sod_shock_tube.f90 simple_shock.f90 RHS_2D_cylinder.f90 triangle.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_navier_stokes_new.o: module_navier_stokes_new.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
-	RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90 save_data_ns.f90
+$(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+	funnel2D.f90 funnel3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+		vortex_street.f90 triangle.f90
+		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)/module_funnel.o $(OBJDIR)/module_ns_penalization.o\
+	$(OBJDIR)/module_shock_tube.o $(OBJDIR)/module_simple_geometry.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
+	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90 save_data_ns.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_shock_tube.o: module_shock_tube.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+		$(OBJDIR)/module_navier_stokes_params.o sod_shock_tube.f90
+		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
@@ -171,7 +188,7 @@ $(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_para
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/module_globals.o \
-	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes_new.o $(OBJDIR)/module_ACM.o
+	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ACM.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o

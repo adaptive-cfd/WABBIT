@@ -2,16 +2,14 @@
 subroutine init_vortex_street(FILE)
 
   implicit none
-
  ! character(len=*), intent(in) :: filename
   type(inifile) , intent(inout) :: FILE
 
-
   call read_param_mpi(FILE, 'VPM', 'x_cntr', cyl%x_cntr,(/ 0.25_rk , 0.5_rk/) )
-  call read_param_mpi(FILE, 'VPM', 'length', cyl%radius,0.05_rk*min(domain_size(1),domain_size(2)) )
+  call read_param_mpi(FILE, 'VPM', 'length', cyl%radius,0.05_rk*min(params_ns%domain_size(1),params_ns%domain_size(2)) )
   cyl%radius=cyl%radius*0.5_rk
-  cyl%x_cntr(1)=cyl%x_cntr(1)*domain_size(1)
-  cyl%x_cntr(2)=cyl%x_cntr(2)*domain_size(2)
+  cyl%x_cntr(1)=cyl%x_cntr(1)*params_ns%domain_size(1)
+  cyl%x_cntr(2)=cyl%x_cntr(2)*params_ns%domain_size(2)
 end subroutine init_vortex_street
 
 
@@ -55,9 +53,9 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
            mask(ix,iy) = smoothstep( r - cyl%radius, h)
-
        end do
     end do
+
 end subroutine draw_cylinder
 !==========================================================================
 
@@ -87,7 +85,7 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy,n
     ! outlets and inlets
-    real(kind=rk)                                    :: T0,rho0,u0,p0
+    real(kind=rk)                                    :: T0,rho0,u0,p0,Rs
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -97,11 +95,11 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     mask    = 0.0_rk
     penalization = 0.0_rk
 
-
-        T0      = params_ns%initial_temp
-        rho0    = params_ns%initial_density
-        p0      =  params_ns%initial_pressure
-        u0      =  params_ns%initial_velocity(1)
+    T0      = params_ns%initial_temp
+    rho0    = params_ns%initial_density
+    p0      =  params_ns%initial_pressure
+    u0      =  params_ns%initial_velocity(1)
+    Rs      =  params_ns%Rs
 
     ! parameter for smoothing function (width)
     h       = 1.5_rk*max(dx(1), dx(2))
@@ -135,7 +133,6 @@ subroutine add_cylinder(penalization, x0, dx, Bs, g ,phi)
     penalization(:,:,3)= penalization(:,:,3) + C_sp_inv*mask * ( rho*v )
     ! preasure
     penalization(:,:,4)= penalization(:,:,4) + C_sp_inv*mask *( p - p0 )
-
 
             ! sponge-free outlet
             !--------

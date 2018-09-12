@@ -18,7 +18,7 @@
 !
 !   NOTE: one idea implemented here is that the lgt_block data is actually only
 !         small numbers (0..7 for octree, +-1 for refinement) so we can save a
-!         lot of transfer volume by converting it to kind=1 integer. This should
+!         lot of transfer volume by converting it to kind=2 integer. This should
 !         one day be done throughout the code.
 !
 !   NOTE: since, by definition, the light data is OUTDATED at this point, you

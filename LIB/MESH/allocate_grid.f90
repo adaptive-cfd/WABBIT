@@ -60,7 +60,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     logical, intent(in) :: simulation
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
-    integer             :: status
+    integer             :: status, nwork
 
     !---------------------------------------------------------------------------------------------
     ! interfaces
@@ -74,6 +74,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     g               = params%number_ghost_nodes
     N_dF            = params%number_data_fields
     number_procs    = params%number_procs
+    ! the number of work arrays is determined by the requirement for the time stepper
+    ! and the number of fields to be saved.
+    nwork           = max( N_dF*(size(params%butcher_tableau,1)), params%N_fields_saved )
+
 
     !---------------------------------------------------------------------------------------------
     ! main body
@@ -86,7 +90,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
-    rk_steps = max(size(params%butcher_tableau,1)-1, params%N_fields_saved)
+
     ! allocate memory
     if ( params%threeD_case ) then
         ! 3D:
@@ -102,7 +106,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
-            allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, N_dF*(rk_steps+1), number_blocks ) )
+            allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
@@ -132,7 +136,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
-            allocate( hvy_work( Bs+2*g, Bs+2*g, 1, N_dF*(rk_steps+1), number_blocks ) )
+            allocate( hvy_work( Bs+2*g, Bs+2*g, 1, nwork, number_blocks ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",5(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)

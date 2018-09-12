@@ -86,7 +86,10 @@ subroutine gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, lgt
           ! if it did not, code hangs anyways. so here assume it worked and on all CPU just copy the light data
           lgt_block( lgt_free_id, : ) = lgt_block( lgt_blocks_to_gather(i), : )
           ! we must also delete the original block (also done on ALL CPUS)
-          lgt_block( lgt_blocks_to_gather(i), : ) = -1
+          ! but this can only happen after we have really send this mother fuckers.
+          ! for this reason we give it a flag here, which tells that these blocks have to
+          ! be erased after they are transferred (checkout the last lines of coarse mesh)
+          lgt_block( lgt_blocks_to_gather(i), params%max_treelevel + idx_refine_sts ) = 55
           ! we return the new index of the blocks we moved
           lgt_blocks_to_gather(i) = lgt_free_id
       endif

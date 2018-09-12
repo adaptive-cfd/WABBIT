@@ -31,7 +31,7 @@ subroutine sparse_to_dense(params)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length, dim
+    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, bs, tc_length
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
     real(kind=rk), dimension(3)             :: domain
@@ -76,8 +76,8 @@ subroutine sparse_to_dense(params)
     ! read attributes from file. This is especially important for the number of
     ! blocks the file contains: this will be the number of active blocks right
     ! after reading.
-    call read_attributes(file_in, lgt_n, time, iteration, domain, bs, tc_length, dim)
-    if (dim==3) then
+    call read_attributes(file_in, lgt_n, time, iteration, domain, bs, tc_length, params%dim)
+    if (params%dim==3) then
         params%threeD_case = .true.
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
@@ -112,7 +112,7 @@ subroutine sparse_to_dense(params)
     params%number_blocks = ceiling( 4.0*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
 
     if (params%rank==0) then
-        write(*,'("Data dimension: ",i1,"D")') dim
+        write(*,'("Data dimension: ",i1,"D")') params%dim
         write(*,'("File contains Nb=",i6," blocks of size Bs=",i4)') lgt_n, bs
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("Time=",g12.4," it=",i9)') time, iteration

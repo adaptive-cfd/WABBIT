@@ -1,10 +1,3 @@
-!> \file
-!> \callgraph
-!********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name     adapt_mesh.f90
-!! \version  0.4
 !! \author   msr, engels
 !
 !> \brief This routine performs the coarsing of the mesh, where possible. For the given mesh
@@ -23,14 +16,7 @@
 !! block after this routine. You do *NOT* have to call it several times.
 !
 !> \details
-!! input:    - params, light and heavy data \n
-!! output:   - light and heavy data arrays
-!!
-!> = log ======================================================================================
-!!
-!! 10/11/16 - switch to v0.4
-! ==========================================================================================
-!********************************************************************************************
+!! \date 10/11/16 - switch to v0.4
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &

@@ -176,10 +176,11 @@ subroutine ini_file_to_params( params, filename )
             Bs      = params%number_block_nodes
             g       = params%number_ghost_nodes
             Neqn    = params%number_data_fields
-            Nrk     = max( size(params%butcher_tableau,1)-1, params%N_fields_saved ) + 2
+            Nrk     = max( Neqn*size(params%butcher_tableau,1), params%N_fields_saved )
             nstages = 2.0
 
-            mem_per_block = real(Neqn) * real(Nrk) * (real(Bs+2*g))**d & ! hvy_work+hvy_block
+            mem_per_block = real(Neqn) * (real(Bs+2*g))**d & ! hvy_block
+            + real(Nrk) * (real(Bs+2*g))**d & ! hvy_work
             + 2.0 * nstages * real(Neqn) * real((Bs+2*g)**d - Bs**d) &  ! real buffer ghosts
             + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
 
@@ -275,8 +276,10 @@ end subroutine ini_file_to_params
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")
     endif
+    
+    params%domain_size=(/ 1.0_rk, 1.0_rk, 0.0_rk /) !default
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
-    (/ 1.0_rk, 1.0_rk, 0.0_rk /) )
+                                                       params%domain_size(1:params%dim) )
 
     call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
 

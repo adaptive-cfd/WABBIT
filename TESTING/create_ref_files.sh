@@ -16,7 +16,7 @@ fi
 # loop over all HDF5 files an generate keyvalues using WABBIT
 for file in *.h5
 do
-  ${mpi_serial} $WABBIT_POST 2D --keyvalues ${file}
+  ${mpi_serial} $WABBIT_POST --keyvalues ${file}
   mv ${file%%.h5}.key ${file%%.h5}.ref
 done
 

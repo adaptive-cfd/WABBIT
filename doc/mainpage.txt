@@ -18,7 +18,7 @@
 !> \subsection step3 Run WABBIT
 !! customize .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name:
 !!
-!!		   $ wabbit [2D|3D] [your_filename.ini]
+!!		   $ wabbit [your_filename.ini]
 !!
 !> \subsection ste4p HDF5 Libary
 !! This is a short example (/working practice) of how to install hdf5 libary
@@ -101,7 +101,7 @@
 !! \image html sparse_to_dense.svg "Sparse to Dense" width=400
 !! \subsection Run
 !!
-!!     $ ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)
+!!     $ ./wabbit-post --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)
 !!
 !! where source.h5 is the input file, target.h5 is the file where the user
 !! wants the output to be saved, target_treelevel is the desired level and
@@ -129,14 +129,14 @@
 !! so that we don't need to store entire fields but rather the *.key only
 !! \subsubsection Run
 !!
-!!     $ ./wabbit-post 2[3]D --keyvalues filename.h5
+!!     $ ./wabbit-post --keyvalues filename.h5
 !!
 !! \subsection com Compare keyvalues
 !! Compares two .key files, prints out the error on the screen and gives back
 !! an exit code
 !! \subsubsection Run
 !!
-!!     $ ./wabbit-post 2[3]D --compare-keys old.key new.key
+!!     $ ./wabbit-post --compare-keys old.key new.key
 !!
 !! \section vor Compute vorticity
 !! This tool can be used for subsequent calculation of the vorticity from a
@@ -145,8 +145,8 @@
 !!
 !! \subsection run Run
 !!
-!!     $ ./wabbit-post 2D --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)
-!!     $ ./wabbit-post 3D --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)
+!!     $ ./wabbit-post --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)
+!!     $ ./wabbit-post --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)
 !!
 !!
 !! where derivative order is the order of the finite differences scheme

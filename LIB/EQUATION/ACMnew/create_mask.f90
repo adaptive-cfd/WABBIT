@@ -35,13 +35,14 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us )
 
         ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
         ! know that the first g points are in fact ghost nodes...
-        call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask, mask_color, us)
+        call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
+        mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3) )
 
     case ('none')
       mask = 0.0_rk
 
     case default
-      call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
+      call abort(120001,"ERROR: geometry for 3d VPM is unknown "//params_acm%geometry)
 
     end select
 
@@ -84,7 +85,7 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
       mask = 0.0_rk
 
     case default
-      call abort(120001,"ERROR: geometry for VPM is unknown"//params_acm%geometry)
+      call abort(120002,"ERROR: geometry for 2d VPM is unknown"//params_acm%geometry)
 
     end select
 
@@ -183,12 +184,12 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
   ! main body
 
   ! center of the first cylinder
-  cx1 = 0.5884_rk*params_acm%Lx
-  cy1 = 0.4116_rk*params_acm%Ly
+  cx1 = 0.5884_rk*params_acm%domain_size(1)
+  cy1 = 0.4116_rk*params_acm%domain_size(2)
 
   ! center of the second cylinder
-  cx2 = 0.4116_rk*params_acm%Lx
-  cy2 = 0.5884_rk*params_acm%Ly
+  cx2 = 0.4116_rk*params_acm%domain_size(1)
+  cy2 = 0.5884_rk*params_acm%domain_size(2)
 
   ! radius of the cylinders
   R = params_acm%R_cyl

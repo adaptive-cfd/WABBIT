@@ -207,7 +207,7 @@ contains
 
   !-----------------------------------------------------------------------------
   ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid any an MPI formalism, neighboring relations and the like.
+  ! independent of the grid and any MPI formalism, neighboring relations and the like.
   ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
   ! from that. Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------

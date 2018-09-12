@@ -85,6 +85,9 @@ subroutine init_filter(filter, FILE )
                 ! bogey shock detection method (p,divU)
                 call read_param_mpi(FILE, 'Discretization', 'detector_method', filter%detector_method, 'divU' )
 
+            case('wavelet')
+              call read_param_mpi(FILE, 'Discretization', 'order_predictor', filter%order_predictor, "multiresolution_4th")
+
             case('no_filter')
                 ! do nothing..
                 return
@@ -179,14 +182,15 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
     ! loop over all datafields
     work_array(:,:,:,N_dF+1:2*N_dF)=work_array(:,:,:,1:N_dF)
 
-    if (filter%name=='bogey_shock') then
+    select case (filter%name)
+    case ('bogey_shock')
       if (params_ns%dim==3) then
         call bogey_filter3D(filter, u, g, Bs, N_dF, x0, dx, work_array)
       else
         call bogey_filter2D_(filter, u, g, Bs, N_dF, x0, dx, work_array) !new bogey_filter
       !  call bogey_filter2D(filter, Bs, g, N_dF ,work_array,x0,dx) !old bogey filter
       endif
-    else ! explicit filtering
+    case('explicit_5pt','explicit_7pt','explicit_9pt','explicit_11pt') ! explicit filtering
       do dF = 1, N_dF
           dF_old=dF+N_dF
               !block_old = hvy_block(:, :, :, dF, hvy_active(k) )
@@ -224,10 +228,17 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
 
               endif
       end do
-    endif
 
+    case('wavelet')
+      do dF = 1, N_dF
+          call wavelet_filter(filter%order_predictor, Bs, g, work_array(:,:,:,dF))
+      enddo
+    case default
+      call abort(100918,"No filter called: "//filter%name //" is known.")
+
+    end select
     ! pack statevector from conservative form !!!
-    call pack_statevector(work_array(:,:,:,:),'conservative')
+    call pack_statevector(work_array,'conservative')
 
 
 end subroutine filter_block
@@ -238,6 +249,43 @@ end subroutine filter_block
 
 
 
+
+!=====================================================================
+!  WAVELET FILTER
+!=====================================================================
+subroutine wavelet_filter(order_predictor, Bs, g, block_data)
+    use module_interpolation, only :  restriction_3D, restriction_2D, prediction_2D, prediction_3D
+
+    implicit none
+    !> params structure of navier stokes
+    character(len=*), intent(in) :: order_predictor
+    !> mesh params
+    integer(kind=ik), intent(in) :: Bs
+    integer(kind=ik), intent(in) :: g
+    !> heavy data array - block data
+    real(kind=rk), intent(inout) :: block_data(:, :, :)
+    real(kind=rk), allocatable, save :: u3(:,:,:)
+
+
+    if ( size(block_data,3)>1 ) then
+        ! ********** 3D **********
+        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,(Bs+1)/2+g))
+        ! now, coarsen array u1 (restriction)
+        call restriction_3D( block_data, u3 )  ! fine, coarse
+        ! then, re-interpolate to the initial level (prediciton)
+        call prediction_3D ( u3, block_data, order_predictor )  ! coarse, fine
+
+    else
+        ! ********** 2D **********
+        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,1))
+        ! now, coarsen array u1 (restriction)
+        call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
+        ! then, re-interpolate to the initial level (prediciton)
+        call prediction_2D ( u3(:,:,1), block_data(:,:,1), order_predictor )  ! coarse, fine
+
+    end if
+
+end subroutine wavelet_filter
 
 
 
@@ -300,141 +348,6 @@ subroutine filter_1D(phi, phi_tilde, a)
     end do
 
 end subroutine filter_1D
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-!
-! !=====================================================================
-! !  WAVELET FILTER
-! !=====================================================================
-!
-! !> \file
-! !> \callgraph
-! !> \name wavelet_filter.f90
-! !> \version 0.5
-! !> \author msr
-! !
-! !> \brief wavelet filter subroutine
-! !! \date 24/07/17 - create
-! subroutine wavelet_filter(filter,Bs,g, block_data)
-!     use module_interpolation, only :    restriction_3D,restriction_2D,&
-!                                         prediction_2D,prediction_3D
-!
-!     implicit none
-!     !> params structure of navier stokes
-!     type(type_params_filter),intent(in) :: filter
-!     !> mesh params
-!     integer(kind=ik),   intent(in)      :: Bs
-!     integer(kind=ik),   intent(in)      :: g
-!     !> heavy data array - block data
-!     real(kind=rk), intent(inout)        :: block_data(:, :, :)
-!
-!     ! loop parameter
-!     integer(kind=ik)                    :: i, j, l
-!     ! detail
-!     real(kind=rk)                       :: detail
-!     ! grid parameter
-!     ! interpolation fields
-!     real(kind=rk)                        ::  u1(Bs+2*g,Bs+2*g,Bs+2*g), &
-!                                             u2(Bs+2*g,Bs+2*g,Bs+2*g), &
-!                                             u3((Bs+1)/2+g,(Bs+1)/2+g,(Bs+1)/2+g)
-!
-!
-!     ! reset detail
-!     detail = 0.0_rk
-!
-!     if ( size(block_data,3)>1 ) then
-!         ! ********** 3D **********
-!         ! copy block data to array u1
-!         u1(:,:,:) = block_data( :, :, : )
-!         ! now, coarsen array u1 (restriction)
-!         call restriction_3D( u1, u3 )  ! fine, coarse
-!         ! then, re-interpolate to the initial level (prediciton)
-!         call prediction_3D ( u3, u2, filter%order_predictor )  ! coarse, fine
-!
-!         ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-!         ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-!         do i = 1, Bs+2*g
-!             do j = 1, Bs+2*g
-!                 do l = 1, Bs+2*g
-!                     detail = max( detail, sqrt( (u1(i,j,l)-u2(i,j,l)) * ( u1(i,j,l)-u2(i,j,l)) ) )
-!                 end do
-!             end do
-!         end do
-!
-!         ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
-!         ! the block should be filtered, overwrite block data with predicted data
-!         if (detail < filter%eps) then
-!             ! wavelet filtering
-!             block_data(:,:,:) = u2(:,:,:)
-!             ! note: do not filter redundant nodes, to avoid instabilities
-!             !block_data(g+2:Bs+g-1,g+2:Bs+g-1,g+2:Bs+g-1) = u2(g+2:Bs+g-1,g+2:Bs+g-1,g+2:Bs+g-1)
-!         end if
-!
-!     else
-!         ! ********** 2D **********
-!         ! copy block data to array u1
-!          u1(:,:,1) = block_data( :, :, 1 )
-!         ! now, coarsen array u1 (restriction)
-!         call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
-!         ! then, re-interpolate to the initial level (prediciton)
-!         call prediction_2D ( u3(:,:,1), u2(:,:,1), filter%order_predictor )  ! coarse, fine
-!
-!         ! ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-!         ! ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-!         ! do i = 1, Bs+2*g
-!         !     do j = 1, Bs+2*g
-!         !         detail = max( detail, sqrt( (u1(i,j,1)-u2(i,j,1)) * ( u1(i,j,1)-u2(i,j,1)) ) )
-!         !     end do
-!         ! end do
-!
-!         ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
-!         ! the block should be filtered, overwrite block data with predicted data
-!     !    if (detail < filter%eps) then
-!             ! wavelet filtering
-!           !  block_data(:,:,1) = u2(:,:,1)
-!             ! note: do not filter redundant nodes, to avoid instabilities
-!             block_data(g+2:Bs+g-1,g+2:Bs+g-1,1) = u2(g+2:Bs+g-1,g+2:Bs+g-1,1)
-!     !    end if
-!
-!     end if
-!
-! end subroutine wavelet_filter
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -905,76 +818,5 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
       enddo !loop over ix
     enddo ! loop over iy
 
-
-
 end subroutine bogey_filter2D_
 !=========================================================================================
-
-
-
-
-
-
-! shock detector - 1D
-! -------------------
-subroutine shock_detector_1D( phi, phi_old, r )
-
-    ! global parameters
-    use module_params
-
-    implicit none
-
-    !> datafield
-    real(kind=rk), intent(in)           :: phi(:)
-    !> old value
-    real(kind=rk), intent(in)           :: phi_old
-    !> r value
-    real(kind=rk), intent(out)          :: r
-
-    r = 0.5_rk * ( ( phi(2) - phi(3) )**2 + ( phi(2) - phi(1) )**2 ) / ( ( phi_old )**2 + 1.0_rk) + 1.0e-16_rk
-
-end subroutine shock_detector_1D
-
-! -------------------
-
-subroutine set_boundary( Bs, g, rho, u, v, p, xx0, ddx, Lx, Ly )
-    use module_params
-    integer(kind=ik), intent(in)         :: Bs, g
-    real(kind=rk), intent(inout)         :: rho(Bs+2*g, Bs+2*g), u(Bs+2*g, Bs+2*g), v(Bs+2*g, Bs+2*g), p(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(in)            :: xx0(1:2), ddx(1:2), Lx, Ly
-
-    integer(kind=ik)                     :: i
-
-    ! north
-    if ( abs( xx0(2) + ddx(2)*real(Bs-1,kind=rk)  - Ly ) < 1e-12_rk ) then
-        ! nothing to do
-    end if
-
-    ! east
-    if ( abs( xx0(1) + ddx(1)*real(Bs-1,kind=rk)  - Lx ) < 1e-12_rk ) then
-        ! set boundary
-        do i = Bs+g+1, Bs+2*g
-            rho(i, :) = rho(Bs+g, :)
-            u(i, :)   = u(Bs+g, :)
-            v(i, :)   = v(Bs+g, :)
-            p(i, :)   = p(Bs+g, :)
-        end do
-    end if
-
-    ! south
-    if ( abs( xx0(2) - 0.0_rk ) < 1e-12_rk ) then
-        ! nothing to do
-    end if
-
-    ! west
-    if ( abs( xx0(1) - 0.0_rk ) < 1e-12_rk ) then
-        ! set boundary
-        do i = 1, g
-            rho(i, :) = rho(g+1, :)
-            u(i, :)   = u(g+1, :)
-            v(i, :)   = v(g+1, :)
-            p(i, :)   = p(g+1, :)
-        end do
-    end if
-
-end subroutine set_boundary

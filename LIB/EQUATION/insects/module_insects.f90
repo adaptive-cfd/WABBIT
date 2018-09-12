@@ -23,7 +23,7 @@ module module_insects
 
   ! size (global) of domain
   real(kind=rk) :: xl, yl, zl
-  ! viscosity (just for Reynolds number)
+  ! viscosity (just for printing the Reynolds number)
   real(kind=rk) :: nu
 
   ! arrays for fourier coefficients are fixed size (avoiding issues with allocatable

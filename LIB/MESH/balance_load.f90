@@ -95,6 +95,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! MPI_parameters
     rank = params%rank
     number_procs = params%number_procs
+    
     ! allocate block to proc lists
     if (.not.allocated(opt_dist_list)) allocate( opt_dist_list(1:number_procs))
     if (.not.allocated(dist_list)) allocate( dist_list(1:number_procs))

@@ -49,6 +49,7 @@ contains
 
     ! create all active (lgt/hvy) lists, create also sorted lgt data list
     include "create_active_and_sorted_lists.f90"
+    include "block_xfer.f90"
 
     ! update neighbors, 2D/3D
     include "update_neighbors.f90"
@@ -126,10 +127,7 @@ contains
     ! find globally coarsest / finest levels
     include "max_active_level.f90"
     include "min_active_level.f90"
-
-    !
     include "get_free_local_light_id.f90"
-    include "gather_blocks_on_proc.f90"
     include "quicksort.f90"
 
     ! routines for creation of an initial grid

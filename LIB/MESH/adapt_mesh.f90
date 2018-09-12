@@ -136,7 +136,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         ! CPU timing (only in debug mode)
         call toc( params, "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 

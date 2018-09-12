@@ -163,7 +163,7 @@ subroutine sparse_to_dense(params)
         ! this might not be necessary since we start from an admissible grid
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
             hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations

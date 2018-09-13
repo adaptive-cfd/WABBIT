@@ -41,6 +41,27 @@
 !!                 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
 !!                 $ export LD_RUN_PATH=$LD_LIBRARY_PATH
 !!
+!> \section tutorials_sec Tutorials
+!! 
+!> \subsection tut1 General
+!! After the installation of WABBIT it is possible to run simulations with the existing physics modules. For the different modules .ini-files can be found in the TESTING directory. These can be adapted and used for first simulations. After adapting the .ini-file a simulation can be started with
+!!
+!!		   $ wabbit [your_filename.ini]
+!!
+!! This can be adapted to start a parallel calculation.
+!!
+!! It is possible to add a new folder with the .ini-file and the WABBIT executable and start the simulation in this folder. Like this all outputs generated during the simulation will be added to this folder.
+!!
+!! For visulization of the results it is usefull to use the tool <a href="https://github.com/pseudospectators/mpi2vis">mpi2vis</a>
+!!
+!! Having installed mpi2vis and added the hdf2xmf.py-file to your binaries calculated results can be visualized by first running 
+!!
+!!                 $ hdf2xmf.py
+!!
+!! and then viewing the created .xmf-files for example with paraview
+!!
+!!                 $ paraview ALL2.xmf
+!!
 -------------------------------------------------------------------------------------------------------------
 !> \page structures Wabbit Structures
 !> \section Treecode Treecode in 2D/3D

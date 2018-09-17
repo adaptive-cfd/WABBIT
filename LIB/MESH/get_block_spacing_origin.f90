@@ -22,7 +22,7 @@ subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
   ! loop variables and shortcuts
   integer(kind=ik)                           :: ix,iy,iz,level,bs
 
-  bs = params%number_block_nodes
+  bs = params%Bs
 
   ! fetch this blocks level:
   level = lgt_block( lgt_id, params%max_treelevel + idx_mesh_lvl )

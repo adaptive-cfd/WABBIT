@@ -137,9 +137,9 @@ subroutine init_ghost_nodes( params )
     ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then
         number_blocks   = params%number_blocks
-        Bs              = params%number_block_nodes
-        g               = params%number_ghost_nodes
-        Neqn            = params%number_data_fields
+        Bs              = params%Bs
+        g               = params%nr_ghosts
+        Neqn            = params%n_eqn
         rank            = params%rank
         Ncpu            = params%number_procs
 

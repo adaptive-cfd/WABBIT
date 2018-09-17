@@ -75,7 +75,7 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     !---------------------------------------------------------------------------------------------
     ! main body
 
-    do dF = 1, params%number_data_fields
+    do dF = 1, params%n_eqn
         do iz = ijk(1,3), ijk(2,3), 2
             do iy = ijk(1,2), ijk(2,2), 2
                 do ix = ijk(1,1), ijk(2,1), 2
@@ -120,7 +120,7 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     !---------------------------------------------------------------------------------------------
     ! variables initialization
 
-    NdF = params%number_data_fields
+    NdF = params%n_eqn
 
     ! data size
     nx = ijk(2,1) - ijk(1,1) + 1

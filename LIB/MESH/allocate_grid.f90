@@ -70,9 +70,9 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! set parameters for readability
     rank            = params%rank
     number_blocks   = params%number_blocks
-    Bs              = params%number_block_nodes
-    g               = params%number_ghost_nodes
-    N_dF            = params%number_data_fields
+    Bs              = params%Bs
+    g               = params%nr_ghosts
+    N_dF            = params%n_eqn
     number_procs    = params%number_procs
     ! the number of work arrays is determined by the requirement for the time stepper
     ! and the number of fields to be saved.

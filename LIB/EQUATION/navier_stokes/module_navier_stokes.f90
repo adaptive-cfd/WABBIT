@@ -110,7 +110,7 @@ contains
     call add_info(params_ns)
 
     ! set global parameters pF,rohF, UxF etc
-    do dF = 1, params_ns%number_data_fields
+    do dF = 1, params_ns%n_eqn
                 if ( params_ns%names(dF) == "p" ) pF = dF
                 if ( params_ns%names(dF) == "rho" ) rhoF = dF
                 if ( params_ns%names(dF) == "Ux" ) UxF = dF
@@ -518,7 +518,7 @@ contains
     Bs = size(u,1) - 2*g
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
-    u=work_array(:,:,:,1:params_ns%number_data_fields)
+    u=work_array(:,:,:,1:params_ns%n_eqn)
 
   end subroutine filter_NStokes
 

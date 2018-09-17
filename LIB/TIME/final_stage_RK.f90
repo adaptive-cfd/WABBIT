@@ -76,7 +76,7 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    N_dF  = params%number_data_fields
+    N_dF  = params%n_eqn
 
 !---------------------------------------------------------------------------------------------
 ! main body

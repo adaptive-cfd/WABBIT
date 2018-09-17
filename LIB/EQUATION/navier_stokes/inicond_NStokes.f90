@@ -35,7 +35,7 @@
     ! NStokes saves the temporary state in the "pure" format, i.e. rho, u, v, w, p
     ! This is why we have to convert them back to skew-symetric, when they have been
     ! red from a file
-    if ( params_ns%inicond=="read_from_files") then
+    if ( params_ns%read_from_files ) then
       ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
         call pack_statevector(u(:,:,:,:),'pure_variables')
         return
@@ -110,6 +110,7 @@
         call set_inicond_moving_shock(x0, dx, Bs, g, u(:,iy,1,:), (/rho_init, u_init(1),p_init /), tmp)
       end do
     endif
+
     case ("mask")
       if (.not. params_ns%penalization) call abort(110918,"SAY WHAAAT? can't hear you! Please switch on penalization for inicond mask!")
       if (.not. allocated(mask))        allocate(mask(size(u,1), size(u,2), size(u,3)))
@@ -146,12 +147,12 @@
 
     !------------------------------------------------------------------
     !check if initial conditions are set properly
-    do dF=1,params_ns%number_data_fields
+    do dF=1,params_ns%n_eqn
       if (  block_contains_NaN(u(:,:,:,dF)) ) then
         call abort(46924,"ERROR [module_navier_stokes]: NaN in inicond!"//&
         " Computer says NOOOOOOOOOOOOOOOO!")
       endif
-    enddo
+    end do
     !------------------------------------------------------------------
 
     if (allocated(mask)) deallocate(mask)

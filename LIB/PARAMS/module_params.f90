@@ -74,14 +74,14 @@ module module_params
         logical, allocatable                         :: threshold_state_vector_component(:)
         ! boundary condition
         character(len=80)                            :: boundary_cond=""
-        ! initial condition
-        character(len=80)                            :: initial_cond=""
+        ! deside if WABBIT should start from input files
+        logical                                       :: read_from_files
         ! files we want to read for inital cond.
         character(len=80), dimension(:), allocatable :: input_files
 
         ! grid parameter
-        integer(kind=ik)                             :: number_block_nodes=0
-        integer(kind=ik)                             :: number_ghost_nodes=0
+        integer(kind=ik)                             :: Bs=0        ! number of block nodes
+        integer(kind=ik)                             :: nr_ghosts=0 ! number of ghost nodes
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
@@ -89,7 +89,7 @@ module module_params
         integer(kind=ik)                             :: number_blocks=0_ik
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
-        integer(kind=ik)                             :: number_data_fields=0_ik
+        integer(kind=ik)                             :: n_eqn=0_ik
         integer(kind=ik)                             :: number_fields=0
 
         ! block distribution for load balancing (also used for start distribution)

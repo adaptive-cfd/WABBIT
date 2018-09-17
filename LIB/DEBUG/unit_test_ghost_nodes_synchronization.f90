@@ -92,9 +92,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         write(*,'("UNIT TEST: Beginning ghost nodes test")')
     end if
 
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
-    dF = params%number_data_fields
+    Bs = params%Bs
+    g  = params%nr_ghosts
+    dF = params%n_eqn
     number_procs  = params%number_procs
     number_blocks = params%number_blocks
 

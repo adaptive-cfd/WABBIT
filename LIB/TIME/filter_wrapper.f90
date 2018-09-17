@@ -52,8 +52,8 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
 ! variables initialization
 
     ! grid parameter
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
+    Bs    = params%Bs
+    g     = params%nr_ghosts
 
 
     do k = 1, hvy_n

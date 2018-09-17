@@ -303,14 +303,14 @@ end subroutine draw_sponge3D
       integer(kind=ik), intent(in)         :: Bs, g         !< grid parameter (g ghostnotes,Bs Bulk)
       real(kind=rk), intent(in)            :: u(:,:,:,:)    !< vector of state in pure format
       real(kind=rk), intent(in)            :: x0(3), dx(3)  !< spacing and origin of block
-      real(kind=rk),intent(out)            :: integral(params_ns%number_data_fields)  !< mean statevector
+      real(kind=rk),intent(out)            :: integral(params_ns%n_eqn)  !< mean statevector
       real(kind=rk),intent(out)            :: volume        !< volume of the integration domain
       ! -----------------------------------------------------------------
       integer(kind=ik)                   :: ix,iy,iz,neq
       real(kind=rk)                      :: h,r,y,x,z,r0,width
       real(kind=rk),allocatable,save     :: tmp(:)
 
-      neq=params_ns%number_data_fields
+      neq=params_ns%n_eqn
 
       if (.not. allocated(tmp) ) allocate(tmp(1:neq+1))
       ! calculate mean density close to the pump

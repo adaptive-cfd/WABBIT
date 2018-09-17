@@ -37,7 +37,7 @@
 
 
     Bs   = size(u,1)-2*g                 ! number of block sides
-    nvar = params_ns%number_data_fields  ! number of variables describing the state of the fluid
+    nvar = params_ns%n_eqn  ! number of variables describing the state of the fluid
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)
     tmp_u  = u(:,:,:,:)

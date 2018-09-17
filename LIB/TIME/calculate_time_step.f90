@@ -39,7 +39,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
           ! or other operators. Everything that is physics-dependent goes here. it is
           ! computed for each block, then the minimum is used.
           call GET_DT_BLOCK( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
-              params%number_block_nodes,params%number_ghost_nodes, xx0, ddx, dt_tmp)
+              params%Bs,params%nr_ghosts, xx0, ddx, dt_tmp)
 
           dt = min( dt, dt_tmp )
       end do

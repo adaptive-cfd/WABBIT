@@ -67,8 +67,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     rank         = params%rank
     number_procs = params%number_procs
     ! grid parameter
-    Bs   = params%number_block_nodes
-    g    = params%number_ghost_nodes
+    Bs   = params%Bs
+    g    = params%nr_ghosts
 
 !---------------------------------------------------------------------------------------------
 ! main body

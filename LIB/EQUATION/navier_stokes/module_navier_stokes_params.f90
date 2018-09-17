@@ -27,7 +27,7 @@ module module_navier_stokes_params
       ! name of filter
       character(len=80)                  :: name
       ! number or data fields to filter
-      integer(kind=ik)                   :: number_data_fields
+      integer(kind=ik)                   :: n_eqn
 
       ! explicit filters
       ! ----------------
@@ -70,7 +70,7 @@ module module_navier_stokes_params
         ! spatial domain%number_data_fields
         real(kind=rk)                               :: R_max, domain_size(3)=0.0_rk
         ! number data fields
-        integer(kind=ik)                            :: number_data_fields
+        integer(kind=ik)                            :: n_eqn
         ! number of block nodes
         integer(kind=ik)                            :: Bs
         ! maximal tree level
@@ -98,6 +98,7 @@ module module_navier_stokes_params
         !---------------------------------------------------------------------------------
         ! initial conditions
         !---------------------------------------------------------------------------------
+        logical                                     :: read_from_files
         ! înitial condition
         character(len=80)                           :: inicond
         ! width of initialcond
@@ -167,7 +168,7 @@ contains
       write(*,'(" -----------------------------------")')
     endif
     ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_equations', params_ns%n_eqn, 1 )
     ! dimension
     call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
     !
@@ -220,8 +221,8 @@ contains
         write(*,*) "PARAMS: "//section
         write(*,'(" ---------------------------")')
       endif
-      call read_param_mpi(FILE, 'Physics', 'initial_cond', params_ns%inicond, "read_from_files" )
-      if ( params_ns%inicond == "read_from_files") then
+      call read_param_mpi(FILE, 'Physics', 'read_from_files', params_ns%read_from_files, .false. )
+      if ( params_ns%read_from_files) then
         if (params_ns%mpirank==0) write(*,'("initial configuration is read from file!")')
         if (params_ns%mpirank==0) write(*,'("we read in (rho,u , v, p) and convert it to skew: (sqrt(rho),sqrt(rho)u, sqrt(rho)v, p)!")')
         return
@@ -267,8 +268,6 @@ subroutine init_other_params(params_ns, FILE )
     if (  list_contains_name(params_ns%names,'sigmax')>0 ) then
       params_ns%filter%save_filter_strength=.true.
     end if
-
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
@@ -361,10 +360,10 @@ subroutine init_other_params(params_ns, FILE )
 
 
           if ( params_ns%dim==3 ) then
-            if( params_ns%number_data_fields<5 ) call abort(9898,'Please increase number of data fields (min 5)')
+            if( params_ns%n_eqn<5 ) call abort(9898,'Please increase number of data fields (min 5)')
             if( min(pF,UxF,UyF,UzF,rhoF)<0 )  call abort(9898,'Check names of data fields [p,Ux,Uy,Uz,rho]!')
           else
-            if( params_ns%number_data_fields<4 ) call abort(9898,'Please increase number of data fields (min 4)')
+            if( params_ns%n_eqn<4 ) call abort(9898,'Please increase number of data fields (min 4)')
             if( min(pF,UxF,UyF,rhoF)<0 )      call abort(9898,'Check names of data fields [p,Ux,Uy,rho]!')
           end if
 
@@ -382,9 +381,9 @@ subroutine init_other_params(params_ns, FILE )
 
         if (.not.allocated(data)) then
           if (params_ns%dim==3) then
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%number_data_fields))
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%n_eqn))
           else
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%number_data_fields))
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%n_eqn))
         endif
       endif
     end subroutine allocate_statevector_ns

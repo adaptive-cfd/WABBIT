@@ -96,7 +96,7 @@ subroutine init_filter(filter, FILE )
                 call abort(4564,"ERROR [filter_block.f90]: filter type is not known!")
         end select
 
-        call read_param_mpi(FILE, 'Blocks', 'number_data_fields', filter%number_data_fields, 1 )
+        call read_param_mpi(FILE, 'Blocks', 'number_equations', filter%n_eqn, 1 )
         ! check ghost nodes number
         ! read number_ghost_nodes
         call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 1 )
@@ -173,7 +173,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
     real(kind=rk)                       :: phi_tilde(3)
 
     stencil_size            =filter%stencil_size
-    N_dF                    =filter%number_data_fields
+    N_dF                    =filter%n_eqn
 
     work_array(:,:,:,1:N_dF)=u
     ! use conservative form of statevector for filtering only!!!!
@@ -414,9 +414,9 @@ subroutine bogey_filter2D(filter, Bs, g, N_dF ,hvy_work, xx0, ddx )
 ! variables initialization
 !
     ! grid parameter
-    ! Bs  = params%number_block_nodes
-    ! g   = params%number_ghost_nodes
-    ! N_dF= params%number_data_fields
+    ! Bs  = params%Bs
+    ! g   = params%nr_ghosts
+    ! N_dF= params%n_eqn
 
     ! allocate old data array
 !    allocate( block_old(Bs+2*g, Bs+2*g, Bs+2*g, N_dF), r_x(Bs+2*g, Bs+2*g), r_y(Bs+2*g, Bs+2*g), sigma_x(Bs+2*g, Bs+2*g), sigma_y(Bs+2*g, Bs+2*g), theta(Bs+2*g, Bs+2*g), &

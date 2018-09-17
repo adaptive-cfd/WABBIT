@@ -56,10 +56,10 @@ subroutine sparse_to_dense(params)
     call get_command_argument(5, order)
     if (order == "4") then
         params%order_predictor = "multiresolution_4th"
-        params%number_ghost_nodes = 4_ik
+        params%nr_ghosts = 4_ik
     elseif (order == "2") then
         params%order_predictor = "multiresolution_2nd"
-        params%number_ghost_nodes = 2_ik
+        params%nr_ghosts = 2_ik
     else
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
@@ -70,7 +70,7 @@ subroutine sparse_to_dense(params)
     ! we do not read an ini file, so defaults may not be set.
     allocate(params%butcher_tableau(1,1))
     ! we read only one datafield in this routine
-    params%number_data_fields  = 1
+    params%n_eqn  = 1
     params%block_distribution="sfc_hilbert"
 
     ! read attributes from file. This is especially important for the number of
@@ -102,7 +102,7 @@ subroutine sparse_to_dense(params)
     ! set max_treelevel for allocation of hvy_block
     params%max_treelevel = max(level, tc_length)
     params%min_treelevel = level
-    params%number_block_nodes = bs
+    params%Bs = bs
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)

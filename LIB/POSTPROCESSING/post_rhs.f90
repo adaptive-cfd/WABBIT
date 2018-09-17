@@ -72,8 +72,8 @@ subroutine post_rhs(params)
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case
     params%number_blocks = 4*lgt_n/params%number_procs
-    Bs = params%number_block_nodes
-    g = params%number_ghost_nodes
+    Bs = params%Bs
+    g = params%nr_ghosts
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
@@ -84,7 +84,7 @@ subroutine post_rhs(params)
 
 
     ! read in all components of statevector
-    do k = 1, params%number_data_fields
+    do k = 1, params%n_eqn
         call get_command_argument(2+k, fname_input)
         call read_field(fname_input, k, params, hvy_block, hvy_n)
     enddo
@@ -104,7 +104,7 @@ subroutine post_rhs(params)
     call RHS_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
 
     ! save result to disk
-    do k = 1, params%number_data_fields
+    do k = 1, params%n_eqn
         write( fname,'("rhs",i1,"_", i12.12, ".h5")') k, nint(time * 1.0e6_rk)
 
         call write_field(fname, time, iteration, k, params, lgt_block,&

@@ -40,8 +40,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     ishift = 1
     invalid = .true.
 
-    g = params%number_ghost_nodes
-    Bs = params%number_block_nodes
+    g = params%nr_ghosts
+    Bs = params%Bs
     nDirs = 74
     if (params%dim == 2) nDirs = 16
 
@@ -254,7 +254,7 @@ subroutine get_block_spacing_origin( params, treecode, x0, dx )
     ! loop variables and shortcuts
     integer(kind=ik)                           :: ix,iy,iz,level,bs
 
-    bs = params%number_block_nodes
+    bs = params%Bs
 
     ! fetch this blocks level:
     level = size(treecode)
@@ -302,8 +302,8 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
     !---------------------------------------------------------------------------------------------
 
     ! grid parameter
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
+    Bs    = params%Bs
+    g     = params%nr_ghosts
 
     sh_start = 0
     sh_end   = 0

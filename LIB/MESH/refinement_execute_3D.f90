@@ -74,8 +74,8 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! set MPI parameter
     rank = params%rank
     ! grid parameter
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
+    Bs = params%Bs
+    g  = params%nr_ghosts
 
     ! NOTE: the predictor for the refinement acts on the extended blocks i.e. it
     ! includes the ghost nodes layer. Therefore, you MUST call sync_ghosts before this routine.
@@ -85,7 +85,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     if (.not.allocated(data_predict_coarse)) allocate( data_predict_coarse(Bs+2*g, Bs+2*g, Bs+2*g) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-    if (.not.allocated(new_data)) allocate( new_data(2*Bs-1, 2*Bs-1, 2*Bs-1, params%number_data_fields) )
+    if (.not.allocated(new_data)) allocate( new_data(2*Bs-1, 2*Bs-1, 2*Bs-1, params%n_eqn) )
 
 
 !---------------------------------------------------------------------------------------------
@@ -107,7 +107,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
             ! loop over all data fields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 data_predict_coarse = hvy_block(:, :, :, dF, hvy_active(k) )
                 ! interpolate data
                 call prediction_3D(data_predict_coarse, data_predict_fine, params%order_predictor)
@@ -133,7 +133,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, 1:Bs, dF)
             end do
 
@@ -153,7 +153,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, 1:Bs, dF)
             end do
 
@@ -173,7 +173,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, 1:Bs, dF)
             end do
 
@@ -193,7 +193,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, 1:Bs, dF)
             end do
 
@@ -213,7 +213,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, 1:Bs, Bs:2*Bs-1, dF)
             end do
 
@@ -233,7 +233,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(1:Bs, Bs:2*Bs-1, Bs:2*Bs-1, dF)
             end do
 
@@ -253,7 +253,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, 1:Bs, Bs:2*Bs-1, dF)
             end do
 
@@ -274,7 +274,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
 
             ! save interpolated data, loop over all datafields
-            do dF = 1, params%number_data_fields
+            do dF = 1, params%n_eqn
                 hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, free_heavy_id ) = new_data(Bs:2*Bs-1, Bs:2*Bs-1, Bs:2*Bs-1, dF)
             end do
 

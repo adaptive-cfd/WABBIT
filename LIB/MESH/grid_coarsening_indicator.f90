@@ -59,14 +59,14 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     ! local variables
     integer(kind=ik) :: k, Jmax, neq, lgt_id, Bs, g, mpierr
     ! local block spacing and origin
-    real(kind=rk) :: dx(1:3), x0(1:3), tmp(1:params%number_data_fields)
-    real(kind=rk) :: norm(1:params%number_data_fields)
+    real(kind=rk) :: dx(1:3), x0(1:3), tmp(1:params%n_eqn)
+    real(kind=rk) :: norm(1:params%n_eqn)
 
 
     Jmax = params%max_treelevel
-    neq = params%number_data_fields
-    Bs = params%number_block_nodes
-    g = params%number_ghost_nodes
+    neq = params%n_eqn
+    Bs = params%Bs
+    g = params%nr_ghosts
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n

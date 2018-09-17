@@ -77,7 +77,7 @@ contains
         !------------------------------------------------------------
         ! process rank
         integer(kind=ik)      :: k,file_size
-        integer(kind=ik),save ::counter
+        integer(kind=ik),save ::counter =0
         ! file name
         character(len=80)     :: fname
 

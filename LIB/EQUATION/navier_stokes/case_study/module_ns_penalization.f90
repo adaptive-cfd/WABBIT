@@ -29,6 +29,7 @@ module module_ns_penalization
   use module_navier_stokes_params
   use module_precision
   use module_ini_files_parser_mpi
+  use module_helpers, only:smoothstep
   use mpi
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -42,9 +43,10 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: init_penalization,smoothstep,hardstep,soft_bump,&
+  PUBLIC :: init_penalization,smoothstep,hardstep,soft_bump, &
             soft_bump2,hard_bump,jet_stream,add_penalization_term, &
-            transition,simple_sponge,draw_free_outlet_wall,init_simple_sponge
+            transition,draw_free_outlet_wall, &
+            init_simple_sponge,draw_simple_sponge
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -108,76 +110,32 @@ subroutine init_penalization( params,FILE )
      if (params%mpirank==0) then
       write(*,*)
       write(*,*)
-      write(*,*) "PARAMS: penalization and geometries!"
-      write(*,'(" -----------------------------------")')
+      write(*,*) "PARAMS: penalization!"
+      write(*,'(" ----------------------")')
     endif
     ! =============================================================================
     ! parameters needed for ns_physics module
     ! -----------------------------------------------------------------------------
     call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
+    if (.not.params%penalization)  return
 
-
-    if (params%penalization) then
-      call read_param_mpi(FILE, 'VPM', 'geometry', params%geometry, "cylinder")
-      call read_param_mpi(FILE, 'Sponge', 'C_sponge',  params%C_sp, 0.01_rk )
-      call read_param_mpi(FILE, 'VPM', 'C_eta', params%C_eta, 0.01_rk )
-    else
-      return
-    endif
-
+    call read_param_mpi(FILE, 'Sponge', 'C_sponge',  params%C_sp, 0.01_rk )
+    call read_param_mpi(FILE, 'VPM', 'C_eta', params%C_eta, 0.01_rk )
     ! =============================================================================
     ! parameters needed for penalization only
     ! -----------------------------------------------------------------------------
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', smooth_mask, .true.)
-    call read_param_mpi(FILE, 'VPM', 'geometry', mask_geometry, "cylinder")
     domain_size=params%domain_size
-    call read_param_mpi(FILE,'Sponge', 'C_sponge', C_sp_inv, 0.01_rk )
-        ! read adiabatic coefficient
-    call read_param_mpi(FILE, 'Navier_Stokes', 'gamma_', gamma_, 0.0_rk )
-    ! read specific gas constant
-    call read_param_mpi(FILE, 'Navier_Stokes', 'Rs', Rs, 0.0_rk )
-
+    gamma_=params%gamma_
+    Rs    =params%Rs
     C_eta_inv=1.0_rk/params%C_eta
-    C_sp_inv =1.0_rk/C_sp_inv
+    C_sp_inv =1.0_rk/params%C_sp
     R_domain =domain_size(2)*0.5_rk
 
 end subroutine init_penalization
 
 
 
-
-
-!> \brief reads parameters for sponge initializing a sipmle sponge form file
-!> \details The simple sponge starts at x=0 and ends at x=L_sponge
-subroutine init_simple_sponge( params,FILE )
-    use module_navier_stokes_params
-    implicit none
-    !> pointer to inifile
-    type(inifile) ,intent(inout)       :: FILE
-   !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params
-
-     if (params%mpirank==0) then
-      write(*,*)
-      write(*,*)
-      write(*,*) "PARAMS: init simple sponge!"
-      write(*,'(" -----------------------------------")')
-    endif
-
-    call read_param_mpi(FILE, 'Sponge', 'use_sponge', use_sponge, .false. )
-
-    if (use_sponge) then
-      call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.1_rk )
-      if ( L_sponge<1e-10 ) then
-        L_sponge=0.1*params%domain_size(1)
-      end if
-      call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_sp_inv, 1.0e-2_rk )
-      C_sp_inv=1.0_rk/C_sp_inv
-    else
-      return
-    endif
-
-end subroutine init_simple_sponge
 
 
 
@@ -211,38 +169,6 @@ end subroutine add_penalization_term
 !==========================================================================
 
 
-
-
-!==========================================================================
-  !> \brief This subroutine returns the value f of a smooth step function \n
-  !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
-  !> h is the semi-size of the smoothing area, so \n
-  !> f is 1 if delta<=0-h \n
-  !> f is 0 if delta>0+h \n
-  !> f is variable (smooth) in between
-  !> \details
-  !> \image html maskfunction.bmp "plot of chi(delta)"
-  !> \image latex maskfunction.eps "plot of chi(delta)"
-    function smoothstep(delta,h)
-
-      implicit none
-      real(kind=rk), intent(in)  :: delta,h
-
-      real(kind=rk)              :: smoothstep,f
-      !-------------------------------------------------
-      ! cos shaped smoothing (compact in phys.space)
-      !-------------------------------------------------
-      if (delta<=-h) then
-        f = 1.0_rk
-      elseif ( -h<delta .and. delta<+h  ) then
-        f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
-      else
-        f = 0.0_rk
-      endif
-
-      smoothstep=f
-    end function smoothstep
-!==========================================================================
 
 
 !==========================================================================
@@ -351,53 +277,70 @@ end function transition
 
 
 
+!> \brief reads parameters for sponge initializing a sipmle sponge form file
+!> \details The simple sponge starts at x=0 and ends at x=L_sponge
+subroutine init_simple_sponge( params,FILE )
+    use module_navier_stokes_params
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)       :: FILE
+   !> params structure of navier stokes
+    type(type_params_ns),intent(inout)  :: params
+
+     if (params%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: sponge!"
+      write(*,'(" --------------")')
+    endif
+
+    call read_param_mpi(FILE, 'Sponge', 'use_sponge', use_sponge, .false. )
+
+    if (use_sponge) then
+      call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.1_rk )
+      if ( L_sponge<1e-10 ) then
+        L_sponge=0.1*params%domain_size(1)
+      end if
+      call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_sp_inv, 1.0e-2_rk )
+      C_sp_inv=1.0_rk/C_sp_inv
+    endif
+
+end subroutine init_simple_sponge
+
+
 !> \brief creates the mask of a simple sponge
-subroutine simple_sponge(sponge, x0, dx, Bs, g)
+subroutine draw_simple_sponge(sponge, x0, dx, Bs, g)
 
     implicit none
-
+    !-----------------------------------------------------------------
     ! grid
     integer(kind=ik), intent(in)                              :: Bs, g
     !> sponge term for every grid point of this block
     real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-
+    !-------------------------------------------------------------------
     ! auxiliary variables
     real(kind=rk)                                             :: x
     ! loop variables
     integer(kind=ik)                                          :: ix, iy
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     ! reset sponge array
     sponge = 0.0_rk
-!---------------------------------------------------------------------------------------------
-! main body
     if ( use_sponge .eqv. .false. ) then
       return
     end if
 
 
         do ix=1, Bs+2*g
-            x = dble(ix-(g+1)) * dx(1) + x0(1)
-            do iy=1, Bs+2*g
-
+          x = dble(ix-(g+1)) * dx(1) + x0(1)
+          do iy=1, Bs+2*g
             sponge(ix,iy)=soft_bump2(x,(domain_size(1)-L_sponge),L_sponge,1.5*min(dx(1),dx(2)))
+          end do
+        end do
 
+end subroutine draw_simple_sponge
 
-    !        if ((domain_size(1)-x) <= L_sponge) then
-    !            sponge(ix,iy) = (x-(domain_size(1)-L_sponge))**2
-    !        elseif (x <= L_sponge) then
-    !            sponge(ix,iy) = (x-L_sponge)**2
-    !        else
-    !            sponge(ix,iy) = 0.0_rk
-    !        end if
-       end do
-     end do
-
-end subroutine simple_sponge
 
 
 
@@ -420,7 +363,7 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs+2*g) call abort(745109,"wrong array size, there's pirates, captain!")
 
     ! reset mask array
     mask  = 0.0_rk
@@ -445,8 +388,6 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
     end do
 end subroutine draw_free_outlet_wall
 !==========================================================================
-
-
 
 
 

@@ -435,19 +435,6 @@ contains
 
 
   !-------------------------------------------------------
-  ! short for the smooth step function.
-  ! the smooting is defined in Insect%smooth, here we need only x, and the
-  ! thickness (i.e., in the limit, steps=1 if x<t and steps=0 if x>t
-  !-------------------------------------------------------
-  real(kind=rk) function steps(x, t, h)
-     implicit none
-    real(kind=rk) :: f,x,t, h
-    call smoothstep(f,x,t,h)
-    steps=f
-  end function
-
-
-  !-------------------------------------------------------
   ! Compute angle from coefficients provided by Maeda
   !-------------------------------------------------------
   subroutine get_dangle( angles, F, a, b, shift_phase, initial_phase, dangle, dangle_dt )

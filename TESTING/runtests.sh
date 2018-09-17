@@ -3,8 +3,7 @@
 #--------------------------------
 # WABBIT run unit tests
 #--------------------------------
-rootdir="../"
-cd $rootdir
+
 echo "   "
 echo -e "\t \033[4m WABBIT: run all existing unit tests \033[0m"
 echo "   "
@@ -26,6 +25,8 @@ end_color=$'\033[0m'
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=(
        "---navier-stokes---"
+       "TESTING/navier_stokes/simple_geometry/rhombus/rhombus_moving_shock.sh"
+       "TESTING/navier_stokes/simple_geometry/triangle/triangle_adapt.sh"
        "TESTING/navier_stokes/pressure_blob/2D/pressure_blob.sh"
        "TESTING/navier_stokes/pressure_blob/3D/pressure_blob3D.sh"
        "TESTING/navier_stokes/funnel/2D/ion_funnel_light.sh"

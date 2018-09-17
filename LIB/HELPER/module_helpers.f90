@@ -6,6 +6,13 @@ module module_helpers
     use mpi
     implicit none
 
+    interface smoothstep
+        module procedure smoothstep1, smoothstep2
+    end interface
+
+    ! routines of the interface should be private to hide them from outside this module
+    private :: smoothstep1, smoothstep2
+
 contains
 
     include "rotation_matrices.f90"
@@ -152,6 +159,7 @@ contains
     end subroutine hermite_eval
 
 
+
     function mpisum( a )
         implicit none
         real(kind=rk) :: a_loc, mpisum
@@ -250,7 +258,38 @@ contains
         return
     end function startup_conditioner
 
-    subroutine smoothstep(f,x,t,h)
+    !==========================================================================
+      !> \brief This subroutine returns the value f of a smooth step function \n
+      !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
+      !> h is the semi-size of the smoothing area, so \n
+      !> f is 1 if delta<=0-h \n
+      !> f is 0 if delta>0+h \n
+      !> f is variable (smooth) in between
+      !> \details
+      !> \image html maskfunction.bmp "plot of chi(delta)"
+      !> \image latex maskfunction.eps "plot of chi(delta)"
+        function smoothstep1(delta,h)
+          use module_precision
+          implicit none
+          real(kind=rk), intent(in)  :: delta,h
+          real(kind=rk)              :: smoothstep1,f
+          !-------------------------------------------------
+          ! cos shaped smoothing (compact in phys.space)
+          !-------------------------------------------------
+          if (delta<=-h) then
+            f = 1.0_rk
+          elseif ( -h<delta .and. delta<+h  ) then
+            f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
+          else
+            f = 0.0_rk
+          endif
+
+          smoothstep1=f
+        end function smoothstep1
+    !==========================================================================
+
+
+    function smoothstep2(x,t,h)
         !-------------------------------------------------------------------------------
         !> This subroutine returns the value f of a smooth step function \n
         !> The sharp step function would be 1 if x<=t and 0 if x>t \n
@@ -262,21 +301,21 @@ contains
         use module_precision
 
         implicit none
-        real(kind=rk), intent(out) :: f
         real(kind=rk), intent(in)  :: x,t,h
+        real(kind=rk)              :: smoothstep2
 
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
         if (x<=t-h) then
-            f = 1.0_rk
+            smoothstep2 = 1.0_rk
         elseif (((t-h)<x).and.(x<(t+h))) then
-            f = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
+            smoothstep2 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
         else
-            f = 0.0_rk
+            smoothstep2 = 0.0_rk
         endif
 
-    end subroutine smoothstep
+    end function smoothstep2
 
     ! abort program if file does not exist
     subroutine check_file_exists(fname)

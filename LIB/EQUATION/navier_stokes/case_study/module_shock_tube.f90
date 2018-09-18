@@ -22,7 +22,7 @@ module module_shock_tube
     !**********************************************************************************************
     ! only this functions are visible outside this module
     PUBLIC :: read_params_shock_tube,add_shock_tube,draw_simple_shock, set_inicond_shock_tube, &
-              set_inicond_moving_shock,moving_shockVals, shockVals
+              set_shock_1D,moving_shockVals, shockVals
     !**********************************************************************************************
 
   !> \file
@@ -425,31 +425,32 @@ end subroutine add_simple_shock
 !>    + example: call set_inicond_moving_shock(x0(2), dx(2), Bs, g, phi(:,1,:,:), (/1, 1, 0/), (/2, 3, 0/), 10)
 !>               for a shock wave along the y axis
 !> \details
-subroutine set_inicond_moving_shock(x0, dx, Bs, g, phi, phi_left, phi_right)
+subroutine set_shock_1D(x0, dx, Bs, g, phi, phi_left, phi_right, x0_shock, xLength)
      implicit none
      ! -----------------------------------------------------------------
      integer(kind=ik), intent(in)       :: Bs, g        !< grid parameter
-     real(kind=rk), intent(in)          :: x0(3), dx(3) !< coordinates of block and block spacinf
+     !> NOTE: x0 and dx are only 1D !!! Pass only the coordinates which is perpendicular to the shock front
+     ! shockfront
+     !       |                                         ^ x0(2),dx(2)
+     !       |                                         |
+     !       |----------------> x0(1),dx(1)            |
+     ! left  |  right                                  |
+     !       |                              ___________|____________ shock front
+     !
+     real(kind=rk), intent(in)          :: x0, dx
+     real(kind=rk), intent(in)          :: x0_shock    !< x0_shock is the position of the shock front
+     real(kind=rk), intent(in)          :: xLength     !< xLength is the lenght of the domain interval in the given direction
      real(kind=rk), intent(inout)       :: phi(:,:)    !< Statevector in skew-symetric form : phi([ix|iy|iz],dF)
      !> Statevector values for the left and right side of the shock
-     !>       + phi_[left/right](1) density at the left or right
-     !>       + phi_[left/right](2) velocity at the left or right
-     !>       + phi_[left/right](3) pressure at the left or right
-     real(kind=rk), intent(in)          :: phi_left(3),phi_right(3)
+     !>       + phi_[left/right](rhoF) density at the left or right
+     !>       + phi_[left/right](UxF) velocity at the left or right
+     !>       + phi_[left/right](pF) pressure at the left or right
+     real(kind=rk), intent(in)          :: phi_left(size(phi,2)),phi_right(size(phi,2))
      ! -----------------------------------------------------------------
-     real(kind=rk)            :: width, max_R, x, x0_inicond, b, radius
+     real(kind=rk)            :: x, b
      real(kind=rk)            :: rho_left,u_left,p_left, rho_right, u_right, p_right
      integer(kind=ik)         :: ix
 
-     ! density at the left and right of the shock
-     rho_left = phi_left(1)
-     rho_right= phi_right(1)
-     ! velocity at hte left and right of the shock
-     u_left = phi_left(2)
-     u_right= phi_right(2)
-     ! pressure at hte left and right of the shock
-     p_left = phi_left(3)
-     p_right= phi_right(3)
 
        ! check for usefull inital values
        if ( rho_left<0 .or. rho_right<0 .or.&
@@ -461,26 +462,25 @@ subroutine set_inicond_moving_shock(x0, dx, Bs, g, phi, phi_left, phi_right)
        !   rhoL    | rhoR                  | rhoL
        !   uL      | uR                    | uL
        !   pL      | pR                    | pL
-       ! 0-----------------------------------------Lx
-       !           x0_inicond             x0_inicond+width
-       width       = params_ns%domain_size(1)*(1-params_ns%inicond_width-0.1)
-       x0_inicond  = params_ns%inicond_width*params_ns%domain_size(1)
-       max_R       = width*0.5_rk
+       ! 0-----------------------------------------xLength
+       !           x0_shock                0.95*Length
        do ix=g+1, Bs+g
-          x = dble(ix-(g+1)) * dx(1) + x0(1)
-          call continue_periodic(x,params_ns%domain_size(1))
-          ! left region
-          radius = abs(x-x0_inicond-width*0.5_rk)
-          b      = 0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
-          phi(ix, rhoF) = dsqrt(rho_left)-b*(dsqrt(rho_left)-dsqrt(rho_right))
-          phi(ix, UxF)  = phi(ix,rhoF)*(u_left-b*(u_left-u_right))
-          phi(ix, UyF)  = 0.0_rk
-          phi(ix, pF)   = p_left-b*(p_left - p_right)
-       end do
+          x = dble(ix-(g+1)) * dx + x0
+          ! hard step for the shock and smooth transition in the sponge domain 
+          b      = hardstep(x0_shock -x) - smoothstep(0.95*xLength - x ,0.05*xLength)
+          !   b(x)
+          !   |
+          ! 1 |       ________
+          !   |      |        |
+          ! 0 |______|_ _ _ _ |____________________x
+          !      x0_shock    0.95Lenght
+
+          ! parametrization of the smooth transition from right to left
+          phi(ix,:) = phi_left-b*(phi_left-phi_right)
+        end do
 
 
-
-  end subroutine set_inicond_moving_shock
+  end subroutine set_shock_1D
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

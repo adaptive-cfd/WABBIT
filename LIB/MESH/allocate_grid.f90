@@ -71,7 +71,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     rank            = params%rank
     number_blocks   = params%number_blocks
     Bs              = params%Bs
-    g               = params%nr_ghosts
+    g               = params%n_ghosts
     N_dF            = params%n_eqn
     number_procs    = params%number_procs
     ! the number of work arrays is determined by the requirement for the time stepper

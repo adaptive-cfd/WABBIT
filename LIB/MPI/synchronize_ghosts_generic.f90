@@ -42,7 +42,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     if (hvy_n == 0) return
 
     Bs    = params%Bs
-    g     = params%nr_ghosts
+    g     = params%n_ghosts
     NdF   = params%n_eqn
     N     = params%number_blocks
     myrank  = params%rank
@@ -712,7 +712,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
 
     ! grid parameter
     Bs    = params%Bs
-    g     = params%nr_ghosts
+    g     = params%n_ghosts
 
     if (params%threeD_case ) then
         spaceDirections = 3

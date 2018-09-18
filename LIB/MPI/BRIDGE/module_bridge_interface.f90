@@ -538,10 +538,10 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
       !  write(*,'("hvy_id=",i6,i6,i6)')particle_id(k),params%bridge%myWorldRank,params%number_blocks
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         !!! calculate grid point ibx, iby, ibz
-        ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%nr_ghosts +1
-        iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%nr_ghosts +1
+        ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%n_ghosts +1
+        iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%n_ghosts +1
         if (params%threeD_case) then
-          ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%nr_ghosts +1
+          ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%n_ghosts +1
         else
           ibz = 1
         endif

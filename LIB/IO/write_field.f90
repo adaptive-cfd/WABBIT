@@ -105,7 +105,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! grid parameter
     Bs   = params%Bs
-    g    = params%nr_ghosts
+    g    = params%n_ghosts
     dim  = 2
     if (params%threeD_case) dim = 3
 

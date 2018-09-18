@@ -66,7 +66,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     Jmax = params%max_treelevel
     neq = params%n_eqn
     Bs = params%Bs
-    g = params%nr_ghosts
+    g = params%n_ghosts
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n

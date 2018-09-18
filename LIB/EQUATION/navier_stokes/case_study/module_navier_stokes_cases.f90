@@ -123,6 +123,8 @@ end subroutine set_case_parameters
        call add_geometry2D(penalization(:,:,1,:),x0,dx,Bs,g,phi(:,:,1,:))
      case('funnel')
        call add_funnel(penalization, x0, dx, Bs, g, phi)
+     case('no')
+       return
      case default
        call abort(1201,"ERROR: Come down to earth and tell me what is that:"//params%CASE)
      end select
@@ -163,6 +165,8 @@ end subroutine set_case_parameters
         call draw_funnel(x0, dx, Bs, g, mask,is_colored)
       case('shock_tube')
         call draw_simple_shock(mask(:,:,1), x0, dx, Bs, g,'boundary' )
+      case('no')
+        return  
       case default
         call abort(120601,"ERROR: say whaaaaaaaaaaaaaat, don't know that case:"//params%CASE)
       end select

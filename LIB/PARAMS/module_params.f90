@@ -81,7 +81,7 @@ module module_params
 
         ! grid parameter
         integer(kind=ik)                             :: Bs=0        ! number of block nodes
-        integer(kind=ik)                             :: nr_ghosts=0 ! number of ghost nodes
+        integer(kind=ik)                             :: n_ghosts=0 ! number of ghost nodes
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.

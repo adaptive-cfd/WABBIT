@@ -66,7 +66,7 @@
 !    volume_int = 0.0_rk
 !
 !    Bs = params%Bs
-!    g  = params%nr_ghosts
+!    g  = params%n_ghosts
 !
 ! !---------------------------------------------------------------------------------------------
 ! ! main body

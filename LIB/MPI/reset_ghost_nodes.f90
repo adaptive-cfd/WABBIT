@@ -51,7 +51,7 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
 
     ! grid parameter
     Bs = params%Bs
-    g  = params%nr_ghosts
+    g  = params%n_ghosts
 
 !---------------------------------------------------------------------------------------------
 ! main body

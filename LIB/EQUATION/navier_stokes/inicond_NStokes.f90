@@ -4,7 +4,7 @@
   !-----------------------------------------------------------------------------
   subroutine INICOND_NStokes( time, u, g, x0, dx )
 
-    use module_shock_tube, only : set_inicond_moving_shock,moving_shockVals,shockVals
+    use module_shock_tube, only : set_shock_1D,moving_shockVals,shockVals
 
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
@@ -24,7 +24,8 @@
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     integer(kind=ik)          :: Bs,ix,iy,iz,dF
-    real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,T_init
+    real(kind=rk)             :: x,y_rel,tmp(1:3),b,mach,T_init,&
+                                left(size(u,4)),right(size(u,4)),phi_init(size(u,4))
     real(kind=rk),allocatable:: mask(:,:,:) ! we dont save this datafield, since it is only called once
 
     ! compute the size of blocks
@@ -56,12 +57,16 @@
     !------------------------------------------------------------------
     ! if set_inicond_case is .false. we provide some generic initial
     ! conditions here, which are available for every case study.
-    p_init    =params_ns%initial_pressure
-    rho_init  =params_ns%initial_density
-    u_init    =params_ns%initial_velocity
+    phi_init(pF)    =params_ns%initial_pressure
+    phi_init(rhoF)  =params_ns%initial_density
+    phi_init(UxF)    =params_ns%initial_velocity(1)
+    phi_init(UyF)    =params_ns%initial_velocity(2)
+    if (params_ns%dim==3) then
+      phi_init(UzF)    =params_ns%initial_velocity(3)
+    end if
     T_init    =params_ns%initial_temp
     ! check if the input values of the initial conditions make sense
-    if (p_init<=0.0_rk .or. rho_init <=0.0) then
+    if (phi_init(pF)<=0.0_rk .or. phi_init(rhoF) <=0.0) then
       call abort(6032,  "Error [module_navier_stokes.f90]: initial pressure and density "//&
       "must be larger then 0")
     endif
@@ -77,39 +82,57 @@
     case ("zeros")
       ! add ambient pressure
       u( :, :, :, pF)   = params_ns%initial_pressure
-      u( :, :, :, rhoF) = sqrt(rho_init)
+      u( :, :, :, rhoF) = sqrt(phi_init(rhoF))
       u( :, :, :, UxF)  = 0.0_rk
       u( :, :, :, UyF)  = 0.0_rk
       if (params_ns%dim==3)  u( :, :, :, UzF) = 0.0_rk
 
     case ("standing-shock","moving-shock")
-      ! chooses values such that shock should not move
-      ! in space according to initial conditions
+      ! following values are imposed and smoothed with tangens:
+      ! ------------------------------------------
+      !   rhoL    | rhoR                  | rho
+      !   uL      | uR                    | uL
+      !   pL      | pR                    | pL
+      ! 0-----------------------------------------xLength
+      !           x0_shock                0.95*Length
+      ! reset the statevector values left and right of the shock
+      right=0
+      left =0
+      ! compute the values from the initial conditions which have been read from params file
       if ( params_ns%inicond == "standing-shock" ) then
-        call shockVals(rho_init,u_init(1)*0.5_rk,p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
+        ! in shockVals we compute the shock values of the other side (i.e right) of the shock
+        call shockVals(phi_init(rhoF),phi_init(UxF),phi_init(pF),right(rhoF),right(UxF),right(pF),params_ns%gamma_)
       else
-        call moving_shockVals(rho_init,u_init(1),p_init, &
-                             tmp(1),tmp(2),tmp(3),params_ns%gamma_,params_ns%machnumber)
-        params_ns%initial_velocity(1)=u_init(1)
+        ! compute the shockVals of the left and right values
+        call moving_shockVals(phi_init(rhoF),phi_init(UxF),phi_init(pF), right(rhoF),right(UxF),right(pF) &
+                              ,params_ns%gamma_,params_ns%machnumber)
+        params_ns%initial_velocity(1)=phi_init(UxF)
       end if
+
+      left     =phi_init  ! the values to the left of the shock are taken from the ini file
+      left(UyF)= 0        ! make sure that only the z and y component of the velocity is 0
+      if (params_ns%dim==3) left(UzF)= 0        ! make sure that only the z and y component of the velocity is 0
+
       ! check for usefull inital values
-      if ( tmp(1)<0 .or. tmp(3)<0 ) then
-        write(*,*) "rho_right=",tmp(1), "p_right=",tmp(3)
-        call abort(3572,"ERROR [module_navier_stokes.f90]: initial values are insufficient for simple-shock")
+      if ( right(rhoF)<0 .or. right(pF)<0 ) then
+        call abort(3572,"ERROR: initial values are insufficient for simple-shock")
       end if
     ! the shock tube is only 1D, therefore we loop over the second component in 2D and
     ! 2cnd and 3rd component in 3D
     if (params_ns%dim==3) then
       do iz = 1, Bs+2*g
         do iy = 1, Bs+2*g
-          call set_inicond_moving_shock(x0, dx, Bs, g, u(:,iy,iz,:), (/rho_init, u_init(1),p_init /), tmp)
+          call set_shock_1D(x0(1), dx(1), Bs, g, u(:,iy,iz,:), &
+           left, right, params_ns%inicond_width,params_ns%domain_size(1))
         end do
       end do
     else
       do iy = 1, Bs+2*g
-        call set_inicond_moving_shock(x0, dx, Bs, g, u(:,iy,1,:), (/rho_init, u_init(1),p_init /), tmp)
+        call set_shock_1D(x0(1), dx(1), Bs, g, u(:,iy,1,:), left, right, &
+                          params_ns%inicond_width, params_ns%domain_size(1))
       end do
     endif
+    call pack_statevector(u,'pure_variables')
 
     case ("mask")
       if (.not. params_ns%penalization) call abort(110918,"SAY WHAAAT? can't hear you! Please switch on penalization for inicond mask!")
@@ -118,12 +141,12 @@
       ! set velocity field u(x)=1 for x in mask
       ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
       call get_mask(params_ns, x0, dx, Bs, g , mask)
-      u( :, :, :, pF) = rho_init*params_ns%Rs*T_init
-      u( :, :, :, rhoF) = sqrt(rho_init)
-      u( :, :, :, UxF) = ( 1 - mask ) * u_init(1)*sqrt(rho_init) !flow in x
-      u( :, :, :, UyF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in y
+      u( :, :, :, pF) = phi_init(rhoF)*params_ns%Rs*T_init
+      u( :, :, :, rhoF) = sqrt(phi_init(rhoF))
+      u( :, :, :, UxF) = ( 1 - mask ) * phi_init(UxF)*sqrt(phi_init(rhoF)) !flow in x
+      u( :, :, :, UyF) = (1-mask)*phi_init(UyF)*sqrt(phi_init(rhoF)) !flow in y
       if (params_ns%dim==3) then
-        u( :, :, :, UzF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in z
+        u( :, :, :, UzF) = (1-mask)*phi_init(UyF)*sqrt(phi_init(rhoF)) !flow in z
       endif
 
     case ("pressure_blob")
@@ -131,15 +154,15 @@
         ! initial value of the pressure.
         ! all other statevariables are set constant to the intial values
         call gauss_function( params_ns%inicond_width,params_ns%dim, &
-                                Bs,g, params_ns%domain_size, u(:,:,:,pF), x0, dx, p_init)
-        u( :, :, :, rhoF)= sqrt(rho_init)
+                                Bs,g, params_ns%domain_size, u(:,:,:,pF), x0, dx, phi_init(pF))
+        u( :, :, :, rhoF)= sqrt(phi_init(rhoF))
         if (params_ns%dim==3) then
-          u( :, :, :, UxF) = u_init(1)*sqrt(rho_init)
-          u( :, :, :, UyF) = u_init(2)*sqrt(rho_init)
-          u( :, :, :, UzF) = u_init(3)*sqrt(rho_init)
+          u( :, :, :, UxF) = phi_init(UxF)*sqrt(phi_init(rhoF))
+          u( :, :, :, UyF) = phi_init(UyF)*sqrt(phi_init(rhoF))
+          u( :, :, :, UzF) = phi_init(UzF)*sqrt(phi_init(rhoF))
         else
-          u( :, :, :, UxF) = u_init(1)*sqrt(rho_init)
-          u( :, :, :, UyF) = u_init(2)*sqrt(rho_init)
+          u( :, :, :, UxF) = phi_init(UxF)*sqrt(phi_init(rhoF))
+          u( :, :, :, UyF) = phi_init(UyF)*sqrt(phi_init(rhoF))
         endif
     case default
         call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))

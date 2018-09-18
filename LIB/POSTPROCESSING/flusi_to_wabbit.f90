@@ -83,7 +83,7 @@ subroutine flusi_to_wabbit(params)
         params%domain_size(1) = domain(2)
         params%domain_size(2) = domain(3)
         params%Bs = Bs
-        params%nr_ghosts = 1_ik
+        params%n_ghosts = 1_ik
         params%order_predictor = 'multiresolution_4th'
         if (params%threeD_case) then
             lgt_n = 8_ik**params%max_treelevel

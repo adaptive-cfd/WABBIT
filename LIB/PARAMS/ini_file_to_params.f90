@@ -174,7 +174,7 @@ subroutine ini_file_to_params( params, filename )
             endif
 
             Bs      = params%Bs
-            g       = params%nr_ghosts
+            g       = params%n_ghosts
             Neqn    = params%n_eqn
             Nrk     = max( Neqn*size(params%butcher_tableau,1), params%N_fields_saved )
             nstages = 2.0
@@ -204,13 +204,13 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    if ( (params%nr_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
+    if ( (params%n_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%nr_ghosts < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%nr_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
@@ -307,7 +307,7 @@ end subroutine ini_file_to_params
     ! read number_block_nodes
     call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%Bs, 1 )
     ! read number_ghost_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%nr_ghosts, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     ! read number_blocks
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
 

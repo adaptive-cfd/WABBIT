@@ -67,7 +67,11 @@ module module_simple_geometry
 contains
 
 
+!=========================================================================================
+! INITIALIZATIONs
+!=========================================================================================
 
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !> \brief reads parameters for mask function from file
 subroutine read_params_geometry( params,FILE )
     implicit none
@@ -111,9 +115,76 @@ subroutine read_params_geometry( params,FILE )
       call abort(111109,"Error inicond ["//trim(params%inicond)//"] not available for this case!")
     endif
 end subroutine read_params_geometry
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!> \brief reads parameters for mask function from file
+subroutine init_vortex_street(FILE)
+
+  implicit none
+ ! character(len=*), intent(in) :: filename
+  type(inifile) , intent(inout) :: FILE
+  character(len=*),parameter         :: section='simple_geometry'
+
+  call read_param_mpi(FILE, section, 'x_cntr', cyl%x_cntr,(/ 0.25_rk , 0.5_rk/) )
+  call read_param_mpi(FILE, section, 'length', cyl%radius,0.05_rk*min(params_ns%domain_size(1),params_ns%domain_size(2)) )
+  cyl%radius=cyl%radius*0.5_rk
+  cyl%x_cntr(1)=cyl%x_cntr(1)*params_ns%domain_size(1)
+  cyl%x_cntr(2)=cyl%x_cntr(2)*params_ns%domain_size(2)
+end subroutine init_vortex_street
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!> \brief reads parameters for mask function from file
+subroutine init_triangle(params,FILE)
+
+ implicit none
+ !> params structure of navier stokes
+  type(type_params_ns),intent(inout)  :: params
+! character(len=*), intent(in) :: filename
+ type(inifile) , intent(inout) :: FILE
+ character(len=*),parameter         :: section='simple_geometry'
+
+ ! read in the angle between the symmetry axis and the triangle side
+ call read_param_mpi(FILE, section, 'angle', triangle%angle, 30.0_rk )
+ call read_param_mpi(FILE, section, 'x_cntr', triangle%x_cntr, (/0.2_rk, 0.5_rk, 0.0_rk/) )
+ call read_param_mpi(FILE, section, 'length', triangle%length, 0.1*params%domain_size(1) )
+
+ ! convert degrees to radians
+ if ( triangle%angle>0.0_rk .and. triangle%angle<90.0_rk ) then
+   triangle%angle=triangle%angle*PI/180.0_rk
+ else
+   call abort(45756,"somebody has to go back to preeshool! 0< angle <90")
+ end if
+
+ !convert from height to length
+ triangle%length=triangle%length/(2*tan(triangle%angle))
+
+ ! a rhombus is only a double triangle
+ if ( mask_geometry=="rhombus" ) then
+   triangle%rhombus    =.true.
+ else
+   triangle%rhombus    =.false.
+ end if
+
+ if (triangle%x_cntr(1)>1.0_rk .or. triangle%x_cntr(1)<0.0_rk ) then
+   triangle%x_cntr(1) =0.2_rk
+ end if
+
+ if (triangle%x_cntr(2)>1.0_rk .or. triangle%x_cntr(2)<0.0_rk ) then
+     triangle%x_cntr(2) =0.5_rk
+ end if
+ triangle%x_cntr(1)=triangle%x_cntr(1)*params%domain_size(1)
+ triangle%x_cntr(2)=triangle%x_cntr(2)*params%domain_size(2)
+ triangle%x_cntr(3)=triangle%x_cntr(3)*params%domain_size(3)
+
+end subroutine init_triangle
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+!=========================================================================================
 
 
 
@@ -237,20 +308,6 @@ end subroutine draw_geometry
 !==========================================================================
 
 
-!> \brief reads parameters for mask function from file
-subroutine init_vortex_street(FILE)
-
-  implicit none
- ! character(len=*), intent(in) :: filename
-  type(inifile) , intent(inout) :: FILE
-  character(len=*),parameter         :: section='simple_geometry'
-
-  call read_param_mpi(FILE, section, 'x_cntr', cyl%x_cntr,(/ 0.25_rk , 0.5_rk/) )
-  call read_param_mpi(FILE, section, 'length', cyl%radius,0.05_rk*min(params_ns%domain_size(1),params_ns%domain_size(2)) )
-  cyl%radius=cyl%radius*0.5_rk
-  cyl%x_cntr(1)=cyl%x_cntr(1)*params_ns%domain_size(1)
-  cyl%x_cntr(2)=cyl%x_cntr(2)*params_ns%domain_size(2)
-end subroutine init_vortex_street
 
 
 
@@ -293,51 +350,6 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 end subroutine draw_cylinder
 !==========================================================================
 
-
-!> \brief reads parameters for mask function from file
-subroutine init_triangle(params,FILE)
-
- implicit none
- !> params structure of navier stokes
-  type(type_params_ns),intent(inout)  :: params
-! character(len=*), intent(in) :: filename
- type(inifile) , intent(inout) :: FILE
- character(len=*),parameter         :: section='simple_geometry'
-
- ! read in the angle between the symmetry axis and the triangle side
- call read_param_mpi(FILE, section, 'angle', triangle%angle, 30.0_rk )
- call read_param_mpi(FILE, section, 'x_cntr', triangle%x_cntr, (/0.2_rk, 0.5_rk, 0.0_rk/) )
- call read_param_mpi(FILE, section, 'length', triangle%length, 0.1*params%domain_size(1) )
-
- ! convert degrees to radians
- if ( triangle%angle>0.0_rk .and. triangle%angle<90.0_rk ) then
-   triangle%angle=triangle%angle*PI/180.0_rk
- else
-   call abort(45756,"somebody has to go back to preeshool! 0< angle <90")
- end if
-
- !convert from height to length
- triangle%length=triangle%length/(2*tan(triangle%angle))
-
- ! a rhombus is only a double triangle
- if ( mask_geometry=="rhombus" ) then
-   triangle%rhombus    =.true.
- else
-   triangle%rhombus    =.false.
- end if
-
- if (triangle%x_cntr(1)>1.0_rk .or. triangle%x_cntr(1)<0.0_rk ) then
-   triangle%x_cntr(1) =0.2_rk
- end if
-
- if (triangle%x_cntr(2)>1.0_rk .or. triangle%x_cntr(2)<0.0_rk ) then
-     triangle%x_cntr(2) =0.5_rk
- end if
- triangle%x_cntr(1)=triangle%x_cntr(1)*params%domain_size(1)
- triangle%x_cntr(2)=triangle%x_cntr(2)*params%domain_size(2)
- triangle%x_cntr(3)=triangle%x_cntr(3)*params%domain_size(3)
-
-end subroutine init_triangle
 
 
 

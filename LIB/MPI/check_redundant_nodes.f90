@@ -51,7 +51,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     stop_status = .false.
 
     Bs       = params%Bs
-    g        = params%nr_ghosts
+    g        = params%n_ghosts
     NdF      = params%n_eqn
     N        = params%number_blocks
     myrank   = params%rank
@@ -214,7 +214,7 @@ subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_s
     real(kind=rk)       :: error_norm
 
     Bs = params%Bs
-    g = params%nr_ghosts
+    g = params%n_ghosts
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -233,7 +233,7 @@ subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_s
     ! if g is odd, then we must compare the even ones
     ! Further note that BS is odd (always), so as odd+even=odd and odd+odd=even
     ! we can simply study the parity of g
-    oddeven = mod(params%nr_ghosts,2)
+    oddeven = mod(params%n_ghosts,2)
 
 !---------------------------------------------------------------------------------------------
 ! main body

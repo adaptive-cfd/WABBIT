@@ -72,7 +72,7 @@ subroutine keyvalues(fname, params)
     params%Bs = Bs
     params%max_treelevel = tc_length
     params%n_eqn = 1
-    params%nr_ghosts = 0
+    params%n_ghosts = 0
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)

@@ -70,7 +70,7 @@ subroutine post_mean(params)
 
     params%Bs = Bs
     params%n_eqn = 1
-    params%nr_ghosts = 0
+    params%n_ghosts = 0
     g = 0
     params%max_treelevel = tc_length
     params%domain_size(1) = domain(1)

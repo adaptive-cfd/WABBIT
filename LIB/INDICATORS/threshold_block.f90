@@ -64,7 +64,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     t0 = MPI_Wtime()
     ! grid parameter
     Bs = params%Bs
-    g  = params%nr_ghosts
+    g  = params%n_ghosts
 
 
     ! reset detail

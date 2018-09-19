@@ -75,7 +75,7 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     rank  = params%rank
     ! grid parameter
     Bs = params%Bs
-    g  = params%nr_ghosts
+    g  = params%n_ghosts
 
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields

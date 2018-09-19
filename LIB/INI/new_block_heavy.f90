@@ -58,7 +58,7 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi)
 
     ! set parameters for readability
     Bs              = params%Bs
-    g               = params%nr_ghosts
+    g               = params%n_ghosts
     dF              = params%n_eqn
 
 !---------------------------------------------------------------------------------------------

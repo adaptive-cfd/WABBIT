@@ -40,7 +40,7 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     ishift = 1
     invalid = .true.
 
-    g = params%nr_ghosts
+    g = params%n_ghosts
     Bs = params%Bs
     nDirs = 74
     if (params%dim == 2) nDirs = 16
@@ -303,7 +303,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
 
     ! grid parameter
     Bs    = params%Bs
-    g     = params%nr_ghosts
+    g     = params%n_ghosts
 
     sh_start = 0
     sh_end   = 0

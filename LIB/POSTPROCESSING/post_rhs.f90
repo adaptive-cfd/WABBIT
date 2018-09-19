@@ -73,7 +73,7 @@ subroutine post_rhs(params)
     !> \todo change that for 3d case
     params%number_blocks = 4*lgt_n/params%number_procs
     Bs = params%Bs
-    g = params%nr_ghosts
+    g = params%n_ghosts
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &

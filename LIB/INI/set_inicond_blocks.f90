@@ -41,7 +41,7 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, h
   !---------------------------------------------------------------------------------------------
   ! variables initialization
     Bs    = params%Bs
-    g     = params%nr_ghosts
+    g     = params%n_ghosts
 
   !---------------------------------------------------------------------------------------------
   ! main body

@@ -197,6 +197,13 @@ end subroutine add_penalization_term
 
 
 
+!> This function computes a normalized boxcar function
+!   f(x)
+!   |
+! 1 |       ________
+!   |      |        |
+! 0 |______|_ _ _ _ |____________________x
+!         x0        x0+width
 
 function hard_bump(x,x0,width)
 
@@ -212,7 +219,16 @@ function hard_bump(x,x0,width)
 end function hard_bump
 
 
-
+!> \brief
+!> Thif function is the smooth version of hard_bump
+!   f(x)
+!   |
+! 1 |       ________
+!   |      |        |
+! 0 |______|_ _ _ _ |____________________x
+!         x0        x0+width
+!> \details
+!> NOTE: the smoothing layer is centered at x0 and x0+width (compare to soft_bump2)
 function soft_bump(x,x0,width,h)
 
   real(kind=rk), intent(in)      :: x, x0, h, width
@@ -232,6 +248,20 @@ function soft_bump(x,x0,width,h)
 
 end function soft_bump
 
+
+
+!> \brief
+!> Thif function is the smooth version of hard_bump
+!   f(x)
+!   |
+! 1 |       ________
+!   |      |        |
+! 0 |______|_ _ _ _ |____________________x
+!         x0        x0+width
+!> \details
+!> NOTE: the smoothing layer at x0 is starting x0 and ends at x0+h ,
+!> respectively the smoothing arround x0+width starts at x0+width-h and ends at x0+width
+!> (compare to soft_bump2)
 function soft_bump2(x,x0,width,h)
 
   real(kind=rk), intent(in)      :: x, x0, h, width

@@ -262,10 +262,11 @@ doc:
 test:
 	./TESTING/runtests.sh
 
-#check-environment:
-#ifndef PKG_CONFIG_PATH
-#$(error Please export PKG_CONFIG_PATH before compiling PiG)
-#endif
+check-environment:
+ifndef HDF_ROOT
+$(error Please export HDF_ROOT before compiling WABBIT)
+endif
+
 # If the object directory doesn't exist, create it.
 .PHONY: directories
 

@@ -138,7 +138,7 @@ subroutine init_ghost_nodes( params )
     if (.not. ghost_nodes_module_ready) then
         number_blocks   = params%number_blocks
         Bs              = params%Bs
-        g               = params%nr_ghosts
+        g               = params%n_ghosts
         Neqn            = params%n_eqn
         rank            = params%rank
         Ncpu            = params%number_procs

@@ -53,7 +53,7 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
 
     ! grid parameter
     Bs    = params%Bs
-    g     = params%nr_ghosts
+    g     = params%n_ghosts
 
 
     do k = 1, hvy_n

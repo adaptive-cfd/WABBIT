@@ -69,7 +69,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
 
     ! grid parameter
     Bs    = params%Bs
-    g     = params%nr_ghosts
+    g     = params%n_ghosts
 
 !---------------------------------------------------------------------------------------------
 ! main body

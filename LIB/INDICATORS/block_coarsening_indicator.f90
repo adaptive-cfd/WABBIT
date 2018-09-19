@@ -59,7 +59,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 
     Jmax = params%max_treelevel
     Bs = params%Bs
-    g = params%nr_ghosts
+    g = params%n_ghosts
 
 
 !---------------------------------------------------------------------------------------------

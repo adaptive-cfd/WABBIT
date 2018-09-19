@@ -56,10 +56,10 @@ subroutine sparse_to_dense(params)
     call get_command_argument(5, order)
     if (order == "4") then
         params%order_predictor = "multiresolution_4th"
-        params%nr_ghosts = 4_ik
+        params%n_ghosts = 4_ik
     elseif (order == "2") then
         params%order_predictor = "multiresolution_2nd"
-        params%nr_ghosts = 2_ik
+        params%n_ghosts = 2_ik
     else
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if

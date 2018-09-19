@@ -107,7 +107,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
 
 !----------------------------------------------------------------------------
   Bs = params%Bs
-  g  = params%nr_ghosts
+  g  = params%n_ghosts
   ! this is necessary in 2D because flusi data is organised as field(1,1:Bs_f,1:Bs_f)
   ! whereas in wabbit the field has only one component in z direction
   if (.not. params%threeD_case) allocate(blockbuffer(1,0:Bs-1,0:Bs-1))

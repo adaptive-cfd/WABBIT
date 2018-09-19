@@ -46,7 +46,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   ! number of blocks to be merged
   N_merge = size(lgt_blocks_to_merge,1)
   Bs = params%Bs
-  g  = params%nr_ghosts
+  g  = params%n_ghosts
   maxtL = params%max_treelevel
   ! level of merged block
   level = lgt_block( lgt_blocks_to_merge(1), maxtL + idx_mesh_lvl )

@@ -75,7 +75,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     rank = params%rank
     ! grid parameter
     Bs = params%Bs
-    g  = params%nr_ghosts
+    g  = params%n_ghosts
 
     ! NOTE: the predictor for the refinement acts on the extended blocks i.e. it
     ! includes the ghost nodes layer. Therefore, you MUST call sync_ghosts before this routine.

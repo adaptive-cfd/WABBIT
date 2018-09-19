@@ -76,12 +76,12 @@ subroutine compute_vorticity_post(params)
     if (order == "4") then
         params%order_discretization = "FD_4th_central_optimized"
         params%order_predictor = "multiresolution_4th"
-        params%nr_ghosts = 4_ik
+        params%n_ghosts = 4_ik
 
     elseif (order == "2") then
         params%order_discretization = "FD_2nd_central"
         params%order_predictor = "multiresolution_2nd"
-        params%nr_ghosts = 2_ik
+        params%n_ghosts = 2_ik
 
     else
         call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
@@ -127,12 +127,12 @@ subroutine compute_vorticity_post(params)
         if (params%threeD_case) then
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
             hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
-            dx, params%Bs, params%nr_ghosts,&
+            dx, params%Bs, params%n_ghosts,&
             params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
         else
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
             hvy_block(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)),&
-            dx, params%Bs, params%nr_ghosts, &
+            dx, params%Bs, params%n_ghosts, &
             params%order_discretization, hvy_work(:,:,:,:,hvy_active(k)))
         end if
     end do

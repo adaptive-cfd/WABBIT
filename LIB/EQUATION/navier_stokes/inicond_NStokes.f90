@@ -4,7 +4,7 @@
   !-----------------------------------------------------------------------------
   subroutine INICOND_NStokes( time, u, g, x0, dx )
 
-    use module_shock_tube, only : set_shock_1D,moving_shockVals,shockVals
+    use module_shock, only : set_shock_1D,moving_shockVals,standing_shockVals
 
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
@@ -100,10 +100,10 @@
       left =0
       ! compute the values from the initial conditions which have been read from params file
       if ( params_ns%inicond == "standing-shock" ) then
-        ! in shockVals we compute the shock values of the other side (i.e right) of the shock
-        call shockVals(phi_init(rhoF),phi_init(UxF),phi_init(pF),right(rhoF),right(UxF),right(pF),params_ns%gamma_)
+        ! in standing_shockVals we compute the shock values of the other side (i.e right) of the shock
+        call standing_shockVals(phi_init(rhoF),phi_init(UxF),phi_init(pF),right(rhoF),right(UxF),right(pF),params_ns%gamma_)
       else
-        ! compute the shockVals of the left and right values
+        ! compute the standing_shockVals of the left and right values
         call moving_shockVals(phi_init(rhoF),phi_init(UxF),phi_init(pF), right(rhoF),right(UxF),right(pF) &
                               ,params_ns%gamma_,params_ns%machnumber)
         params_ns%initial_velocity(1)=phi_init(UxF)

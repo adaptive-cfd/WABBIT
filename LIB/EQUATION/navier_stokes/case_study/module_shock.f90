@@ -7,7 +7,7 @@
 !> \date 10.08.2018 - creation of the module
 !----------------------------------------------------------------
 
-module module_shock_tube
+module module_shock
 
     use module_navier_stokes_params
     use module_precision
@@ -22,7 +22,7 @@ module module_shock_tube
     !**********************************************************************************************
     ! only this functions are visible outside this module
     PUBLIC :: read_params_shock_tube,add_shock_tube,draw_simple_shock, set_inicond_shock_tube, &
-              set_shock_1D,moving_shockVals, shockVals
+              set_shock_1D,moving_shockVals, standing_shockVals
     !**********************************************************************************************
 
   !> \file
@@ -86,8 +86,8 @@ contains
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   !> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
   !> values \f$\rho_2,u_2,p_2\f$ on the ohter side
-  !> of the shock
-  subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
+  !> of the shock to generate a standing shock front
+  subroutine standing_shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
       implicit none
       !> one side of the shock (density, velocity, pressure)
       real(kind=rk), intent(in)      ::rho1,u1,p1
@@ -102,7 +102,7 @@ contains
       u2 = cstar_sq /u1;
       rho2 = (rho1*u1)/u2;
       p2= (p1+ rho1*u1**2 )-rho2*u2**2;
-  end subroutine shockVals
+  end subroutine standing_shockVals
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -139,7 +139,7 @@ subroutine read_params_shock_tube( params,FILE )
         call read_param_mpi(FILE, 'Shock_Tube', 'velocity_left', shock%u_left, 3.0_rk )
         call read_param_mpi(FILE, 'Shock_Tube', 'density_left', shock%rho_left, 2.0_rk )
         ! from the initial values we calculate the values of the other side of the shock
-        call shockVals( shock%rho_left,shock%u_left,shock%p_left, &
+        call standing_shockVals( shock%rho_left,shock%u_left,shock%p_left, &
                         shock%rho_right,shock%u_right,shock%p_right,params%gamma_)
     case('sod_shock_tube')
       ! Sods test case: shock tube
@@ -466,7 +466,7 @@ subroutine set_shock_1D(x0, dx, Bs, g, phi, phi_left, phi_right, x0_shock, xLeng
        !           x0_shock                0.95*Length
        do ix=g+1, Bs+g
           x = dble(ix-(g+1)) * dx + x0
-          ! hard step for the shock and smooth transition in the sponge domain 
+          ! hard step for the shock and smooth transition in the sponge domain
           b      = hardstep(x0_shock -x) - smoothstep(0.95*xLength - x ,0.05*xLength)
           !   b(x)
           !   |
@@ -486,4 +486,4 @@ subroutine set_shock_1D(x0, dx, Bs, g, phi, phi_left, phi_right, x0_shock, xLeng
 
 
 
-end module module_shock_tube
+end module module_shock

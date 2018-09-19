@@ -105,7 +105,7 @@ contains
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
     ! initialice parameters and fields of the specific case study
-    call set_case_parameters( params_ns , FILE )
+    call read_case_parameters( params_ns , FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
     call add_info(params_ns)
 

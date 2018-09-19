@@ -61,12 +61,12 @@ module module_funnel
 ! identifyers of the different parts of the funnel
 ! they are used in the array mask_color
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  integer(kind=2),save :: color_capillary  =6
-  integer(kind=2),save :: color_outlet     =5
-  integer(kind=2),save :: color_plates     =4
-  integer(kind=2),save :: color_walls      =3
-  integer(kind=2),save :: color_pumps      =2
-  integer(kind=2),save :: color_pumps_sink =1
+  integer(kind=2),parameter :: color_capillary  =6
+  integer(kind=2),parameter :: color_outlet     =5
+  integer(kind=2),parameter :: color_plates     =4
+  integer(kind=2),parameter :: color_walls      =3
+  integer(kind=2),parameter :: color_pumps      =2
+  integer(kind=2),parameter :: color_pumps_sink =1
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

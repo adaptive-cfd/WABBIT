@@ -57,43 +57,6 @@ module module_ns_penalization
   ! radius of domain (Ly/2)
   real(kind=rk),                     save        :: R_domain
   real(kind=rk),                     save        :: Rs,gamma_
-  !------------------------------------------------
-  !> \file
-  !> \details
-  !> Available mask geometrys
-  !! ------------------------
-  !!
-  !!    | geometry    | geometrical properties                             |
-  !!    |-------------|----------------------------------------------------|
-  !!    | \b cylinder |   \c x_cntr(1:2),\c radius                              |
-  !!    | \b funnel   |   \c offset(1:2),\c Nr_plates, \c dx_plates,\c diameter_slope  \c dout, \c dmin \c dmax,\c Nr_plates, \c dx_plates  |
-  !!    | \b fplate   |   \c x_0(1:2),\c R_in, \c R_out , \c width         |
-  !!     ------------------------------------------
-  type :: type_cylinder
-      real(kind=rk), dimension(2) :: x_cntr
-      real(kind=rk)               :: radius
-  end type type_cylinder
-
-
-  type :: type_triangle
-      real(kind=rk), dimension(3) :: x_cntr
-      real(kind=rk)               :: length
-      real(kind=rk)               :: angle
-      logical                     :: rhombus
-  end type type_triangle
-
-  type :: type_shock_params
-      real(kind=rk) :: rho_left,u_left,p_left
-      real(kind=rk) :: rho_right,u_right,p_right
-  end type type_shock_params
-
-
-
-  !------------------------------------------------
-  type(type_cylinder) , save :: cyl
-  type(type_triangle) , save :: triangle
-  type(type_shock_params) , save :: shock_params
-  !------------------------------------------------
 
 contains
 

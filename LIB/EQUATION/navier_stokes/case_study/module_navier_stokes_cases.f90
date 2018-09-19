@@ -11,7 +11,7 @@ module module_navier_stokes_cases
     use module_funnel
     use module_ns_penalization
     use module_simple_geometry
-    use module_shock_tube
+    use module_shock
 
 
     implicit none
@@ -21,7 +21,7 @@ module module_navier_stokes_cases
     !***************************************************************
     ! routines visible outside this module
     !***************************************************************
-    PUBLIC :: set_case_parameters, set_inicond_case, add_constraints, get_mask
+    PUBLIC :: read_case_parameters, set_inicond_case, add_constraints, get_mask
     !***************************************************************
 contains
 
@@ -29,7 +29,7 @@ contains
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !> In this subroutine you should read in the necessary parameters of your study.
 !> Furthermore you can choose a geometry for the volume penalization.
- subroutine set_case_parameters( params , FILE )
+ subroutine read_case_parameters( params , FILE )
   implicit none
   !--------------------------------------------------------
   type(inifile)       ,intent(inout)   :: FILE         !< filepointer
@@ -49,7 +49,7 @@ contains
     call abort(1992132,'Computer says NOOOOOOOOOOOOOO! ~Little Britain~')
   end select
 
-end subroutine set_case_parameters
+end subroutine read_case_parameters
  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -166,7 +166,7 @@ end subroutine set_case_parameters
       case('shock_tube')
         call draw_simple_shock(mask(:,:,1), x0, dx, Bs, g,'boundary' )
       case('no')
-        return  
+        return
       case default
         call abort(120601,"ERROR: say whaaaaaaaaaaaaaat, don't know that case:"//params%CASE)
       end select

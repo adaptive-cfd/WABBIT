@@ -194,6 +194,11 @@ subroutine ini_file_to_params( params, filename )
                 write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
                 params%number_blocks*params%number_procs
             endif
+
+            if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**d)) then
+                call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
+                & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
+            endif
         endif
     end do
 
@@ -276,7 +281,7 @@ end subroutine ini_file_to_params
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")
     endif
-    
+
     params%domain_size=(/ 1.0_rk, 1.0_rk, 0.0_rk /) !default
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
                                                        params%domain_size(1:params%dim) )

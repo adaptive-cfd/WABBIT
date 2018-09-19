@@ -146,7 +146,7 @@ module module_navier_stokes_params
   ! statevector index
   integer(kind=ik) ,save,public :: rhoF=-1,UxF=-1,UyF=-1,UzF=-1,pF=-1
 
-  type(type_params_ns)          :: params_ns
+  type(type_params_ns), save :: params_ns
 
 contains
 

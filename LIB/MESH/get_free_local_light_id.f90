@@ -20,7 +20,7 @@
 !
 ! ********************************************************************************************
 
-subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt_active, lgt_n )
+subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt_active, lgt_n, ignore_error )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -45,10 +45,13 @@ subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt
     integer(kind=ik), optional, intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
     integer(kind=ik), optional, intent(inout)     :: lgt_n
+    !> if there are no more free light ids, the code aborts, unless use set ignore_error=.true
+    !> in which case it will return the -1 ligt id
+    logical, optional, intent(in) :: ignore_error
 
     ! local variables
     integer(kind=ik) :: k, first_light_id, last_light_id, i
-    logical :: valid
+    logical :: valid, ign_err
 
     lgt_free_id = -1
 
@@ -96,10 +99,17 @@ subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt
 
     endif
 
-    ! error catching: is there no more free blocks on the list?
-    if (lgt_free_id == -1) then
-        write(*,'("rank=",i5)') params%rank
-        call abort(4458110, "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU")
-    end if
+    ign_err = .false.
+    if (present(ignore_error)) ign_err = ignore_error
+
+    ! if desired, the code will not exit here but instead return an invalid light
+    ! id (-1)
+    if ( .not. ign_err ) then
+        ! error catching: is there no more free blocks on the list?
+        if (lgt_free_id == -1) then
+            write(*,'("rank=",i5)') params%rank
+            call abort(4458110, "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU")
+        end if
+    endif
 
 end subroutine get_free_local_light_id

@@ -16,7 +16,7 @@ prefixes=(rho Ux Uy p vort mask sigmax sigmay)
 times=(000000050000)
 
 # run actual test
-${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
+${mpi_command} ./wabbit ${params} ${memory}
 
 echo "============================"
 echo "run done, analyzing data now"

@@ -21,7 +21,7 @@ times=(000000000000
 000000250000)
 
 # run actual test
-${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
+${mpi_command} ./wabbit ${params} ${memory}
 
 echo "============================"
 echo "run done, analyzing data now"

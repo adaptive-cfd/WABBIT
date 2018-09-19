@@ -44,9 +44,10 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
-    if (.not. allocated(xfer_list)) allocate(xfer_list(size(lgt_block,1),4))
+    if (.not. allocated(xfer_list)) allocate(xfer_list(size(lgt_block,1),2))
 
-    n_xfer  = 1
+    ! transfer counter
+    n_xfer = 0
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -66,8 +67,6 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
         ! ensure_gradedness removes the -1 flag if not all sister blocks share it
 
         if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+IDX_REFINE_STS) == -1) then
-
-
             ! find all sisters (including the block in question, so four or eight blocks)
             ! their light IDs are in "light_ids" and ordered by their last treecode-digit
             call find_sisters( params, lgt_active(k), light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist )
@@ -85,9 +84,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
             do j = 1, N
                 if (mpirank_owners(j) /= data_rank) then
                     ! MPI xfer required. Add the xfer to the list
+                    n_xfer = n_xfer + 1
                     xfer_list(n_xfer, 1) = light_ids(j) ! transfer this block ...
                     xfer_list(n_xfer, 2) = data_rank    ! ... to this rank
-                    n_xfer = n_xfer + 1
                 endif
 
                 ! don't forget: mark all 4/8 sisters as treated here, in order not to trigger this
@@ -98,8 +97,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     enddo
 
     ! actual xfer
-    call block_xfer( params, xfer_list(1:n_xfer-1,:), lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+    call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
 
+    ! the active lists are outdates after the transfer: we need to create them or find_sisters will not be able to do its job
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
     ! actual merging

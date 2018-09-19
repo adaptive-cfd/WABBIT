@@ -15,6 +15,7 @@ module module_helpers
 
 contains
 
+    include "most_common_element.f90"
     include "rotation_matrices.f90"
 
     !-----------------------------------------------------------------------------

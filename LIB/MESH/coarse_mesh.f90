@@ -27,13 +27,13 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)  !< sorted list of numerical treecodes, used for block finding
     !--------------------------------------------------------------
     ! loop variables and bounds
-    integer(kind=ik)                    :: k, maxtl, N, j, N_sisters
+    integer(kind=ik)                    :: k, maxtl, N_sisters, j
     ! rank of all sister blocks
-    integer (kind=ik), allocatable	:: rank_sisters(:)
+    integer(kind=ik),save,allocatable   :: rank_sisters(:)
     ! list of block ids, proc ranks
     integer(kind=ik)                    :: light_ids(1:8,lgt_n)
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank,  n_req, ierr,n_merge
+    integer(kind=ik)                    :: gather_rank,  n_req, ierr,n_merge
     ! non blocking send receives use communication requests
     integer(kind=ik),save,allocatable   :: request(:)
 
@@ -41,13 +41,14 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     maxtL = params%max_treelevel
 
     if (params%threeD_case) then
-      N = 8
+      N_sisters = 8
     else
-      N = 4
+      N_sisters = 4
     endif
 
     ! at worst every block is on a different rank
-    if (.not. allocated(request)) allocate(request(N*size(lgt_block,1)))
+    if (.not. allocated(request))       allocate(request(N_sisters*size(lgt_block,1)))
+    if (.not. allocated(rank_sisters))  allocate(rank_sisters(N_sisters))
 
     n_req   = 0_ik
     n_merge = 0_ik
@@ -67,22 +68,18 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
           ! find all sisters (including the block in question, so four blocks)
           ! their light IDs are in "light_ids" and ordered by their last treecode-digit
-          call find_sisters( params, lgt_active(k), light_ids(1:N,n_merge), lgt_block, lgt_n, lgt_sortednumlist )
+          call find_sisters( params, lgt_active(k), light_ids(1:N_sisters,n_merge), lgt_block, lgt_n, lgt_sortednumlist )
 
-	N_sisters = size(light_ids(1:N,n_merge))
-    	if (.not. allocated(rank_sisters)) allocate(rank_sisters(N_sisters))
-		do j=1, N_sisters
-        	! Check which CPU holds this block. The CPU will also hold the merged, new block
-        	call lgt_id_to_proc_rank( data_rank, lgt_active(k), params%number_blocks)
-		rank_sisters(j)=data_rank
-	enddo
-
-	data_rank = most_common_element(rank_sisters)
-
-          ! gather all four sisters on the process "datarank". The light_ids are updated in the routine
+          do j=1, N_sisters
+        	   !  Check which CPU holds this block. The CPU will also hold the merged, new block
+             call lgt_id_to_proc_rank( rank_sisters(j), lgt_active(k), params%number_blocks)
+          end do
+          ! find the rank which holds the most blocks to define the gather rank
+          gather_rank = most_common_element(rank_sisters)
+          ! gather all four sisters on the process "gather_rank". The light_ids are updated in the routine
           ! and they are still in the same order (0,1,2,3)-sister. It is just that they are now on one CPU
-          call gather_blocks_on_proc( params, hvy_block, lgt_block, data_rank, light_ids(1:N,n_merge), request, n_req )
-        endif
+          call gather_blocks_on_proc( params, hvy_block, lgt_block, gather_rank, light_ids(1:N_sisters,n_merge), request, n_req )
+        end if
       end do
 
       ! In gather_block_on_proc we have initiated communications with irecv and isend, to get the
@@ -95,8 +92,8 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
           ! merge the four blocks into one new block. Merging is done in two steps,
           ! first for light data (which all CPUS do redundantly, so light data is kept synched)
           ! Then only the responsible rank will perform the heavy data merging.
-          call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N,k) )
-      enddo
+          call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N_sisters,k) )
+      end do
 
       if (n_merge> 0_ik) then
         ! the mesh changes if we merge blocks.

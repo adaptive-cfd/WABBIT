@@ -26,8 +26,10 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), intent(inout)     :: lgt_n                   !< number of active blocks (light data)
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)  !< sorted list of numerical treecodes, used for block finding
     !--------------------------------------------------------------
-    ! loop variables
-    integer(kind=ik)                    :: k, maxtl, N
+    ! loop variables and bounds
+    integer(kind=ik)                    :: k, maxtl, N, j, N_sisters
+    ! rank of all sister blocks
+    integer (kind=ik), allocatable	:: rank_sisters(:)
     ! list of block ids, proc ranks
     integer(kind=ik)                    :: light_ids(1:8,lgt_n)
     ! rank of proc to keep the coarsened data
@@ -62,12 +64,20 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
       if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+idx_refine_sts) == -1) then
           ! count the number of merges
           n_merge=n_merge+1
-          ! Check which CPU holds this block. The CPU will also hold the merged, new block
-          call lgt_id_to_proc_rank( data_rank, lgt_active(k), params%number_blocks )
 
           ! find all sisters (including the block in question, so four blocks)
           ! their light IDs are in "light_ids" and ordered by their last treecode-digit
           call find_sisters( params, lgt_active(k), light_ids(1:N,n_merge), lgt_block, lgt_n, lgt_sortednumlist )
+
+	N_sisters = size(light_ids(1:N,n_merge))
+    	if (.not. allocated(rank_sisters)) allocate(rank_sisters(N_sisters))
+		do j=1, N_sisters
+        	! Check which CPU holds this block. The CPU will also hold the merged, new block
+        	call lgt_id_to_proc_rank( data_rank, lgt_active(k), params%number_blocks)
+		rank_sisters(j)=data_rank
+	enddo
+
+	data_rank = most_common_element(rank_sisters)
 
           ! gather all four sisters on the process "datarank". The light_ids are updated in the routine
           ! and they are still in the same order (0,1,2,3)-sister. It is just that they are now on one CPU

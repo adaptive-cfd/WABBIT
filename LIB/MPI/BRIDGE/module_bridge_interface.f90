@@ -1,7 +1,7 @@
 !===========================================================================
 !> this module implements the MPI_bridge between fluid and particle on the side
 !> of the fluid
-!> @todo
+!> \details
 !> 1. it initializes the bridge see init_bridge()
 !> 2. it provides a routine which sends the treecode and further information
 !>    to the particle side of the bridge. This is needed to map the
@@ -102,12 +102,11 @@ character(len=80)                            :: geometry
   if (myBridge%myWorldRank == 0) then                              ! check if the process is the root process
 
     ! - receive the discretization parameters
-    discretizationParams=(/ params%number_block_nodes,  &
+    discretizationParams=(/ params%Bs,  &
                             params%number_blocks,       &
                             params%max_treelevel,       &
                             params%dim,                 &
                             params%number_procs/)
-
     call MPI_send(discretizationParams, 5, MPI_integer, myBridge%minOtherWorldRank, &
                   parameters_delivery, myBridge%commonWorld,  ierr)
 
@@ -146,18 +145,17 @@ integer                              :: n,m
     ! number of blocks
     n      = size(lgt_block,1)
     ! number of columns in matrix
-    m        = params%max_treelevel + idx_refine_sts
-
+    m        = params%max_treelevel + extra_lgt_fields-1
     ! send number of active and maximal number of blocks
     call MPI_send((/lgt_n/), 1, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld,  ierr )
-    ! send list of active blocks
+                  ! send list of active blocks
     call MPI_send(lgt_active, lgt_n, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld,  ierr )
     ! send light data
-    call MPI_send(lgt_block, n*m, MPI_integer, &
+    call MPI_send(lgt_block(:,1:m), n*m, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &
                   params%bridge%commonWorld, ierr )
   end if
@@ -204,13 +202,12 @@ character(1)                                    :: buf ! Message sent to the flu
 !!          -> interpolate fluid data to requestet position
 !!          -> send fluid data back to the sender (i.e. particle rank)
 !!    - if \c MPI_TAG is \c end_communication stop waiting for requests
-
 maxpoints=100000
 k=0
 
 allocate(distributedParticles(4,maxpoints))
 distributedParticles=-99
-allocate(requests(params%bridge%otherWorldSize))
+allocate(requests(params%bridge%otherWorldSize+1))
 do
     call MPI_probe(MPI_ANY_SOURCE,MPI_ANY_TAG,params%bridge%otherWorld,status,ierr)
 
@@ -428,7 +425,7 @@ position_to_lgt_id=-999999
     do k=1,lgt_n ! loop over all active blocks
 
        call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
-       x1=x0(:)+dx(:)*(params%number_block_nodes-1)
+       x1=x0(:)+dx(:)*(params%Bs-1)
        ! check if position is inside the block with origin x0 and size dx
        ! if yes:   found the right block with its lgt_id
        ! if not:   go to the next block
@@ -541,16 +538,16 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
       !  write(*,'("hvy_id=",i6,i6,i6)')particle_id(k),params%bridge%myWorldRank,params%number_blocks
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         !!! calculate grid point ibx, iby, ibz
-        ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%number_ghost_nodes +1
-        iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%number_ghost_nodes +1
+        ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%n_ghosts +1
+        iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%n_ghosts +1
         if (params%threeD_case) then
-          ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%number_ghost_nodes +1
+          ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%n_ghosts +1
         else
           ibz = 1
         endif
         ! if ( positions(1,k)>1.0_rk .and. params%rank==0 ) then
-        !   write(*,'("hvy_id =", i6, " x=", f6.3," [xmin,xmax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(1,k),x0(1), x0(1)+dx(1)*(params%number_block_nodes-1)
-        !   write(*,'("hvy_id =", i6, " y=", f6.3," [ymin,ymax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(2,k),x0(2), x0(2)+dx(2)*(params%number_block_nodes-1)
+        !   write(*,'("hvy_id =", i6, " x=", f6.3," [xmin,xmax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(1,k),x0(1), x0(1)+dx(1)*(params%Bs-1)
+        !   write(*,'("hvy_id =", i6, " y=", f6.3," [ymin,ymax]=[",f6.3,",",f6.3,"]")')particle_id(k),positions(2,k),x0(2), x0(2)+dx(2)*(params%Bs-1)
         ! endif
         ! remark: the first 3 dimensions of hvy_block project the grid structure into the array
         ! this means:
@@ -583,13 +580,13 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
       v   =   hvy_block(ibx, iby, ibz,3, particle_id(k) ) &
             / hvy_block(ibx, iby, ibz,1, particle_id(k) )
       if (params%threeD_case) then
-        if (params%number_data_fields /= 5) then
+        if (params%n_eqn /= 5) then
           call abort(333990,"[bridgefluid] number of data fields is less then 5, Stop")
         else
           w   =   hvy_block(ibx, iby, ibz,4, particle_id(k) ) &
                 / hvy_block(ibx, iby, ibz,1, particle_id(k) )
           p   =   hvy_block(ibx, iby, ibz,5, particle_id(k) )
-          u_inter(:,k)   = hvy_block(ibx, iby, ibz,1:params%number_data_fields, particle_id(k) )
+          u_inter(:,k)   = hvy_block(ibx, iby, ibz,1:params%n_eqn, particle_id(k) )
         endif
       else
           w   = 0

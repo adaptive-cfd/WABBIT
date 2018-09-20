@@ -88,7 +88,7 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    neq = params%number_data_fields
+    neq = params%n_eqn
 
     if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
     dt = 9.0e9_rk

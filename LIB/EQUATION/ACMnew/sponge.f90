@@ -42,7 +42,7 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
             ! distance to borders of domain
             tmp = minval( (/x,y,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2))/) )
 
-            call smoothstep(sponge(ix,iy), tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+            sponge(ix,iy) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
         end do
     end do
 
@@ -76,7 +76,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
                 ! distance to borders of domain
                 tmp = minval( (/x,y,z,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
 
-                call smoothstep(sponge(ix,iy,iz), tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
             end do
         end do
     end do

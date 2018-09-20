@@ -53,7 +53,7 @@ contains
   include "RHS_3D_navier_stokes.f90"
   include "RHS_2D_cylinder.f90"
   include "filter_block.f90"
-  include "inicond_shear_layer.f90"
+  include "inicond_NStokes.f90"
   include "save_data_ns.f90"
 !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
@@ -105,12 +105,12 @@ contains
     ! read in initial conditions
     call init_initial_conditions(params_ns,file)
     ! initialice parameters and fields of the specific case study
-    call set_case_parameters( params_ns , FILE )
+    call read_case_parameters( params_ns , FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
     call add_info(params_ns)
 
     ! set global parameters pF,rohF, UxF etc
-    do dF = 1, params_ns%number_data_fields
+    do dF = 1, params_ns%n_eqn
                 if ( params_ns%names(dF) == "p" ) pF = dF
                 if ( params_ns%names(dF) == "rho" ) rhoF = dF
                 if ( params_ns%names(dF) == "Ux" ) UxF = dF
@@ -219,7 +219,7 @@ contains
       ! 3rd stage: post_stage.
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
-      if (params_ns%geometry=="funnel") then
+      if (params_ns%case=="funnel") then
         ! reduce sum on each block to global sum
         call mean_quantity(integral,area)
       endif
@@ -248,7 +248,7 @@ contains
 
       if (params_ns%penalization) then
         ! add volume penalization
-        call add_constraints(rhs, Bs, g, x0, dx, u)
+        call add_constraints(params_ns, rhs, Bs, g, x0, dx, u)
       endif
 
     case default
@@ -328,7 +328,7 @@ contains
        if (params_ns%dim==3) allocate(mask(Bs+2*g, Bs+2*g, Bs+2*g))
      endif
       if ( params_ns%penalization ) then
-        call get_mask(x0, dx, Bs, g , mask)
+        call get_mask(params_ns, x0, dx, Bs, g , mask)
       else
         mask=0.0_rk
       end if
@@ -479,193 +479,6 @@ contains
   end subroutine GET_DT_BLOCK_NStokes
 
 
-  !-----------------------------------------------------------------------------
-  ! main level wrapper for setting the initial condition on a block
-  !-----------------------------------------------------------------------------
-  subroutine INICOND_NStokes( time, u, g, x0, dx )
-    implicit none
-
-    ! it may happen that some source terms have an explicit time-dependency
-    ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
-
-    ! block data, containg the state vector. In general a 4D field (3 dims+components)
-    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
-
-    ! as you are allowed to compute the RHS only in the interior of the field
-    ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g
-
-    ! for each block, you'll need to know where it lies in physical space. The first
-    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    integer(kind=ik)          :: Bs,ix,iy,dF
-    real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
-                                radius,max_R,width
-    real(kind=rk),allocatable:: mask(:,:,:)
-
-    p_init    =params_ns%initial_pressure
-    rho_init  =params_ns%initial_density
-    u_init    =params_ns%initial_velocity
-    ! compute the size of blocks
-    Bs = size(u,1) - 2*g
-
-
-
-    ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
-    if ( params_ns%inicond=="read_from_files") then
-        call pack_statevector(u(:,:,:,:),'pure_variables')
-        return
-    else
-        u = 0.0_rk
-    endif
-
-
-    if (p_init<=0.0_rk .or. rho_init <=0.0) then
-      call abort(6032,  "Error [module_navier_stokes.f90]: initial pressure and density"//&
-                        "must be larger then 0")
-    endif
-
-
-
-    select case( params_ns%inicond )
-    case("shear_layer")
-      if (params_ns%dim==2) then
-        call inicond_shear_layer(  u, x0, dx ,Bs, g)
-      else
-        call abort(4832,"ERROR [navier_stokes_new.f90]: no 3d shear layer implemented")
-      endif
-
-    case ("zeros")
-      ! add ambient pressure
-      u( :, :, :, pF)   = params_ns%initial_pressure
-      u( :, :, :, rhoF) = sqrt(rho_init)
-      u( :, :, :, UxF)  = 0.0_rk
-      u( :, :, :, UyF)  = 0.0_rk
-      if (params_ns%dim==3)  u( :, :, :, UzF) = 0.0_rk
-
-    case ("standing-shock","moving-shock")
-      ! chooses values such that shock should not move
-      ! in space according to initial conditions
-      if ( params_ns%inicond == "standing-shock" ) then
-        call shockVals(rho_init,u_init(1)*0.5_rk,p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
-      else
-        call moving_shockVals(rho_init,u_init(1),p_init, &
-                             tmp(1),tmp(2),tmp(3),params_ns%gamma_,params_ns%machnumber)
-        params_ns%initial_velocity(1)=u_init(1)
-      end if
-      ! check for usefull inital values
-      if ( tmp(1)<0 .or. tmp(3)<0 ) then
-        write(*,*) "rho_right=",tmp(1), "p_right=",tmp(3)
-        call abort(3572,"ERROR [module_navier_stokes.f90]: initial values are insufficient for simple-shock")
-      end if
-      ! following values are imposed and smoothed with tangens:
-      ! ------------------------------------------
-      !   rhoL    | rhoR                  | rhoL
-      !   uL      | uR                    | uL
-      !   pL      | pR                    | pL
-      ! 0-----------------------------------------Lx
-      !           x0_inicond             x0_inicond+width
-      width       = params_ns%domain_size(1)*(1-params_ns%inicond_width-0.1)
-      x0_inicond  = params_ns%inicond_width*params_ns%domain_size(1)
-      max_R       = width*0.5_rk
-      do ix=g+1, Bs+g
-         x = dble(ix-(g+1)) * dx(1) + x0(1)
-         call continue_periodic(x,params_ns%domain_size(1))
-         ! left region
-         radius = abs(x-x0_inicond-width*0.5_rk)
-         b      = 0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
-         u(ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
-         u(ix, :, :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
-         u(ix, :, :, UyF)  = 0.0_rk
-         u(ix, :, :, pF)   = p_init-b*(p_init - tmp(3))
-      end do
-
-    case ("sod_shock_tube")
-      ! Sods test case: shock tube
-      ! ---------------------------
-      !
-      ! Test case for shock capturing filter
-      ! The initial condition is devided into
-      ! Left part x<= Lx/2
-      !
-      ! rho=1
-      ! p  =1
-      ! u  =0
-      !
-      ! Rigth part x> Lx/2
-      !
-      ! rho=0.125
-      ! p  =0.1
-      ! u  =0
-      do ix=1, Bs+2*g
-         x = dble(ix-(g+1)) * dx(1) + x0(1)
-         call continue_periodic(x,params_ns%domain_size(1))
-         ! left region
-         if (x <= params_ns%domain_size(1)*0.5_rk) then
-           u( ix, :, :, rhoF) = 1.0_rk
-           u( ix, :, :, pF)   = 1.0_rk
-         else
-           u( ix, :, :, rhoF) = sqrt(0.125_rk)
-           u( ix, :, :, pF)   = 0.1_rk
-         endif
-      end do
-
-
-      ! velocity set to 0
-       u( :, :, :, UxF) = 0.0_rk
-       u( :, :, :, UyF) = 0.0_rk
-
-    case ("mask")
-      ! add ambient pressure
-      u( :, :, :, pF) = p_init
-      ! set rho
-      u( :, :, :, rhoF) = sqrt(rho_init)
-
-      ! set velocity field u(x)=1 for x in mask
-      if (params_ns%penalization) then
-        if (.not. allocated(mask))        allocate(mask(size(u,1), size(u,2), size(u,3)))
-        call get_mask(x0, dx, Bs, g , mask)
-      endif
-
-      ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
-      u( :, :, :, UxF) = ( 1 - mask ) * u_init(1)*sqrt(rho_init) !flow in x
-      if ( params_ns%geometry=="funnel" ) then
-        do iy=g+1, Bs+g
-            !initial y-velocity negative in lower half and positive in upper half
-            y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%domain_size(2)*0.5_rk
-            b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
-            u( :, iy, 1, UyF) = (1-mask(:,iy,1))*b*u_init(2)*sqrt(rho_init)
-        enddo
-      else
-        u( :, :, :, UyF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in y
-      end if
-
-    case ("pressure_blob")
-
-        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%domain_size(1), params_ns%domain_size(2), params_ns%domain_size(3)/), u(:,:,:,pF), x0, dx )
-        ! add ambient pressure
-         u( :, :, :, pF)  = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
-        u( :, :, :, rhoF)= sqrt(params_ns%initial_density)
-        u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
-        u( :, :, :, UyF) = params_ns%initial_velocity(2)*sqrt(params_ns%initial_density)
-        if (params_ns%dim==3)  u( :, :, :, UzF) = params_ns%initial_velocity(3)*sqrt(params_ns%initial_density)
-    case default
-        call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))
-    end select
-
-    !check if initial conditions are set properly
-    do dF=1,params_ns%number_data_fields
-      if (  block_contains_NaN(u(:,:,:,dF)) ) then
-        call abort(46924,"ERROR [module_navier_stokes]: NaN in inicond!"//&
-        " Computer says NOOOOOOOOOOOOOOOO!")
-      endif
-    enddo
-  end subroutine INICOND_NStokes
-
-
 
 
 
@@ -705,7 +518,7 @@ contains
     Bs = size(u,1) - 2*g
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
-    u=work_array(:,:,:,1:params_ns%number_data_fields)
+    u=work_array(:,:,:,1:params_ns%n_eqn)
 
   end subroutine filter_NStokes
 

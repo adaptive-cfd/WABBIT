@@ -41,9 +41,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
-    NdF   = params%number_data_fields
+    Bs    = params%Bs
+    g     = params%n_ghosts
+    NdF   = params%n_eqn
     N     = params%number_blocks
     myrank  = params%rank
     mpisize = params%number_procs
@@ -711,8 +711,8 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
 
 
     ! grid parameter
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
+    Bs    = params%Bs
+    g     = params%n_ghosts
 
     if (params%threeD_case ) then
         spaceDirections = 3
@@ -831,7 +831,7 @@ subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
     buffer_counter = 0
 
     ! loop over all data fields
-    do dF = 1, params%number_data_fields
+    do dF = 1, params%n_eqn
         do k = 1, size(hvy_data, 3) ! third dimension, note: for 2D cases k is always 1
             do j = 1, size(hvy_data, 2)
                 do i = 1, size(hvy_data, 1)
@@ -867,7 +867,7 @@ subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id 
 
     buffer_i = 1
     ! loop over all data fields
-    do dF = 1, params%number_data_fields
+    do dF = 1, params%n_eqn
         do k = data_bounds(1,3), data_bounds(2,3) ! third dimension, note: for 2D cases k is always 1
             do j = data_bounds(1,2), data_bounds(2,2)
                 do i = data_bounds(1,1), data_bounds(2,1)
@@ -898,7 +898,7 @@ subroutine Line2GhostLayer2( params, line_buffer, data_bounds, hvy_block )
 
     buffer_i = 1
     ! loop over all data fields
-    do dF = 1, params%number_data_fields
+    do dF = 1, params%n_eqn
         do k = data_bounds(1,3), data_bounds(2,3) ! third dimension, note: for 2D cases k is always 1
             do j = data_bounds(1,2), data_bounds(2,2)
                 do i = data_bounds(1,1), data_bounds(2,1)
@@ -1173,6 +1173,6 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
 
 
     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
-    recv_list(:) = recv_list(:) * params%number_data_fields
-    send_list(:) = send_list(:) * params%number_data_fields
+    recv_list(:) = recv_list(:) * params%n_eqn
+    send_list(:) = send_list(:) * params%n_eqn
 end subroutine get_my_sendrecv_amount_with_ranks

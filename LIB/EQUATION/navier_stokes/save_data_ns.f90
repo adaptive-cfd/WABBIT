@@ -10,7 +10,7 @@
   ! NOTE that as we have way more work arrays than actual state variables (typically
   ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
   !-----------------------------------------------------------------------------
-  subroutine PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work )
+  subroutine PREPARE_SAVE_DATA_NStokes(time, u, g, x0, dx, work )
     use module_helpers , only: choose, list_contains_name
     use module_navier_stokes_cases, only: get_mask
     implicit none
@@ -37,7 +37,7 @@
 
 
     Bs   = size(u,1)-2*g                 ! number of block sides
-    nvar = params_ns%number_data_fields  ! number of variables describing the state of the fluid
+    nvar = params_ns%n_eqn  ! number of variables describing the state of the fluid
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)
     tmp_u  = u(:,:,:,:)
@@ -70,7 +70,7 @@
     ! +++++++++++++++++++++++++++++++++
     if (  list_contains_name(params_ns%names,'mask')>0 ) then
       if ( .not. allocated(mask) ) allocate(mask(size(u,1),size(u,2),size(u,3)))
-          call get_mask(x0, dx, Bs, g, mask, .true.)   ! the true boolean stands for: make mask colored if possible
+          call get_mask(params_ns, x0, dx, Bs, g, mask, .true.)   ! the true boolean stands for: make mask colored if possible
     end if
 
     !+++++++++++++++++++

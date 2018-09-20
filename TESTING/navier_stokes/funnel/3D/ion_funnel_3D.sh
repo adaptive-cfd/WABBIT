@@ -8,11 +8,11 @@ dir="TESTING/navier_stokes/funnel/3D/"
 params=${dir}"ion_funnel_3D.ini"
 happy=0
 sad=0
-echo "testing ion funnel"
+echo "Testing the Ion Funnel in 3D"
 # list of prefixes the test generates
-prefixes=(rho Ux Uy p mask)
+prefixes=(rho Ux Uy Uz p mask)
 # list of possible times (no need to actually have them)
-times=(000000000001)
+times=(000000000000 000000000001)
 
 # run actual test
 ${mpi_command} ./wabbit ${params} ${memory}

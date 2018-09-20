@@ -27,7 +27,7 @@ module module_navier_stokes_params
       ! name of filter
       character(len=80)                  :: name
       ! number or data fields to filter
-      integer(kind=ik)                   :: number_data_fields
+      integer(kind=ik)                   :: n_eqn
 
       ! explicit filters
       ! ----------------
@@ -70,7 +70,7 @@ module module_navier_stokes_params
         ! spatial domain%number_data_fields
         real(kind=rk)                               :: R_max, domain_size(3)=0.0_rk
         ! number data fields
-        integer(kind=ik)                            :: number_data_fields
+        integer(kind=ik)                            :: n_eqn
         ! number of block nodes
         integer(kind=ik)                            :: Bs
         ! maximal tree level
@@ -98,6 +98,7 @@ module module_navier_stokes_params
         !---------------------------------------------------------------------------------
         ! initial conditions
         !---------------------------------------------------------------------------------
+        logical                                     :: read_from_files
         ! înitial condition
         character(len=80)                           :: inicond
         ! width of initialcond
@@ -144,63 +145,12 @@ module module_navier_stokes_params
   end type type_params_ns
 
   ! statevector index
-  integer(kind=ik) ,save,public :: rhoF=-1,UxF=-1,UyF=-1,UzF=-1,pF=-1
+  integer(kind=ik), save, public :: rhoF=-1,UxF=-1,UyF=-1,UzF=-1,pF=-1
 
   type(type_params_ns), save :: params_ns
 
 contains
 
-  include "initial_conditions.f90"
-
-
-  !> \brief reft and right shock values for 1D shock moving with mach to the right
-  !> \detail This function converts with the Rankine-Hugoniot Conditions
-  !>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
-  !>  \f$\rho_R,u_R,p_R\f$ and \f$u_L\f$ .
-  !> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
-  !> author F.Toro
-  subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)
-      implicit none
-      !> one side of the shock (density, pressure)
-      real(kind=rk), intent(in)      ::rhoL,pL
-      !> shock speed
-      real(kind=rk), intent(in)      :: mach
-      !> speed on
-      real(kind=rk), intent(inout)      :: uL
-      !> other side of the shock (density, velocity, pressure)
-      real(kind=rk), intent(out)      ::rhoR,uR,pR
-      !> heat capacity ratio
-      real(kind=rk), intent(in)      ::gamma
-
-      real(kind=rk)                ::c_R
-
-
-       uR    =   0
-       rhoR  =   ((gamma-1)*mach**2+2)/((gamma+1)*mach**2)*rhoL
-       pR    = (gamma+1)/(2*gamma*mach**2-gamma+1)*pL
-       c_R   = sqrt(gamma*pR/rhoR)
-       uL    = (1-rhoR/rhoL)*mach*c_R
-  end subroutine moving_shockVals
-
-  !> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
-  !> values \f$\rho_2,u_2,p_2\f$ on the ohter side
-  !> of the shock
-  subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
-      implicit none
-      !> one side of the shock (density, velocity, pressure)
-      real(kind=rk), intent(in)      ::rho1,u1,p1
-      !> other side of the shock (density, velocity, pressure)
-      real(kind=rk), intent(out)      ::rho2,u2,p2
-      !> heat capacity ratio
-      real(kind=rk), intent(in)      ::gamma
-      real(kind=rk)                ::cstar_sq
-
-      cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
-      !sqrt(cstar_sq)
-      u2 = cstar_sq /u1;
-      rho2 = (rho1*u1)/u2;
-      p2= (p1+ rho1*u1**2 )-rho2*u2**2;
-  end subroutine shockVals
 
   subroutine init_navier_stokes_eq(params_ns, FILE )
     implicit none
@@ -218,7 +168,7 @@ contains
       write(*,'(" -----------------------------------")')
     endif
     ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_equations', params_ns%n_eqn, 1 )
     ! dimension
     call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
     !
@@ -247,6 +197,9 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'mu0', params_ns%mu0, 0.0_rk )
     ! read switch to turn on|off dissipation
     call read_param_mpi(FILE, 'Navier_Stokes', 'dissipation', params_ns%dissipation, .true. )
+    ! which case is studied in the NStokes module
+    call read_param_mpi(FILE, 'Navier_Stokes', 'case', params_ns%case, 'no' )
+
 
   end subroutine init_navier_stokes_eq
 
@@ -259,26 +212,27 @@ contains
       !> params structure of navier stokes
       type(type_params_ns),intent(inout)  :: params_ns
       ! initial parameters
-      real(kind=rk)                       :: rho_init=1,p_init=1,u_init(3)=0,T_init=1,width
+      real(kind=rk)                       :: rho_init=-1,p_init=-1,u_init(3)=0,T_init=-1,width
+      character(len=*),parameter         :: section='Initial_Values'
 
       if (params_ns%mpirank==0) then
         write(*,*)
         write(*,*)
-        write(*,*) "PARAMS: initial conditions"
+        write(*,*) "PARAMS: "//section
         write(*,'(" ---------------------------")')
       endif
-      call read_param_mpi(FILE, 'Physics', 'initial_cond', params_ns%inicond, "read_from_files" )
-      if ( params_ns%inicond == "read_from_files") then
+      call read_param_mpi(FILE, 'Physics', 'read_from_files', params_ns%read_from_files, .false. )
+      if ( params_ns%read_from_files) then
         if (params_ns%mpirank==0) write(*,'("initial configuration is read from file!")')
         if (params_ns%mpirank==0) write(*,'("we read in (rho,u , v, p) and convert it to skew: (sqrt(rho),sqrt(rho)u, sqrt(rho)v, p)!")')
         return
       end if
-      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%domain_size(1)*0.1_rk )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init(1:params_ns%dim), u_init(1:params_ns%dim) )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
+      call read_param_mpi(FILE, section, 'inicond'      , params_ns%inicond, "no" )
+      call read_param_mpi(FILE, section, 'inicond_width',width, params_ns%domain_size(1)*0.1_rk )
+      call read_param_mpi(FILE, section, 'initial_pressure' , p_init, p_init )
+      call read_param_mpi(FILE, section, 'initial_velocity' , u_init(1:params_ns%dim), u_init(1:params_ns%dim) )
+      call read_param_mpi(FILE, section, 'initial_temperature', T_init, T_init )
+      call read_param_mpi(FILE, section, 'initial_density', rho_init, rho_init )
       params_ns%initial_density=rho_init
       params_ns%initial_velocity=u_init
       params_ns%initial_pressure=p_init
@@ -314,8 +268,6 @@ subroutine init_other_params(params_ns, FILE )
     if (  list_contains_name(params_ns%names,'sigmax')>0 ) then
       params_ns%filter%save_filter_strength=.true.
     end if
-
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
@@ -371,12 +323,14 @@ subroutine init_other_params(params_ns, FILE )
       end if
 
       ! initial speed of sound, Mach number, reynolds number
-      params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
-      params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
-                                +params_ns%initial_velocity(2)**2 &
-                                +params_ns%initial_velocity(3)**2)/params_ns%c0
-      params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
-                            params_ns%machnumber*params_ns%c0/params_ns%mu0
+      if ( params_ns%initial_density>0 ) then
+        params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+        params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
+                                  +params_ns%initial_velocity(2)**2 &
+                                  +params_ns%initial_velocity(3)**2)/params_ns%c0
+        params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
+                              params_ns%machnumber*params_ns%c0/params_ns%mu0
+      endif
 
       if (params_ns%mpirank==0) then
         write(*,*)
@@ -406,10 +360,10 @@ subroutine init_other_params(params_ns, FILE )
 
 
           if ( params_ns%dim==3 ) then
-            if( params_ns%number_data_fields<5 ) call abort(9898,'Please increase number of data fields (min 5)')
+            if( params_ns%n_eqn<5 ) call abort(9898,'Please increase number of data fields (min 5)')
             if( min(pF,UxF,UyF,UzF,rhoF)<0 )  call abort(9898,'Check names of data fields [p,Ux,Uy,Uz,rho]!')
           else
-            if( params_ns%number_data_fields<4 ) call abort(9898,'Please increase number of data fields (min 4)')
+            if( params_ns%n_eqn<4 ) call abort(9898,'Please increase number of data fields (min 4)')
             if( min(pF,UxF,UyF,rhoF)<0 )      call abort(9898,'Check names of data fields [p,Ux,Uy,rho]!')
           end if
 
@@ -427,9 +381,9 @@ subroutine init_other_params(params_ns, FILE )
 
         if (.not.allocated(data)) then
           if (params_ns%dim==3) then
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%number_data_fields))
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%n_eqn))
           else
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%number_data_fields))
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%n_eqn))
         endif
       endif
     end subroutine allocate_statevector_ns

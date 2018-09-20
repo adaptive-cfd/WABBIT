@@ -43,7 +43,7 @@ subroutine flusi_to_wabbit(params)
     integer(kind=ik)                  :: status, start_x, start_y, start_z
 
 !-----------------------------------------------------------------------------------------------------
-    params%number_data_fields  = 1
+    params%n_eqn  = 1
 !----------------------------------------------
     call get_command_argument(2, file_in)
     ! does the user need help?
@@ -82,8 +82,8 @@ subroutine flusi_to_wabbit(params)
         params%max_treelevel=level
         params%domain_size(1) = domain(2)
         params%domain_size(2) = domain(3)
-        params%number_block_nodes = Bs
-        params%number_ghost_nodes = 1_ik
+        params%Bs = Bs
+        params%n_ghosts = 1_ik
         params%order_predictor = 'multiresolution_4th'
         if (params%threeD_case) then
             lgt_n = 8_ik**params%max_treelevel

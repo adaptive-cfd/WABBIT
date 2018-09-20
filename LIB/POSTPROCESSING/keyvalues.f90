@@ -69,10 +69,10 @@ subroutine keyvalues(fname, params)
     else
         params%threeD_case = .false.
     end if
-    params%number_block_nodes = Bs
+    params%Bs = Bs
     params%max_treelevel = tc_length
-    params%number_data_fields = 1
-    params%number_ghost_nodes = 0
+    params%n_eqn = 1
+    params%n_ghosts = 0
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
@@ -95,7 +95,7 @@ subroutine keyvalues(fname, params)
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
-    Bs = params%number_block_nodes
+    Bs = params%Bs
     if (params%threeD_case) then
         nz = Bs
     else

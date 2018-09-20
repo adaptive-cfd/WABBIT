@@ -50,8 +50,8 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
 ! variables initialization
 
     ! grid parameter
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
+    Bs = params%Bs
+    g  = params%n_ghosts
 
 !---------------------------------------------------------------------------------------------
 ! main body

@@ -18,7 +18,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_debug.
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
-	module_simple_geometry.f90 module_shock_tube.f90
+	module_simple_geometry.f90 module_shock.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -140,31 +140,30 @@ $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/modul
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o\
-	initial_conditions.f90 filter_block.f90
+	inicond_NStokes.f90 filter_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_ini_files_parser_mpi.o\
- 	vortex_street.f90 sod_shock_tube.f90 simple_shock.f90 RHS_2D_cylinder.f90 triangle.f90
+$(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o\
+	$(OBJDIR)/module_ini_files_parser_mpi.o RHS_2D_cylinder.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
 	funnel2D.f90 funnel3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
-		vortex_street.f90 triangle.f90
+$(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)/module_funnel.o $(OBJDIR)/module_ns_penalization.o\
-	$(OBJDIR)/module_shock_tube.o $(OBJDIR)/module_simple_geometry.o
+	$(OBJDIR)/module_shock.o $(OBJDIR)/module_simple_geometry.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
-	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_shear_layer.f90 save_data_ns.f90
+	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_NStokes.f90 save_data_ns.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_shock_tube.o: module_shock_tube.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
-		$(OBJDIR)/module_navier_stokes_params.o sod_shock_tube.f90
+$(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+		$(OBJDIR)/module_navier_stokes_params.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
@@ -177,8 +176,7 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_debug.o: module_debug.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_interpolation.o $(OBJDIR)/module_treelib.o \
-	check_lgt_block_synchronization.f90 write_debug_times.f90 write_block_distribution.f90 \
-	allocate_init_debugging.f90
+	check_lgt_block_synchronization.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
@@ -215,9 +213,12 @@ $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $
 	refinement_indicator.f90 block_coarsening_indicator.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o \
-	$(OBJDIR)/module_boundary_conditions.o update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
+	$(OBJDIR)/module_boundary_conditions.o $(OBJDIR)/module_helpers.o update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
@@ -233,9 +234,6 @@ $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(O
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o get_neighbor_treecode.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
-$(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
@@ -262,7 +260,12 @@ doc:
 	doxygen doc/doc_configuration
 	firefox doc/output/html/index.html &
 test:
-	@cd TESTING/;  ./runtests.sh
+	./TESTING/runtests.sh
+
+check-environment:
+ifndef HDF_ROOT
+$(error Please export HDF_ROOT before compiling WABBIT)
+endif
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

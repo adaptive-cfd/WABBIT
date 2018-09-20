@@ -65,8 +65,8 @@ subroutine statistics_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_a
 ! variables initialization
 
     ! grid parameter
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
+    Bs    = params%Bs
+    g     = params%n_ghosts
 !---------------------------------------------------------------------------------------------
 ! main body
 

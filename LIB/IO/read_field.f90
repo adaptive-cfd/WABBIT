@@ -55,8 +55,8 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     rank = params%rank
 
     ! grid parameter
-    g    = params%number_ghost_nodes
-    Bs   = params%number_block_nodes
+    g    = params%n_ghosts
+    Bs   = params%Bs
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
 !---------------------------------------------------------------------------------------------
 ! main body

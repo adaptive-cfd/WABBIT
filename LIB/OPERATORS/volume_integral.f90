@@ -65,8 +65,8 @@
 !    int_local  = 0.0_rk
 !    volume_int = 0.0_rk
 !
-!    Bs = params%number_block_nodes
-!    g  = params%number_ghost_nodes
+!    Bs = params%Bs
+!    g  = params%n_ghosts
 !
 ! !---------------------------------------------------------------------------------------------
 ! ! main body

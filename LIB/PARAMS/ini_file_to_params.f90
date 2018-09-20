@@ -74,13 +74,13 @@ subroutine ini_file_to_params( params, filename )
     ! other initial condition is "physics-module", which means the modules decide what inicond
     ! is set.
 
-    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
+    call read_param_mpi(FILE, 'Physics', 'read_from_files', params%read_from_files, .false. )
     ! saving options.
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
-    if (params%initial_cond == 'read_from_files') then
+    if (params%read_from_files ) then
         ! read variable names
-        allocate( params%input_files( params%number_data_fields ) )
+        allocate( params%input_files( params%n_eqn ) )
 
         params%input_files = "---"
         call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
@@ -133,7 +133,7 @@ subroutine ini_file_to_params( params, filename )
     !
     ! first: read physics type
     call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
-    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "physics-module" )
+    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%read_from_files, .false.)
     !***************************************************************************
     ! read MPI parameters
     !
@@ -173,9 +173,9 @@ subroutine ini_file_to_params( params, filename )
                 max_neighbors = 12.0
             endif
 
-            Bs      = params%number_block_nodes
-            g       = params%number_ghost_nodes
-            Neqn    = params%number_data_fields
+            Bs      = params%Bs
+            g       = params%n_ghosts
+            Neqn    = params%n_eqn
             Nrk     = max( Neqn*size(params%butcher_tableau,1), params%N_fields_saved )
             nstages = 2.0
 
@@ -209,13 +209,13 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
+    if ( (params%n_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%number_ghost_nodes < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
@@ -310,17 +310,17 @@ end subroutine ini_file_to_params
     endif
 
     ! read number_block_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%Bs, 1 )
     ! read number_ghost_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     ! read number_blocks
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
 
     ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
     ! set number of fields in heavy work data
     ! every datafield has 5 additional fields: old, k1, k2, k3, k4
-    params%number_fields = params%number_data_fields*5
+    params%number_fields = params%n_eqn*5
     ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
@@ -339,12 +339,12 @@ end subroutine ini_file_to_params
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.
-    allocate(tmp(1:params%number_data_fields))
-    allocate(params%threshold_state_vector_component(1:params%number_data_fields))
+    allocate(tmp(1:params%n_eqn))
+    allocate(params%threshold_state_vector_component(1:params%n_eqn))
     ! as default, use ones (all components used for indicator)
     tmp = 1.0_rk
     call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
-    do i = 1, params%number_data_fields
+    do i = 1, params%n_eqn
         if (tmp(i)>0.0_rk) then
             params%threshold_state_vector_component(i) = .true.
         else

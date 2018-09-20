@@ -57,7 +57,7 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    N_dF  = params%number_data_fields
+    N_dF  = params%n_eqn
 !---------------------------------------------------------------------------------------------
 ! main body
 

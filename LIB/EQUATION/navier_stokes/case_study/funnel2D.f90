@@ -181,7 +181,6 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
 
     ! parameter for smoothing function (width)
     h  = 1.5_rk*max(dx(1), dx(2))
-
     if (3*dx(2)<=0.05_rk*funnel%jet_radius) then
       jet_smooth_width = 0.05_rk*funnel%jet_radius
     else
@@ -249,8 +248,8 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
               Phi_ref(4) =  p_capillary  !rho*Rs*funnel%temperatur * (1 - dq) + p_capillary * dq
             endif
 
-            ! ! Outlet flow: Transition to 2pump
-            ! ! ---------------------
+            ! Outlet flow: Transition to 2pump
+            ! ---------------------
               if (mask_color(ix,iy)==color_outlet) then
                 Phi_ref(1) = rho_2nd_pump_stage
                 !Phi_ref(2) = 0

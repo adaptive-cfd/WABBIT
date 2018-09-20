@@ -112,7 +112,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! number of blocks
     N = params%number_blocks
-    neq = params%number_data_fields
+    neq = params%n_eqn
 
     ! size of data array, use for readability
     data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3) * size(hvy_block,4)

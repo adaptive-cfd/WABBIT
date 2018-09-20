@@ -68,9 +68,9 @@ subroutine post_mean(params)
         params%threeD_case = .false.
     end if
 
-    params%number_block_nodes = Bs
-    params%number_data_fields = 1
-    params%number_ghost_nodes = 0
+    params%Bs = Bs
+    params%n_eqn = 1
+    params%n_ghosts = 0
     g = 0
     params%max_treelevel = tc_length
     params%domain_size(1) = domain(1)

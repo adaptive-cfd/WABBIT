@@ -182,8 +182,6 @@ program main
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    ! initalize debugging ( this is mainly time measurements )
-    call allocate_init_debugging( params )
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
@@ -210,7 +208,7 @@ program main
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_work )
-    if (params%initial_cond /= "read_from_files" .or. params%adapt_inicond) then
+    if (.not. params%read_from_files .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
@@ -290,11 +288,9 @@ program main
 
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
-            call MPI_Barrier(WABBIT_COMM,ierr)
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
             call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, &
                                     lgt_active, lgt_n, hvy_n,params)
-            call MPI_Barrier(WABBIT_COMM,ierr)
         endif
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -452,55 +448,9 @@ program main
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)
 
-    ! debug info output
-    if ( params%debug ) then
-        ! sum times
-        debug%comp_time(:,2) = 0.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
-        ! MPI Barrier before program ends
-        call MPI_Barrier(WABBIT_COMM, ierr)
-
-        ! average times
-        debug%comp_time(:,2) = debug%comp_time(:,2) / params%number_procs
-        ! standard deviation
-        debug%comp_time(:,3) = 0.0_rk
-        debug%comp_time(:,4) = (debug%comp_time(:,4) - debug%comp_time(:,2))**2.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
-        ! MPI Barrier before program ends
-        call MPI_Barrier(WABBIT_COMM, ierr)
-
-        if (params%number_procs == 1) then
-            debug%comp_time(:,3) = 0.0_rk
-        else
-            debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
-        end if
-
-        ! output
-        if (rank==0) then
-            write(*,'(80("_"))')
-            write(*, '("debug times (average value +- standard deviation) :")')
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-
-                ! write name
-                write(*, '(a)', advance='no') debug%name_comp_time(k)
-                ! write average time
-                write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,2)
-                ! write standard deviation
-                write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,3)
-                ! next line
-                write(*,*)
-                ! loop variable
-                k = k + 1
-
-            end do
-
-            write(*,'(80("_"))')
-            write(*, '("sum: ", 2x,f12.3)', advance='yes') sum(debug%comp_time(:,2))
-
-        end if
-
-    end if
+    ! make a summary of the program parts, which have been profiled using toc(...)
+    ! and print it to stdout
+    call summarize_profiling( params, WABBIT_COMM )
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
         hvy_active, lgt_sortednumlist, hvy_work )

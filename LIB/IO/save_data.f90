@@ -89,7 +89,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
         call PREPARE_SAVE_DATA(params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
-        params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
+        params%n_ghosts, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
 
     enddo
 

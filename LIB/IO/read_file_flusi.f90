@@ -36,7 +36,7 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   real(kind=rk), dimension(:,:,:), allocatable   :: blockbuffer
 
 !----------------------------------------------------------------------------
-  Bs = params%number_block_nodes
+  Bs = params%Bs
   call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
     ! print a message
   if (params%rank==0) then
@@ -106,8 +106,8 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   real(kind=rk), dimension(:,:,:), allocatable   :: blockbuffer
 
 !----------------------------------------------------------------------------
-  Bs = params%number_block_nodes
-  g  = params%number_ghost_nodes
+  Bs = params%Bs
+  g  = params%n_ghosts
   ! this is necessary in 2D because flusi data is organised as field(1,1:Bs_f,1:Bs_f)
   ! whereas in wabbit the field has only one component in z direction
   if (.not. params%threeD_case) allocate(blockbuffer(1,0:Bs-1,0:Bs-1))

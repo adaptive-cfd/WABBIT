@@ -1,18 +1,10 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_mesh.f90
-!> \version 0.4
-!> \author msr
 !
 !> \brief module for all mesh subroutines
 !
 !> \details
-!! = log ======================================================================================
-!! \n
-!! 24/11/16 - create
+!> \author msr
+!! \date 24/11/16 - create
 ! ********************************************************************************************
 
 module module_mesh
@@ -33,17 +25,13 @@ module module_mesh
     use module_treelib
     !
     use module_boundary_conditions
-!---------------------------------------------------------------------------------------------
-! variables
 
+    ! used in coarse_mesh
+    use module_helpers, only: most_common_element 
 
     implicit none
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
     logical, private,save ::  mesh_has_changed=.false.
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 

@@ -80,11 +80,11 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
         ! use  unique tag for each message
         tag = lgt_id
 
-        ! Am I the target rank who receives all the data?
+        ! Am I the target rank who receives this block of data?
         if (myrank == mpirank_newowner) then
-            !------------------------
+            !-------------------------------------------------------------------
             ! RECV CASE
-            !------------------------
+            !-------------------------------------------------------------------
             ! get hvy id where to store the data
             call lgt_id_to_hvy_id( hvy_id_new, lgt_id_new, myrank, params%number_blocks )
 
@@ -96,11 +96,11 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
 
             if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] MPI_irecv failed!")
 
+        ! Am I the owner of this block, so will I have to send data?
         elseif (myrank == mpirank_owner) then
-            ! Am I the owner of this block, so will I have to send data?
-            !------------------------
+            !-------------------------------------------------------------------
             ! SEND CASE
-            !------------------------
+            !-------------------------------------------------------------------
             ! what heavy ID (on its owner proc, which is me) does the block have?
             call lgt_id_to_hvy_id( hvy_id, lgt_id, mpirank_owner, params%number_blocks )
 

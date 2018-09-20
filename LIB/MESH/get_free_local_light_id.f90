@@ -22,14 +22,14 @@
 
 subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt_active, lgt_n, ignore_error )
 
-!---------------------------------------------------------------------------------------------
-! modules
+    !---------------------------------------------------------------------------------------------
+    ! modules
 
     ! global parameters
     use module_params
 
-!---------------------------------------------------------------------------------------------
-! variables
+    !---------------------------------------------------------------------------------------------
+    ! variables
 
     implicit none
 
@@ -61,41 +61,41 @@ subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt
     last_light_id = first_light_id + (params%number_blocks - 1)
 
     if (present(lgt_n) .and. present(lgt_active)) then
-      ! if an active list is given, extra care is taken to return a free ID
-      ! WHICH IS NOT ON THAT LIST. This may seem odd, but is required if the grid
-      ! changes in a routine - it may then happen that a new block slipps into
-      ! the active list.
+        ! if an active list is given, extra care is taken to return a free ID
+        ! WHICH IS NOT ON THAT LIST. This may seem odd, but is required if the grid
+        ! changes in a routine - it may then happen that a new block slipps into
+        ! the active list.
 
-      ! loop over the range of light IDs belonging to proc "mpirank"
-      do k = first_light_id, last_light_id
-        ! check: if the block is not active, then we found a free block to return
-        if ( lgt_block(k,1) == -1 ) then
-          ! we found d block inactive, but check the active list
-          valid = .true.
-          ! check if point is on active list:
-          do i = 1, lgt_n
-            if ( lgt_active(i) == k) then
-              valid = .false.
-            endif
-          enddo
-          if (valid) then
-            lgt_free_id = k
-            exit
-          endif
-        end if
-      end do
+        ! loop over the range of light IDs belonging to proc "mpirank"
+        do k = first_light_id, last_light_id
+            ! check: if the block is not active, then we found a free block to return
+            if ( lgt_block(k,1) == -1 ) then
+                ! we found d block inactive, but check the active list
+                valid = .true.
+                ! check if point is on active list:
+                do i = 1, lgt_n
+                    if ( lgt_active(i) == k) then
+                        valid = .false.
+                    endif
+                enddo
+                if (valid) then
+                    lgt_free_id = k
+                    exit
+                endif
+            end if
+        end do
 
     else
-      ! without active list in the call, just take any inactive block
+        ! without active list in the call, just take any inactive block
 
-      ! loop over the range of light IDs belonging to proc "mpirank"
-      do k = first_light_id, last_light_id
-        ! check: if the block is not active, then we found a free block to return
-        if ( lgt_block(k,1) == -1 ) then
-          lgt_free_id = k
-          exit
-        end if
-      end do
+        ! loop over the range of light IDs belonging to proc "mpirank"
+        do k = first_light_id, last_light_id
+            ! check: if the block is not active, then we found a free block to return
+            if ( lgt_block(k,1) == -1 ) then
+                lgt_free_id = k
+                exit
+            end if
+        end do
 
     endif
 

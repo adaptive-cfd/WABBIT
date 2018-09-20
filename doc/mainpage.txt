@@ -42,7 +42,6 @@
 !!                 $ export LD_RUN_PATH=$LD_LIBRARY_PATH
 !!
 !> \section tutorials_sec Tutorials
-!! 
 !> \subsection tut1 General
 !! After the installation of WABBIT it is possible to run simulations with the existing physics modules. For the different modules .ini-files can be found in the TESTING directory. These can be adapted and used for first simulations. After adapting the .ini-file a simulation can be started with
 !!
@@ -54,7 +53,7 @@
 !!
 !! For visulization of the results it is usefull to use the tool <a href="https://github.com/pseudospectators/mpi2vis">mpi2vis</a>
 !!
-!! Having installed mpi2vis and added the hdf2xmf.py-file to your binaries calculated results can be visualized by first running 
+!! Having installed mpi2vis and added the hdf2xmf.py-file to your binaries calculated results can be visualized by first running
 !!
 !!                 $ hdf2xmf.py
 !!
@@ -63,10 +62,10 @@
 !!                 $ paraview ALL2.xmf
 !!
 !> \subsection tut2 Pressure Blob
-!! This tutorial demonstrates the evolution of a Gaussian pressure blob of a given radius over time in a 2D environment. In this tutorial, 
-!! the Navier-Stokes equations are used as the physics model. To run the simulation, the general tutorial described above can be used after the ini file is modified. 
-!! The following ini file has to be used to create the desired results of a 2 D Gaussian pressure blob evolution: 
-!!                  
+!! This tutorial demonstrates the evolution of a Gaussian pressure blob of a given radius over time in a 2D environment. In this tutorial,
+!! the Navier-Stokes equations are used as the physics model. To run the simulation, the general tutorial described above can be used after the ini file is modified.
+!! The following ini file has to be used to create the desired results of a 2 D Gaussian pressure blob evolution:
+!!
 !!                 $  ############################################                                   ###############################################
 !!                 $  ############################################ WABBIT 2 D PRESSURE BLOB TUTORIAL ###############################################
 !!                 $  ############################################               INI FILE            ###############################################
@@ -76,7 +75,7 @@
 !!                 $  ; 2D or 3D problem?
 !!                 $  dim=2;
 !!                 $  domain_size=6 3;
-!!                 $  
+!!                 $
 !!                 $  [Blocks]
 !!                 $  ; size of each block, should be odd (17, 33, 65 etc)
 !!                 $  number_block_nodes=17;129;17;33;
@@ -104,14 +103,14 @@
 !!                 $  ; sfc_z  -> space filling curve -> z-curve
 !!                 $  ; sfc_hilbert -> hilbert space filling curve
 !!                 $  block_dist=sfc_hilbert;
-!!                 $  
+!!                 $
 !!                 $  [Saving]
 !!                 $  ; TODO: maybe this section is clumsy and should be revised.
 !!                 $  ; how many fields are you going to save?
 !!                 $  N_fields_saved=5;
 !!                 $  ; how are the fields labeled?
 !!                 $  field_names=rho Ux Uy p vort;
-!!                 $  
+!!                 $
 !!                 $  [Time]
 !!                 $  ; final time to reach in simulation
 !!                 $  time_max=0.01;
@@ -132,7 +131,7 @@
 !!                 $  ; largest time step, if you want to set one. dt is always smaller than that, if the
 !!                 $  ; value is greater 0. default is 0.0, so not used.
 !!                 $  dt_max=0.0;
-!!                 $  
+!!                 $
 !!                 $  [Physics]
 !!                 $  ; what physics module is used?
 !!                 $  ; [ACM-new, ConvDiff-new, navier_stokes]
@@ -141,7 +140,7 @@
 !!                 $  ; case details are given in the corresponding subsection for each physics module.
 !!                 $  ; [ physics-module | read_from_files]
 !!                 $  initial_cond=physics-module;
-!!                 $  
+!!                 $
 !!                 $  [Navier_Stokes]
 !!                 $  ; adiabatic coefficient
 !!                 $  gamma_=1.4;
@@ -159,7 +158,7 @@
 !!                 $  initial_velocity=0.0 0.0 0;
 !!                 $  initial_temperature=200;
 !!                 $  initial_density=1.645;
-!!                 $  
+!!                 $
 !!                 $  [Discretization]
 !!                 $  ; order of derivatives [ FD_2nd_central | FD_4th_central_optimized ]
 !!                 $  order_discretization=FD_4th_central_optimized;
@@ -167,7 +166,7 @@
 !!                 $  order_predictor=multiresolution_4th;
 !!                 $  ; filter type [no_filter | explicit_5pt | explicit_7pt | explicit_9pt | explicit_11pt | wavelet | bogey_shock]
 !!                 $  filter_type=no_filter;
-!!                 $  
+!!                 $
 !!                 $  [Debug]
 !!                 $  ; 1 ... debuging for time measurements and testcases is active,
 !!                 $  debug=1;
@@ -178,7 +177,7 @@
 !!                 $  test_ghost_nodes_synch=1;
 !!                 $  test_treecode=0;
 !!
-!! After running the simulation, the physical fields are obtained. Using mpi2vis, the hdf files can be converted to xmf files that can be visualized using Paraview or similar software. 
+!! After running the simulation, the physical fields are obtained. Using mpi2vis, the hdf files can be converted to xmf files that can be visualized using Paraview or similar software.
 !! Subsequently, the density distribution is shown for the final time step:
 !> \image html pressure_blob_density_no_filter.png width=600
 !! plus its evolution over time:

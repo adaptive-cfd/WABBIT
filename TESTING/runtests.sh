@@ -17,6 +17,10 @@ if [ -z "$mpi_command" ]; then
     export mpi_command="nice mpiexec -n ${nprocs}"
 fi
 
+if [ "${memory}" == "" ]; then
+    export memory="--memory=5.0GB"
+fi
+
 fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'
 end_color=$'\033[0m'
@@ -58,7 +62,8 @@ sad_sum=0
 numtests=0
 
 echo "employed command for parallel exec: " $mpi_command
-echo "to modify the command, set \$nprocs, \$mpi_command in shell"
+echo "memory flag for wabbit is: " $memory
+echo "to modify the command, export \$memory, \$mpi_command in shell "
 echo "   "
 
 if [ $nprocs != 4 ]; then
@@ -86,11 +91,11 @@ do
         ./${ts} > $logfile
 
         if [ $? == 0 ]; then
-            printf "%s \n" "${pass_color}pass${end_color}"
+            printf "%s \n" "${pass_color} pass ${end_color}"
             happy_sum=$((happy_sum+1))
             summary[$numtests]=0
         else
-            printf "%s \n" "${fail_color}fail${end_color}"
+            printf "%s \n" "${fail_color} fail ${end_color}"
             sad_sum=$((sad_sum+1))
             summary[$numtests]=1
         fi

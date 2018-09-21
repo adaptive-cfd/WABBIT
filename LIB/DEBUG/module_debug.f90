@@ -35,7 +35,7 @@ module module_debug
     !**********************************************************************************************
     ! These are the important routines that are visible to other modules:
     !**********************************************************************************************
-    PUBLIC :: write_debug_times,toc,timing_next_timestep,summarize_profiling,write_block_distribution, &
+    PUBLIC :: write_debug_times, toc, timing_next_timestep, summarize_profiling, write_block_distribution, &
               write_neighbors, write_lgt_data
     !*********************************************************************************************
     !> global user defined debug structure

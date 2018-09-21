@@ -24,7 +24,8 @@
 !> \image html load_balancing.svg width=500
 ! ********************************************************************************************
 
-subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work)
+subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,9 +44,11 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
+    integer(kind=ik), intent(inout)     :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
@@ -53,25 +56,18 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
 
-    integer(kind=ik), allocatable, save :: buffer_light( : )
     ! MPI error variable
     integer(kind=ik)                    :: ierr
     ! process rank
     integer(kind=ik)                    :: rank, proc_dist_id, proc_data_id
     ! number of processes
     integer(kind=ik)                    :: number_procs
-    ! MPI message tag
-    integer(kind=ik)                    :: tag
-    ! MPI status
-    integer                             :: status(MPI_status_size)
     ! block distribution lists
     integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
     ! loop variables
     integer(kind=ik)                    :: k, N, l, com_i, com_N, heavy_id, sfc_id, neq
-    ! size of data array
-    integer(kind=ik)                    :: data_size
     ! free light/heavy data id
-    integer(kind=ik)                    :: lgt_free_id, hvy_free_id, lgt_id
+    integer(kind=ik)                    :: lgt_free_id, hvy_free_id
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1
     ! space filling curve list
@@ -90,11 +86,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! start time
     t0 = MPI_Wtime()
 
-    tag = 0
-
     ! MPI_parameters
     rank = params%rank
     number_procs = params%number_procs
+
     ! allocate block to proc lists
     if (.not.allocated(opt_dist_list)) allocate( opt_dist_list(1:number_procs))
     if (.not.allocated(dist_list)) allocate( dist_list(1:number_procs))
@@ -106,16 +101,9 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! and for each block, we store the space-filling-curve-index and the lgt ID
     if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( size(lgt_block,1), 2) )
 
-    ! allocate buffer arrays
-    if (.not.allocated(buffer_light)) allocate( buffer_light( params%number_blocks ) )
-
     ! number of blocks
     N = params%number_blocks
     neq = params%n_eqn
-
-    ! size of data array, use for readability
-    data_size = size(hvy_block,1) * size(hvy_block,2) * size(hvy_block,3) * size(hvy_block,4)
-
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -323,7 +311,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             call toc( params, "balance_load (SFC+sort)", MPI_wtime()-t1 )
 
             !---------------------------------------------------------------------------------
-            ! 2nd: plan communication
+            ! 2nd: plan communication (fill list of blocks to transfer)
             !---------------------------------------------------------------------------------
             t1 = MPI_wtime()
             ! proc_dist_id: process responsible for current part of sfc
@@ -391,106 +379,12 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             !---------------------------------------------------------------------------------
             ! 3rd: actual communication (send/recv)
             !---------------------------------------------------------------------------------
-            ! loop over com list, and sen / recv data.
-            ! note: delete com list elements after send/receive and if proc not
-            ! responsible for com list entry.
-            ! NOTE: we try to send as many blocks as possible at one time, not just one
-            ! block at a time. The com_list already has a very nice structure, there is no
-            ! need to sort them (Thomas, 13/03/2018), on the contrary, sorting ended oup with
-            ! more communications
-            do k = 1, com_i
-                ! com list element is active
-                if ( sfc_com_list(k, 1) /= -1 ) then
-
-                    !-----------------------------------------------------------
-                    ! I am the sender in this operation?
-                    !-----------------------------------------------------------
-                    if ( sfc_com_list(k, 1) == rank ) then
-
-                        ! create send buffer, search list, send next l blocks to the same receiver
-                        l = 0
-                        do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
-                            lgt_id = sfc_com_list(k+l, 3)
-                            ! calculate heavy id from light id
-                            call lgt_id_to_hvy_id( heavy_id, lgt_id, rank, params%number_blocks )
-
-                            ! send buffer: fill buffer, heavy data
-                            hvy_work(:, :, :, 1:neq, l+1 ) = hvy_block(:, :, :, 1:neq, heavy_id )
-                            ! ... light data
-                            buffer_light( l+1 ) = lgt_id
-
-                            !..then delete what I just got rid of
-                            hvy_block(:, :, :, :, heavy_id) = 0.0_rk
-                            lgt_block(lgt_id, : ) = -1
-
-                            ! go to next element
-                            l = l + 1
-                        end do
-
-                        ! send data
-                        call MPI_Send( buffer_light(1:l), l, MPI_INTEGER4, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
-                        call MPI_Send( hvy_work(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, sfc_com_list(k, 2), tag, WABBIT_COMM, ierr)
-
-                        ! delete all com list elements
-                        sfc_com_list(k:k+l-1, :) = -1
-
-                    !-----------------------------------------------------------
-                    ! I am the receiver in this operation?
-                    !-----------------------------------------------------------
-                    elseif ( sfc_com_list(k, 2) == rank ) then
-
-                        ! count received data sets, recv next l blocks from the sender
-                        l = 1
-                        do while ( (sfc_com_list(k+l, 1) == sfc_com_list(k, 1)) .and. (sfc_com_list(k+l, 2) == sfc_com_list(k, 2)) )
-
-                            ! delete element
-                            sfc_com_list(k+l, :) = -1
-
-                            ! go to next element
-                            l = l + 1
-                        end do
-
-                        ! receive data
-                        call MPI_Recv( buffer_light(1:l), l, MPI_INTEGER4, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
-                        call MPI_Recv( hvy_work(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, sfc_com_list(k, 1), tag, WABBIT_COMM, status, ierr)
-
-                        ! delete first com list element after receiving data
-                        sfc_com_list(k, :) = -1
-
-                        ! save comm count
-                        com_N = l
-
-                        ! loop over all received blocks
-                        do l = 1,  com_N
-                            ! fetch a free light id slot on my rank
-                            call get_free_local_light_id( params, rank, lgt_block, lgt_free_id )
-                            call lgt_id_to_hvy_id( hvy_free_id, lgt_free_id, rank, N )
-
-                            ! copy the data from the buffers
-                            lgt_block( lgt_free_id, :) = lgt_block( buffer_light(l), : )
-                            hvy_block(:, :, :, 1:neq, hvy_free_id) = hvy_work(:, :, :, 1:neq, l)
-
-                        end do
-                    else
-                        ! I am not concerned by this operation, delete element
-                        sfc_com_list(k, :) = -1
-                    end if
-                end if
-            end do
+            call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, lgt_active, &
+                 lgt_n, lgt_sortednumlist, hvy_work )
             call toc( params, "balance_load (comm)", MPI_wtime()-t1 )
 
-            !---------------------------------------------------------------------------------
-            ! 4th: synchronize light data
-            !---------------------------------------------------------------------------------
-            t1 = MPI_wtime()
-            call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
-            call toc( params, "balance_load (sync_lgt)", MPI_wtime()-t1 )
-
         case default
-            write(*,'(80("_"))')
-            write(*,*) "ERROR: block distribution scheme is unknown"
-            write(*,*) params%block_distribution
-            call abort(1882, "ERROR: block distribution scheme is unknown")
+            call abort(2009182147, "[balance_load.f90] ERROR: block distribution scheme is unknown")
 
     end select
 

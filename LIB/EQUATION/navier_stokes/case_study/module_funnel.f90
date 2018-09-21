@@ -2,22 +2,7 @@
 !-----------------------------------------------------------------
 !> \file
 !> \brief
-!! Module for volume penaliza \f$\chi(x,t)\f$
-!> \details
-!> This module implements the mask function on each Block
-!!          \f[
-!!                           \chi(x,t)\quad \forall\;  x\in\mathcal{–}^l
-!!            \f]
-!!                        for Volume penalization
-!> To increase peformance there are certain tasks:
-!> \todo
-!>       + include update flag: block_updated
-!>                - if true the mask needs to be computed again
-!>                - if false the grid has not changed on the proc rank and the mask function stays
-!!                  the same
-!!       + maybe it is better to have a global mask on the finest grid level and coarsen it for
-!!         lower levels on the specific Blocks
-!!
+!! Module of 2D/3D ion funnel
 !> \version 23.2.2018
 !> \author P.Krah
 !-----------------------------------------------------------------

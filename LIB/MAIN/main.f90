@@ -151,6 +151,11 @@ program main
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
+#ifdef BLOCKINGSENDRECV
+        write(*,'("MPI: code build with blocking send/recv in transfer (block_xfer_blocking.f90)")')
+#else
+        write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
+#endif
     end if
 
 
@@ -162,7 +167,6 @@ program main
 
     ! unit test off
     params%unit_test    = .false.
-
 
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
@@ -349,6 +353,15 @@ program main
              close(14)
         end if
 
+        ! statistics
+        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+            ! we need to sync ghost nodes for some derived qtys, for sure
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+            call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+            params%next_stats_time = params%next_stats_time + params%tsave_stats
+        endif
+
         !***********************************************************************
         ! Adapt mesh (coarsening where possible)
         !***********************************************************************
@@ -361,14 +374,6 @@ program main
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
 
-        ! statistics
-        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
-          ! we need to sync ghost nodes for some derived qtys, for sure
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-
-          call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
-          params%next_stats_time = params%next_stats_time + params%tsave_stats
-        endif
 
         ! write data to disk
         if ( it_is_time_to_save_data) then

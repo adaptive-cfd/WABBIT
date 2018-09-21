@@ -64,6 +64,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   ! check out how many sisters we look for. The number can be 4 or 8 in 2D or 3D. Note the
   ! block whose sisters we look for is returned as well
   N_sisters = size(lgt_sisters_id)
+
   if ( N_sisters /= 4 .and. N_sisters /= 8 ) then
     call abort(123123, "find_sisters: you don't ask for a valid number of sisters")
   endif
@@ -87,18 +88,18 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
 
 
   do i = 1, N_sisters
-      if ( i-1 == lgt_block( lgt_my_id, my_level ) ) then
+      if ( i-1 == lgt_block(lgt_my_id, my_level) ) then
           ! this is the block itself, no need to look for it
           lgt_sisters_id(i) = lgt_my_id
 
       else
           ! copy the identical mother level
-          all_treecodes(i,1:mother_level) = lgt_block( lgt_my_id, 1:mother_level )
+          all_treecodes(i,1:mother_level) = lgt_block(lgt_my_id, 1:mother_level)
           ! the last index is (0..3) or (0..7)
           all_treecodes(i,mother_level+1) = i-1
           ! look for the sisters in the list of blocks (light data), store their ID if found
           ! (-1 otherwise)
-          call does_block_exist( all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
+          call does_block_exist(all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
 
       end if
   enddo

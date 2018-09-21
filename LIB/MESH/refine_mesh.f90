@@ -72,6 +72,20 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
 
+    ! if the refinement is "everwhere" and we use filtering on the max level
+    ! (force_maxlvel_dealiasing=1), then we end up with exactly 8*hvy_n blocks (on this rank)
+    ! and we can say right now if the memory is sufficient or not. Advantage: you
+    ! get a cleaner error message than the one issued by get_free_local_light_id
+    if ( indicator == "everywhere" .and. params%force_maxlevel_dealiasing ) then
+        if ( (2**params%dim)*hvy_n > params%number_blocks ) then
+            write(*,'("On rank:",i5," hvy_n=",i6," which will give ",i1,"*hvy_n=",i7," but limit is ",i6)') &
+            params%rank, hvy_n, 2**params%dim, (2**params%dim)*hvy_n, params%number_blocks
+
+            call abort (1909181827,"[refine_mesh.f90]: The refinement step will fail because we do not&
+            & have enough memory. Try increasing --memory.")
+        endif
+    endif
+
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
     call refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
@@ -130,7 +144,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     !! output of adapt_mesh.)
     if (params%force_maxlevel_dealiasing .eqv. .false.) then
         t1 = MPI_Wtime()
-        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_active, hvy_n, hvy_work )
         call toc( params, "refine_mesh (balance_load)", MPI_Wtime()-t1 )
 

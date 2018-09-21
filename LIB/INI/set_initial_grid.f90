@@ -220,7 +220,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! balance the load
-    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work)
+    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, hvy_work)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks

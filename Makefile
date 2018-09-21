@@ -35,6 +35,19 @@ FC = mpif90
 endif
 
 #-------------------------------------------------------------------------------
+# PRAGMAS part.
+#-------------------------------------------------------------------------------
+# we really should avoid as many PRAGMAS as possible, but some things just cannot
+# be done without them. Use them ONLY for machine or compiler dependent settings
+# AND NEVER FOR PHYSICS MODULES (e.g. switching the viscosity)
+#
+# PRAGMAS are added in the compiler specific section, but here is their list:
+# NOHDF5 : if set, all dependency of HDF5 is removed. The code can not save output anymore.
+#          useful for developmend on some machines only. use only if absolutely necessary
+#          NOT IMPLEMENTED YET
+# BLOCKINGSENDRECV
+
+#-------------------------------------------------------------------------------
 # COMPILER-DEPENDEND PART
 #-------------------------------------------------------------------------------
 # GNU compiler
@@ -43,7 +56,7 @@ ifeq ($(shell $(FC) --version 2>&1 | head -n 1 | head -c 3),GNU)
 # Specify directory for compiled modules:
 FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -O3 -ffree-line-length-none
-PPFLAG= -cpp #preprocessor flag
+PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
 FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
@@ -55,6 +68,9 @@ HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
+# for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
+# different pragmas are space-separated
+PRAGMAS = #-DBLOCKINGSENDRECV
 endif
 
 #-------------------------------------------------------------------------------
@@ -62,7 +78,7 @@ endif
 #-------------------------------------------------------------------------------
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
-PPFLAG = -fpp
+PPFLAG = -fpp # preprocessor flag
 FFLAGS += -FR -O3 -heap-arrays
 # debug flags: attention they might disable all optimization!
 # FFLAGS += -warn all,nounused -traceback -check bounds -debug all -check all,noarg_temp_created
@@ -74,6 +90,9 @@ HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
 FFLAGS += -I$(HDF_INC)
+# for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
+# different pragmas are space-separated
+PRAGMAS = # -DBLOCKINGSENDRECV
 endif
 
 #-------------------------------------------------------------------------------
@@ -84,12 +103,19 @@ ifeq ($(shell $(FC) -qversion 2>&1 | head -c 3),IBM)
 #code below are of two different types; ct0 is double precision and -0.999
 #is single (-0.999d0 would be double). If you want xlf to auto-promote
 #single precision constants to doubles, add the compiler option "-qdpc".
-FFLAGS += -O5 -qdpc -qmoddir=$(OBJDIR)
+FFLAGS += -O4 -qdpc -qmoddir=$(OBJDIR)
 FFLAGS += -qnohot
 #FFLAGS += -C -qflttrap=overflow:underflow:nanq:zerodivide:qpxstore:enable -qsigtrap -g9 -qnoopt -qfullpath
 FFLAGS += -I$(OBJDIR)
+PPFLAG=-qsuffix=cpp=f90  #preprocessor flag
+# for IBMXLF95 PRAGMAS=-WF,-DIFORT will turn #ifdef IFORT to true in the code
+# here different PRAGMAS are comma separated (NO SPACES!!!)
+# NOTE first pragma (if any is used) MUST be -WF,
+PRAGMAS = -WF,-DBLOCKINGSENDRECV
 endif
 
+# add the PRAGMAS to FFLAGS: (for all compilers)
+FFLAGS += $(PPFLAG) $(PRAGMAS)
 
 
 # Both programs are compiled by default.
@@ -224,9 +250,9 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	compute_friends_table.f90 compute_affinity.f90 treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
     treecode_to_hilbertcode_3D.f90 update_neighbors_3D.f90 find_neighbor_face_3D.f90 find_neighbor_edge_3D.f90 find_neighbor_corner_3D.f90 \
     refinement_execute_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 \
-	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 gather_blocks_on_proc.f90 \
+	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 \
 	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 grid_coarsening_indicator.f90 \
-	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90
+	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90 block_xfer_nonblocking.f90 block_xfer_blocking.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
@@ -261,11 +287,6 @@ doc:
 	firefox doc/output/html/index.html &
 test:
 	./TESTING/runtests.sh
-
-check-environment:
-ifndef HDF_ROOT
-$(error Please export HDF_ROOT before compiling WABBIT)
-endif
 
 # If the object directory doesn't exist, create it.
 .PHONY: directories

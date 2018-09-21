@@ -20,7 +20,7 @@ subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
   !> light data array
   integer(kind=ik), intent(in)               :: lgt_block(:, :)
   ! loop variables and shortcuts
-  integer(kind=ik)                           :: ix,iy,iz,level,bs
+  integer(kind=ik)                           :: ix, iy ,iz, level, bs
 
   bs = params%Bs
 

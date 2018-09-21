@@ -11,13 +11,15 @@
 ! Q: Wouldn't it be nicer to wait elsewhere, in order to do some stuff while we wait?
 ! A: well, the question is how much you can do and where you wait. I don't think the
 ! performance is better. note you have to wait somewhere! always!
-
-subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+!
+! NOTE: We expect the xfer_list to be identical on all ranks
+subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_work )
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> list of transfers (:,1) lgt id to transfer (:,2) mpirank to transfer to
+    !> list of transfers (:,1)=sender (:,2)=recv (:,3)=lgt_id
     integer(kind=ik), intent(inout)     :: xfer_list(:,:)
     integer(kind=ik), intent(in)        :: N_xfers
     !> light data array
@@ -30,8 +32,10 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
     integer(kind=ik), intent(inout)     :: lgt_n
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
+    !> heavy work data array - block data.
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
 
-    integer(kind=ik) :: k, lgt_id, mpirank_newowner, mpirank_owner, myrank
+    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag
 
     ! array of mpi requests, taken from stack. for extremely large N_xfers, that can cause stack problems
@@ -56,16 +60,16 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
 
     do k = k_start, N_xfers
         ! we will transfer this block:
-        lgt_id = xfer_list(k,1)
+        lgt_id = xfer_list(k,3)
 
-        ! from its current owner: "mpirank_owner"
-        call lgt_id_to_proc_rank( mpirank_owner, lgt_id, params%number_blocks )
+        ! from its current owner: "mpirank_sender"
+        mpirank_sender = xfer_list(k,1)
 
         ! to its new owner:
-        mpirank_newowner = xfer_list(k,2)
+        mpirank_recver = xfer_list(k,2)
 
         ! its new light id will be "lgt_id_new"
-        call get_free_local_light_id( params, mpirank_newowner, lgt_block, lgt_id_new, ignore_error=.true. )
+        call get_free_local_light_id( params, mpirank_recver, lgt_block, lgt_id_new, ignore_error=.true. )
 
         ! the idea is now if w do not have enough memory (ie no free block on target rank) we can
         ! wait until the current requests are finnished. Then we retry the loop.
@@ -81,7 +85,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
         tag = lgt_id
 
         ! Am I the target rank who receives this block of data?
-        if (myrank == mpirank_newowner) then
+        if (myrank == mpirank_recver) then
             !-------------------------------------------------------------------
             ! RECV CASE
             !-------------------------------------------------------------------
@@ -91,24 +95,24 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
             ireq = ireq + 1
 
             ! open channel to receive one block.
-            call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_owner, &
+            call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_sender, &
             tag, WABBIT_COMM, requests(ireq), ierr)
 
             if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] MPI_irecv failed!")
 
         ! Am I the owner of this block, so will I have to send data?
-        elseif (myrank == mpirank_owner) then
+    elseif (myrank == mpirank_sender) then
             !-------------------------------------------------------------------
             ! SEND CASE
             !-------------------------------------------------------------------
             ! what heavy ID (on its owner proc, which is me) does the block have?
-            call lgt_id_to_hvy_id( hvy_id, lgt_id, mpirank_owner, params%number_blocks )
+            call lgt_id_to_hvy_id( hvy_id, lgt_id, mpirank_sender, params%number_blocks )
 
             ireq = ireq + 1
 
             ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
             ! we have to wait for the MPI_REQUEST to be finnished.
-            call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, mpirank_newowner, tag, &
+            call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
             WABBIT_COMM, requests(ireq), ierr)
 
             if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] MPI_isend failed!")
@@ -132,7 +136,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
     ! so now, we can safely delete the original blocks
     do k = 1, N_xfers
         ! delete block. it has been moved previously, and now we delete the original
-        lgt_block( xfer_list(k,1), 1 ) = -1
+        lgt_block( xfer_list(k,3), 1 ) = -1
     enddo
 
     ! it may happen that we cannot execute a xfer because the target ranks has no more memory left

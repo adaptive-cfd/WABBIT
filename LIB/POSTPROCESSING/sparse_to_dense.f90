@@ -141,7 +141,7 @@ subroutine sparse_to_dense(params)
 
     ! balance the load
     call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, hvy_active, hvy_n, hvy_work)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work)
 
     ! create lists of active blocks (light and heavy data) after load balancing (have changed)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
@@ -163,7 +163,8 @@ subroutine sparse_to_dense(params)
         ! this might not be necessary since we start from an admissible grid
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_active, hvy_n, hvy_work)
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
             hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
@@ -196,7 +197,7 @@ subroutine sparse_to_dense(params)
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
+        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work )
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     call write_field(file_out, time, iteration, 1, params, lgt_block, &

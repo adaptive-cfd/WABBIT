@@ -9,7 +9,8 @@
 !! \date 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
 !!            subroutines
 ! ********************************************************************************************
-subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    hvy_active, hvy_n, hvy_work )
     implicit none
 
     !> user defined parameter structure
@@ -28,6 +29,8 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_n
+    !> heavy work data array - block data.
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
 
     ! loop variables
     integer(kind=ik)                    :: k, maxtl, N, j
@@ -44,7 +47,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
-    if (.not. allocated(xfer_list)) allocate(xfer_list(size(lgt_block,1),2))
+    if (.not. allocated(xfer_list)) allocate(xfer_list(size(lgt_block,1),3))
 
     ! transfer counter
     n_xfer = 0
@@ -76,17 +79,16 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
                 call lgt_id_to_proc_rank( mpirank_owners(j), light_ids(j), params%number_blocks )
             enddo
 
-            ! Check which CPU holds this block. The CPU will also hold the merged, new block
-            call lgt_id_to_proc_rank( data_rank, lgt_active(k), params%number_blocks )
-            !====> to replace by
-            ! data_rank = find_most_common_array_element(mpirank_owners)
+            ! The merging will be done on the mpirank which holds the most of the sister blocks
+            data_rank = most_common_element( mpirank_owners(1:N) )
 
             do j = 1, N
                 if (mpirank_owners(j) /= data_rank) then
                     ! MPI xfer required. Add the xfer to the list
                     n_xfer = n_xfer + 1
-                    xfer_list(n_xfer, 1) = light_ids(j) ! transfer this block ...
-                    xfer_list(n_xfer, 2) = data_rank    ! ... to this rank
+                    xfer_list(n_xfer, 1) = mpirank_owners(j)  ! send from this rank ..
+                    xfer_list(n_xfer, 2) = data_rank          ! ... to this rank
+                    xfer_list(n_xfer, 3) = light_ids(j)       ! transfer this block
                 endif
 
                 ! don't forget: mark all 4/8 sisters as treated here, in order not to trigger this
@@ -97,10 +99,13 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     enddo
 
     ! actual xfer
-    call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist )
+    call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_work )
 
-    ! the active lists are outdates after the transfer: we need to create them or find_sisters will not be able to do its job
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    ! the active lists are outdates after the transfer: we need to create
+    ! them or find_sisters will not be able to do its job
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
+    hvy_n, lgt_sortednumlist, .true. )
 
     ! actual merging
     do k = 1, lgt_n

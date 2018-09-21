@@ -27,7 +27,7 @@ module module_mesh
     use module_boundary_conditions
 
     ! used in coarse_mesh
-    use module_helpers, only: most_common_element 
+    use module_helpers, only: most_common_element
 
     implicit none
 
@@ -37,7 +37,12 @@ contains
 
     ! create all active (lgt/hvy) lists, create also sorted lgt data list
     include "create_active_and_sorted_lists.f90"
-    include "block_xfer.f90"
+
+#ifdef BLOCKINGSENDRECV
+    include "block_xfer_blocking.f90"
+#else
+    include "block_xfer_nonblocking.f90"
+#endif
 
     ! update neighbors, 2D/3D
     include "update_neighbors.f90"

@@ -136,7 +136,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_active, hvy_n, hvy_work )
         ! CPU timing (only in debug mode)
         call toc( params, "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
@@ -176,7 +177,10 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !! be balanced, so we have to balance load now
     if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load .or. time<1.0e-10_rk) then
         t0 = MPI_Wtime()
-        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work )
+
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work )
+
         call toc( params, "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
         never_balanced_load = .false.
 

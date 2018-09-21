@@ -1,0 +1,20 @@
+/*!
+  \page NStokes Navier Stokes Module
+
+  \section NS_structure Program Structure
+  The following flow chart should give an overview of the current
+  layout of the Navier Stokes module
+  \image html flowchart_navier_stokes.svg  (Flow chart added 20. September 18)
+
+\section NS_mod_descript Description of the Modules
+  Implemntations of the Navier Stokes core modules:
+    + \link module_navier_stokes.f90 \endlink \n
+    + \link module_navier_stokes_params.f90 \endlink\n
+    + \link module_ns_penalization.f90 \endlink \n
+\n
+  Implementations of the Navier Stokes cases:
+    + \link module_funnel.f90 \endlink \n
+    + \link module_shock.f90 \endlink\n
+    + \link module_simple_geometry.f90 \endlink
+
+*/

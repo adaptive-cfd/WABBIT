@@ -272,7 +272,7 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
 
     rhs(:,:,:,3) = rhs(:,:,:,3) + fric_v
 
-    ! RHS of  momentum equation for v
+    ! RHS of  momentum equation for w
     call diff1x_zentral_3D( Bs, g, dx, (u * rho * w), dummy)
     rhs(:,:,:,4) = - 0.5_rk * dummy
     call diff1y_zentral_3D( Bs, g, dy, (v * rho * w), dummy)
@@ -280,9 +280,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
     call diff1z_zentral_3D( Bs, g, dz, (w * rho * w), dummy)
     rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * dummy
 
-    rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * rho * u * v_x
-    rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * rho * v * v_y
-    rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * rho * w * v_z
+    rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * rho * u * w_x
+    rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * rho * v * w_y
+    rhs(:,:,:,4) = rhs(:,:,:,4) - 0.5_rk * rho * w * w_z
 
     rhs(:,:,:,4) = rhs(:,:,:,4) - p_z
 
@@ -373,15 +373,14 @@ subroutine  diffx_c_3D( Bs, g, dx, u, dudx)
 
     n = size(u,2)
 
-    dudx(1,:,:) = ( u(n-1,:,:) - 8.0_rk*u(n,:,:) + 8.0_rk*u(2,:,:) - u(3,:,:) ) / (12.0_rk*dx)
-    dudx(2,:,:) = ( u(n,:,:)   - 8.0_rk*u(1,:,:) + 8.0_rk*u(3,:,:) - u(4,:,:) ) / (12.0_rk*dx)
+    dudx(1,:,:) = ( u(2,:,:) - u(1,:,:) ) / (dx)
+    dudx(2,:,:) = ( u(3,:,:) - u(1,:,:) ) / (2.0_rk*dx)
 
     forall ( i = 3:n-2 )
        dudx(i,:,:) = ( u(i-2,:,:) - 8.0_rk*u(i-1,:,:) + 8.0_rk*u(i+1,:,:) - u(i+2,:,:) ) / (12.0_rk*dx)
     end forall
-
-    dudx(n-1,:,:) = ( u(n-3,:,:) - 8.0_rk*u(n-2,:,:) + 8.0_rk*u(n,:,:) - u(1,:,:) ) / (12.0_rk*dx)
-    dudx(n,:,:)   = ( u(n-2,:,:) - 8.0_rk*u(n-1,:,:) + 8.0_rk*u(1,:,:) - u(2,:,:) ) / (12.0_rk*dx)
+    dudx(n-1,:,:) = ( u(n,:,:) - u(n-2,:,:) ) / (2.0_rk*dx)
+    dudx(n,:,:)   = ( u(n,:,:) - u(n-1,:,:) ) / (dx)
 
 end subroutine diffx_c_3D
 
@@ -398,15 +397,16 @@ subroutine  diffy_c_3D( Bs, g, dy, u, dudy)
 
     n = size(u,3)
 
-    dudy(:,1,:) = ( u(:,n-1,:) - 8.0_rk*u(:,n,:) + 8.0_rk*u(:,2,:) - u(:,3,:) ) / (12.0_rk*dy)
-    dudy(:,2,:) = ( u(:,n,:)   - 8.0_rk*u(:,1,:) + 8.0_rk*u(:,3,:) - u(:,4,:) ) / (12.0_rk*dy)
+    dudy(:,1,:) = ( u(:,2,:) - u(:,1,:) ) / (dy)
+    dudy(:,2,:) = ( u(:,3,:) - u(:,1,:) ) / (2.0_rk*dy)
 
     forall ( i = 3:n-2 )
        dudy(:,i,:) = ( u(:,i-2,:) - 8.0_rk*u(:,i-1,:) + 8.0_rk*u(:,i+1,:) - u(:,i+2,:) ) / (12.0_rk*dy)
     end forall
 
-    dudy(:,n-1,:) = ( u(:,n-3,:) - 8.0_rk*u(:,n-2,:) + 8.0_rk*u(:,n,:) - u(:,1,:) ) / (12.0_rk*dy)
-    dudy(:,n,:)   = ( u(:,n-2,:) - 8.0_rk*u(:,n-1,:) + 8.0_rk*u(:,1,:) - u(:,2,:) ) / (12.0_rk*dy)
+    dudy(:,n-1,:) = ( u(:,n,:)- u(:,n-2,:) ) / (2.0_rk*dy)
+    dudy(:,n,:)  = ( u(:,n,:)- u(:,n-1,:) ) / (dy)
+
 
 end subroutine diffy_c_3D
 
@@ -423,14 +423,14 @@ subroutine  diffz_c_3D( Bs, g, dz, u, dudz)
 
     n = size(u,1)
 
-    dudz(:,:,1) = ( u(:,:,n-1) - 8.0_rk*u(:,:,n) + 8.0_rk*u(:,:,2) - u(:,:,3) ) / (12.0_rk*dz)
-    dudz(:,:,2) = ( u(:,:,n)   - 8.0_rk*u(:,:,1) + 8.0_rk*u(:,:,3) - u(:,:,4) ) / (12.0_rk*dz)
+    dudz(:,:,1) = ( u(:,:,2) - u(:,:,1) ) / (dz)
+    dudz(:,:,2) = ( u(:,:,3) - u(:,:,1) ) / (2.0_rk*dz)
 
     forall ( i = 3:n-2 )
        dudz(:,:,i) = ( u(:,:,i-2) - 8.0_rk*u(:,:,i-1) + 8.0_rk*u(:,:,i+1) - u(:,:,i+2) ) / (12.0_rk*dz)
     end forall
 
-    dudz(:,:,n-1) = ( u(:,:,n-3) - 8.0_rk*u(:,:,n-2) + 8.0_rk*u(:,:,n) - u(:,:,1) ) / (12.0_rk*dz)
-    dudz(:,:,n)   = ( u(:,:,n-2) - 8.0_rk*u(:,:,n-1) + 8.0_rk*u(:,:,1) - u(:,:,2) ) / (12.0_rk*dz)
+    dudz(:,:,n-1) = ( u(:,:,n) - u(:,:,n-2) ) / (2.0_rk*dz)
+    dudz(:,:,n)   = ( u(:,:,n) - u(:,:,n-1) ) / (dz)
 
 end subroutine diffz_c_3D

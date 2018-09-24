@@ -39,6 +39,14 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
 
     u = 0.0_rk
 
+    if (params_acm%dim==2 .and. size(u,4)/=3) then
+        call abort(23091801,"ACM: state vector has not the right number of components")
+    endif
+
+    if (params_acm%dim==3 .and. size(u,4)/=4) then
+        call abort(23091801,"ACM: state vector has not the right number of components")
+    endif
+
     select case (params_acm%inicond)
     case("pressure-blob")
         if (params_acm%dim==2) then

@@ -254,7 +254,7 @@ subroutine add_geometry2D(penalization, x0, dx, Bs, g, phi)
 
       ! sponge
       !--------
-      call draw_simple_sponge(mask, x0, dx, Bs, g)
+      call sponge_2D(mask, x0, dx, Bs, g)
 
       penalization(:,:,rhoF)= penalization(:,:,rhoF) + C_sp_inv*mask * ( rho - rho0 )
       ! x-velocity

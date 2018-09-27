@@ -164,7 +164,7 @@ end subroutine read_case_parameters
       case('funnel')
         call draw_funnel(x0, dx, Bs, g, mask,is_colored)
       case('shock_tube')
-        call draw_simple_shock(mask(:,:,1), x0, dx, Bs, g,'boundary' )
+        call draw_simple_shock(mask(:,:,:), x0, dx, Bs, g )
       case('no')
         return
       case default

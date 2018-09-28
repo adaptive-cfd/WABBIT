@@ -286,7 +286,8 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
                                                        params%domain_size(1:params%dim) )
 
-    call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC(1:params%dim), &
+                                                       params%periodic_BC(1:params%dim) )
 
   end subroutine ini_domain
 

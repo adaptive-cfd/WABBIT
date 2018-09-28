@@ -12,7 +12,8 @@ module module_ini_files_parser_mpi
   ! the generic call "read_param" redirects to these routines, depending on the data
   ! type and the dimensionality. vectors can be read without setting a default.
   interface read_param_mpi
-    module procedure param_dbl_mpi, param_int_mpi, param_vct_mpi, param_str_mpi, param_bool_mpi, param_matrix_mpi, param_vct_str_mpi
+    module procedure param_dbl_mpi, param_int_mpi, param_vct_mpi, param_str_mpi, &
+                     param_bool_mpi, param_matrix_mpi, param_vct_str_mpi, param_boolvct_mpi
   end interface
 
 !!!!!!!!
@@ -426,6 +427,45 @@ end subroutine read_intarray_from_ascii_file_mpi
         call MPI_BCAST( params_bool, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
       end subroutine param_bool_mpi
 
+
+        !-------------------------------------------------------------------------------
+        ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
+        ! Displays what it does on stdout (so you can see whats going on)
+        ! Input:
+        !       PARAMS: the complete *.ini file
+        !       section: the section we're looking for
+        !       keyword: the keyword we're looking for
+        !       defaultvalue: if the we can't find a vector, we return this and warn
+        !       n: length of vector
+        ! Output:
+        !       params_vector: this is the parameter you were looking for
+        !-------------------------------------------------------------------------------
+        subroutine param_boolvct_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+          implicit none
+          ! Contains the ascii-params file
+          type(inifile), intent(inout) :: PARAMS
+          character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+          character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+          logical, intent(inout)       :: params_vector(1:)
+          logical, intent(in):: defaultvalue(1:)
+
+          integer :: n
+          integer :: mpicode
+          integer :: mpirank
+
+          ! fetch my process id
+          call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+          n = size(params_vector,1)
+
+          ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
+          if (mpirank==0) then
+                call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+          endif
+
+          ! And then broadcast
+          call MPI_BCAST( params_vector, n, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+        end subroutine param_boolvct_mpi
 
       !-----------------------------------------------------------------------------
       ! sometimes, it turned out to be useful to provide some values as multiples of

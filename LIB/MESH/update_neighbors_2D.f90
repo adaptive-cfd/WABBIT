@@ -120,5 +120,5 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
 
         end do
     end if
-    ! call abort(235643)
+
 end subroutine update_neighbors_2D

@@ -169,6 +169,7 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
     if ( .not. All(params%periodic_BC) ) then
         if ( block_is_adjacent_to_boundary(params,dir,my_treecode,neighbor,level,max_treelevel) ) then
             neighbor_light_id=-1
+            ! write(*,('("my=",2(i1)," neigbor ",2(i1)," dir=",A3)')) my_treecode,neighbor,dir
         endif
     end if
     ! +++++++++++++

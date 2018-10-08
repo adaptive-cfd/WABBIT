@@ -131,5 +131,4 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, lgt_block, hvy_active, 
            x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), "local_stage" , surface)
     enddo
 
-
 end subroutine RHS_wrapper

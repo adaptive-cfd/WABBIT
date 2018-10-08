@@ -51,6 +51,7 @@ tests=(
        "TESTING/conv/blob_3D_adaptive/blob3d-adaptive.sh"
        "TESTING/conv/blob_3D_equi/blob3d.sh"
        "TESTING/conv/blob_3D_nonequi/blob3d.sh"
+       "TESTING/conv/blob_convection_boundary/blob_convection_boundary.sh"
        "TESTING/conv/blob_convection_equi/blob-convection-equi.sh"
        "TESTING/conv/blob_convection_2nd_serial/blob-conv-adaptive-serial.sh"
        "TESTING/conv/blob_convection/blob-convection-adaptive.sh"

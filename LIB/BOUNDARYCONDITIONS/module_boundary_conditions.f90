@@ -20,7 +20,7 @@ module module_boundary_conditions
     PUBLIC :: get_adjacent_boundary_surface_normal,block_is_adjacent_to_boundary
     !**********************************************************************************************
 
-    character(len=3), parameter, dimension(16)  :: dir_2D  = (/ '__N', '__E', &
+    character(len=3), parameter, dimension(16)  :: DIR_2D  = (/ '__N', '__E', &
                                                           '__S', '__W', '_NE', '_NW', '_SE', &
                                                           '_SW', 'NNE', 'NNW', 'SSE', 'SSW', &
                                                           'ENE', 'ESE', 'WNW', 'WSW' /)
@@ -52,28 +52,32 @@ contains
    my_treecode  =lgt_block(lgt_id,1:max_treelevel)
    my_level     =lgt_block(lgt_id,max_treelevel+idx_mesh_lvl)
 
+   ! reset surface normal
+   surface=0
+
    do i=1,4  ! loop over the four directions N E S W
-
      ! 1. calculate the neighbor treecode in this direction
-     call adjacent_block_2D( my_treecode, neighbor, dir_2d(i), my_level,max_treelevel)
-
+     call adjacent_block_2D( my_treecode, neighbor, DIR_2D(i), my_level,max_treelevel)
      ! 2. find out if the neigbor is on the other side of the domain. If this is the case,
      !    then mark the side as boundary of the domain
      !    The boundary is crossed when the treecode changes on the coarsest level
-     if (    block_is_adjacent_to_boundary(params,dir_2D(i),my_treecode,neighbor,my_level,max_treelevel) ) then
-       surface(2) =  1 ! surface normal in the positive y direction n=e_2*1
-     elseif ( block_is_adjacent_to_boundary(params,dir_2D(i),my_treecode,neighbor,my_level,max_treelevel)) then
-       surface(1) =  1 ! surface normal in the positive x direction n=e_1*(1)
-     elseif ( block_is_adjacent_to_boundary(params,dir_2D(i),my_treecode,neighbor,my_level,max_treelevel)) then
-       surface(2) = -1 ! surface normal in the negative y direction n=e_2*(-1)
-     elseif ( block_is_adjacent_to_boundary(params,dir_2D(i),my_treecode,neighbor,my_level,max_treelevel)) then
-       surface(1) = -1 ! surface normal in the negative x direction n=e_1*(-1)
-     else
-      ! do nothing
-     endif
-
+     if (block_is_adjacent_to_boundary(params,DIR_2D(i),my_treecode,neighbor,my_level,max_treelevel) ) then
+       select case ( DIR_2D(i))
+       case( '__N' )
+         surface(1) = -1 ! surface normal in the negative x direction n=e_1*(-1)
+       case( '__W' )
+         surface(2) = -1 ! surface normal in the negative y direction n=e_2*(-1)
+       case( '__S' )
+         surface(1) = 1 ! surface normal in the positive x direction n=e_1*(1)
+       case( '__E' )
+         surface(2) =  1 ! surface normal in the positive y direction n=e_2*1
+       case default
+         call abort(2808181, "Could not determine a surface normal for the boundary block!")
+       end select
+     end if
    end do
 
+   ! write(*,('("my=",2(i1)," surf=",3(I2))')) my_treecode,surface
 
  end subroutine get_adjacent_boundary_surface_normal
 
@@ -107,7 +111,7 @@ recursive logical function block_is_adjacent_to_boundary(params,dir,my_treecode,
    !  1   |......0.......|......1.......|   0
    !      | 02   :    03 |      :       |
    !      |      :       |      :       |
-   ! ------------------------------------------
+   ! ------------------------------------------ E
    !      |      :       |      :       |
    !      |      :       |      :       |
    !   3  |......2.......|......3.......|  2
@@ -117,21 +121,28 @@ recursive logical function block_is_adjacent_to_boundary(params,dir,my_treecode,
    !      |              |              |
    !  1   |       0      |      1       |    0
 
-
-   if ( (.not. params%periodic_BC(1)) .and. &! non periodic BC in x direction
-      (neighbor(1)-my_treecode(1) == 1 .and. dir == dir_2D(2)) .or. & !east
-      (neighbor(1)-my_treecode(1) ==-1 .and. dir == dir_2D(4))) then  !west
-              is_adjacent =.true.
-              return
+   ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   ! check boundary in north, south, east, west
+   ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   if (.not. params%periodic_BC(2)) then! non periodic BC in y direction          ! NOTE:
+    if((neighbor(1)-my_treecode(1) ==-1 .and. dir == DIR_2D(2)) .or. & !east      ! apparently the block synchronization of the
+       (neighbor(1)-my_treecode(1) == 1 .and. dir == DIR_2D(4))) then  !west      ! block ghost node layer in east/west and north/south
+              is_adjacent =.true.                                                 ! seams to be switched,
+              return                                                              ! such that east/west is in x direction and north/south is in y direction
+    endif
    endif
 
-    if ( (.not. params%periodic_BC(2)) .and. &! non periodic BC in y direction
-       (neighbor(1)-my_treecode(1) == 2 .and. dir == dir_2D(1)) .or. & !north
-       (neighbor(1)-my_treecode(1) ==-2 .and. dir == dir_2D(3))) then !south
-            is_adjacent =.true.
-            return
+   if ( .not. params%periodic_BC(1) ) then ! non periodic BC in x direction
+    if((neighbor(1)-my_treecode(1) == 2 .and. dir == DIR_2D(1)) .or. & !north
+       (neighbor(1)-my_treecode(1) ==-2 .and. dir == DIR_2D(3))) then !south
+           is_adjacent =.true.
+           return
+    endif
    endif
 
+   ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   ! check boundary in NE,NW,SE,SW
+   ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    ! For the tilted directions (NW/SE/NE/SW) we check if there is a adjacent
    ! boundary in any of the two directions:
    ! Exmaple:
@@ -139,66 +150,66 @@ recursive logical function block_is_adjacent_to_boundary(params,dir,my_treecode,
    !              if yes: return true
    !              if not:
    !             2. Check East!
-   if (dir==dir_2D(5)) then     ! north east
+   if (dir==DIR_2D(5)) then     ! north east
       ! check if a boundary is in the north
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(1), my_level,max_treelevel)
-      if(block_is_adjacent_to_boundary(params,dir_2D(1),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+      if(block_is_adjacent_to_boundary(params,DIR_2D(1),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
         is_adjacent = .true.
         return
       endif
       ! check if a boundary is in the east
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(2), my_level,max_treelevel)
-      if( block_is_adjacent_to_boundary(params,dir_2D(2),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+      if( block_is_adjacent_to_boundary(params,DIR_2D(2),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
             is_adjacent = .true.
             return
       endif
 
     endif
 
-    if (dir==dir_2D(6)) then    ! north west
+    if (dir==DIR_2D(6)) then    ! north west
       ! is my block adjacent to a domain boundary in the north?
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(1), my_level,max_treelevel)
-      if ( block_is_adjacent_to_boundary(params,dir_2D(1),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+      if ( block_is_adjacent_to_boundary(params,DIR_2D(1),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
         is_adjacent = .true.
         return
       endif
       ! is my block adjacent to a domain boundary in the west?
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(4), my_level,max_treelevel)
-      if( block_is_adjacent_to_boundary(params,dir_2D(4),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+      if( block_is_adjacent_to_boundary(params,DIR_2D(4),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
             is_adjacent = .true.
             return
       endif
 
     endif
 
-    if (dir==dir_2D(7)) then     ! south east
+    if (dir==DIR_2D(7)) then     ! south east
 
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(2), my_level,max_treelevel)
-      if (block_is_adjacent_to_boundary(params,dir_2D(2),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+      if (block_is_adjacent_to_boundary(params,DIR_2D(2),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
         is_adjacent = .true.
         return
       endif
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(3), my_level,max_treelevel)
-      if(block_is_adjacent_to_boundary(params,dir_2D(3),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+      if(block_is_adjacent_to_boundary(params,DIR_2D(3),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
            is_adjacent = .true.
            return
       endif
 
     endif
 
-    if (dir==dir_2D(8)) then    ! south west
+    if (dir==DIR_2D(8)) then    ! south west
 
       call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(3), my_level,max_treelevel)
-      if (block_is_adjacent_to_boundary(params,dir_2D(3),my_treecode,tmp_neighbor,my_level,max_treelevel))then
+      if (block_is_adjacent_to_boundary(params,DIR_2D(3),my_treecode,tmp_neighbor,my_level,max_treelevel))then
         is_adjacent = .true.
         return
     endif
     call adjacent_block_2D( my_treecode, tmp_neighbor, dir_2d(4), my_level,max_treelevel)
-    if(block_is_adjacent_to_boundary(params,dir_2D(4),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
+    if(block_is_adjacent_to_boundary(params,DIR_2D(4),my_treecode,tmp_neighbor,my_level,max_treelevel)) then
           is_adjacent = .true.
           return
       endif
-      
+
     endif
 
 

@@ -186,7 +186,7 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi,rhs)
         fric_p = dummy
         call diff1y_zentral_3D( Bs, g, dy, ( u*tau12 + v*tau22 + w*tau23 + fric_T2 ), dummy)
         fric_p = fric_p + dummy
-        call diff1z_zentral_3D( Bs, g, dz, ( u*tau12 + v*tau22 + w*tau33 + fric_T3 ), dummy)
+        call diff1z_zentral_3D( Bs, g, dz, ( u*tau13 + v*tau23 + w*tau33 + fric_T3 ), dummy)
         fric_p = fric_p + dummy
 
         ! u_i*dx_k (tau_ik) terms

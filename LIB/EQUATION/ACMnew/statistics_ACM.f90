@@ -67,6 +67,8 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
 
+        if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+
     case ("integral_stage")
         !-------------------------------------------------------------------------
         ! 2nd stage: integral_stage.

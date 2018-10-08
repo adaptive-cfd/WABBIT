@@ -323,7 +323,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
             ! communication counter. each communication (=send and receive) is stored
             ! in a long list
-            com_i = 1
+            com_i = 0
 
             ! loop over sfc_list
             do k = 1, lgt_n
@@ -354,12 +354,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     !    1     sender proc
                     !    2     receiver proc
                     !    3     block light data id
+                    com_i = com_i + 1
                     sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank
                     sfc_com_list(com_i, 2) = proc_dist_id           ! receiver mpirank
                     sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)   ! light id of block
-
-                    ! increase communication index
-                    com_i = com_i + 1
                 end if
 
                 ! The opt_dist_list defines how many blocks this rank should have, and
@@ -372,9 +370,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     proc_dist_id = proc_dist_id + 1
                 end if
             end do
-
-            ! counted one too far
-            com_i = com_i - 1
 
             !---------------------------------------------------------------------------------
             ! 3rd: actual communication (send/recv)

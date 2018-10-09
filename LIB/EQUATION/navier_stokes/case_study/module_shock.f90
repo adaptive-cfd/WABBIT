@@ -21,8 +21,9 @@ module module_shock
     PRIVATE
     !**********************************************************************************************
     ! only this functions are visible outside this module
-    PUBLIC :: read_params_shock_tube,add_shock_tube,draw_simple_shock, set_inicond_shock_tube, &
-              set_shock_in_direction,moving_shockVals, standing_shockVals
+    PUBLIC :: read_params_shock_tube,draw_simple_shock, set_inicond_shock_tube, &
+              set_shock_in_direction,moving_shockVals, standing_shockVals, &
+              shock_tube_penalization2D, shock_tube_penalization3D
     !**********************************************************************************************
 
   !> \file
@@ -229,39 +230,9 @@ end subroutine read_params_shock_tube
 
 
 
-
-!==========================================================================
-!> This function adds a penalization term
-!> to navier stokes equations
-subroutine add_shock_tube(penalization, x0, dx, Bs, g, phi)
-      implicit none
-      !-------------------------------------------------------
-      !> grid parameter
-      integer(kind=ik), intent(in)    :: g, Bs
-      !> rhs
-      real(kind=rk), intent(inout)    :: penalization(:,:,:,:)
-      !> state variables
-      real(kind=rk), intent(in)       :: phi(:,:,:,:)
-      !> spacing and origin of block
-      real(kind=rk), intent(in)       :: x0(3), dx(3)
-      !--------------------------------------------------------
-
-      if ( params_ns%dim==2 ) then
-        call add_simple_shock2D(penalization(:,:,1,:),x0,dx,Bs,g,phi(:,:,1,:))
-      else
-        call add_simple_shock3D(penalization,x0,dx,Bs,g,phi)
-      end if
-end subroutine add_shock_tube
-!==========================================================================
-
-
-
-
 !==========================================================================
 !> \brief Compute mask function of sod shock tube
 subroutine draw_simple_shock(mask, x0, dx, Bs, g )
-
-
     implicit none
     !-----------------------------------------------------------
     ! grid
@@ -275,7 +246,7 @@ subroutine draw_simple_shock(mask, x0, dx, Bs, g )
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     if ( params_ns%dim==2 ) then
-      call wall_2D(mask(:,:,1), x0(1:2), dx(1:2), Bs, g, shock%normalvector)
+      call sponge_2D(mask(:,:,1), x0(1:2), dx(1:2), Bs, g, shock%normalvector)
     else
       call wall_3D(mask, x0, dx, Bs, g, shock%normalvector)
     end if
@@ -293,40 +264,33 @@ end subroutine draw_simple_shock
 !>        the penalized domains.
 !>        Be aware that this function uses the C_sp_inv parameter globaly defined
 !>        when importing the module_penalization.
-subroutine add_simple_shock3D(penalization, x0, dx, Bs, g ,phi)
+subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
 
     implicit none
-    ! grid
-    integer(kind=ik), intent(in)                     :: Bs, g
-    !> penalization term including mask
-    real(kind=rk), dimension(:,:,:,:), intent(inout) :: penalization
-    !> spacing and origin of block
-    real(kind=rk), dimension(3), intent(in)          :: x0, dx
-    !> statevector
-    real(kind=rk), dimension(:,:,:,:), intent(in)      :: phi
-
-
-    ! preasure,density velocities
-    real(kind=rk),save,allocatable  :: mask(:,:,:)
-    real(kind=rk),save,allocatable  :: phi_ref(:,:,:,:),phi_tmp(:,:,:,:)
+    ! -----------------------------------------------------------------
+    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(inout)  :: phi_ref(:,:,:,:) !< reference values of penalized volume
+    real(kind=rk), intent(inout)  :: mask(:,:,:,:)    !< mask function
+    ! -----------------------------------------------------------------
     ! coordinate systems
     real(kind=rk)       :: X(3),domain_size(3)
-    integer(kind=ik)    :: ix, iy, iz, alpha,UshockF
+    integer(kind=ik)    :: ix, iy, iz, alpha,UshockF,neq
     ! left and right boundary
     real(kind=rk)       :: u_ref,u_R,u_L,rho_R,rho_L,p_L,p_R,width,rho_ref,p_ref
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-    if (size(penalization,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,3) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-    if (.not. allocated(phi_ref) ) allocate(phi_ref(Bs+2*g,Bs+2*g,Bs+2*g,params_ns%n_eqn))
-    if (.not. allocated(phi_tmp) ) allocate(phi_tmp(Bs+2*g,Bs+2*g,Bs+2*g,params_ns%n_eqn))
-    if (.not. allocated(mask) ) allocate(mask(Bs+2*g,Bs+2*g,Bs+2*g))
     ! index x_alpha of the coordinate vector which is the normal of the shock front
     alpha=shock%normalvector
 
     ! draw a shock on the boundaries of the x_alhpa coordinate
-    call sponge_3D(mask, x0, dx, Bs, g, alpha)
+    ! all compontents are penalized
+    do neq = 1, params_ns%n_eqn
+      call sponge_3D(mask(:,:,:,neq), x0, dx, Bs, g, alpha)
+      !we allready add the penalization strength to the mask
+      mask(:,:,:,neq)=C_sp_inv*mask(:,:,:,neq)
+    end do
 
 
     if ( alpha==1 ) then
@@ -336,10 +300,6 @@ subroutine add_simple_shock3D(penalization, x0, dx, Bs, g ,phi)
     else
       UshockF=UzF
     end if
-
-
-    phi_tmp=phi
-    call convert_statevector(phi_tmp,'pure_variables')
 
     domain_size = params_ns%domain_size
     width    = params_ns%L_sponge* 0.25_rk ! width of the transition area
@@ -394,26 +354,11 @@ subroutine add_simple_shock3D(penalization, x0, dx, Bs, g ,phi)
                   phi_ref(ix,iy,iz,pF)     = transition(X(alpha),domain_size(alpha)-width,width,p_R  ,p_L    )
                   phi_ref(ix,iy,iz,UshockF)= transition(X(alpha),domain_size(alpha)-width,width,u_R  ,u_L    )
                 endif
-
-                ! density
-                penalization(ix,iy,iz,rhoF)=  C_sp_inv*mask(ix,iy,iz) * ( phi_tmp(ix,iy,iz,rhoF) - phi_ref(ix,iy,iz,rhoF) )
-                ! x-velocity
-                penalization(ix,iy,iz,UxF)= C_sp_inv *mask(ix,iy,iz) &
-                 * ( phi_tmp(ix,iy,iz,rhoF)*phi_tmp(ix,iy,iz,UxF)- phi_ref(ix,iy,iz,rhoF)*phi_ref(ix,iy,iz,UxF) )
-                ! y-velocity
-                penalization(ix,iy,iz,UyF)= C_sp_inv*mask(ix,iy,iz) &
-                * ( phi_tmp(ix,iy,iz,rhoF)*phi_tmp(ix,iy,iz,UyF)- phi_ref(ix,iy,iz,rhoF)*phi_ref(ix,iy,iz,UyF) )
-                ! z-velocity
-                penalization(ix,iy,iz,UzF)= C_sp_inv*mask(ix,iy,iz) &
-                * ( phi_tmp(ix,iy,iz,rhoF)*phi_tmp(ix,iy,iz,UzF)- phi_ref(ix,iy,iz,rhoF)*phi_ref(ix,iy,iz,UzF) )
-                ! preasure
-                penalization(ix,iy,iz,pF)=C_sp_inv*mask(ix,iy,iz) &
-                *( phi_tmp(ix,iy,iz,pF) - phi_ref(ix,iy,iz,pF) )
             end do
         end do
     end do
 
-end subroutine add_simple_shock3D
+end subroutine shock_tube_penalization3D
 
 
 
@@ -425,49 +370,40 @@ end subroutine add_simple_shock3D
 !>        the penalized domains.
 !>        Be aware that this function uses the C_sp_inv parameter globaly defined
 !>        when importing the module_penalization.
-subroutine add_simple_shock2D(penalization, x0, dx, Bs, g ,phi)
+subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
     implicit none
-    ! grid
-    integer(kind=ik), intent(in)                     :: Bs, g
-    !> penalization term including mask
-    real(kind=rk), dimension(:,:,:), intent(inout) :: penalization
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)          :: x0, dx
-    !> statevector
-    real(kind=rk), dimension(:,:,:), intent(in)      :: phi
-
-    !fields
-    real(kind=rk),save,allocatable  :: mask(:,:)
-    real(kind=rk),save,allocatable  :: phi_ref(:,:,:),phi_tmp(:,:,:)
+    ! -----------------------------------------------------------------
+    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
+    real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
+    ! -----------------------------------------------------------------
     ! auxiliary variables
     real(kind=rk)       :: X(2),domain_size(2)
-    integer(kind=ik)    :: ix, iy, alpha, UshockF
+    integer(kind=ik)    :: ix, iy, alpha, UshockF,neq
     ! left and right boundary
     real(kind=rk)       :: u_R,u_L,rho_R,rho_L,p_L,p_R,width
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    if (size(penalization,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-    if (.not. allocated(phi_ref) ) allocate(phi_ref(Bs+2*g,Bs+2*g,params_ns%n_eqn))
-    if (.not. allocated(phi_tmp) ) allocate(phi_tmp(Bs+2*g,Bs+2*g,params_ns%n_eqn))
-    if (.not. allocated(mask) ) allocate(mask(Bs+2*g,Bs+2*g))
     ! index x_alpha of the coordinate vector which is the normal of the shock front
     alpha=shock%normalvector
 
-    call sponge_2D(mask, x0, dx, Bs, g, alpha)
-
+    ! all compontents are penalized
+    do neq = 1, params_ns%n_eqn
+      call sponge_2D(mask(:,:,neq), x0, dx, Bs, g, alpha)
+      !we allready add the penalization strength to the mask
+      mask(:,:,neq)=C_sp_inv*mask(:,:,neq)
+    end do
 
     if ( alpha==1 ) then
       UshockF=UxF
     else
       UshockF=UyF
     end if
-
-    phi_tmp=phi
-    call convert_statevector(phi_tmp,'pure_variables')
-
 
     domain_size = params_ns%domain_size(1:2)
     width       = params_ns%L_sponge *0.5_rk
@@ -518,22 +454,10 @@ subroutine add_simple_shock2D(penalization, x0, dx, Bs, g ,phi)
                   phi_ref(ix,iy,pF)     = transition(X(alpha),domain_size(alpha)-width,width,p_R  ,p_L    )
                   phi_ref(ix,iy,UshockF)= transition(X(alpha),domain_size(alpha)-width,width,u_R  ,u_L    )
                 endif
-
-                ! density
-                penalization(ix,iy,rhoF)=  C_sp_inv*mask(ix,iy) * ( phi_tmp(ix,iy,rhoF) - phi_ref(ix,iy,rhoF) )
-                ! x-velocity
-                penalization(ix,iy,UxF)= C_sp_inv *mask(ix,iy) &
-                 * ( phi_tmp(ix,iy,rhoF)*phi_tmp(ix,iy,UxF)- phi_ref(ix,iy,rhoF)*phi_ref(ix,iy,UxF) )
-                ! y-velocity
-                penalization(ix,iy,UyF)= C_sp_inv*mask(ix,iy) &
-                * ( phi_tmp(ix,iy,rhoF)*phi_tmp(ix,iy,UyF)- phi_ref(ix,iy,rhoF)*phi_ref(ix,iy,UyF) )
-                ! preasure
-                penalization(ix,iy,pF)=C_sp_inv*mask(ix,iy) &
-                *( phi_tmp(ix,iy,pF) - phi_ref(ix,iy,pF) )
             end do
         end do
 
-end subroutine add_simple_shock2D
+end subroutine shock_tube_penalization2D
 
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   !> \brief

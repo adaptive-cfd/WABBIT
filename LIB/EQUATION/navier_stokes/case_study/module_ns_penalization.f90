@@ -428,13 +428,13 @@ end subroutine sponge_3D
 ! x_alpha |   |__________________________________|0.5L_sponge
 !         ->
 !         x_beta
-subroutine wall_2D(sponge, x0, dx, Bs, g, alpha)
+subroutine wall_2D(mask, x0, dx, Bs, g, alpha)
     implicit none
     !--------------------------------------------------------------
     ! grid
     integer(kind=ik), intent(in)                   :: Bs, g
-    !> sponge term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(out)     :: sponge
+    !> mask at the boundary of the domain
+    real(kind=rk), dimension(:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)        :: x0, dx
     !> boundary index (alpha=1 : x-direction, alpha=2: y-direction)
@@ -450,7 +450,7 @@ subroutine wall_2D(sponge, x0, dx, Bs, g, alpha)
     if ( present(alpha) ) then
       alpha_ = alpha
     else
-      ! if not present sponge in x direction
+      ! if not present wall in x direction
       alpha_ = 1
     end if
 
@@ -466,7 +466,7 @@ subroutine wall_2D(sponge, x0, dx, Bs, g, alpha)
             ! distance to x-border of domain
             tmp(1) = min(x,-(x-params_ns%domain_size(1)))
 
-            sponge(ix,iy) = smoothstep( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+            mask(ix,iy) = smoothstep( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
         end do
     end do
 
@@ -486,13 +486,13 @@ end subroutine wall_2D
 ! x_alpha |   |__________________________________|0.5L_sponge
 !         ->
 !         x_beta
-subroutine wall_3D(sponge, x0, dx, Bs, g, alpha)
+subroutine wall_3D(mask, x0, dx, Bs, g, alpha)
     implicit none
     !--------------------------------------------------------------
     ! grid
     integer(kind=ik), intent(in)  :: Bs, g
-    !> sponge term for every grid point of this block
-    real(kind=rk), dimension(:,:,:), intent(out)     :: sponge
+    !> mask that is created on domain boundaries
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
     !> boundary index (alpha=1 : x-direction, alpha=2: y-direction alpha=3 :z-direction)
@@ -506,7 +506,7 @@ subroutine wall_3D(sponge, x0, dx, Bs, g, alpha)
     if ( present(alpha) ) then
       alpha_ = alpha
     else
-      ! if not present sponge in x direction
+      ! if not present wall in the boundary in x direction
       alpha_ = 1
     end if
 
@@ -527,7 +527,7 @@ subroutine wall_3D(sponge, x0, dx, Bs, g, alpha)
                 ! distance to x-border of domain
                 tmp(1) = min(x,-(x-params_ns%domain_size(1)))
 
-                sponge(ix,iy,iz) = smoothstep( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, h)
+                mask(ix,iy,iz) = smoothstep( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, h)
             end do
         end do
     end do

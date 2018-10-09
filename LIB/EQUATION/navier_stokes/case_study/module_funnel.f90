@@ -28,8 +28,8 @@ module module_funnel
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: integrate_over_pump_area,read_params_funnel,mean_quantity,add_funnel,draw_funnel, &
-            set_inicond_funnel
+  PUBLIC :: integrate_over_pump_area,read_params_funnel,mean_quantity,draw_funnel, &
+            set_inicond_funnel,funnel_penalization2D,funnel_penalization3D
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -245,27 +245,6 @@ subroutine  draw_funnel(x0, dx, Bs, g, mask, mask_is_colored)
 end subroutine draw_funnel
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  !> This function adds constraints of the funnel geometry
-  subroutine add_funnel( penalization, x0, dx, Bs, g, phi )
-    implicit none
-    !---------------------------------------------------------------
-    integer(kind=ik), intent(in)                     :: Bs, g
-    real(kind=rk), dimension(3), intent(in)          :: x0, dx
-    real(kind=rk), dimension(:,:,:,:), intent(in)    :: phi
-    real(kind=rk), dimension(:,:,:,:), intent(inout) :: penalization
-    !---------------------------------------------------------------
-    integer,save :: count=0
-    if (params_ns%dim==3) then
-        call  funnel_penalization3D(penalization, x0, dx, Bs, g ,phi)
-    else
-        call  funnel_penalization2D(penalization(:,:,1,:), x0, dx, Bs, g , phi(:,:,1,:))
-    endif
-
-
-  end subroutine add_funnel
-  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   !> \brief Set the initial condition of a specific case
@@ -307,7 +286,6 @@ end subroutine draw_funnel
       ! endif
     end subroutine set_inicond_funnel
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 

@@ -19,7 +19,7 @@ module module_simple_geometry
 
   !**********************************************************************************************
   ! only this functions are visible outside this module
-  PUBLIC :: read_params_geometry,add_geometry2D,draw_geometry
+  PUBLIC :: read_params_geometry,geometry_penalization2D,draw_geometry
   !**********************************************************************************************
   ! make everything private if not explicitly marked public
   PRIVATE
@@ -191,96 +191,98 @@ end subroutine init_triangle
 !==========================================================================
 !> This function adds a penalization term
 !> to navier stokes equations
-subroutine add_geometry2D(penalization, x0, dx, Bs, g, phi)
+subroutine geometry_penalization2D(Bs, g, x0, dx, rho, mask, phi_ref)
       implicit none
-      !-------------------------------------------------------
-      !> grid parameter
-      integer(kind=ik), intent(in)    :: g, Bs
-      !> rhs
-      real(kind=rk), intent(inout)    :: penalization(:,:,:)
-      !> state variables
-      real(kind=rk), intent(in)       :: phi(:,:,:)
-      !> spacing and origin of block
-      real(kind=rk), intent(in)       :: x0(3), dx(3)
-      !--------------------------------------------------------
-      real(kind=rk),allocatable ,save, dimension(:,:)  :: mask,p,rho,u,v
-      real(kind=rk),save  :: T0,rho0,u0,p0,Rs
-      logical, save       :: tmp_fields_allocated=.false.
+      ! -----------------------------------------------------------------
+      integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+      real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
+      real(kind=rk), intent(in)     :: rho(:,:)       !< density of the current field
+      real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
+      real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
+      ! -----------------------------------------------------------------
+      real(kind=rk) :: T0,rho0,u0,p0,Rs
+      real(kind=rk),save,allocatable :: tmp_mask(:,:)    !< mask function
+      integer(kind=ik):: ix, iy
 
-
-      if (size(penalization,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
-
-      if (.not. tmp_fields_allocated) then
-        allocate(mask(Bs+2*g,Bs+2*g))
-        allocate(p(Bs+2*g,Bs+2*g))
-        allocate(rho(Bs+2*g,Bs+2*g))
-        allocate(u(Bs+2*g,Bs+2*g))
-        allocate(v(Bs+2*g,Bs+2*g))
-        tmp_fields_allocated=.true.
-      endif
-
+      if (size(phi_ref,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+      if (size(mask,1) /= Bs+2*g) call abort(7109,"wrong array size, there's pirates, captain!")
+      if (.not. allocated(tmp_mask)) allocate(tmp_mask(Bs+2*g,Bs+2*g))
       ! reset mask array
       mask    = 0.0_rk
-
+      phi_ref = 0.0_rk
       T0      = params_ns%initial_temp
       rho0    = params_ns%initial_density
       p0      =  params_ns%initial_pressure
       u0      =  params_ns%initial_velocity(1)
       Rs      =  params_ns%Rs
-
-      rho         = phi(:,:,rhoF)**2
-      u           = phi(:,:,UxF)/phi(:,:,rhoF)
-      v           = phi(:,:,UyF)/phi(:,:,rhoF)
-      p           = phi(:,:,pF)
-
       ! geometry
       !----------
       select case( MASK_GEOMETRY )
       case('vortex_street','cylinder')
-        call draw_cylinder(mask, x0, dx, Bs, g )
+        call draw_cylinder(tmp_mask, x0, dx, Bs, g )
       case('rhombus','triangle')
-        call draw_triangle(mask, x0, dx, Bs, g )
+        call draw_triangle(tmp_mask, x0, dx, Bs, g )
       case default
         call abort(120401,"ERROR: geometry for VPM is unknown"//mask_geometry)
       end select
 
-      penalization (:,:,rhoF) = 0.0_rk
-      ! x-velocity
-      penalization(:,:,UxF)=C_eta_inv*mask * ( rho*u )
-      ! y-velocity
-      penalization(:,:,UyF)=C_eta_inv*mask * ( rho*v )
-      ! preasure
-      penalization(:,:,pF)=C_eta_inv*mask *( p- rho*Rs*T0 )
+      ! for solid obstacles we only penalize the
+      ! velocity components and pressure component
+      mask(:,:,UxF)=tmp_mask*C_eta_inv
+      mask(:,:,UyF)=tmp_mask*C_eta_inv
+      mask(:,:,pF )=tmp_mask*C_eta_inv
 
-      ! sponge
-      !--------
-      call sponge_2D(mask, x0, dx, Bs, g)
+      phi_ref(:,:,UxF)=0.0_rk
+      phi_ref(:,:,UyF)=0.0_rk
+      phi_ref(:,:,pF )=rho*Rs*T0
 
-      penalization(:,:,rhoF)= penalization(:,:,rhoF) + C_sp_inv*mask * ( rho - rho0 )
-      ! x-velocity
-      penalization(:,:,UxF)= penalization(:,:,UxF) + C_sp_inv*mask * ( rho*u - rho0*u0  )
-      ! y-velocity
-      penalization(:,:,UyF)= penalization(:,:,UyF) + C_sp_inv*mask * ( rho*v )
-      ! preasure
-      penalization(:,:,pF)= penalization(:,:,pF) + C_sp_inv*mask *( p - p0 )
+      ! sponge for in and outflow
+      !---------------------------
+      call sponge_2D(tmp_mask, x0, dx, Bs, g)
+
+
+      do iy = g+1, Bs + g
+        do ix = g+1, Bs + g
+          ! this if is necessary to not overwrite the privious values
+          if ( tmp_mask(ix,iy)>0 ) then
+            ! mask of the inlet and outlet sponge
+            mask(ix,iy,rhoF) = C_sp_inv*tmp_mask(ix,iy)
+            mask(ix,iy,UxF ) = C_sp_inv*tmp_mask(ix,iy)
+            mask(ix,iy,UyF ) = C_sp_inv*tmp_mask(ix,iy)
+            mask(ix,iy,pF  ) = C_sp_inv*tmp_mask(ix,iy)
+            ! values of the sponge inlet
+            phi_ref(ix,iy,rhoF)= rho0
+            phi_ref(ix,iy,UxF) = rho0*u0
+            phi_ref(ix,iy,UyF) = 0.0_rk
+            phi_ref(ix,iy,pF ) = p0
+          end if
+        end do
+      end do
+
 
       ! free outelt wall
       ! ----------------
       ! add a free outlet wall as a sponge in north and south if necessary
       if ( FREE_OUTLET_WALL ) then
-        call draw_free_outlet_wall(mask, x0, dx, Bs, g )
-
-        penalization(:,:,1)= penalization(:,:,rhoF) + C_sp_inv*mask * ( rho - rho0 )
-        ! x-velocity
-        !penalization(:,:,UxF)= penalization(:,:,UxF) + C_sp_inv*mask * ( rho*u - rho0*u0  )
-        ! y-velocity
-        penalization(:,:,UyF)= penalization(:,:,UyF) + C_sp_inv*mask * ( rho*v )
-        ! preasure
-        penalization(:,:,pF)= penalization(:,:,pF) + C_sp_inv*mask *( p - p0 )
+        call draw_free_outlet_wall(tmp_mask, x0, dx, Bs, g )
+        do iy = g+1, Bs + g
+          do ix = g+1, Bs + g
+            if ( tmp_mask(ix,iy)>0 ) then
+              ! mask of the wall
+              mask(ix,iy,rhoF) = C_sp_inv*tmp_mask(ix,iy)
+              mask(ix,iy,UyF ) = C_sp_inv*tmp_mask(ix,iy)
+              mask(ix,iy,pF  ) = C_sp_inv*tmp_mask(ix,iy)
+              ! values at the wall boundaries
+              phi_ref(ix,iy,rhoF)= rho0
+              phi_ref(ix,iy,UyF) = 0.0_rk
+              phi_ref(ix,iy,pF ) = p0
+            end if
+          end do
+        end do
       endif
 
 
-end subroutine add_geometry2D
+end subroutine geometry_penalization2D
 !==========================================================================
 
 

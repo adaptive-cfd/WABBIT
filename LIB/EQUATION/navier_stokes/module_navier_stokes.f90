@@ -246,10 +246,10 @@ contains
          call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
 
-      if (params_ns%penalization) then
-        ! add volume penalization
-        call add_constraints(params_ns, rhs, Bs, g, x0, dx, u)
-      endif
+      ! if (params_ns%penalization) then
+      !   ! add volume penalization
+      !   call add_constraints(params_ns, rhs, Bs, g, x0, dx, u)
+      ! endif
 
     case default
       call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")

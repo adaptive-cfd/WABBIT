@@ -82,8 +82,10 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     real(kind=rk)                                           :: phi1_inv(Bs+2*g, Bs+2*g, Bs+2*g)
 
     ! loop variables
-    integer(kind=ik)                                        :: i, j, k
-
+    integer(kind=ik)                                        :: i, j, k,n_eqn
+    ! penalization fields
+    real(kind=rk), allocatable,save   :: phi_prime(:,:,:,:), phi_ref(:,:,:,:), mask(:,:,:,:)
+    logical ,save :: allocated_penal_fields=.false.
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -481,6 +483,40 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
             end do
         end do
     end do
+
+    if (params_ns%penalization) then
+        ! add volume penalization
+        if (.not. allocated_penal_fields) then
+          allocated_penal_fields=.true.
+          n_eqn=params_ns%n_eqn
+          allocate( mask(Bs+2*g,Bs+2*g,Bs+2*g,n_eqn), &
+                    phi_prime(Bs+2*g,Bs+2*g,Bs+2*g,n_eqn),&
+                    phi_ref(Bs+2*g,Bs+2*g,Bs+2*g,n_eqn))
+        endif
+        phi_prime(:,:,:,rhoF)= rho
+        phi_prime(:,:,:,UxF )= u
+        phi_prime(:,:,:,UyF )= v
+        phi_prime(:,:,:,UzF )= w
+        phi_prime(:,:,:,pF  )= p
+
+        call compute_mask_and_ref3D(params_ns, Bs, g, x0, delta_x, phi_prime, mask, phi_ref)
+        do k = 1, Bs+2*g
+          do j = 1, Bs+2*g
+            do i = 1, Bs+2*g
+              ! density
+              rhs(i,j,k,rhoF)=rhs(i,j,k,rhoF) -0.5_rk*phi1_inv(i,j,k)*mask(i,j,k,rhoF)*(phi_prime(i,j,k,rhoF)-  Phi_ref(i,j,k,rhoF) )
+              ! x-velocity
+              rhs(i,j,k,UxF)=rhs(i,j,k,UxF) -1.0_rk*phi1_inv(i,j,k)*mask(i,j,k,UxF)*(phi_prime(i,j,k,rhoF)*phi_prime(i,j,k,UxF)-  Phi_ref(i,j,k,UxF) )
+              ! y-velocity
+              rhs(i,j,k,UyF)=rhs(i,j,k,UyF) -1.0_rk*phi1_inv(i,j,k)*mask(i,j,k,UyF)*(phi_prime(i,j,k,rhoF)*phi_prime(i,j,k,UyF)-  Phi_ref(i,j,k,UyF) )
+              ! z-velocity
+              rhs(i,j,k,UzF)=rhs(i,j,k,UzF) -1.0_rk*phi1_inv(i,j,k)*mask(i,j,k,UzF)*(phi_prime(i,j,k,rhoF)*phi_prime(i,j,k,UzF)-  Phi_ref(i,j,k,UzF) )
+              ! preasure
+              rhs(i,j,k,pF)=rhs(i,j,k,pF)                        -mask(i,j,k,pF)*(phi_prime(i,j,k,pF)- Phi_ref(i,j,k,pF) )
+            end do
+          end do
+        end do
+    endif
 
 end subroutine RHS_3D_navier_stokes
 

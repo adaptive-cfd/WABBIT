@@ -21,7 +21,8 @@ module module_navier_stokes_cases
     !***************************************************************
     ! routines visible outside this module
     !***************************************************************
-    PUBLIC :: read_case_parameters, set_inicond_case, add_constraints, get_mask
+    PUBLIC :: read_case_parameters, set_inicond_case, get_mask, &
+              compute_mask_and_ref2D, compute_mask_and_ref3D
     !***************************************************************
 contains
 
@@ -87,57 +88,67 @@ end subroutine read_case_parameters
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
-
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- !> Use this subroutine to add case specific constraints like
- !>             - boundary conditions
- !>             - volume penalization
- !> to the right hand side
- !> \details
- !> This routine is called in the local stage (i.e. for every block)
- !> after the right hand side was computed
-
  !==========================================================================
  !> \brief This function computes a penalization term for different geometries
  !! in Navier Stokes physics
- subroutine add_constraints(params, rhs ,Bs , g, x0, dx, phi)
+ subroutine compute_mask_and_ref2D(params, Bs, g, x0, dx, phi, mask, phi_ref)
      implicit none
      !-------------------------------------------------------
      integer(kind=ik), intent(in)    :: g, Bs          !< grid parameter
-     real(kind=rk), intent(inout)    :: rhs(:,:,:,:)   !< rhs
-     real(kind=rk), intent(in)       :: phi(:,:,:,:)   !< state variables
-     real(kind=rk), intent(in)       :: x0(3), dx(3)   !< spacing and origin of block
+     real(kind=rk), intent(in)       :: phi(:,:,:)     !< primary state variables
+     real(kind=rk), intent(inout)    :: mask(:,:,:)    !< rhs
+     real(kind=rk), intent(inout)    :: phi_ref(:,:,:) !< reference state variables
+     real(kind=rk), intent(in)       :: x0(2), dx(2)   !< spacing and origin of block
      type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure
      !--------------------------------------------------------
-      real(kind=rk), allocatable, save :: penalization(:,:,:,:)
 
-      ! allocates the penalization array if not allready allocated
-      call allocate_statevector_ns(penalization, Bs, g)
-
-     ! 1. compute volume penalization term for the different case studies
+     ! compute mask and reference statevector for volume penalization
+     ! term for the different case studies
      select case( params%CASE )
      case('shock_tube')
-       call add_shock_tube(penalization, x0, dx, Bs, g, phi )
+       call shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
      case('simple_geometry')
-       call add_geometry2D(penalization(:,:,1,:),x0,dx,Bs,g,phi(:,:,1,:))
+       call geometry_penalization2D(Bs, g, x0, dx, phi(:,:,rhoF), mask, phi_ref)
      case('funnel')
-       call add_funnel(penalization, x0, dx, Bs, g, phi)
+       call funnel_penalization2D(Bs, g, x0, dx, phi, mask, phi_ref)
      case('no')
        return
      case default
        call abort(1201,"ERROR: Come down to earth and tell me what is that:"//params%CASE)
      end select
 
-     ! 2. add penalty to the right hand side
-     call add_penalization_term(rhs, penalization, phi)
-
-     ! 3. add boundary conditions (set_boundary conditions) here
-
- end subroutine add_constraints
+ end subroutine compute_mask_and_ref2D
  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+ !==========================================================================
+ !> \brief This function computes a penalization term for different geometries
+ !! in Navier Stokes physics
+ subroutine compute_mask_and_ref3D(params, Bs, g, x0, dx, phi, mask, phi_ref)
+     implicit none
+     !-------------------------------------------------------
+     integer(kind=ik), intent(in)    :: g, Bs          !< grid parameter
+     real(kind=rk), intent(in)       :: phi(:,:,:,:)     !< primary state variables
+     real(kind=rk), intent(inout)    :: mask(:,:,:,:)    !< rhs
+     real(kind=rk), intent(inout)    :: phi_ref(:,:,:,:) !< reference state variables
+     real(kind=rk), intent(in)       :: x0(3), dx(3)   !< spacing and origin of block
+     type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure
+     !--------------------------------------------------------
 
+     ! compute mask and reference statevector for volume penalization
+     ! term for the different case studies
+     select case( params%CASE )
+     case('shock_tube')
+       call shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
+     case('funnel')
+       call funnel_penalization3D(Bs, g, x0, dx, phi, mask, phi_ref)
+     case('no')
+       return
+     case default
+       call abort(1201014,"ERROR: Do not know what that is:"//params%CASE)
+     end select
+
+ end subroutine compute_mask_and_ref3D
+ !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 

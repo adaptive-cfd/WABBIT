@@ -4,7 +4,7 @@
   !-----------------------------------------------------------------------------
   subroutine INICOND_NStokes( time, u, g, x0, dx )
 
-    use module_shock, only : set_shock_1D,moving_shockVals,standing_shockVals
+    use module_shock, only : set_shock_in_direction,moving_shockVals,standing_shockVals
 
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
@@ -117,21 +117,11 @@
       if ( right(rhoF)<0 .or. right(pF)<0 ) then
         call abort(3572,"ERROR: initial values are insufficient for simple-shock")
       end if
-    ! the shock tube is only 1D, therefore we loop over the second component in 2D and
-    ! 2cnd and 3rd component in 3D
-    if (params_ns%dim==3) then
-      do iz = 1, Bs+2*g
-        do iy = 1, Bs+2*g
-          call set_shock_1D(x0(1), dx(1), Bs, g, u(:,iy,iz,:), &
-           left, right, params_ns%inicond_width,params_ns%domain_size(1))
-        end do
-      end do
-    else
-      do iy = 1, Bs+2*g
-        call set_shock_1D(x0(1), dx(1), Bs, g, u(:,iy,1,:), left, right, &
-                          params_ns%inicond_width, params_ns%domain_size(1))
-      end do
-    endif
+
+    ! set the shock in the direction alpha (=1,2,3) at position x_alpha=params_ns%inicond_width
+    ! the values to the left and right of the shock are defined by left and right
+    call set_shock_in_direction(x0, dx, Bs, g, u, left, right, params_ns%inicond_width, 1)
+
     call pack_statevector(u,'pure_variables')
 
     case ("mask")

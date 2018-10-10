@@ -13,7 +13,7 @@ echo "testing navier stokes pressure blob in 3 dimensions"
 # list of prefixes the test generates
 prefixes=(Ux Uy Uz p rho)
 # list of possible times (no need to actually have them)
-times=(000000005000 000000010000)
+times=(000000000000 000000002500 000000005000)
 
 # run actual test
 ${mpi_command} ./wabbit ${params} ${memory}

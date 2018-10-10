@@ -1,35 +1,30 @@
 !#########################################################################################
 !                     2D FUNNEL IMPLEMENTATION
 !#########################################################################################
-subroutine  funnel_penalization2D(penalization, x0, dx, Bs, g ,phi)
+subroutine  funnel_penalization2D(Bs, g, x0, dx, phi, mask, phi_ref)
   use module_helpers
   implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
     real(kind=rk), intent(in)     :: phi(:,:,:)     !< state vector
-    real(kind=rk), intent(inout)  :: penalization(:,:,:) !< reference values of penalized volume
-    real(kind=rk), allocatable,save :: mask(:,:,:)    !< mask function
+    real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
+    real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
     integer(kind=2), allocatable,save:: mask_color(:,:)!< identifyers of mask parts (plates etc)
     logical                       :: mesh_was_adapted=.true.
     ! -----------------------------------------------------------------
     if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(mask))        allocate(mask(1:Bs+2*g, 1:Bs+2*g, 4))
-
     !!> todo implement function check_if_mesh_adapted (true/false) in adapt mesh
     if ( mesh_was_adapted .eqv. .true. ) then
-      ! reset parameters
-      mask        = 0.0_rk
-      mask_color  = 0
+      ! dont switch the order of draw_funnel3D and draw_sponge3D,
+      ! because mask and color are reset in the draw_funnel
       call draw_funnel2D(x0, dx, Bs, g, mask, mask_color)
       call draw_sponge2D(x0, dx, Bs, g, mask, mask_color)
-      call compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
-    else
-      call compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
     end if
 
-end subroutine  funnel_penalization2D
+    call compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,phi_ref)
 
+end subroutine  funnel_penalization2D
 
 
 
@@ -37,7 +32,7 @@ subroutine draw_funnel2D(x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)             :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)                :: x0(3), dx(3)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)                :: x0(2), dx(2)   !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)             :: mask(:,:,:)    !< mask function
     integer(kind=2), intent(inout), optional :: mask_color(:,:)!< identifyers of mask parts (plates etc)
     ! -----------------------------------------------------------------
@@ -55,6 +50,17 @@ subroutine draw_funnel2D(x0, dx, Bs, g, mask, mask_color)
        r = abs(y-domain_size(2)*0.5_rk)
        do ix=g+1, Bs+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+            !=============================
+!     /\     reset the mask function!
+!    /  \    caution! Reseting should only be done once
+!   /    \   for optimal performance
+!  / stop \
+! +--------+
+            mask_color(ix,iy)=0
+            mask(ix,iy,:)=0.0_rk
+            !=============================
+
 
             ! plates
             ! ------
@@ -84,7 +90,7 @@ subroutine draw_sponge2D(x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)             :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)                :: x0(3), dx(3)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)                :: x0(2), dx(2)   !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)             :: mask(:,:,:)    !< mask function
     integer(kind=2), intent(inout), optional :: mask_color(:,:)!< identifyers of mask parts (plates etc)
     ! -----------------------------------------------------------------
@@ -148,18 +154,18 @@ end subroutine  draw_sponge2D
 
 
 !> Computes the 2D funnel mask with reference values of the penalized system
-subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
+subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,phi_ref)
     implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
     integer(kind=2), intent(inout):: mask_color(:,:)!< identifyers of mask parts (plates etc)
     real(kind=rk), intent(in)     :: phi(:,:,:)     !< state vector
-    real(kind=rk), intent(in)     :: mask(:,:,:)     !< state vector
-    real(kind=rk), intent(inout)  :: penalization(:,:,:)  !< funnel penalization term
+    real(kind=rk), intent(inout)  :: mask(:,:,:)     !< mask
+    real(kind=rk), intent(inout)  :: phi_ref(:,:,:)  !< funnel penalization term
     ! -----------------------------------------------------------------
     real(kind=rk)     :: x, y, r, h,velocity
-    real(kind=rk)     :: rho,chi,v_ref,dq,u,v,p,phi_ref(4),C_inv
+    real(kind=rk)     :: rho,chi,v_ref,dq,u,v,p,C_inv
     integer(kind=ik)  :: ix, iy,n                                    ! loop variables
     real(kind=rk)     :: velocity_pump,rho_pump,pressure_pump, &    ! outlets and inlets
                       rho_capillary,u_capillary,v_capillary,p_capillary, &
@@ -200,10 +206,10 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
        r = abs(y-domain_size(2)*0.5_rk)
        do ix=1, Bs+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
-            rho = phi(ix,iy,1)**2
-            u   = phi(ix,iy,2)/phi(ix,iy,1)
-            v   = phi(ix,iy,3)/phi(ix,iy,1)
-            p   = phi(ix,iy,4)
+            rho = phi(ix,iy,rhoF)
+            u   = phi(ix,iy,UxF)
+            v   = phi(ix,iy,UyF)
+            p   = phi(ix,iy,pF)
 
             C_inv=C_sp_inv
 
@@ -211,9 +217,9 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
             ! ------
             if  (mask_color(ix,iy) == color_plates &
             .or. mask_color(ix,iy) == color_walls ) then
-              Phi_ref(2) = 0.0_rk                     ! no velocity in x
-              Phi_ref(3) = 0.0_rk                     ! no velocity in y
-              Phi_ref(4) = rho*Rs*funnel%temperatur   ! pressure set according to
+              Phi_ref(ix,iy,2) = 0.0_rk                     ! no velocity in x
+              Phi_ref(ix,iy,3) = 0.0_rk                     ! no velocity in y
+              Phi_ref(ix,iy,4) = rho*Rs*funnel%temperatur   ! pressure set according to
               C_inv=C_eta_inv
             endif                                           ! the temperature of the funnel
 
@@ -222,18 +228,18 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
             if (mask_color(ix,iy) == color_pumps) then
               v_ref=velocity_pump*jet_stream(abs(x-funnel%pump_x_center), &
                                              funnel%pump_diameter*0.5_rk,pump_smooth_width)
-               Phi_ref(2) = 0
+               Phi_ref(ix,iy,2) = 0
                C_inv=C_eta_inv
               if (y>R_domain) then
-                Phi_ref(3) = rho*v_ref
+                Phi_ref(ix,iy,3) = rho*v_ref
               else
-                Phi_ref(3) = -rho*v_ref
+                Phi_ref(ix,iy,3) = -rho*v_ref
               endif
             endif
             ! mass and energy sink
             if (mask_color(ix,iy)==color_pumps_sink) then
-              Phi_ref(1) = rho_pump
-              Phi_ref(4) = pressure_pump
+              Phi_ref(ix,iy,1) = rho_pump
+              Phi_ref(ix,iy,4) = pressure_pump
               C_inv=C_eta_inv
             endif
 
@@ -242,30 +248,23 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,penalization)
             if (mask_color(ix,iy)==color_capillary) then
               dq               =jet_stream(r,funnel%jet_radius,jet_smooth_width)
               C_inv=C_sp_inv
-              Phi_ref(1) =  rho_capillary
-              Phi_ref(2) =  rho_capillary*u_capillary*dq
-              Phi_ref(3) =  rho_capillary*v_capillary
-              Phi_ref(4) =  p_capillary  !rho*Rs*funnel%temperatur * (1 - dq) + p_capillary * dq
+              Phi_ref(ix,iy,1) =  rho_capillary
+              Phi_ref(ix,iy,2) =  rho_capillary*u_capillary*dq
+              Phi_ref(ix,iy,3) =  rho_capillary*v_capillary
+              Phi_ref(ix,iy,4) =  p_capillary  !rho*Rs*funnel%temperatur * (1 - dq) + p_capillary * dq
             endif
 
             ! Outlet flow: Transition to 2pump
             ! ---------------------
               if (mask_color(ix,iy)==color_outlet) then
-                Phi_ref(1) = rho_2nd_pump_stage
-                !Phi_ref(2) = 0
-                Phi_ref(3) = 0
-                Phi_ref(4) = p_2nd_pump_stage
+                Phi_ref(ix,iy,1) = rho_2nd_pump_stage
+                !Phi_ref(ix,iy,2) = 0
+                Phi_ref(ix,iy,3) = 0
+                Phi_ref(ix,iy,4) = p_2nd_pump_stage
                 C_inv=C_sp_inv
               endif
-
-            ! density
-            penalization(ix,iy,1)=C_inv*mask(ix,iy,1)*(rho-  Phi_ref(1) )
-            ! x-velocity
-            penalization(ix,iy,2)=C_inv*mask(ix,iy,2)*(rho*u-  Phi_ref(2) )
-            ! y-velocity
-            penalization(ix,iy,3)=C_inv*mask(ix,iy,3)*(rho*v-  Phi_ref(3) )
-            ! preasure
-            penalization(ix,iy,4)=C_inv*mask(ix,iy,4)*(p- Phi_ref(4) )
+              ! add penalization strength to mask
+              mask(ix,iy,:)=C_inv*mask(ix,iy,:)
        end do
     end do
 end subroutine  compute_penal2D

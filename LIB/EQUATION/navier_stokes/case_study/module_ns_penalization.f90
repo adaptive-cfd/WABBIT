@@ -46,13 +46,13 @@ module module_ns_penalization
   PUBLIC :: init_penalization,smoothstep,hardstep,soft_bump, &
             soft_bump2,hard_bump,jet_stream,add_penalization_term, &
             transition,draw_free_outlet_wall, &
-            init_simple_sponge,draw_simple_sponge
+            init_simple_sponge,sponge_2D,sponge_3D,wall_2D,wall_3D
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
   character(len=80),                 save        :: mask_geometry!273.15_rk
   logical           ,                save        :: smooth_mask, use_sponge
-  real(kind=rk),public             , save        :: C_eta_inv,C_sp_inv,L_sponge
+  real(kind=rk),public             , save        :: C_eta_inv,C_sp_inv
   real(kind=rk),                     save        :: domain_size(3)=0.0_rk
   ! radius of domain (Ly/2)
   real(kind=rk),                     save        :: R_domain
@@ -290,10 +290,7 @@ subroutine init_simple_sponge( params,FILE )
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', use_sponge, .false. )
 
     if (use_sponge) then
-      call read_param_mpi(FILE, 'Sponge', 'L_sponge', L_sponge, 0.1_rk )
-      if ( L_sponge<1e-10 ) then
-        L_sponge=0.1*params%domain_size(1)
-      end if
+      call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_ns%L_sponge, 0.1_rk )
       call read_param_mpi(FILE, 'Sponge', 'C_sponge', C_sp_inv, 1.0e-2_rk )
       C_sp_inv=1.0_rk/C_sp_inv
     endif
@@ -301,40 +298,241 @@ subroutine init_simple_sponge( params,FILE )
 end subroutine init_simple_sponge
 
 
-!> \brief creates the mask of a simple sponge
-subroutine draw_simple_sponge(sponge, x0, dx, Bs, g)
-
+!> \brief creates the mask of a simple sponge at the x_alpha (alpha=1,2) domain-boundary
+!             ___________________________________
+!             |                                  | 0.5L_sponge
+!             |+------------------------------- +|
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!         ^   |+--------------------------------+|
+! x_alpha |   |__________________________________|0.5L_sponge
+!         ->
+!         x_beta
+subroutine sponge_2D(sponge, x0, dx, Bs, g, alpha)
     implicit none
-    !-----------------------------------------------------------------
+    !--------------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in)                   :: Bs, g
     !> sponge term for every grid point of this block
-    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge
+    real(kind=rk), dimension(:,:), intent(out)     :: sponge
     !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-    !-------------------------------------------------------------------
-    ! auxiliary variables
-    real(kind=rk)                                             :: x
-    ! loop variables
-    integer(kind=ik)                                          :: ix, iy
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> boundary index (alpha=1 : x-direction, alpha=2: y-direction)
+    integer(kind=ik), intent(in),optional  :: alpha
+    !--------------------------------------------------------------
+    integer(kind=ik) :: alpha_
 
-    ! reset sponge array
-    sponge = 0.0_rk
-    if ( use_sponge .eqv. .false. ) then
-      return
+    ! auxiliary variables
+    real(kind=rk)    :: x, y, tmp(2)
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+
+    if ( present(alpha) ) then
+      alpha_ = alpha
+    else
+      ! if not present sponge in x direction
+      alpha_ = 1
+    end if
+
+    do iy = 1, Bs+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        ! distance to y-border of domain
+        tmp(2) = min(y,-(y-params_ns%domain_size(2)))
+
+        do ix = 1, Bs+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            ! distance to x-border of domain
+            tmp(1) = min(x,-(x-params_ns%domain_size(1)))
+
+            sponge(ix,iy) = smoothstep( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+        end do
+    end do
+
+end subroutine sponge_2D
+
+!> \brief creates the mask of a simple sponge at the x_alpha (alpha=1,2,3) domain-boundary
+!             ___________________________________
+!             |                                  |0.5L_sponge
+!             |+------------------------------- +|
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!         ^   |+--------------------------------+|
+! x_alpha |   |__________________________________|0.5L_sponge
+!         ->
+!         x_beta
+subroutine sponge_3D(sponge, x0, dx, Bs, g, alpha)
+    implicit none
+    !--------------------------------------------------------------
+    ! grid
+    integer(kind=ik), intent(in)  :: Bs, g
+    !> sponge term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: sponge
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+    !> boundary index (alpha=1 : x-direction, alpha=2: y-direction alpha=3 :z-direction)
+    integer(kind=ik), intent(in),optional  :: alpha
+    !--------------------------------------------------------------
+    ! auxiliary variables
+    real(kind=rk)     :: x, y, z, tmp(3)
+    ! loop variables
+    integer(kind=ik)  :: ix, iy, iz, alpha_
+
+    if ( present(alpha) ) then
+      alpha_ = alpha
+    else
+      ! if not present sponge in x direction
+      alpha_ = 1
     end if
 
 
-        do ix=1, Bs+2*g
-          x = dble(ix-(g+1)) * dx(1) + x0(1)
-          do iy=1, Bs+2*g
-            sponge(ix,iy)=soft_bump2(x,(domain_size(1)-L_sponge),L_sponge,1.5*min(dx(1),dx(2)))
-          end do
+    do iz = 1, Bs+2*g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        ! distance to z-border of domain
+        tmp(3) = min(z,-(z-params_ns%domain_size(3)))
+
+        do iy = 1, Bs+2*g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            ! distance to y-border of domain
+            tmp(2) = min(y,-(y-params_ns%domain_size(2)))
+
+            do ix = 1, Bs+2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+                ! distance to x-border of domain
+                tmp(1) = min(x,-(x-params_ns%domain_size(1)))
+
+                sponge(ix,iy,iz) = smoothstep( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+            end do
         end do
+    end do
 
-end subroutine draw_simple_sponge
+end subroutine sponge_3D
 
 
+!> \brief creates the mask of a simple sponge at the x_alpha (alpha=1,2) domain-boundary
+!             ___________________________________
+!             |                                  | 0.5L_sponge
+!             |+------------------------------- +|
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!         ^   |+--------------------------------+|
+! x_alpha |   |__________________________________|0.5L_sponge
+!         ->
+!         x_beta
+subroutine wall_2D(mask, x0, dx, Bs, g, alpha)
+    implicit none
+    !--------------------------------------------------------------
+    ! grid
+    integer(kind=ik), intent(in)                   :: Bs, g
+    !> mask at the boundary of the domain
+    real(kind=rk), dimension(:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> boundary index (alpha=1 : x-direction, alpha=2: y-direction)
+    integer(kind=ik), intent(in),optional  :: alpha
+    !--------------------------------------------------------------
+    integer(kind=ik) :: alpha_
+
+    ! auxiliary variables
+    real(kind=rk)    :: x, y, tmp(2),h
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if ( present(alpha) ) then
+      alpha_ = alpha
+    else
+      ! if not present wall in x direction
+      alpha_ = 1
+    end if
+
+    h = 1.5_rk*dx(alpha_)
+
+    do iy = 1, Bs+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        ! distance to y-border of domain
+        tmp(2) = min(y,-(y-params_ns%domain_size(2)))
+
+        do ix = 1, Bs+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            ! distance to x-border of domain
+            tmp(1) = min(x,-(x-params_ns%domain_size(1)))
+
+            mask(ix,iy) = smoothstep( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+        end do
+    end do
+
+end subroutine wall_2D
+
+
+!> \brief creates the mask of a simple wall at the x_alpha (alpha=1,2,3) domain-boundary
+!             ___________________________________
+!             |                                  |0.5L_sponge
+!             |+------------------------------- +|
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!             |                                  |
+!         ^   |+--------------------------------+|
+! x_alpha |   |__________________________________|0.5L_sponge
+!         ->
+!         x_beta
+subroutine wall_3D(mask, x0, dx, Bs, g, alpha)
+    implicit none
+    !--------------------------------------------------------------
+    ! grid
+    integer(kind=ik), intent(in)  :: Bs, g
+    !> mask that is created on domain boundaries
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+    !> boundary index (alpha=1 : x-direction, alpha=2: y-direction alpha=3 :z-direction)
+    integer(kind=ik), intent(in),optional  :: alpha
+    !--------------------------------------------------------------
+    ! auxiliary variables
+    real(kind=rk)     :: x, y, z, tmp(3),h
+    ! loop variables
+    integer(kind=ik)  :: ix, iy, iz, alpha_
+
+    if ( present(alpha) ) then
+      alpha_ = alpha
+    else
+      ! if not present wall in the boundary in x direction
+      alpha_ = 1
+    end if
+
+    h = 1.5_rk*dx(alpha_)
+
+    do iz = 1, Bs+2*g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        ! distance to z-border of domain
+        tmp(3) = min(z,-(z-params_ns%domain_size(3)))
+
+        do iy = 1, Bs+2*g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            ! distance to y-border of domain
+            tmp(2) = min(y,-(y-params_ns%domain_size(2)))
+
+            do ix = 1, Bs+2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+                ! distance to x-border of domain
+                tmp(1) = min(x,-(x-params_ns%domain_size(1)))
+
+                mask(ix,iy,iz) = smoothstep( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, h)
+            end do
+        end do
+    end do
+
+end subroutine wall_3D
 
 
 

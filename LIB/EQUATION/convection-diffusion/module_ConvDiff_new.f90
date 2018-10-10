@@ -40,10 +40,11 @@ module module_convdiff_new
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl
     real(kind=rk)                               :: domain_size(3)=0.0_rk
-    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0
+    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
     character(len=80), allocatable :: names(:), inicond(:), velocity(:)
-    character(len=80) :: discretization
+    character(len=80) :: discretization,boundary_type
+    logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
   end type type_paramsb
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -51,13 +52,6 @@ module module_convdiff_new
   type(type_paramsb), save :: params_convdiff
 
 
-
-
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
 
 contains
 
@@ -74,7 +68,7 @@ contains
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     ! inifile structure
     type(inifile) :: FILE
-
+    integer(kind=ik):: number_ghost_nodes
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
@@ -92,6 +86,8 @@ contains
     allocate( params_convdiff%inicond(1:params_convdiff%N_scalars))
     allocate( params_convdiff%velocity(1:params_convdiff%N_scalars))
 
+
+
     allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0x', params_convdiff%u0x )
@@ -106,13 +102,23 @@ contains
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'gauss_blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
 
+
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    ! params_convdiff%domain_size(1)=domain_size(1)
-    ! params_convdiff%domain_size(2)=domain_size(2)
-    ! params_convdiff%domain_size(3)=domain_size(3)
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_convdiff%periodic_BC(1:params_convdiff%dim), &
+                                                       params_convdiff%periodic_BC(1:params_convdiff%dim) )
+    if ( .not. All(params_convdiff%periodic_BC) ) then
+      allocate( params_convdiff%phi_boundary(1:params_convdiff%N_scalars))
+      call read_param_mpi(FILE, 'ConvectionDiffusion', 'boundary_type', params_convdiff%boundary_type,'--' )
+      call read_param_mpi(FILE, 'ConvectionDiffusion', 'phi_boundary', params_convdiff%phi_boundary,  params_convdiff%phi_boundary )
+    endif
+
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_convdiff%discretization, "FD_2nd_central")
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes',number_ghost_nodes, 0_ik )
+    if ( params_convdiff%discretization=='FD_4th_central_optimized' .and. number_ghost_nodes<=2  ) then
+      call abort(91020181, "Number of ghost nodes for this scheme is 3!")
+    endif
 
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_convdiff%N_fields_saved, 1 )
     allocate( params_convdiff%names(1:params_convdiff%N_fields_saved))
@@ -205,97 +211,6 @@ contains
   end subroutine FIELD_NAMES_convdiff
 
 
-  !-----------------------------------------------------------------------------
-  ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid and any MPI formalism, neighboring relations and the like.
-  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
-  ! from that. Ghost nodes are assumed to be sync'ed.
-  !-----------------------------------------------------------------------------
-  subroutine RHS_convdiff( time, u, g, x0, dx, rhs, stage )
-    implicit none
-
-    ! it may happen that some source terms have an explicit time-dependency
-    ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
-
-    ! block data, containg the state vector. In general a 4D field (3 dims+components)
-    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
-
-    ! as you are allowed to compute the RHS only in the interior of the field
-    ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g
-
-    ! for each block, you'll need to know where it lies in physical space. The first
-    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    ! output. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
-
-    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
-    ! terms that depend on global qtys, such as forces etc, which cannot be computed
-    ! from a single block alone, the first stage does that. the second stage can then
-    ! use these integral qtys for the actual RHS evaluation.
-    character(len=*), intent(in) :: stage
-
-    ! local variables
-    integer(kind=ik) :: Bs, mpierr
-    real(kind=rk) :: tmp(1:3)
-
-    ! compute the size of blocks
-    Bs = size(u,1) - 2*g
-
-    select case(stage)
-    case ("init_stage")
-      !-------------------------------------------------------------------------
-      ! 1st stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
-      ! performs initializations in the RHS module, such as resetting integrals
-
-      return
-
-    case ("integral_stage")
-      !-------------------------------------------------------------------------
-      ! 2nd stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! For some RHS, the eqn depend not only on local, block based qtys, such as
-      ! the state vector, but also on the entire grid, for example to compute a
-      ! global forcing term (e.g. in FSI the forces on bodies). As the physics
-      ! modules cannot see the grid, (they only see blocks), in order to encapsulate
-      ! them nicer, two RHS stages have to be defined: integral / local stage.
-      !
-      ! called for each block.
-
-      return
-
-    case ("post_stage")
-      !-------------------------------------------------------------------------
-      ! 3rd stage: post_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
-
-      return
-
-    case ("local_stage")
-      !-------------------------------------------------------------------------
-      ! 4th stage: local evaluation of RHS on all blocks
-      !-------------------------------------------------------------------------
-      ! the second stage then is what you would usually do: evaluate local differential
-      ! operators etc.
-      !
-      ! called for each block.
-
-      call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs)
-
-
-    case default
-      call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
-    end select
-
-
-  end subroutine RHS_convdiff
 
   !-----------------------------------------------------------------------------
   ! subroutine statistics_convdiff()
@@ -361,7 +276,6 @@ contains
 
   end subroutine GET_DT_BLOCK_convdiff
 
-
   !-----------------------------------------------------------------------------
   ! main level wrapper for setting the initial condition on a block
   !-----------------------------------------------------------------------------
@@ -425,12 +339,14 @@ contains
                       x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                       y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-                      if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                      if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-
-                      if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                      if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-
+                      if (params_convdiff%periodic_BC(1)) then
+                        if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+                        if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
+                      endif
+                      if (params_convdiff%periodic_BC(2)) then
+                        if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+                        if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
+                      endif
                       ! set actual inicond gauss blob
                       u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
                   end do
@@ -445,15 +361,18 @@ contains
                           y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
                           z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
 
-                          if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                          if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-
-                          if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                          if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-
-                          if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
-                          if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
-
+                          if (params_convdiff%periodic_BC(1)) then
+                            if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+                            if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
+                          endif
+                          if (params_convdiff%periodic_BC(2)) then
+                            if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+                            if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
+                          endif
+                          if (params_convdiff%periodic_BC(3)) then
+                            if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
+                            if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
+                          endif
                           ! set actual inicond gauss blob
                           u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
                       end do
@@ -463,7 +382,6 @@ contains
       case default
           call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
       end select
-
 
     enddo
 

@@ -21,8 +21,9 @@ module module_shock
     PRIVATE
     !**********************************************************************************************
     ! only this functions are visible outside this module
-    PUBLIC :: read_params_shock_tube,add_shock_tube,draw_simple_shock, set_inicond_shock_tube, &
-              set_shock_1D,moving_shockVals, standing_shockVals
+    PUBLIC :: read_params_shock_tube,draw_simple_shock, set_inicond_shock_tube, &
+              set_shock_in_direction,moving_shockVals, standing_shockVals, &
+              shock_tube_penalization2D, shock_tube_penalization3D
     !**********************************************************************************************
 
   !> \file
@@ -39,10 +40,11 @@ module module_shock
 
 
   type :: type_shock_params
-      character(len=80) :: name
-      real(kind=rk)     :: rho_left,u_left,p_left
-      real(kind=rk)     :: rho_right,u_right,p_right
-      real(kind=rk)     :: machnumber
+      character(len=80) :: name                      !< name of the shock (sod_shock_tube,moving-shock,etc.)
+      real(kind=rk)     :: rho_left,u_left,p_left    !< left values (behind the shock front)
+      real(kind=rk)     :: rho_right,u_right,p_right !< right values of the shock front
+      real(kind=rk)     :: machnumber     !< machnumber of a moving shock
+      integer(kind=ik)   :: normalvector=-1   !< normalvector of the shock front
   end type type_shock_params
 
   !---------------------------------------
@@ -162,6 +164,13 @@ subroutine read_params_shock_tube( params,FILE )
       shock%rho_right=0.125
       shock%p_right  =0.1
       shock%u_right  =0
+      ! read in the normal vector of the shock wavefront
+      ! 1: direction e_x
+      ! 2: direction e_y
+      ! 3: direction e_z only in 3D
+      call read_param_mpi(FILE, 'Shock_Tube', 'shock_front_normal', shock%normalvector,1_ik )
+      ! for this case we want to have fixed sponge layer size
+      params_ns%L_sponge=0.1*params_ns%domain_size(shock%normalvector)
     case default
       call abort(8546501,"ERROR: Mr. Spock: Insufficient facts always invite danger. "//shock%name)
 
@@ -183,51 +192,34 @@ end subroutine read_params_shock_tube
        ! -----------------------------------------------------------------
        real(kind=rk),allocatable:: mask(:,:,:)
        real(kind=rk)            :: x,p_init, rho_init,u_init(3),T_init
-       integer(kind=ik)         :: ix
+       real(kind=rk)            :: u_left(size(u,4)),u_right(size(u,4))
+       integer(kind=ik)         :: ix,UshockF
 
-
-       p_init    =params_ns%initial_pressure
-       rho_init  =params_ns%initial_density
-       u_init    =params_ns%initial_velocity
-       T_init    =params_ns%initial_temp
 
        select case(shock%name)
        case ('moving-shock','standing-shock')
-
+         ! not implemented yet
        case('sod_shock_tube')
          ! Sods test case: shock tube
          ! ---------------------------
-         !
-         ! Test case for shock capturing filter
-         ! The initial condition is devided into
          ! Left part x<= Lx/2
-         !
          ! rho=1
          ! p  =1
          ! u  =0
          !
-         ! Rigth part x> Lx/2
+         u_left(:)      =0
+         u_left(rhoF)   =sqrt(shock%rho_left)
+         u_left(pF)     =shock%p_left
          !
+         ! Rigth part x> Lx/2
          ! rho=0.125
          ! p  =0.1
          ! u  =0
-         do ix=1, Bs+2*g
-           x = dble(ix-(g+1)) * dx(1) + x0(1)
-           call continue_periodic(x,params_ns%domain_size(1))
-           if (x <= params_ns%domain_size(1)*0.5_rk) then
-             ! left domain half
-             u( ix, :, :, rhoF) = sqrt(shock%rho_left)
-             u( ix, :, :, pF)   = shock%p_left
-             u( :, :, :, UxF)   = shock%u_left
-           else
-             ! right domain half
-             u( ix, :, :, rhoF) = sqrt(shock%rho_right)
-             u( ix, :, :, pF)   = shock%p_right
-             u( :, :, :, UxF)   = shock%u_right
-           endif
-         end do
-         ! velocity set to 0
-         u( :, :, :, UyF) = 0.0_rk
+         u_right(:)=0
+         u_right(rhoF)   =sqrt(shock%rho_right)
+         u_right(pF)     =shock%p_right
+         call set_shock_in_direction(x0, dx, Bs, g, u, u_left, u_right,&
+                                      0.5_rk*params_ns%domain_size(1), shock%normalvector)
        case default
          call abort(8546501,"ERROR: Mr. Spock: Insufficient facts always invite danger. "//shock%name)
        end select
@@ -238,77 +230,26 @@ end subroutine read_params_shock_tube
 
 
 
-
-!==========================================================================
-!> This function adds a penalization term
-!> to navier stokes equations
-subroutine add_shock_tube(penalization, x0, dx, Bs, g, phi)
-      implicit none
-      !-------------------------------------------------------
-      !> grid parameter
-      integer(kind=ik), intent(in)    :: g, Bs
-      !> rhs
-      real(kind=rk), intent(inout)    :: penalization(:,:,:,:)
-      !> state variables
-      real(kind=rk), intent(in)       :: phi(:,:,:,:)
-      !> spacing and origin of block
-      real(kind=rk), intent(in)       :: x0(3), dx(3)
-      !--------------------------------------------------------
-
-      call add_simple_shock(penalization(:,:,1,:),x0,dx,Bs,g,phi(:,:,1,:))
-
-end subroutine add_shock_tube
-!==========================================================================
-
-
-
-
 !==========================================================================
 !> \brief Compute mask function of sod shock tube
-!> \detail
-!>      +For boundary_type=='left'
-!>             -> mask will be generatet for 0<x<0.1*Lx
-!>      +For boundary_type=='rigth'
-!>             -> mask will be generatet for 0.9Lx<x<Lx
-!>      +For boundary_type else
-!>             -> mask will be generatet for both sides
-subroutine draw_simple_shock(mask, x0, dx, Bs, g, boundary_type )
-
-
+subroutine draw_simple_shock(mask, x0, dx, Bs, g )
     implicit none
-
+    !-----------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in)                     :: Bs, g
     !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(out)     :: mask
+    real(kind=rk), dimension(:,:,:), intent(inout)   :: mask
     !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-    !> boundary_type={'left','rigth'}
-     character(len=*),          intent(in)                    :: boundary_type
-    ! auxiliary variables
-    real(kind=rk)                                             :: x, h, x_boundary(2),boundary_width
-    ! loop variables
-    integer(kind=ik)                                          :: ix
+    real(kind=rk), dimension(3), intent(in)          :: x0, dx
+    !-----------------------------------------------------------
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
     if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-    ! reset mask array
-    mask = 0.0_rk
-    ! left and right boundary of shock tube
-    x_boundary(1)   =0.1_rk*params_ns%domain_size(1)
-    x_boundary(2)   =params_ns%domain_size(1)*0.9_rk
-    ! parameter for smoothing function (width)
-    h = 1.5_rk*max(dx(1), dx(2))
-
-       do ix=1, Bs+2*g
-           x = dble(ix-(g+1)) * dx(1) + x0(1)
-
-              mask(ix,:) = smoothstep(x-x_boundary(1),h) &
-                         + smoothstep(x_boundary(2)-x,h)
-
-       end do
+    if ( params_ns%dim==2 ) then
+      call sponge_2D(mask(:,:,1), x0(1:2), dx(1:2), Bs, g, shock%normalvector)
+    else
+      call wall_3D(mask, x0, dx, Bs, g, shock%normalvector)
+    end if
 
 end subroutine draw_simple_shock
 !==========================================================================
@@ -323,165 +264,283 @@ end subroutine draw_simple_shock
 !>        the penalized domains.
 !>        Be aware that this function uses the C_sp_inv parameter globaly defined
 !>        when importing the module_penalization.
-subroutine add_simple_shock(penalization, x0, dx, Bs, g ,phi)
+subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
 
     implicit none
-    ! grid
-    integer(kind=ik), intent(in)                     :: Bs, g
-    !> penalization term including mask
-    real(kind=rk), dimension(:,:,:), intent(inout)   :: penalization
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)          :: x0, dx
-    !> statevector
-    real(kind=rk), dimension(:,:,:), intent(in)      :: phi
-      !> statevector
-    real(kind=rk)                                    :: mask
-
-    ! auxiliary variables
-    real(kind=rk)                                    :: x, y, h,domain_size(3)
-    ! preasure,density velocities
-    real(kind=rk)                                    :: p(Bs+2*g,Bs+2*g),rho(Bs+2*g,Bs+2*g), &
-                                                        u(Bs+2*g,Bs+2*g),v(Bs+2*g,Bs+2*g)
-    ! loop variables
-    integer(kind=ik)                                 :: ix, iy,n
+    ! -----------------------------------------------------------------
+    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(inout)  :: phi_ref(:,:,:,:) !< reference values of penalized volume
+    real(kind=rk), intent(inout)  :: mask(:,:,:,:)    !< mask function
+    ! -----------------------------------------------------------------
+    ! coordinate systems
+    real(kind=rk)       :: X(3),domain_size(3)
+    integer(kind=ik)    :: ix, iy, iz, alpha,UshockF,neq
     ! left and right boundary
-    real(kind=rk)                                    :: u_ref,u_R,u_L,rho_R,rho_L,p_L,p_R, &
-                                                        x_L,x_R,rho_ref,p_ref
+    real(kind=rk)       :: u_ref,u_R,u_L,rho_R,rho_L,p_L,p_R,width,rho_ref,p_ref
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-    if (size(penalization,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,3) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-    ! reset mask array
-    mask         = 0.0_rk
-    penalization = 0.0_rk
+    ! index x_alpha of the coordinate vector which is the normal of the shock front
+    alpha=shock%normalvector
 
-    ! parameter for smoothing function (width)
-    h       = 1.5_rk*max(dx(1), dx(2))
+    ! draw a shock on the boundaries of the x_alhpa coordinate
+    ! all compontents are penalized
+    do neq = 1, params_ns%n_eqn
+      call sponge_3D(mask(:,:,:,neq), x0, dx, Bs, g, alpha)
+      !we allready add the penalization strength to the mask
+      mask(:,:,:,neq)=C_sp_inv*mask(:,:,:,neq)
+    end do
 
-    rho         = phi(:,:,1)**2
-    u           = phi(:,:,2)/phi(:,:,1)
-    v           = phi(:,:,3)/phi(:,:,1)
-    p           = phi(:,:,4)
+
+    if ( alpha==1 ) then
+      UshockF=UxF
+    elseif (alpha==2) then
+      UshockF=UyF
+    else
+      UshockF=UzF
+    end if
+
     domain_size = params_ns%domain_size
+    width    = params_ns%L_sponge* 0.25_rk ! width of the transition area
+    !                    shockfront
+    ! -----------------------------------------
+    ! |sponge  \ rhoL    ||     rhoR  \sponge |
+    ! |sponge  \ uL      ||-->  uR    \sponge |
+    ! |sponge  \ pL      ||     pR    \sponge |
+    ! 0-------------------_--------------------L_alpha
+    !          L_alpha/2
 
-    ! left boundary
-    x_L      =0.1_rk*domain_size(1)
+    ! left side of the shock
     p_L      = shock%p_left
     rho_L    =  shock%rho_left
     u_L      =  shock%u_left
 
-    ! right boundary
-    x_R      =domain_size(1)*0.9_rk
+    ! right side of the shock
     p_R      = shock%p_right
     rho_R    =  shock%rho_right
     u_R      =  shock%u_right
 
     ! parameter for smoothing function (width)
 
-    do ix=1, Bs+2*g
-      x = dble(ix-(g+1)) * dx(1) + x0(1)
-      if (x<domain_size(1)*0.5_rk) then
-        ! values of the left sponge domain
-        mask      = smoothstep(x-x_L,h)
-        rho_ref   = rho_L
-        p_ref     = p_L
-        u_ref   = u_L
-      else
-        mask      = smoothstep(x_R-x,h)
-        ! Because WABBIT provides only periodic BC, we have to ensure a smooth transition
-        ! from the sponge values on the left side of the domain (rho_L, p_L ,u_L)
-        ! to the values on the right side (rho_R, p_R, u_R),
-        ! For this reason we use the transition function for assigning the values
-        ! inside the right sponge domain.
-        ! The transition is located in the right sponge (x>x_R) and starts
-        ! from x0=0.925_rk*domain_size(1) to x0+widht=(0.925_rk+0.05)*domain_size(1)
-        rho_ref   = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),rho_R,rho_L)
-        p_ref     = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),p_R  ,p_L    )
-        u_ref     = transition(x,0.925_rk*domain_size(1),0.05_rk*domain_size(1),u_R  ,u_L    )
-      endif
+    do iz = 1, Bs+2*g
+        ! z-coordinate
+        X(3) = dble(iz-(g+1)) * dx(3) + x0(3)
 
-      ! density
-      penalization(ix,:,1)= penalization(ix,:,1) + C_sp_inv*mask * ( rho(ix,:) - rho_ref )
-      ! x-velocity
-      penalization(ix,:,2)= penalization(ix,:,2) + C_sp_inv*mask * ( rho(ix,:)*u(ix,:)- rho_ref*u_ref )
-      ! y-velocity
-      penalization(ix,:,3)= penalization(ix,:,3) + C_sp_inv*mask * ( rho(ix,:)*v(ix,:) )
-      ! preasure
-      penalization(ix,:,4)= penalization(ix,:,4) + C_sp_inv*mask *( p(ix,:) - p_ref )
+        do iy = 1, Bs+2*g
+            ! y-coordinate
+            X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
+
+            do ix = 1, Bs+2*g
+                ! x-coordinate
+                X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                !default is 0
+                phi_ref(ix,iy,iz,:)=0.0_rk
+                ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                if (X(alpha)<domain_size(alpha)*0.5_rk) then
+                  phi_ref(ix,iy,iz,rhoF)   = rho_L
+                  phi_ref(ix,iy,iz,pF)     = p_L
+                  phi_ref(ix,iy,iz,UshockF)= u_L
+                else
+                  ! Because WABBIT provides only periodic BC, we have to ensure a smooth transition
+                  ! from the sponge values on the left side of the domain (rho_L, p_L ,u_L)
+                  ! to the values on the right side (rho_R, p_R, u_R),
+                  ! For this reason we use the transition function for assigning the values
+                  ! inside the right sponge domain.
+                  ! The transition is located in the right sponge (x>x_R) and starts
+                  ! from xstart to xstart+widht
+                  phi_ref(ix,iy,iz,rhoF)   = transition(X(alpha),domain_size(alpha)-width,width,rho_R,rho_L)
+                  phi_ref(ix,iy,iz,pF)     = transition(X(alpha),domain_size(alpha)-width,width,p_R  ,p_L    )
+                  phi_ref(ix,iy,iz,UshockF)= transition(X(alpha),domain_size(alpha)-width,width,u_R  ,u_L    )
+                endif
+            end do
+        end do
     end do
 
-
-
-end subroutine add_simple_shock
+end subroutine shock_tube_penalization3D
 
 
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-!> \brief
-!>    + Sets the initial condition of a moving shock wave along a one axis, using the Rankine-Hugoniot
-!>      conditions.
-!>    + If shock\_speed is not passed to the routine, the shock wave is a standing-shock
-!>    + example: call set_inicond_moving_shock(x0(2), dx(2), Bs, g, phi(:,1,:,:), (/1, 1, 0/), (/2, 3, 0/), 10)
-!>               for a shock wave along the y axis
-!> \details
-subroutine set_shock_1D(x0, dx, Bs, g, phi, phi_left, phi_right, x0_shock, xLength)
-     implicit none
-     ! -----------------------------------------------------------------
-     integer(kind=ik), intent(in)       :: Bs, g        !< grid parameter
-     !> NOTE: x0 and dx are only 1D !!! Pass only the coordinates which is perpendicular to the shock front
-     ! shockfront
-     !       |                                         ^ x0(2),dx(2)
-     !       |                                         |
-     !       |----------------> x0(1),dx(1)            |
-     ! left  |  right                                  |
-     !       |                              ___________|____________ shock front
-     !
-     real(kind=rk), intent(in)          :: x0, dx
-     real(kind=rk), intent(in)          :: x0_shock    !< x0_shock is the position of the shock front
-     real(kind=rk), intent(in)          :: xLength     !< xLength is the lenght of the domain interval in the given direction
-     real(kind=rk), intent(inout)       :: phi(:,:)    !< Statevector in skew-symetric form : phi([ix|iy|iz],dF)
-     !> Statevector values for the left and right side of the shock
-     !>       + phi_[left/right](rhoF) density at the left or right
-     !>       + phi_[left/right](UxF) velocity at the left or right
-     !>       + phi_[left/right](pF) pressure at the left or right
-     real(kind=rk), intent(in)          :: phi_left(size(phi,2)),phi_right(size(phi,2))
-     ! -----------------------------------------------------------------
-     real(kind=rk)            :: x, b
-     real(kind=rk)            :: rho_left,u_left,p_left, rho_right, u_right, p_right
-     integer(kind=ik)         :: ix
+!==========================================================================
+!> \brief Adds penalization terms for a simple shock_tube
+!> \detail
+!>        A mask will be generatet at 0<x<0.1*Lx and 0.9Lx<x<Lx and
+!>        the left and right values of the shock tube will be assigned to
+!>        the penalized domains.
+!>        Be aware that this function uses the C_sp_inv parameter globaly defined
+!>        when importing the module_penalization.
+subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
+    implicit none
+    ! -----------------------------------------------------------------
+    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
+    real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
+    ! -----------------------------------------------------------------
+    ! auxiliary variables
+    real(kind=rk)       :: X(2),domain_size(2)
+    integer(kind=ik)    :: ix, iy, alpha, UshockF,neq
+    ! left and right boundary
+    real(kind=rk)       :: u_R,u_L,rho_R,rho_L,p_L,p_R,width
 
-       ! check for usefull inital values
-       if ( rho_left<0 .or. rho_right<0 .or.&
-            p_left  <0 .or. p_right  <0) then
-         call abort(3572,"ERROR initial values are insufficient")
-       end if
-       ! following values are imposed and smoothed with tangens:
-       ! ------------------------------------------
-       !   rhoL    | rhoR                  | rhoL
-       !   uL      | uR                    | uL
-       !   pL      | pR                    | pL
-       ! 0-----------------------------------------xLength
-       !           x0_shock                0.95*Length
-       do ix=g+1, Bs+g
-          x = dble(ix-(g+1)) * dx + x0
-          ! hard step for the shock and smooth transition in the sponge domain
-          b      = hardstep(x0_shock -x) - smoothstep(0.95*xLength - x ,0.05*xLength)
-          !   b(x)
-          !   |
-          ! 1 |       ________
-          !   |      |        |
-          ! 0 |______|_ _ _ _ |____________________x
-          !      x0_shock    0.95Lenght
+!---------------------------------------------------------------------------------------------
+! variables initialization
+    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
-          ! parametrization of the smooth transition from right to left
-          phi(ix,:) = phi_left-b*(phi_left-phi_right)
+    ! index x_alpha of the coordinate vector which is the normal of the shock front
+    alpha=shock%normalvector
+
+    ! all compontents are penalized
+    do neq = 1, params_ns%n_eqn
+      call sponge_2D(mask(:,:,neq), x0, dx, Bs, g, alpha)
+      !we allready add the penalization strength to the mask
+      mask(:,:,neq)=C_sp_inv*mask(:,:,neq)
+    end do
+
+    if ( alpha==1 ) then
+      UshockF=UxF
+    else
+      UshockF=UyF
+    end if
+
+    domain_size = params_ns%domain_size(1:2)
+    width       = params_ns%L_sponge *0.5_rk
+    !                    shockfront
+    ! -----------------------------------------
+    ! |sponge  \ rhoL    ||     rhoR  \sponge |
+    ! |sponge  \ uL      ||-->  uR    \sponge |
+    ! |sponge  \ pL      ||     pR    \sponge |
+    ! 0-------------------_--------------------L_alpha
+    !          L_alpha/2
+
+    ! left side of the shock
+    p_L      = shock%p_left
+    rho_L    =  shock%rho_left
+    u_L      =  shock%u_left
+
+    ! right side of the shock
+    p_R      = shock%p_right
+    rho_R    =  shock%rho_right
+    u_R      =  shock%u_right
+
+    ! parameter for smoothing function (width)
+
+        do iy = 1, Bs+2*g
+            ! y-coordinate
+            X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
+
+            do ix = 1, Bs+2*g
+                ! x-coordinate
+                X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                !default is 0
+                phi_ref(ix,iy,:)=0.0_rk
+                ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                if (X(alpha)<domain_size(alpha)*0.5_rk) then
+                  phi_ref(ix,iy,rhoF)   = rho_L
+                  phi_ref(ix,iy,pF)     = p_L
+                  phi_ref(ix,iy,UshockF)= u_L
+                else
+                  ! Because WABBIT provides only periodic BC, we have to ensure a smooth transition
+                  ! from the sponge values on the left side of the domain (rho_L, p_L ,u_L)
+                  ! to the values on the right side (rho_R, p_R, u_R),
+                  ! For this reason we use the transition function for assigning the values
+                  ! inside the right sponge domain.
+                  ! The transition is located in the right sponge (x>x_R) and starts
+                  ! from x0=0.925_rk*domain_size(1) to x0+widht=(0.925_rk+0.05)*domain_size(1)
+                  phi_ref(ix,iy,rhoF)   = transition(X(alpha),domain_size(alpha)-width,width,rho_R,rho_L)
+                  phi_ref(ix,iy,pF)     = transition(X(alpha),domain_size(alpha)-width,width,p_R  ,p_L    )
+                  phi_ref(ix,iy,UshockF)= transition(X(alpha),domain_size(alpha)-width,width,u_R  ,u_L    )
+                endif
+            end do
         end do
 
+end subroutine shock_tube_penalization2D
 
-  end subroutine set_shock_1D
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  !> \brief
+  !>    + Sets the initial condition of a shock with shock values phi_left and phi_right
+  !>      along the axis alpha,
+  !>    + example: set_shock_in_direction(x0, dx, Bs, g, phi, phi_left, phi_right, 0.4*domain_size(3), 3)
+  !>               for a shock wave along the z axis
+  subroutine set_shock_in_direction(x0, dx, Bs, g, phi, phi_left, phi_right, x0_shock, alpha)
+    implicit none
+    ! -----------------------------------------------------------------
+    integer(kind=ik), intent(in)       :: Bs, g            !< grid parameter
+    real(kind=rk), intent(in)          :: x0(1:3), dx(1:3) !< block coordinate x0 and spacing dx
+    !> direction \f$\vec{e}_\alpha\f$ along the shock front is moving (perpendicular to the initial shock front)
+    !>          * alpha=1 : shock is put in x direction
+    !>          * alpha=2 : shock is put in y direction
+    !>          * alpha=3 : shock is put in z direction
+    integer(kind=ik),intent(in)        :: alpha
+    ! shockfront
+    !       |
+    !       |
+    !       |----------------> x0(alpha),dx(alpha)
+    ! left  |  right
+    !       |
+    !
+    real(kind=rk), intent(in)          :: x0_shock    !< x0_shock is the position of the shock front
+    real(kind=rk), intent(inout)       :: phi(:,:,:,:)    !< Statevector in skew-symetric form : phi(ix,iy,dF)
+    !> Statevector values for the left and right side of the shock
+    !>       + phi_[left/right](rhoF) density at the left or right
+    !>       + phi_[left/right](UxF) velocity at the left or right
+    !>       + phi_[left/right](pF) pressure at the left or right
+    real(kind=rk), intent(in)          :: phi_left(size(phi,2)),phi_right(size(phi,2))
+    ! -----------------------------------------------------------------
+    integer(kind=ik)    :: ix,iy,iz,nF ! loop variables
+    real(kind=rk)       :: X(3),b,h
+    ! check if the direction is allowed in the 2D case
+    if ( alpha > params_ns%dim ) call abort(2410181,"Oh no, I am sorry to tell you that the direction is not available!")
+
+  h        = 3*dx(alpha) !smoothing width
+  ! loop over all fields
+  if (params_ns%dim==3) then
+    do nF = 1, params_ns%n_eqn
+      do iz = 1, Bs+2*g
+          ! z-coordinate
+          X(3) = dble(iz-(g+1)) * dx(3) + x0(3)
+
+          do iy = 1, Bs+2*g
+              ! y-coordinate
+              X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
+
+              do ix = 1, Bs+2*g
+                  ! x-coordinate
+                  X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
+                  !default is 0
+                  phi(ix,iy,iz,nF)=0.0_rk
+                  ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                  b      = smoothstep(x0_shock -X(alpha),h)
+                  phi(ix,iy,iz,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
+              end do !ix
+          end do !iy
+      end do !iz
+    end do! field
+  else
+    do nF = 1, params_ns%n_eqn
+          do iy = 1, Bs+2*g
+              ! y-coordinate
+              X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
+
+              do ix = 1, Bs+2*g
+                  ! x-coordinate
+                  X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
+                  !default is 0
+                  phi(ix,iy,1,nF)=0.0_rk
+                  ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                  b      = smoothstep(x0_shock -X(alpha),h)
+                  phi(ix,iy,1,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
+              end do !ix
+          end do !iy
+    end do! field
+  end if
+
+
+end subroutine set_shock_in_direction
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 

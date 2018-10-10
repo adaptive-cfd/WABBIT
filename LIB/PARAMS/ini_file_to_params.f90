@@ -286,7 +286,8 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
                                                        params%domain_size(1:params%dim) )
 
-    call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC(1:params%dim), &
+                                                       params%periodic_BC(1:params%dim) )
 
   end subroutine ini_domain
 
@@ -327,6 +328,9 @@ end subroutine ini_file_to_params
     ! read treelevel bounds
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    if ( params%max_treelevel < params%min_treelevel ) then
+      call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
+    end if
     ! read switch to turn on|off mesh refinement
     call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
     call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )

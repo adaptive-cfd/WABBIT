@@ -72,8 +72,6 @@ module module_params
         character(len=80)                            :: order_discretization=""
         character(len=80)                            :: coarsening_indicator="threshold-state-vector"
         logical, allocatable                         :: threshold_state_vector_component(:)
-        ! boundary condition
-        character(len=80)                            :: boundary_cond=""
         ! deside if WABBIT should start from input files
         logical                                       :: read_from_files
         ! files we want to read for inital cond.
@@ -175,7 +173,7 @@ module module_params
         logical                                     :: save_filter_strength
 
         ! -------------------------------------------------------------------------------------
-        ! different BC can be assigned to each block
+        ! Boundary conditions
         ! -------------------------------------------------------------------------------------
         logical,dimension(3)                        :: periodic_BC=(/.true.,.true.,.true./)
 

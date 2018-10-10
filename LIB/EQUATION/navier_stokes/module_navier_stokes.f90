@@ -93,21 +93,23 @@ contains
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     ! open file
-    call read_ini_file_mpi(FILE, filename, .true.)
+    call read_ini_file_mpi( FILE, filename, .true.)
     ! init all parameters used in ns_equations
-    call init_navier_stokes_eq(params_ns, FILE)
+    call init_navier_stokes_eq( FILE )
     ! init all parameters used for penalization
-    call init_penalization(    params_ns, FILE)
+    call init_penalization( FILE )
     ! init all parameters used for the filter
-    call init_filter(   params_ns%filter, FILE)
+    call init_filter( params_ns%filter, FILE)
     ! init all params for organisation
-    call init_other_params(params_ns,     FILE )
+    call init_other_params( FILE )
     ! read in initial conditions
-    call init_initial_conditions(params_ns,file)
+    call init_initial_conditions( FILE )
     ! initialice parameters and fields of the specific case study
-    call read_case_parameters( params_ns , FILE )
+    call read_case_parameters( FILE )
+    ! read parameters for the boundatry CONDITIONS
+    call read_boundary_conditions( FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
-    call add_info(params_ns)
+    call add_info()
 
     ! set global parameters pF,rohF, UxF etc
     do dF = 1, params_ns%n_eqn
@@ -118,7 +120,7 @@ contains
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
 
-    call check_parameters(params_ns)
+    call check_parameters()
 
     call clean_ini_file_mpi( FILE )
 
@@ -235,13 +237,13 @@ contains
       if (params_ns%dim==2) then
         select case(params_ns%coordinates)
         case ("cartesian")
+
           call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
         case("cylindrical")
           call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
         case default
           call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
         end select
-        !call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
       else
          call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif

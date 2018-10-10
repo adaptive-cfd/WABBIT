@@ -62,15 +62,13 @@ contains
 
 
 !> \brief reads parameters for mask function from file
-subroutine init_penalization( params,FILE )
+subroutine init_penalization( FILE )
     use module_navier_stokes_params
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)       :: FILE
-   !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params
 
-     if (params%mpirank==0) then
+     if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
       write(*,*) "PARAMS: penalization!"
@@ -79,20 +77,20 @@ subroutine init_penalization( params,FILE )
     ! =============================================================================
     ! parameters needed for ns_physics module
     ! -----------------------------------------------------------------------------
-    call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
-    if (.not.params%penalization)  return
+    call read_param_mpi(FILE, 'VPM', 'penalization', params_ns%penalization, .false.)
+    if (.not.params_ns%penalization)  return
 
-    call read_param_mpi(FILE, 'Sponge', 'C_sponge',  params%C_sp, 0.01_rk )
-    call read_param_mpi(FILE, 'VPM', 'C_eta', params%C_eta, 0.01_rk )
+    call read_param_mpi(FILE, 'Sponge', 'C_sponge',  params_ns%C_sp, 0.01_rk )
+    call read_param_mpi(FILE, 'VPM', 'C_eta', params_ns%C_eta, 0.01_rk )
     ! =============================================================================
     ! parameters needed for penalization only
     ! -----------------------------------------------------------------------------
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', smooth_mask, .true.)
-    domain_size=params%domain_size
-    gamma_=params%gamma_
-    Rs    =params%Rs
-    C_eta_inv=1.0_rk/params%C_eta
-    C_sp_inv =1.0_rk/params%C_sp
+    domain_size=params_ns%domain_size
+    gamma_=params_ns%gamma_
+    Rs    =params_ns%Rs
+    C_eta_inv=1.0_rk/params_ns%C_eta
+    C_sp_inv =1.0_rk/params_ns%C_sp
     R_domain =domain_size(2)*0.5_rk
 
 end subroutine init_penalization
@@ -272,15 +270,13 @@ end function transition
 
 !> \brief reads parameters for sponge initializing a sipmle sponge form file
 !> \details The simple sponge starts at x=0 and ends at x=L_sponge
-subroutine init_simple_sponge( params,FILE )
+subroutine init_simple_sponge( FILE )
     use module_navier_stokes_params
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)       :: FILE
-   !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params
 
-     if (params%mpirank==0) then
+     if (params_ns%mpirank==0) then
       write(*,*)
       write(*,*)
       write(*,*) "PARAMS: sponge!"

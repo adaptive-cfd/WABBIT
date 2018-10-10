@@ -244,6 +244,8 @@ program main
         close(44)
         open (44, file='eps_norm.t', status='replace')
         close(44)
+        open (44, file='block_dist.dat', status='replace')
+        close(44)
     endif
 
     ! next write time for reloaded data

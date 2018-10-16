@@ -74,7 +74,7 @@ module module_acm
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3)
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !

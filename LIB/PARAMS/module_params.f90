@@ -177,7 +177,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! different BC can be assigned to each block
         ! -------------------------------------------------------------------------------------
-        logical,dimension(3)                        :: periodic_BC=(/.true.,.true.,.true./)
+        logical,dimension(3)                        :: periodic_BC = .true.
 
     end type type_params
 

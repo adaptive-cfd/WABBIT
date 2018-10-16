@@ -62,11 +62,12 @@ module module_acm
     logical :: p_mean_zero
     ! sponge term:
     logical :: use_sponge=.false.
-    real(kind=rk) :: C_sponge, L_sponge
+    real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
+    character(len=80) :: sponge_type=""
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p
@@ -178,6 +179,8 @@ contains
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
     call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )
     call read_param_mpi(FILE, 'Sponge', 'C_sponge', params_acm%C_sponge, 1.0e-2_rk )
+    call read_param_mpi(FILE, 'Sponge', 'sponge_type', params_acm%sponge_type, "rect" )
+    call read_param_mpi(FILE, 'Sponge', 'p_sponge', params_acm%p_sponge, 20.0_rk )
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )

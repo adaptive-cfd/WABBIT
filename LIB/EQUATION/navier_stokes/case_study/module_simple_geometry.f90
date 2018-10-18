@@ -86,7 +86,7 @@ subroutine read_params_geometry( params,FILE )
     'pressure-blob', 'zeros', 'simple-shock' /)
 
     ! add sponge parameters for the in and outflow of the domain
-    call init_simple_sponge(params,FILE)
+    call init_simple_sponge(FILE)
 
     if (params%mpirank==0) then
      write(*,*)

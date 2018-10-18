@@ -30,20 +30,19 @@ contains
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !> In this subroutine you should read in the necessary parameters of your study.
 !> Furthermore you can choose a geometry for the volume penalization.
- subroutine read_case_parameters( params , FILE )
+ subroutine read_case_parameters( FILE )
   implicit none
   !--------------------------------------------------------
-  type(inifile)       ,intent(inout)   :: FILE         !< filepointer
-  type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure
+  type(inifile),intent(inout)   :: FILE         !< filepointer
   !--------------------------------------------------------
 
-  select case ( params%case )
+  select case ( params_ns%case )
   case ('funnel')
-    call read_params_funnel(params,FILE)
+    call read_params_funnel(params_ns,FILE)
   case('simple_geometry')
-    call read_params_geometry(params,FILE)
+    call read_params_geometry(params_ns,FILE)
   case('shock_tube')
-    call read_params_shock_tube(params,FILE)
+    call read_params_shock_tube(params_ns,FILE)
   case('no')
 
   case default

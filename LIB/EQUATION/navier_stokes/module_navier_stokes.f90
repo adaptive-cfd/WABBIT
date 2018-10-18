@@ -93,21 +93,23 @@ contains
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     ! open file
-    call read_ini_file_mpi(FILE, filename, .true.)
+    call read_ini_file_mpi( FILE, filename, .true.)
     ! init all parameters used in ns_equations
-    call init_navier_stokes_eq(params_ns, FILE)
+    call init_navier_stokes_eq( FILE )
     ! init all parameters used for penalization
-    call init_penalization(    params_ns, FILE)
+    call init_penalization( FILE )
     ! init all parameters used for the filter
-    call init_filter(   params_ns%filter, FILE)
+    call init_filter( params_ns%filter, FILE)
     ! init all params for organisation
-    call init_other_params(params_ns,     FILE )
+    call init_other_params( FILE )
     ! read in initial conditions
-    call init_initial_conditions(params_ns,file)
+    call init_initial_conditions( FILE )
     ! initialice parameters and fields of the specific case study
-    call read_case_parameters( params_ns , FILE )
+    call read_case_parameters( FILE )
+    ! read parameters for the boundatry CONDITIONS
+    call read_boundary_conditions( FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
-    call add_info(params_ns)
+    call add_info()
 
     ! set global parameters pF,rohF, UxF etc
     do dF = 1, params_ns%n_eqn
@@ -118,7 +120,7 @@ contains
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
 
-    call check_parameters(params_ns)
+    call check_parameters()
 
     call clean_ini_file_mpi( FILE )
 
@@ -147,7 +149,7 @@ contains
 
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -235,13 +237,18 @@ contains
       if (params_ns%dim==2) then
         select case(params_ns%coordinates)
         case ("cartesian")
+          if (.not. ALL(boundary_flag(:)==0)) then
+            call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
+          endif
+
+
+
           call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
         case("cylindrical")
           call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
         case default
           call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
         end select
-        !call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
       else
          call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
@@ -257,6 +264,73 @@ contains
 
 
   end subroutine RHS_NStokes
+
+
+
+
+  !> This function computes the boundary values for the ghost node layer of the
+  !> boundary blocks
+  subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, boundary_flag)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      integer(kind=ik), intent(in) :: g, Bs
+      real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
+      !> datafields, and velocity field
+      real(kind=rk), intent(inout) :: phi(:,:,:)
+      ! when implementing boundary conditions, it is necessary to now if the local field (block)
+      ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+      ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+      ! boundary_flag(i) can be either 0, 1, -1,
+      !  0: no boundary in the direction +/-e_i
+      !  1: boundary in the direction +e_i
+      ! -1: boundary in the direction - e_i
+      integer(kind=2), intent(in):: boundary_flag(3)
+
+      integer(kind=ik) :: ix,iy
+      ! boundary ghost node layer in x direction
+      ! ---------------------------------
+      ! |  1  |                    |  2  |
+      ! |     |   ^                |     |
+      ! |     |   |                |     |
+      ! |<-g->|  Bs+2g             |<-g->|
+      ! |     |   |                |     |
+      ! |     |   v                |     |
+      ! ---------------------------------
+      ! x->
+      real(kind=rk)   :: phi_boundary_x(Bs+2*g,Bs+2*g,params_ns%n_eqn)
+
+    !##################################################
+    ! compute the boundary values
+    !##################################################
+    select case(params_ns%boundary_type)
+    case("symmetric-open")
+      ! ! first the symmetric BC:
+      ! ! u_-i = -u_i
+      ! ! v_-i = -v_i
+      !
+      !
+      !   ! Boundary conditions for outflow extrapolation
+      !   phi_boundary_x(1:g,:)=phi(g+1:2*g+1,:,i)
+      !   phi_boundary(2,:)=phi(Bs+g,:,i)
+      !   if (params_convdiff%u0x(i)>0) then
+      !       phi_boundary(1,:)=params_convdiff%phi_boundary(i)
+      !   else
+      !       phi_boundary(2,:)=params_convdiff%phi_boundary(i)
+      !   endif
+      !   ! Boundary conditions for outflow extrapolation
+      !   phi_boundary(3,:)=phi(:,g+1,i)
+      !   phi_boundary(4,:)=phi(:,Bs+g,i)
+      !   if (params_convdiff%u0y(i)>0) then
+      !       phi_boundary(3,:)=params_convdiff%phi_boundary(i)
+      !   else
+      !       phi_boundary(4,:)=params_convdiff%phi_boundary(i)
+      !   endif
+    case default
+      call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_ns%boundary_type)
+    end select
+
+
+  end subroutine
 
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------

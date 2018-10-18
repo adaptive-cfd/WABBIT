@@ -366,14 +366,22 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
+        ! create the mask for the sponge on this block
         call sponge_2D(sponge, x0, dx, Bs, g)
+        ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
-        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
-        ! which is different from the penalization term, which acts only on ux,uy and not p
-        rhs(:,:,1) = rhs(:,:,1) - (phi(:,:,1)-params_acm%u_mean_set(1)) * sponge * eps_inv
-        rhs(:,:,2) = rhs(:,:,2) - (phi(:,:,2)-params_acm%u_mean_set(2)) * sponge * eps_inv
-        rhs(:,:,3) = rhs(:,:,3) - phi(:,:,3)*sponge*eps_inv
+        do iy = g+1, Bs+g
+            do ix = g+1, Bs+g
+                ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+                ! which is different from the penalization term, which acts only on ux,uy and not p
+                sponge(ix,iy) = sponge(ix,iy) * eps_inv
+
+                rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * sponge(ix,iy)
+                rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * sponge(ix,iy)
+                rhs(ix,iy,3) = rhs(ix,iy,3) - phi(ix,iy,3)*sponge(ix,iy)
+            enddo
+        enddo
     end if
 
 
@@ -610,16 +618,25 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
+        ! create the mask for the sponge on this block
         call sponge_3D(sponge, x0, dx, Bs, g)
+        ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
-        sponge = sponge * eps_inv
 
-        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
-        ! which is different from the penalization term, which acts only on ux,uy and not p
-        rhs(:,:,:,1) = rhs(:,:,:,1) - (phi(:,:,:,1)-params_acm%u_mean_set(1)) * sponge
-        rhs(:,:,:,2) = rhs(:,:,:,2) - (phi(:,:,:,2)-params_acm%u_mean_set(2)) * sponge
-        rhs(:,:,:,3) = rhs(:,:,:,3) - (phi(:,:,:,3)-params_acm%u_mean_set(3)) * sponge
-        rhs(:,:,:,4) = rhs(:,:,:,4) - phi(:,:,:,4)*sponge
+        do iz = g+1, Bs+g
+            do iy = g+1, Bs+g
+                do ix = g+1, Bs+g
+                    ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+                    ! which is different from the penalization term, which acts only on ux,uy and not p
+                    sponge(ix,iy,iz) = sponge(ix,iy,iz) * eps_inv
+
+                    rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) - (phi(ix,iy,iz,3)-params_acm%u_mean_set(3)) * sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - phi(ix,iy,iz,4)*sponge(ix,iy,iz)
+                end do
+            end do
+        end do
     end if
 
 end subroutine RHS_3D_acm

@@ -175,7 +175,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions
         ! -------------------------------------------------------------------------------------
-        logical,dimension(3)                        :: periodic_BC=(/.true.,.true.,.true./)
+        logical,dimension(3)                        :: periodic_BC = .true.
 
     end type type_params
 

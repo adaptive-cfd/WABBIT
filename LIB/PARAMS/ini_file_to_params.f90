@@ -69,14 +69,14 @@ subroutine ini_file_to_params( params, filename )
     !**************************************************************************
     ! read INITIAL CONDITION parameters
 
-    ! initial condition. NOTE: nowadays, there is only two distinct ones: read_from_files
-    ! which, well, reads some files. This is the same for all physics modules. The only
-    ! other initial condition is "physics-module", which means the modules decide what inicond
-    ! is set.
+    ! which physics module is used? (note that the initialization of different parameters takes
+    ! place in those modules, i.e., they are not read here.)
+    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
 
+    ! if the initial condition is read from file, it is handled by wabbit itself, i.e. not
+    ! by the physics modules. the pyhsics modules cannot do this, because they just see 'blocks'
+    ! and never the entire grid as such.
     call read_param_mpi(FILE, 'Physics', 'read_from_files', params%read_from_files, .false. )
-    ! saving options.
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
     if (params%read_from_files ) then
         ! read variable names
@@ -85,6 +85,11 @@ subroutine ini_file_to_params( params, filename )
         params%input_files = "---"
         call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
     end if
+
+    ! wabbit does need to know how many fiels are written to disk when saving is triggered.
+    ! e.g. saving ux, uy and p would mean 3. The names of these files as well as their contents
+    ! are defined by the physics modules.
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
     !***************************************************************************
     ! read DISCRETIZATION parameters
@@ -125,12 +130,6 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
     call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .true.)
 
-    !***************************************************************************
-    ! read PHYSICS parameters
-    !
-    ! first: read physics type
-    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
-    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%read_from_files, .false.)
     !***************************************************************************
     ! read MPI parameters
     !
@@ -283,9 +282,9 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
                                                        params%domain_size(1:params%dim) )
 
+    params%periodic_BC = .true.
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC(1:params%dim), &
                                                        params%periodic_BC(1:params%dim) )
-
   end subroutine ini_domain
 
 

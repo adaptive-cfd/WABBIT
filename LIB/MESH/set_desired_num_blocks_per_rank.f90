@@ -3,9 +3,9 @@
 !> \brief Get current distribution of blocks among CPUs, compute optimal #blocks for each mpirank
 !>        ---------------------------------------------
 !! \details
-!! The function returns a list "dist_list" of size mpisize, where the number of blocks for each mpirank
+!! The function returns a list "blocks_per_rank" of size mpisize, where the number of blocks for each mpirank
 !! is contained. Note 1-based indexing. \n
-!! In addition we return "opt_dist_list" of size mpisize, where we set the number of blocks for each rank
+!! In addition we return "blocks_per_rank_optimal" of size mpisize, where we set the number of blocks for each rank
 !! such that the distribution is as homogeneous as possible and required block transfer is minimized
 !!
 !!
@@ -13,7 +13,7 @@
 !> \date 13/03/18 \n
 !> \author engels
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
-subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
+subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_rank_optimal, lgt_n, hvy_n)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -27,7 +27,7 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     type (type_params), intent(in)      :: params
 
     !> block distribution lists. Note 1-based indexing.
-    integer(kind=ik), intent(out)       :: dist_list(:), opt_dist_list(:)
+    integer(kind=ik), intent(out)       :: blocks_per_rank(:), blocks_per_rank_optimal(:)
 
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
@@ -55,9 +55,9 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     ! determinate process number
     number_procs = params%number_procs
 
-    dist_list = 0
+    blocks_per_rank = 0
     my_dist_list = 0
-    opt_dist_list = 0
+    blocks_per_rank_optimal = 0
 
 
 !---------------------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     ! save my number of active blocks
     my_dist_list(rank+1) = hvy_n
     ! count number of active blocks and current block distribution
-    call MPI_Allreduce(my_dist_list, dist_list, number_procs, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
+    call MPI_Allreduce(my_dist_list, blocks_per_rank, number_procs, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! count global number of blocks on all mpiranks
     num_blocks = lgt_n
@@ -75,10 +75,10 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     ! yields a double (since it is not guaranteed that all mpiranks hold the exact same number of blocks)
     ! using the integer division, decimal places are cut
     avg_blocks = num_blocks / number_procs
-    opt_dist_list(:) = avg_blocks
+    blocks_per_rank_optimal(:) = avg_blocks
 
     ! some blocks are missing due to the integer division
-    excess_blocks = num_blocks - sum(opt_dist_list)
+    excess_blocks = num_blocks - sum(blocks_per_rank_optimal)
 
     ! distribute remaining blocks (the excess blocks, if we have some)
     do while ( excess_blocks>0 )
@@ -88,8 +88,8 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
         do proc_id = 1, number_procs
             ! check if this proc_id already has more blocks than it is supposed to
             ! and if so, we attribute it one of the excess blocks
-            if ( dist_list(proc_id) > avg_blocks) then
-                opt_dist_list(proc_id) = opt_dist_list(proc_id) + 1
+            if ( blocks_per_rank(proc_id) > avg_blocks) then
+                blocks_per_rank_optimal(proc_id) = blocks_per_rank_optimal(proc_id) + 1
                 ! we got rid of one excess block
                 excess_blocks = excess_blocks - 1
                 ! no more blocks to distribute?
@@ -104,8 +104,8 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
         ! distributed. so now we repeat the loop, but look for mpiranks that already
         ! have enough blocks and give them one more.
         do proc_id = 1, number_procs
-            if ( dist_list(proc_id) == avg_blocks) then
-                opt_dist_list(proc_id) = opt_dist_list(proc_id) + 1
+            if ( blocks_per_rank(proc_id) == avg_blocks) then
+                blocks_per_rank_optimal(proc_id) = blocks_per_rank_optimal(proc_id) + 1
                 excess_blocks = excess_blocks - 1
                 if (excess_blocks==0) exit
             end if
@@ -117,8 +117,8 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
         ! third, it may still not be enough. so now all procs that currently have
         ! less than the average get one more block each
         do proc_id = 1, number_procs
-            if ( dist_list(proc_id) < avg_blocks) then
-                opt_dist_list(proc_id) = opt_dist_list(proc_id) + 1
+            if ( blocks_per_rank(proc_id) < avg_blocks) then
+                blocks_per_rank_optimal(proc_id) = blocks_per_rank_optimal(proc_id) + 1
                 excess_blocks = excess_blocks - 1
                 if (excess_blocks==0) exit
             end if
@@ -129,10 +129,10 @@ subroutine set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt
     if (rank==0) then
         ! error checking. the sum of newly distributed blocks must of course be
         ! the same as the number we had before distribution
-        if (sum(opt_dist_list)/=num_blocks .or. maxval(abs(opt_dist_list-avg_blocks))>1) then
+        if (sum(blocks_per_rank_optimal)/=num_blocks .or. maxval(abs(blocks_per_rank_optimal-avg_blocks))>1) then
             write(*,*) "something went wrong - during balancing, we lost or gained some blocks", excess_blocks
             write(*,*) "or we have more than +-1 block difference among them"
-            write(*,*) opt_dist_list
+            write(*,*) blocks_per_rank_optimal
             call abort(11191,"ERROR lost some blocks")
         end if
     end if

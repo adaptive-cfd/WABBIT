@@ -223,4 +223,4 @@ integer                                  :: ierr                   ! MPI communi
 
 end subroutine getMinMaxCommonWorldRanks
 
-end module module_bridge
+end module

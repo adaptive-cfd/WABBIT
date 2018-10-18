@@ -34,10 +34,10 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: Bs, mpierr, ix, iy, idir
-    real(kind=rk) :: tmp(1:6)
+    integer(kind=ik) :: Bs, mpierr, ix, iy, iz
+    real(kind=rk) :: tmp(1:6), tmp_meanflow(1:3), tmp_force(1:3), tmp_residual(1:3), tmp_ekin, tmp_volume
     real(kind=rk) :: x, y
-    real(kind=rk) :: eps_inv
+    real(kind=rk) :: eps_inv, dV
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
@@ -48,9 +48,11 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
     if (params_acm%dim==3) then
         if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
         if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+        dV = dx(1)*dx(2)*dx(3)
     else
         if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
         if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
+        dV = dx(1)*dx(2)
     endif
 
 
@@ -66,6 +68,8 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         params_acm%force = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
+        params_acm%mask_volume = 0.0_rk
+        params_acm%u_residual = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -78,19 +82,8 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         ! called for each block.
 
         if (maxval(abs(u))>1.0e5) then
-            call abort(6661,"ACM fail: very very large values in state vector.")
+            call abort(16102018, "ACM fail: very very large values in state vector.")
         endif
-
-        !-------------------------------------------------------------------------
-        ! compute mean flow for output in statistics
-        if (params_acm%dim == 2) then
-            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
-            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
-        else
-            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
-            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
-            params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
-        endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
         !-------------------------------------------------------------------------
         ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
@@ -114,46 +107,90 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
             params_acm%error = params_acm%error*dx(1)*dx(2)
         end if
 
-        !-------------------------------------------------------------------------
-        ! compute fluid force on penalized obstacle. The force can be computed by
-        ! volume integration (which is much easier than surface integration), see
-        ! Angot et al. 1999
-        if (params_acm%dim == 2) then
-            call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2))
-        else
-            call create_mask_3D(time, x0, dx, Bs, g, mask, us)
-        endif
-
-        eps_inv = 1.0_rk / params_acm%C_eta
-        mask = mask * eps_inv
+        ! tmp values for computing the current block only
+        tmp_meanflow = 0.0_rk
+        tmp_force = 0.0_rk
+        tmp_residual = 0.0_rk
+        tmp_ekin = 0.0_rk
+        tmp_volume = 0.0_rk
 
         if (params_acm%dim == 2) then
-            params_acm%force(1) = params_acm%force(1) + sum( &
-            (u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)-us(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*mask(g+1:Bs+g-1, g+1:Bs+g-1,1))*dx(1)*dx(2)
+            ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
+            call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+            eps_inv = 1.0_rk / params_acm%C_eta
 
-            params_acm%force(2) = params_acm%force(2) + sum(&
-            (u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)-us(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*mask(g+1:Bs+g-1, g+1:Bs+g-1,1))*dx(1)*dx(2)
 
-            params_acm%force(3) = 0.d0
+            do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
+            do ix = g+1, Bs+g-1
+                ! compute mean flow for output in statistics
+                tmp_meanflow(1) = tmp_meanflow(1) + u(ix,iy,1,1)
+                tmp_meanflow(2) = tmp_meanflow(2) + u(ix,iy,1,2)
+
+                ! volume of mask (useful to see if it is properly generated)
+                tmp_volume = tmp_volume + mask(ix,iy,1)
+
+                ! for the penalization term, we need to divide by C_eta
+                mask(ix,iy,1) = mask(ix,iy,1) * eps_inv
+
+                ! forces acting on body
+                tmp_force(1) = tmp_force(1) + (u(ix,iy,1,1)-us(ix,iy,1,1))*mask(ix,iy,1)
+                tmp_force(2) = tmp_force(2) + (u(ix,iy,1,2)-us(ix,iy,1,2))*mask(ix,iy,1)
+
+                ! residual velocity in the solid domain
+                tmp_residual(1) = max( tmp_residual(1), (u(ix,iy,1,1)-us(ix,iy,1,1)) * mask(ix,iy,1))
+                tmp_residual(2) = max( tmp_residual(2), (u(ix,iy,1,2)-us(ix,iy,1,2)) * mask(ix,iy,1))
+
+                ! kinetic energy
+                tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
+            enddo
+            enddo
         else
-            do idir = 1, 3
-                params_acm%force(idir) = params_acm%force(idir) + sum( &
-                ( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, idir) - us(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, idir) )&
-                * mask(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1))*dx(1)*dx(2)*dx(3)
+            ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
+            call create_mask_3D( time, x0, dx, Bs, g, mask, us )
+            eps_inv = 1.0_rk / params_acm%C_eta
+
+            do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
+            do iy = g+1, Bs+g-1
+            do ix = g+1, Bs+g-1
+                ! compute mean flow for output in statistics
+                tmp_meanflow(1) = tmp_meanflow(1) + u(ix,iy,iz,1)
+                tmp_meanflow(2) = tmp_meanflow(2) + u(ix,iy,iz,2)
+                tmp_meanflow(3) = tmp_meanflow(3) + u(ix,iy,iz,3)
+
+                ! volume of mask (useful to see if it is properly generated)
+                tmp_volume = tmp_volume + mask(ix, iy, iz)
+
+                ! for the penalization term, we need to divide by C_eta
+                mask(ix,iy,iz) = mask(ix,iy,iz) * eps_inv
+
+                ! forces acting on body
+                tmp_force(1) = tmp_force(1) + (u(ix,iy,iz,1) - us(ix,iy,iz,1)) * mask(ix,iy,iz)
+                tmp_force(2) = tmp_force(2) + (u(ix,iy,iz,2) - us(ix,iy,iz,2)) * mask(ix,iy,iz)
+                tmp_force(3) = tmp_force(3) + (u(ix,iy,iz,3) - us(ix,iy,iz,3)) * mask(ix,iy,iz)
+
+                ! residual velocity in the solid domain
+                tmp_residual(1) = max( tmp_residual(1), (u(ix,iy,iz,1)-us(ix,iy,iz,1))*mask(ix,iy,iz) )
+                tmp_residual(2) = max( tmp_residual(2), (u(ix,iy,iz,2)-us(ix,iy,iz,2))*mask(ix,iy,iz) )
+                tmp_residual(3) = max( tmp_residual(3), (u(ix,iy,iz,3)-us(ix,iy,iz,3))*mask(ix,iy,iz) )
+
+                tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
+            enddo
+            enddo
             enddo
         endif
 
-        !-------------------------------------------------------------------------
-        ! compute kinetic energy in the whole domain (including penalized regions)
-        if (params_acm%dim == 2) then
-            params_acm%e_kin = params_acm%e_kin + 0.5_rk*sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1:2)**2)*dx(1)*dx(2)
-        else
-            params_acm%e_kin = params_acm%e_kin + 0.5_rk*sum(u(g+1:Bs+g-1,g+1:Bs+g-1,g+1:Bs+g-1, 1:3)**2)*dx(1)*dx(2)*dx(3)
-        end if
+        ! we just computed the values on the current block, which we now add to the
+        ! existing blocks in the variables (recall normalization by dV)
+        params_acm%u_residual = params_acm%u_residual + tmp_residual * dV
+        params_acm%mean_flow = params_acm%mean_flow + tmp_meanflow * dV
+        params_acm%mask_volume = params_acm%mask_volume + tmp_volume * dV
+        params_acm%force = params_acm%force + tmp_force * dV
+        params_acm%e_kin = params_acm%e_kin + tmp_ekin * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
         call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+
         if (params_acm%dim ==2) then
             params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs+g-1,g+1:Bs+g-1,1,1)**2)*dx(1)*dx(2)
         else
@@ -182,6 +219,16 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         ! force
         tmp(1:3) = params_acm%force
         call MPI_ALLREDUCE(tmp(1:3), params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        !-------------------------------------------------------------------------
+        ! residual velocity in solid domain
+        tmp(1:3) = params_acm%u_residual
+        call MPI_ALLREDUCE(tmp(1:3), params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        !-------------------------------------------------------------------------
+        ! volume of mask (useful to see if it is properly generated)
+        tmp(1)= params_acm%mask_volume
+        call MPI_ALLREDUCE(tmp(1), params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! kinetic energy
@@ -215,6 +262,16 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
             open(14,file='enstrophy.t',status='unknown',position='append')
             write (14,'(2(es15.8,1x))') time, params_acm%enstrophy
             close(14)
+
+            ! write mask_volume to disk...
+            open(14,file='mask_volume.t',status='unknown',position='append')
+            write (14,'(2(es15.8,1x))') time, params_acm%mask_volume
+            close(14)
+
+            ! write residual velocity to disk...
+            open(14,file='u_residual.t',status='unknown',position='append')
+            write (14,'(4(es15.8,1x))') time, params_acm%u_residual
+            close(14)
         end if
 
         if (params_acm%forcing_type(1) .eq. "taylor_green") then
@@ -231,8 +288,10 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
             end if
 
         end if
+
     case default
         call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")
+
     end select
 
 

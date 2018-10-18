@@ -16,8 +16,14 @@ How to get a copy of WABBIT and compiling the code:
 git clone https://github.com/adaptive-cfd/WABBIT
 ```
 
-2. Compile the code running make.  
-  Note that the mpi library and the HDF5 library have to be installed first and the variables have to be exported (see below).
+2. Compile the code running make.
+
+     Note that WABBI requires:
+  
+     + [MPI library](https://www.open-mpi.org/)
+     + [HDF5 library](https://www.hdfgroup.org/downloads/hdf5/source-code/ "HDF5 Source Code")
+     + [BLAS+LAPACK library](http://ab-initio.mit.edu/wiki/index.php/Template:Installing_BLAS_and_LAPACK)
+     + some variables have to be exported (see below).
 
 ```
 make [FC=[mpif90]]

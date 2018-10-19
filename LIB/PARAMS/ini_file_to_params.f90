@@ -98,9 +98,6 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
     ! order of predictor for refinement
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
-    ! boundary condition
-    call read_param_mpi(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
-
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
     if (params%filter_type /= "no_filter") then

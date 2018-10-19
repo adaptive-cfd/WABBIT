@@ -141,6 +141,11 @@ module module_navier_stokes_params
         real(kind=rk)                               :: machnumber
         ! smallest lattice spacing
         real(kind=rk)                               :: dx_min
+        ! -------------------------------------------------------------------------------------
+        ! Boundary conditions
+        ! -------------------------------------------------------------------------------------
+        logical,dimension(3)                        :: periodic_BC=(/.true.,.true.,.true./)
+        character(len=80)                           :: boundary_type
 
   end type type_params_ns
 
@@ -157,12 +162,10 @@ module module_navier_stokes_params
 contains
 
 
-  subroutine init_navier_stokes_eq(params_ns, FILE )
+  subroutine init_navier_stokes_eq( FILE )
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)     :: FILE
-    !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params_ns
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
 
 
@@ -210,12 +213,10 @@ contains
 
 
 
-  subroutine init_initial_conditions(params_ns, FILE )
+  subroutine init_initial_conditions( FILE )
       implicit none
       !> pointer to inifile
       type(inifile) ,intent(inout)        :: FILE
-      !> params structure of navier stokes
-      type(type_params_ns),intent(inout)  :: params_ns
       ! initial parameters
       real(kind=rk)                       :: rho_init=-1,p_init=-1,u_init(3)=0,T_init=-1,width
       character(len=*),parameter         :: section='Initial_Values'
@@ -247,16 +248,37 @@ contains
     end subroutine init_initial_conditions
 
 
+subroutine read_boundary_conditions( FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)        :: FILE
+
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_ns%periodic_BC(1:params_ns%dim), &
+                                                       params_ns%periodic_BC(1:params_ns%dim) )
+
+    ! only read in parameters if we need them
+    if ( ALL(params_ns%periodic_BC) ) then
+      return
+    end if
+
+    if (params_ns%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Boundary Conditions"
+      write(*,'(" ---------------------------")')
+    endif
+
+    call read_param_mpi(FILE, 'Navier_Stokes', 'boundary_type', params_ns%boundary_type, "no" )
+
+end subroutine read_boundary_conditions
 
 
-subroutine init_other_params(params_ns, FILE )
+subroutine init_other_params( FILE )
 
     use module_helpers , only: list_contains_name
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)        :: FILE
-    !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params_ns
 
     if (params_ns%mpirank==0) then
       write(*,*)
@@ -313,11 +335,10 @@ subroutine init_other_params(params_ns, FILE )
 
 
 !> \brief Add additional info to navier stokes (initial Mach, Reynolds and speed of sound)
-  subroutine add_info(params_ns )
+  subroutine add_info(  )
       implicit none
-      !> params structure of navier stokes
-      type(type_params_ns),intent(inout)  :: params_ns
-          integer(kind=ik)                :: nx_max
+      integer(kind=ik)                :: nx_max
+
       ! compute min(dx,dy,dz)
       if ( params_ns%dim==2 ) then
         params_ns%dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%domain_size(1),params_ns%domain_size(2)) &
@@ -358,11 +379,8 @@ subroutine init_other_params(params_ns, FILE )
 
 
     !> \brief Add additional info to navier stokes (initial Mach, Reynolds and speed of sound)
-      subroutine check_parameters(params_ns )
+      subroutine check_parameters()
           implicit none
-          !> params structure of navier stokes
-          type(type_params_ns),intent(inout)  :: params_ns
-
 
           if ( params_ns%dim==3 ) then
             if( params_ns%n_eqn<5 ) call abort(9898,'Please increase number of data fields (min 5)')

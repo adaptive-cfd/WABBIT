@@ -25,8 +25,9 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,&
-              STATISTICS_meta,FILTER_meta
+    PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
+              INICOND_meta, FIELD_NAMES_meta,&
+              STATISTICS_meta, FILTER_meta
     !**********************************************************************************************
 
 contains
@@ -35,7 +36,7 @@ contains
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
  !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
  !> the parameter struct for wabbit is not available.
- subroutine READ_PARAMETERS( physics, filename )
+ subroutine READ_PARAMETERS_meta( physics, filename )
    implicit none
    character(len=*), intent(in) :: physics
    character(len=*), intent(in) :: filename
@@ -55,7 +56,7 @@ contains
 
    end select
 
- end subroutine READ_PARAMETERS
+ end subroutine
 
 
  !-----------------------------------------------------------------------------
@@ -69,7 +70,7 @@ contains
  ! NOTE that as we have way more work arrays than actual state variables (typically
  ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
  !-----------------------------------------------------------------------------
- subroutine PREPARE_SAVE_DATA( physics, time, u, g, x0, dx, work )
+ subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work )
    implicit none
    character(len=*), intent(in) :: physics
 
@@ -117,7 +118,7 @@ contains
  ! the main routine save_fields has to know how you label the stuff you want to
  ! store from the work array, and this routine returns those strings
  !-----------------------------------------------------------------------------
- subroutine FIELD_NAMES( physics, N, name )
+ subroutine FIELD_NAMES_meta( physics, N, name )
    implicit none
    character(len=*), intent(in) :: physics
    ! component index
@@ -140,7 +141,7 @@ contains
 
    end select
 
- end subroutine FIELD_NAMES
+end subroutine FIELD_NAMES_meta
 
 
  !-----------------------------------------------------------------------------
@@ -262,7 +263,7 @@ contains
  ! condition, sometimes not. So each physic module must be able to decide on its
  ! time step. This routine is called for all blocks, the smallest returned dt is used.
  !-----------------------------------------------------------------------------
- subroutine GET_DT_BLOCK( physics, time, u, Bs, g, x0, dx, dt )
+ subroutine GET_DT_BLOCK_meta( physics, time, u, Bs, g, x0, dx, dt )
    implicit none
    character(len=*), intent(in) :: physics
    ! it may happen that some source terms have an explicit time-dependency
@@ -302,7 +303,7 @@ contains
 
    end select
 
- end subroutine GET_DT_BLOCK
+ end subroutine
 
 
  !-----------------------------------------------------------------------------

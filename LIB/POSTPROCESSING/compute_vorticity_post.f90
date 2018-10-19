@@ -28,7 +28,7 @@ subroutine compute_vorticity_post(params)
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
-    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -128,23 +128,23 @@ subroutine compute_vorticity_post(params)
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
             hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
             dx, params%Bs, params%n_ghosts,&
-            params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
+            params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k),1))
         else
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)),&
+            hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,1,hvy_active(k)),&
             dx, params%Bs, params%n_ghosts, &
-            params%order_discretization, hvy_work(:,:,:,:,hvy_active(k)))
+            params%order_discretization, hvy_work(:,:,:,:,hvy_active(k),1))
         end if
     end do
     write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
     call write_field(fname, time, iteration, 1, params, lgt_block,&
-    hvy_work, lgt_active, lgt_n, hvy_n, hvy_active )
+    hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
     if (params%threeD_case) then
         write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 2, params, lgt_block,&
-        hvy_work, lgt_active, lgt_n, hvy_n,  hvy_active)
+        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n,  hvy_active)
         write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 3, params, lgt_block, &
-        hvy_work, lgt_active, lgt_n, hvy_n, hvy_active)
+        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active)
     end if
 end subroutine compute_vorticity_post

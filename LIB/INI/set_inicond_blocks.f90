@@ -10,7 +10,7 @@
 !
 !
 ! ********************************************************************************************
-subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_work, adapting)
+subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, adapting)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -24,7 +24,7 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, h
     !> heavy data array - block data
     real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
     !> heavy data array - work data
-    real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)         :: hvy_tmp(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)      :: hvy_active(:)
     !> number of heavy and light active blocks
@@ -61,7 +61,7 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, h
 
         ! set the initial condition on this block
         call INICOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), g, &
-            x0, dx, hvy_work(:,:,:,:,hvy_id), adapting)
+            x0, dx, hvy_tmp(:,:,:,:,hvy_id), adapting)
     enddo
 
 end subroutine set_inicond_blocks

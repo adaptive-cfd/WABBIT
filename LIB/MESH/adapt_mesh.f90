@@ -20,7 +20,7 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_work )
+    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -34,7 +34,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -114,7 +114,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
         t0 = MPI_Wtime()
-        call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
+        call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
         hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
         call toc( params, "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
@@ -137,7 +137,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, hvy_work )
+        hvy_active, hvy_n, hvy_tmp )
         ! CPU timing (only in debug mode)
         call toc( params, "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
@@ -179,7 +179,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         t0 = MPI_Wtime()
 
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work )
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp )
 
         call toc( params, "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
         never_balanced_load = .false.

@@ -22,7 +22,7 @@
 !! \n
 !! 29/05/2018 create
 ! ********************************************************************************************
-subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_work, lgt_active, lgt_n, &
+subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
   hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
   !---------------------------------------------------------------------------------------------
   ! modules
@@ -37,7 +37,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
@@ -91,12 +91,12 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
             ! actual computation of vorticity on the block
-            call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)), &
-            dx, Bs, g, params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
+            call compute_vorticity( hvy_block(:,:,:,1,hvy_active(k)), hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_active(k)) )
         enddo
 
-        ! note here we synch hvy_work (=vorticity) and not hvy_block
-        call sync_ghosts( params, lgt_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+        ! note here we synch hvy_tmp (=vorticity) and not hvy_block
+        call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:3,:), hvy_neighbor, hvy_active, hvy_n )
     endif
 
     !---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
         if (params%coarsening_indicator=="threshold-vorticity") then
             ! loop over my active hvy data
             do k = 1, hvy_n
-                norm(1) = max(norm(1),  maxval(abs(hvy_work(:, :, :, 1, hvy_active(k)))) )
+                norm(1) = max(norm(1),  maxval(abs(hvy_tmp(:, :, :, 1, hvy_active(k)))) )
             enddo
         else
             do k = 1, hvy_n
@@ -158,7 +158,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_wo
 
         ! evaluate the criterion on this block.
         call block_coarsening_indicator( params, hvy_block(:,:,:,1:neq,hvy_active(k)), &
-        hvy_work(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
+        hvy_tmp(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
         lgt_block(lgt_id, Jmax + idx_refine_sts), norm )
     enddo
 

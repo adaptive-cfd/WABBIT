@@ -25,7 +25,7 @@
 ! ********************************************************************************************
 
 subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -54,7 +54,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
     !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -375,7 +375,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             ! 3rd: actual communication (send/recv)
             !---------------------------------------------------------------------------------
             call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, lgt_active, &
-                 lgt_n, lgt_sortednumlist, hvy_work )
+                 lgt_n, lgt_sortednumlist, hvy_tmp )
             call toc( params, "balance_load (comm)", MPI_wtime()-t1 )
 
         case default

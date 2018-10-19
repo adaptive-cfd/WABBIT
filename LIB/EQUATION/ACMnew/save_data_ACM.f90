@@ -43,8 +43,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
 
     Bs = size(u,1)-2*g
 
-    ! copy state vector
-    work(:,:,:,1:neqn) = u(:,:,:,:)
+
 
 
     if (params_acm%dim==3) then
@@ -56,20 +55,49 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
     endif
 
 
-    do k = neqn+1, size(params_acm%names,1)
+    do k = 1, size(params_acm%names,1)
         name = params_acm%names(k)
-        select case(name(1:3))
+        select case(name)
+        case('ux', 'Ux', 'UX')
+            ! copy state vector
+            work(:,:,:,k) = u(:,:,:,1)
+
+        case('uy', 'Uy', 'UY')
+            ! copy state vector
+            work(:,:,:,k) = u(:,:,:,2)
+
+        case('uz', 'Uz', 'UZ')
+            ! copy state vector
+            work(:,:,:,k) = u(:,:,:,3)
+
+        case('p', 'P')
+            ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
+            work(:,:,:,k) = u(:,:,:,neqn)
+
         case('vor')
             ! vorticity
             call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+
+            if (k /= 1) then
+                call abort(19101810,"ACM: if you want to store vor, put it at 1st position of field_names. works only in 2D")
+            endif
+
+            if (params_acm%dim /= 2) then
+                call abort(19101811,"ACM: storing vor is not possible in 3D (known bug)")
+            endif
+
+            if (size(params_acm%names,1) < 3) then
+                call abort(19101811,"ACM: storing vor requires at least 3 fields to be saved (known bug)")
+            endif
+
 
         case('div')
             ! div(u)
             call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, &
             g, params_acm%discretization, work(:,:,:,k))
 
-        case('mas')
+        case('mask')
             ! mask
             if (params_acm%dim==2) then
                 call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
@@ -98,7 +126,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
             call create_mask_3D(time, x0, dx, Bs, g, mask, us )
             work(:,:,:,k) = us(:,:,:,3)
 
-        case('spo')
+        case('sponge')
             ! mask for sponge
             if (params_acm%dim==2) then
                 call sponge_2D(work(:,:,1,k), x0(1:2), dx(1:2), Bs, g )

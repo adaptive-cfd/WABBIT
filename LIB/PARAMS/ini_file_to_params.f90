@@ -175,10 +175,11 @@ subroutine ini_file_to_params( params, filename )
             Bs      = params%Bs
             g       = params%n_ghosts
             Neqn    = params%n_eqn
-            Nrk     = max( Neqn*size(params%butcher_tableau,1), params%N_fields_saved )
+            Nrk     = Neqn*size(params%butcher_tableau,1)
             nstages = 2.0
 
             mem_per_block = real(Neqn) * (real(Bs+2*g))**d & ! hvy_block
+            + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs+2*g))**d & ! hvy_tmp
             + real(Nrk) * (real(Bs+2*g))**d & ! hvy_work
             + 2.0 * nstages * real(Neqn) * real((Bs+2*g)**d - Bs**d) &  ! real buffer ghosts
             + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)

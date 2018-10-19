@@ -14,7 +14,7 @@
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
 subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_work )
+    lgt_n, lgt_sortednumlist, hvy_tmp )
     implicit none
 
     !> user defined parameter structure
@@ -33,7 +33,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
     !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
 
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag

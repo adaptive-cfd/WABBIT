@@ -29,7 +29,7 @@
 !! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, indicator  )
 
 !---------------------------------------------------------------------------------------------
@@ -42,15 +42,15 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     implicit none
 
     !> user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in)         :: params
     !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)        :: lgt_block(:, :)
     !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)        :: lgt_active(:)
     !> number of active blocks (light data)
@@ -145,7 +145,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lg
     if (params%force_maxlevel_dealiasing .eqv. .false.) then
         t1 = MPI_Wtime()
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, hvy_work )
+        hvy_active, hvy_n, hvy_tmp )
         call toc( params, "refine_mesh (balance_load)", MPI_Wtime()-t1 )
 
         t2 = MPI_wtime()

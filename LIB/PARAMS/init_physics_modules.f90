@@ -42,6 +42,6 @@ subroutine init_physics_modules( params, filename )
   endif
 
   ! call the initialization routines for the physics module that is in use
-  call READ_PARAMETERS( params%physics_type, filename )
+  call READ_PARAMETERS_meta( params%physics_type, filename )
 
 end subroutine

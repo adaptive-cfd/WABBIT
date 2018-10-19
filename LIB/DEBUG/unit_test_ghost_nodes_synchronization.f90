@@ -11,7 +11,7 @@
 !
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
+subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_tmp, &
     hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
 
 
@@ -22,8 +22,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
-    !> heavy work array  )
-    real(kind=rk),  intent(inout)           :: hvy_work (:, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
+    !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
+    real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -108,7 +110,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! this one grid.
     !---------------------------------------------------------------------------
     l = 5
-    call create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+    call create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l )
 
     if (params%rank == 0) then
@@ -163,7 +165,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! now the entire grid (incl ghost nodes) holds the exact solution: make a
         ! copy of the grid for later comparison, but use work arrays usually used for RK4 substages
         ! so no additional memory is used.
-        hvy_work(:,:,:,1,:) = hvy_block(:,:,:,1,:)
+        hvy_work(:,:,:,1,:,1) = hvy_block(:,:,:,1,:)
 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
@@ -179,8 +181,8 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
         ! loop over all active blocks and compute their error
         do k = 1, hvy_n
-          my_error = my_error + sqrt(sum((hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k)))**2 ))
-          my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k)))**2 ))
+          my_error = my_error + sqrt(sum((hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k),1))**2 ))
+          my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k),1))**2 ))
         end do
 
         ! synchronize errors

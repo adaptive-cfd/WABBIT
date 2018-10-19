@@ -11,7 +11,7 @@
 ! ----------------------------------------------------------------------------------------
 
 !> \brief reset grid, set all blocks to empty
-subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n,&
+subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, lgt_n,&
      hvy_active, hvy_n, lgt_sortednumlist, verbosity )
 
     implicit none
@@ -22,8 +22,10 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
-    !> heavy work array  )
-    real(kind=rk),  intent(inout)           :: hvy_work(:, :, :, :, :)
+    !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
+    real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -50,6 +52,7 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_
     ! reset data
     hvy_block = 9.99e99_rk
     hvy_work = 9.99e99_rk
+    hvy_tmp =  9.99e99_rk
     hvy_neighbor = -1
     ! as the grid has changed (we deleted it here), we now update the heavy and light
     ! active lists

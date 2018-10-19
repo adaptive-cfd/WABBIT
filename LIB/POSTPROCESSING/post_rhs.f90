@@ -18,7 +18,7 @@ subroutine post_rhs(params)
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
-    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -101,14 +101,14 @@ subroutine post_rhs(params)
 
     ! compute right hand side
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    call RHS_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), lgt_block, hvy_active, hvy_n)
 
     ! save result to disk
     do k = 1, params%n_eqn
         write( fname,'("rhs",i1,"_", i12.12, ".h5")') k, nint(time * 1.0e6_rk)
 
         call write_field(fname, time, iteration, k, params, lgt_block,&
-        hvy_work, lgt_active, lgt_n, hvy_n, hvy_active )
+        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
     enddo
 
 end subroutine post_rhs

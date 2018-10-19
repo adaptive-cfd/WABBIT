@@ -72,16 +72,25 @@ program main
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( 1:number_data_fields)
+    !                   -> dim 4: components ( 1:number_equations)
     ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( old data, k1, k2, k3, k4 )
-    ! heavy work array  -> dim 5: block id  ( 1:number_blocks )
-    real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :)
+    !                   -> dim 4: components ( 1:number_equations)
+    !                   -> dim 5: RHS slot (k1,k2 etc for RK4)
+    ! heavy work array  -> dim 6: block id  ( 1:number_blocks )
+    real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :, :)
+
+    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 4: components ( 1:number_equations)
+    ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
+    ! This array can be used for work data.
+    real(kind=rk), allocatable          :: hvy_tmp(:, :, :, :, :)
 
     ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
     !                             -> number_columns = 16 (...different neighbor relations:
@@ -182,9 +191,9 @@ program main
     call init_physics_modules( params, filename )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, .true., hvy_work)
+        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -200,10 +209,11 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+        hvy_tmp, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     endif
 
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
 
     !---------------------------------------------------------------------------
@@ -211,7 +221,8 @@ program main
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_work )
+    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_tmp )
+
     if (.not. params%read_from_files .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
@@ -221,7 +232,7 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
 
     end if
 
@@ -290,7 +301,7 @@ program main
             call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
 
             if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -299,7 +310,7 @@ program main
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, &
+            call serve_data_request(lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active, &
                                     lgt_active, lgt_n, hvy_n,params)
         endif
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -315,7 +326,7 @@ program main
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
             ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
@@ -345,7 +356,7 @@ program main
             .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
         end if
         call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
 
@@ -364,7 +375,7 @@ program main
             ! we need to sync ghost nodes for some derived qtys, for sure
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+            call statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
             params%next_stats_time = params%next_stats_time + params%tsave_stats
         endif
 
@@ -375,7 +386,7 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_work )
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
@@ -387,9 +398,10 @@ program main
           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
           ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-          ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+          ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
           ! slots. the state vector (hvy_block) is copied if desired.
-          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+          lgt_n, hvy_n, hvy_tmp, hvy_active )
 
           output_time = time
           params%next_write_time = params%next_write_time + params%write_time
@@ -442,13 +454,13 @@ program main
 
         ! filter before write out
         if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
         end if
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-        ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+        ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements
@@ -463,7 +475,7 @@ program main
     call summarize_profiling( params, WABBIT_COMM )
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work )
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp )
 
     ! computing time output on screen
     call cpu_time(t1)

@@ -66,10 +66,9 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> list of active blocks (light data)
@@ -78,17 +77,18 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     integer(kind=ik), intent(in)        :: hvy_n
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+
     ! loop variables
-    integer(kind=ik)                    :: k, j, neq
+    integer(kind=ik)                    :: k, j, Neqn
     ! time step, dx
     real(kind=rk)                       :: dt, t
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save    :: rk_coeffs(:,:)
-    logical::test
+
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    neq = params%n_eqn
+    Neqn = params%n_eqn
 
     if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
     dt = 9.0e9_rk
@@ -107,22 +107,23 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
         lgt_active, lgt_n, dt)
 
     ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
-    ! slots after the copy of the state vector, which is in the first 1:neq slots
-    j = 1
-    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block(:,:,:,1:neq,:),&
-        hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
+    ! slot after the copy of the state vector (hence 2)
+    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), lgt_block, hvy_active, hvy_n)
+
+
 
     ! save data at time t to heavy work array
     ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
     ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
     ! if the copy part is above, the changes in state vector are ignored
     do k = 1, hvy_n
-      hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
+        ! first slot in hvy_work is previous time step
+        hvy_work( :, :, :, :, hvy_active(k), 1 ) = hvy_block( :, :, :, :, hvy_active(k) )
     end do
 
 
     ! compute k_1, k_2, .... (coefficients for final stage)
-    do j = 2, size(rk_coeffs, 1)-1
+    do j = 2, size(rk_coeffs, 1) - 1
         ! prepare input for the RK substep
         call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
 
@@ -132,8 +133,9 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)
-        call RHS_wrapper(t, params, hvy_block(:,:,:,1:neq,:), &
-            hvy_work(:,:,:,j*neq+1:(j+1)*neq,:), lgt_block, hvy_active, hvy_n)
+        
+        call RHS_wrapper(t, params, hvy_block, &
+            hvy_work(:,:,:,:,:,j+1), lgt_block, hvy_active, hvy_n)
     end do
 
     ! final stage

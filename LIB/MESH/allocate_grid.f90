@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, simulation, hvy_work)
+    lgt_sortednumlist, simulation, hvy_work, hvy_tmp)
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -40,11 +40,13 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> user defined parameter structure
     type (type_params), intent(inout)                   :: params
     !> light data array
-    integer(kind=ik), allocatable, intent(out)       :: lgt_block(:, :)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
-    !> heavy work array
-    real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_tmp(:, :, :, :, :)
+    !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -54,13 +56,13 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                    :: Bs, g, N_dF, number_blocks,&
+    integer(kind=ik)                                    :: Bs, g, Neqn, number_blocks,&
                                                       rank, number_procs,number_trees
     !> do we have to allocate everything?
     logical, intent(in) :: simulation
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
-    integer             :: status, nwork
+    integer             :: status, nrhs_slots, nwork
 
     !---------------------------------------------------------------------------------------------
     ! interfaces
@@ -72,12 +74,13 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     number_blocks   = params%number_blocks
     Bs              = params%Bs
     g               = params%n_ghosts
-    N_dF            = params%n_eqn
+    Neqn            = params%n_eqn
     number_procs    = params%number_procs
-    ! the number of work arrays is determined by the requirement for the time stepper
-    ! and the number of fields to be saved.
-    nwork           = max( N_dF*(size(params%butcher_tableau,1)), params%N_fields_saved )
-
+    ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
+    ! that means one rhs is stored in a 5D subset of a 6D array.
+    ! Hence, nrhs_slots is number of slots for RHS saving:
+    nrhs_slots = size(params%butcher_tableau,1)
+    nwork      = max( 2*Neqn, params%N_fields_saved)
 
     !---------------------------------------------------------------------------------------------
     ! main body
@@ -97,7 +100,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (rank==0) write(*,'("INIT: Allocating a 3D case.")')
 
         !---------------------------------------------------------------------------
-        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, N_dF, number_blocks ) )
+        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
@@ -106,10 +109,16 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
-            allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks ) )
+            allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks, nrhs_slots ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
+            endif
+
+            allocate( hvy_tmp( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks )  )
+            if (rank==0) then
+                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+                "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
             endif
         end if
 
@@ -127,7 +136,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (rank==0) write(*,'("INIT: Allocating a 2D case.")')
 
         !---------------------------------------------------------------------------
-        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, N_dF, number_blocks ) )
+        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
@@ -136,10 +145,16 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
-            allocate( hvy_work( Bs+2*g, Bs+2*g, 1, nwork, number_blocks ) )
+            allocate( hvy_work( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks, nrhs_slots ) )
             if (rank==0) then
-                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",5(i9,1x))') &
+                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",6(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
+            endif
+
+            allocate( hvy_tmp( Bs+2*g, Bs+2*g, 1, nwork, number_blocks )  )
+            if (rank==0) then
+                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+                "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
             endif
         end if
 
@@ -189,7 +204,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
 
     if (rank == 0 .and. simulation) then
-        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, N_dF
+        write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
         write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
 
@@ -212,7 +227,7 @@ end subroutine allocate_grid
 
 
 subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work )
+    lgt_sortednumlist, hvy_work, hvy_tmp )
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -225,8 +240,9 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
-    !> heavy work array  )
-    real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable, intent(out)             :: hvy_tmp(:, :, :, :, :)
+    !> heavy work array
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -243,6 +259,7 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     if (allocated(hvy_block)) deallocate( hvy_block )
     if (allocated(hvy_work)) deallocate( hvy_work )
+    if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )
     if (allocated(lgt_sortednumlist)) deallocate( lgt_sortednumlist )

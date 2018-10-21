@@ -41,10 +41,13 @@ module module_params
         real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
         real(kind=rk)                                :: CFL=0.0_rk
+        character(len=80)                            :: time_step_method="RungeKuttaGeneric"
+        character(len=80)                            :: krylov_subspace_dimension="fixed"
         ! dt
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
+        integer(kind=ik)                             :: M_krylov = 12
         ! data writing frequency
         integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
         ! data writing frequency

@@ -98,49 +98,56 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    if (params%time_step_method=="Krylov") then
+        ! use krylov time stepping
+        call krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
+            hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
 
 
-    ! calculate time step
-    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
-        lgt_active, lgt_n, dt)
+    elseif (params%time_step_method=="RungeKuttaGeneric") then
 
-    ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
-    ! slot after the copy of the state vector (hence 2)
-    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), lgt_block, hvy_active, hvy_n)
-
-
-
-    ! save data at time t to heavy work array
-    ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
-    ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
-    ! if the copy part is above, the changes in state vector are ignored
-    do k = 1, hvy_n
-        ! first slot in hvy_work is previous time step
-        hvy_work( :, :, :, :, hvy_active(k), 1 ) = hvy_block( :, :, :, :, hvy_active(k) )
-    end do
-
-
-    ! compute k_1, k_2, .... (coefficients for final stage)
-    do j = 2, size(rk_coeffs, 1) - 1
-        ! prepare input for the RK substep
-        call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
-
-        ! synchronize ghost nodes for new input
-        ! further ghost nodes synchronization, fixed grid
+        ! synchronize ghost nodes
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-        ! note substeps are at different times, use temporary time "t"
-        t = time + dt*rk_coeffs(j,1)
-        
-        call RHS_wrapper(t, params, hvy_block, &
-            hvy_work(:,:,:,:,:,j+1), lgt_block, hvy_active, hvy_n)
-    end do
+        ! calculate time step
+        call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
+            lgt_active, lgt_n, dt)
 
-    ! final stage
-    call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
+        ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
+        ! slot after the copy of the state vector (hence 2)
+        call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), lgt_block, hvy_active, hvy_n)
 
+        ! save data at time t to heavy work array
+        ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
+        ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
+        ! if the copy part is above, the changes in state vector are ignored
+        do k = 1, hvy_n
+            ! first slot in hvy_work is previous time step
+            hvy_work( :, :, :, :, hvy_active(k), 1 ) = hvy_block( :, :, :, :, hvy_active(k) )
+        end do
+
+
+        ! compute k_1, k_2, .... (coefficients for final stage)
+        do j = 2, size(rk_coeffs, 1) - 1
+            ! prepare input for the RK substep
+            call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active, hvy_n)
+
+            ! synchronize ghost nodes for new input
+            ! further ghost nodes synchronization, fixed grid
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
+            ! note substeps are at different times, use temporary time "t"
+            t = time + dt*rk_coeffs(j,1)
+
+            call RHS_wrapper(t, params, hvy_block, &
+                hvy_work(:,:,:,:,:,j+1), lgt_block, hvy_active, hvy_n)
+        end do
+
+        ! final stage
+        call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
+    else
+        call abort(19101816, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+    endif
 
     ! increase time variable after all RHS substeps
     time = time + dt

@@ -46,7 +46,7 @@ module module_acm
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params
-    real(kind=rk) :: CFL, T_end
+    real(kind=rk) :: CFL, T_end, CFL_eta
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
     ! nu
@@ -136,9 +136,6 @@ contains
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_acm%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    ! call read_param_mpi(FILE, 'DomainSize', 'Lx', params_acm%domain_size(1), 1.0_rk )
-    ! call read_param_mpi(FILE, 'DomainSize', 'Ly', params_acm%domain_size(2), 1.0_rk )
-    ! call read_param_mpi(FILE, 'DomainSize', 'Lz', params_acm%domain_size(3), 0.0_rk )
 
     ! --- saving ----
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_acm%N_fields_saved, 3 )
@@ -183,6 +180,7 @@ contains
     call read_param_mpi(FILE, 'Sponge', 'p_sponge', params_acm%p_sponge, 20.0_rk )
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
+    call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
 
@@ -262,13 +260,13 @@ contains
     if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
 
     ! just for completeness...this condition should never be active (gamma ~ 1)
-    if (params_acm%gamma_p>0) dt = min( dt, 0.99_rk*params_acm%gamma_p )
+    if (params_acm%gamma_p>0) dt = min( dt, params_acm%CFL_eta*params_acm%gamma_p )
 
     ! penalization
-    if (params_acm%penalization) dt = min( dt, 0.99_rk*params_acm%C_eta )
+    if (params_acm%penalization) dt = min( dt, params_acm%CFL_eta*params_acm%C_eta )
 
     ! sponge
-    if (params_acm%use_sponge) dt = min( dt, 0.99_rk*params_acm%C_sponge )
+    if (params_acm%use_sponge) dt = min( dt, params_acm%CFL_eta*params_acm%C_sponge )
 
   end subroutine GET_DT_BLOCK_ACM
 

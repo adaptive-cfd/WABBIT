@@ -79,7 +79,17 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
     ! Hence, nrhs_slots is number of slots for RHS saving:
-    nrhs_slots = size(params%butcher_tableau,1)
+    if (params%time_step_method == "RungeKuttaGeneric") then
+        nrhs_slots = size(params%butcher_tableau,1)
+
+    elseif (params%time_step_method == "Krylov") then
+        nrhs_slots = params%M_krylov +3
+
+    else
+        call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+
+    endif
+
     nwork      = max( 2*Neqn, params%N_fields_saved)
 
     !---------------------------------------------------------------------------------------------

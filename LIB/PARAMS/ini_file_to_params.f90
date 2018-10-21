@@ -172,7 +172,15 @@ subroutine ini_file_to_params( params, filename )
             Bs      = params%Bs
             g       = params%n_ghosts
             Neqn    = params%n_eqn
-            Nrk     = Neqn*size(params%butcher_tableau,1)
+
+            if (params%time_step_method == "RungeKuttaGeneric") then
+                Nrk = size(params%butcher_tableau,1)
+            elseif (params%time_step_method == "Krylov") then
+                Nrk = params%M_krylov + 3
+            else
+                call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+            endif
+
             nstages = 2.0
 
             mem_per_block = real(Neqn) * (real(Bs+2*g))**d & ! hvy_block
@@ -381,7 +389,9 @@ end subroutine ini_file_to_params
       ! number of time steps to be performed. default value is very large, so if not set
       ! the limit will not be reached
       call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
-
+      call read_param_mpi(FILE, 'Time', 'time_step_method', params%time_step_method, "RungeKuttaGeneric" )
+      call read_param_mpi(FILE, 'Time', 'M_krylov', params%M_krylov, 12 )
+      call read_param_mpi(FILE, 'Time', 'krylov_subspace_dimension', params%krylov_subspace_dimension, "fixed" )
       ! read output write method
       call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
       ! read output write frequency

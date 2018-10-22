@@ -25,32 +25,33 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
     !---------------------------------------------------------------------------
-    integer :: M, M_max ! M is M_krylov number of subspace
-    real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:)
+    integer :: M_max ! M is M_krylov number of subspace
+    real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:), H_tmp(:,:)
     integer :: M_iter
     integer :: i, j, k, l, iter
     real(kind=rk) :: normv, eps, beta, err_tolerance
     real(kind=rk) :: h_klein, err
 
     M_max = params%M_krylov
-
-    ! M is M_krylov number of subspace
-    if (params%krylov_subspace_dimension == "fixed") then
-        ! fixed dimension
-        M = params%M_krylov
-    elseif (params%krylov_subspace_dimension == "dynamic") then
-        ! we start with a small number, then increase if necessary.
-        M = 2
-    else
-        call abort(2110181, " krylov subspace dimensionality must be either fixed or dynamic.")
-
-    endif
+    !
+    ! ! M is M_krylov number of subspace
+    ! if (params%krylov_subspace_dimension == "fixed") then
+    !     ! fixed dimension
+    !     M = params%M_krylov
+    ! elseif (params%krylov_subspace_dimension == "dynamic") then
+    !     ! we start with a small number, then increase if necessary.
+    !     M = 2
+    ! else
+    !     call abort(2110181, " krylov subspace dimensionality must be either fixed or dynamic.")
+    !
+    ! endif
 
     err_tolerance = 1.0e-3
 
     ! allocate matrices with largest admissible
     if (.not. allocated(H)) then
         allocate( H(M_max+2,M_max+2) )
+        allocate( H_tmp(M_max+2,M_max+2) )
         allocate( phiMat(M_max+2,M_max+2) )
     endif
 
@@ -58,7 +59,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     H = 0.0_rk
 
     ! check if we have enough RHS slots available: they must be
-    if (size(hvy_work,6) < M+3 ) then
+    if (size(hvy_work,6) < M_max+3 ) then
         call abort(18101817, "not enough registers for krylov method")
     endif
 
@@ -75,16 +76,16 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
 
     ! the very last slot (M+3) is the "reference right hand side"
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M+3), lgt_block, hvy_active, hvy_n)
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), lgt_block, hvy_active, hvy_n)
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
     ! NSF: this guy is called normuu
-    call wabbit_norm( params, hvy_work(:,:,:,:,:,M+3), hvy_active, hvy_n, beta )
+    call wabbit_norm( params, hvy_work(:,:,:,:,:,M_max+3), hvy_active, hvy_n, beta )
     if (beta < epsilon(1.0_rk)) beta = 1.0_rk
 
     ! start iteration, fill first slot
     do k = 1, hvy_n
-        hvy_work(:,:,:,:,hvy_active(k),1) = hvy_work(:,:,:,:,hvy_active(k),M+3) / beta
+        hvy_work(:,:,:,:,hvy_active(k),1) = hvy_work(:,:,:,:,hvy_active(k),M_max+3) / beta
     enddo
 
     !**************************************!
@@ -129,24 +130,25 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
             hvy_work(:,:,:,:,hvy_active(k),M_iter+1) = hvy_work(:,:,:,:,hvy_active(k),M_max+1) / H(M_iter+1,M_iter)
         enddo
 
-        ! if this is the last iteration, we compute the H matrix and the matrix exponential
-        ! and use it to get an error estimate. If the error seems okay, we are done and can
-        ! compute the new time step, otherwise we increase M by one and retry.
-        if (M_iter == M) then
-            h_klein    = H(M+1,M)
-            H(M+1,M)   = 0.0_rk
-            H(1,M+1)   = 1.0_rk
-            H(M+1,M+2) = 1.0_rk
 
-            ! phiMat          = expM_pade(dt*H(1:M+2,1:M+2))
-            phiMat          = expM_pade(dt*H)
-            phiMat(M+1,M+1) = h_klein*phiMat(M,M+2)
+        if (params%krylov_subspace_dimension == "dynamic" .or. M_iter == M_max) then
+            ! if this is the last iteration, we compute the H matrix and the matrix exponential
+            ! and use it to get an error estimate. If the error seems okay, we are done and can
+            ! compute the new time step, otherwise we increase M by one and retry.
+            h_klein    = H(M_iter+1,M_iter)
+            H_tmp      = 0.0_rk
+            H_tmp(1:M_iter, 1:M_iter) = H(1:M_iter, 1:M_iter)
+            H_tmp(M_iter+1,M_iter)    = 0.0_rk
+            H_tmp(1,M_iter+1)         = 1.0_rk
+            H_tmp(M_iter+1,M_iter+2)  = 1.0_rk
+
+            phiMat(1:M_iter+2, 1:M_iter+2) = expM_pade( dt*H_tmp(1:M_iter+2, 1:M_iter+2) )
+            phiMat(M_iter+1, M_iter+1)     = h_klein*phiMat(M_iter, M_iter+2)
 
             ! *** Error estimate ***!
-            err = abs( beta*phiMat(M+1,M+1) )
+            err = abs( beta*phiMat(M_iter+1,M_iter+1) )
 
-            ! if (err > err_tolerance .and. M < M_max) then
-            if (err < err_tolerance .or. M == M_max) then
+            if (err < err_tolerance .or. M_iter == M_max) then
                 exit
             endif
         endif
@@ -157,16 +159,16 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
     ! compute final value of new state vector at new time level
     ! result will be in hvy_block again (inout)
-    do iter = 1, M+1
+    do iter = 1, M_iter+1
         do k = 1, hvy_n
             hvy_block(:,:,:,:,hvy_active(k)) = hvy_block(:,:,:,:,hvy_active(k)) &
-            + beta * hvy_work(:,:,:,:,hvy_active(k),iter) * phiMat(iter,M+1)
+            + beta * hvy_work(:,:,:,:,hvy_active(k),iter) * phiMat(iter,M_iter+1)
         enddo
     enddo
 
     if (params%rank==0) then
         open(14,file='krylov_err.t',status='unknown',position='append')
-        write (14,'(3(g15.8,1x))') time, dt, err, M, M_max
+        write (14,'(3(g15.8,1x),2(i3,1x))') time, dt, err, M_iter, M_max
         close(14)
     endif
 

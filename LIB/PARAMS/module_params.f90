@@ -97,7 +97,7 @@ module module_params
         character(len=80)                            :: block_distribution=""
 
         ! debug flag
-        logical                                      :: debug=.false.
+        logical                                      :: debug=.false., write_individual_timings=.true.
 
         ! -------------------------------------------------------------------------------------
         ! physics

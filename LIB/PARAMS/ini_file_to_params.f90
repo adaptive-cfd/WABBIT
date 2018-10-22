@@ -119,6 +119,7 @@ subroutine ini_file_to_params( params, filename )
     !
     ! debug flag
     call read_param_mpi(FILE, 'Debug', 'debug', params%debug, .true. )
+    call read_param_mpi(FILE, 'Debug', 'write_individual_timings', params%write_individual_timings, .false. )
     ! unit test time_stepper flag
     call read_param_mpi(FILE, 'Debug', 'test_time_stepper', params%test_time_stepper, .false.)
     ! unit test spatial flag

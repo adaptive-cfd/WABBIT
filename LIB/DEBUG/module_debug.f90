@@ -248,7 +248,7 @@ contains
             debug%comp_time(:,3) = debug%comp_time(:,3) + debug%comp_time(:,1)
             debug%comp_time(:,4) = debug%comp_time(:,4) + debug%comp_time(:,2)
             ! write debug infos to file
-            call write_debug_times( iteration, params )
+            if (params%write_individual_timings) call write_debug_times( iteration, params )
             ! reset loop values
             debug%comp_time(:,1) = 0.0_rk
             debug%comp_time(:,2) = 0.0_rk

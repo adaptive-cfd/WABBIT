@@ -30,7 +30,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     integer :: M_iter
     integer :: i, j, k, l, iter
     real(kind=rk) :: normv, eps, beta, err_tolerance
-    real(kind=rk) :: h_klein, err
+    real(kind=rk) :: h_klein, err, t0
 
     M_max = params%M_krylov
     !
@@ -135,6 +135,8 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
             ! if this is the last iteration, we compute the H matrix and the matrix exponential
             ! and use it to get an error estimate. If the error seems okay, we are done and can
             ! compute the new time step, otherwise we increase M by one and retry.
+            ! if we use the dynamic method, we evaluate the error after every iteration to see if
+            ! we're good to go.
             h_klein    = H(M_iter+1,M_iter)
             H_tmp      = 0.0_rk
             H_tmp(1:M_iter, 1:M_iter) = H(1:M_iter, 1:M_iter)
@@ -142,8 +144,11 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
             H_tmp(1,M_iter+1)         = 1.0_rk
             H_tmp(M_iter+1,M_iter+2)  = 1.0_rk
 
+            t0 = MPI_wtime()
             phiMat(1:M_iter+2, 1:M_iter+2) = expM_pade( dt*H_tmp(1:M_iter+2, 1:M_iter+2) )
             phiMat(M_iter+1, M_iter+1)     = h_klein*phiMat(M_iter, M_iter+2)
+            call toc( params, "Krylov: matrix exponential", MPI_wtime()-t0)
+
 
             ! *** Error estimate ***!
             err = abs( beta*phiMat(M_iter+1,M_iter+1) )

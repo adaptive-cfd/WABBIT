@@ -40,7 +40,7 @@ module module_params
         ! maximal time for main time loop
         real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
-        real(kind=rk)                                :: CFL=0.0_rk
+        real(kind=rk)                                :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
         character(len=80)                            :: time_step_method="RungeKuttaGeneric"
         character(len=80)                            :: krylov_subspace_dimension="fixed"
         ! dt

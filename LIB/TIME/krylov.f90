@@ -33,20 +33,6 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     real(kind=rk) :: h_klein, err, t0
 
     M_max = params%M_krylov
-    !
-    ! ! M is M_krylov number of subspace
-    ! if (params%krylov_subspace_dimension == "fixed") then
-    !     ! fixed dimension
-    !     M = params%M_krylov
-    ! elseif (params%krylov_subspace_dimension == "dynamic") then
-    !     ! we start with a small number, then increase if necessary.
-    !     M = 2
-    ! else
-    !     call abort(2110181, " krylov subspace dimensionality must be either fixed or dynamic.")
-    !
-    ! endif
-
-    err_tolerance = 1.0e-3
 
     ! allocate matrices with largest admissible
     if (.not. allocated(H)) then
@@ -138,12 +124,15 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
             ! if we use the dynamic method, we evaluate the error after every iteration to see if
             ! we're good to go.
             h_klein    = H(M_iter+1,M_iter)
+
+            ! create a copy of the H matrix with the right dimension
             H_tmp      = 0.0_rk
             H_tmp(1:M_iter, 1:M_iter) = H(1:M_iter, 1:M_iter)
             H_tmp(M_iter+1,M_iter)    = 0.0_rk
             H_tmp(1,M_iter+1)         = 1.0_rk
             H_tmp(M_iter+1,M_iter+2)  = 1.0_rk
 
+            ! compute matrix exponential
             t0 = MPI_wtime()
             phiMat(1:M_iter+2, 1:M_iter+2) = expM_pade( dt*H_tmp(1:M_iter+2, 1:M_iter+2) )
             phiMat(M_iter+1, M_iter+1)     = h_klein*phiMat(M_iter, M_iter+2)
@@ -153,7 +142,23 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
             ! *** Error estimate ***!
             err = abs( beta*phiMat(M_iter+1,M_iter+1) )
 
-            if (err < err_tolerance .or. M_iter == M_max) then
+            if (params%krylov_subspace_dimension == "dynamic" .and. M_iter == M_max .and. err > params%krylov_err_threshold ) then
+                ! we are at the last krylov subspace M and cannot increase the number any more.
+                ! But the error is still too large, hance we decrease the time step now.
+                do while (err > params%krylov_err_threshold)
+                    dt = 0.90_rk * dt
+
+                    ! compute matrix exponential
+                    phiMat = 0.0_rk
+                    phiMat(1:M_iter+2, 1:M_iter+2) = expM_pade( dt*H_tmp(1:M_iter+2, 1:M_iter+2) )
+                    phiMat(M_iter+1, M_iter+1)     = h_klein*phiMat(M_iter, M_iter+2)
+
+                    ! *** Error estimate ***!
+                    err = abs( beta*phiMat(M_iter+1,M_iter+1) )
+                enddo
+            endif
+
+            if (err <= params%krylov_err_threshold .or. M_iter == M_max) then
                 exit
             endif
         endif

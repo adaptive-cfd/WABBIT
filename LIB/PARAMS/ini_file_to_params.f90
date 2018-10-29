@@ -392,6 +392,7 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
       call read_param_mpi(FILE, 'Time', 'time_step_method', params%time_step_method, "RungeKuttaGeneric" )
       call read_param_mpi(FILE, 'Time', 'M_krylov', params%M_krylov, 12 )
+      call read_param_mpi(FILE, 'Time', 'krylov_err_threshold', params%krylov_err_threshold, 1.0e-3_rk )
       call read_param_mpi(FILE, 'Time', 'krylov_subspace_dimension', params%krylov_subspace_dimension, "fixed" )
       ! read output write method
       call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )

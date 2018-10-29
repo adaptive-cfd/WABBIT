@@ -58,6 +58,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
     ! compute norm "normv" of input state vector ("hvy_block")
     call wabbit_norm( params, hvy_block, hvy_active, hvy_n, normv )
+    if (normv < epsilon(1.0_rk)) normv = 1.0_rk
     eps = normv * sqrt(epsilon(1.0_rk))
 
 

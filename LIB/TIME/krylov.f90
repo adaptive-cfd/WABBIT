@@ -179,7 +179,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
     if (params%rank==0) then
         open(14,file='krylov_err.t',status='unknown',position='append')
-        write (14,'(3(g15.8,1x),2(i3,1x))') time, dt, err, M_iter, M_max
+        write (14,'(3(es15.8,1x),2(i3,1x))') time, dt, err, M_iter, M_max
         close(14)
     endif
 

@@ -416,5 +416,7 @@ end subroutine ini_file_to_params
       0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
+      call read_param_mpi(FILE, 'Time', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
+
 
     end subroutine ini_time

@@ -125,7 +125,7 @@ program main
     character(len=80)                   :: filename
 
     ! loop variable
-    integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks
+    integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks, it
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart
@@ -332,54 +332,61 @@ program main
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
-
         Nblocks_rhs = lgt_n
-        !***********************************************************************
-        ! advance in time
-        !***********************************************************************
-        t4 = MPI_wtime()
-        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
-        hvy_active, lgt_active, lgt_n, hvy_n )
-        call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
+
+        ! internal loop over time steps: if desired, we perform more than one time step
+        ! before adapting the grid again. this can further reduce the overhead of adaptivity
+        ! Note: the non-linear terms can create finer scales than resolved on the grid. they
+        ! are usually filtered by the coarsening/refinement round trip. So if you do more than one time step
+        ! on the grid, consider using a filter.
+        do it = 1, params%N_dt_per_grid
+            !***********************************************************************
+            ! advance in time
+            !***********************************************************************
+            t4 = MPI_wtime()
+            call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
+            hvy_active, lgt_active, lgt_n, hvy_n )
+            call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
 
 
-        if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-            (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+            if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
+                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
 
-            it_is_time_to_save_data=.true.
-        else
+                it_is_time_to_save_data=.true.
+            else
 
-            it_is_time_to_save_data=.false.
-        endif
+                it_is_time_to_save_data=.false.
+            endif
 
-        ! filter
-        t4 = MPI_wtime()
-        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
-            .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            ! filter
+            t4 = MPI_wtime()
+            if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
+                .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
-        end if
-        call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
+                call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+            end if
+            call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
 
-        ! it is useful to save the number of blocks per rank into a log file.
-        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
-        if (rank==0) then
-             open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-             min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-             close(14)
-        end if
+            ! it is useful to save the number of blocks per rank into a log file.
+            call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+            if (rank==0) then
+                 open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
+                 write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
+                 min_active_level( lgt_block, lgt_active, lgt_n ), &
+                 max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
+                 close(14)
+            end if
 
-        ! statistics
-        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
-            ! we need to sync ghost nodes for some derived qtys, for sure
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            ! statistics
+            if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+                ! we need to sync ghost nodes for some derived qtys, for sure
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            call statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
-            params%next_stats_time = params%next_stats_time + params%tsave_stats
-        endif
+                call statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                params%next_stats_time = params%next_stats_time + params%tsave_stats
+            endif
+        enddo
 
         !***********************************************************************
         ! Adapt mesh (coarsening where possible)

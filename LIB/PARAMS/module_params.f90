@@ -47,7 +47,7 @@ module module_params
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
-        integer(kind=ik)                             :: M_krylov = 12
+        integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1
         ! data writing frequency
         integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
         ! data writing frequency

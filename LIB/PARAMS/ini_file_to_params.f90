@@ -346,6 +346,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
+    call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.
@@ -416,7 +417,6 @@ end subroutine ini_file_to_params
       0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
-      call read_param_mpi(FILE, 'Time', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
 
 
     end subroutine ini_time

@@ -4,12 +4,12 @@
 ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
 ! on individual blocks. This requires one to use the same staging concept as for the RHS.
 !-----------------------------------------------------------------------------
-subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
+subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
+    real(kind=rk), intent (in) :: time, dt
 
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
@@ -36,8 +36,9 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
     ! local variables
     integer(kind=ik) :: Bs, mpierr, ix, iy, iz
     real(kind=rk) :: tmp(1:6), tmp_meanflow(1:3), tmp_force(1:3), tmp_residual(1:3), tmp_ekin, tmp_volume
-    real(kind=rk) :: x, y
-    real(kind=rk) :: eps_inv, dV
+    real(kind=rk) :: x, y, CFL, CFL_eta, CFL_nu
+    real(kind=rk) :: eps_inv, dV, dx_min
+    real(kind=rk), save :: umag
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
@@ -70,6 +71,7 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         params_acm%enstrophy = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
+        umag = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -142,6 +144,8 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
 
                 ! kinetic energy
                 tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
+
+                umag = max( umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
             enddo
             enddo
         else
@@ -174,6 +178,8 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
                 tmp_residual(3) = max( tmp_residual(3), (u(ix,iy,iz,3)-us(ix,iy,iz,3))*mask(ix,iy,iz) )
 
                 tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
+
+                umag = max( umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
             enddo
             enddo
             enddo
@@ -203,7 +209,6 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         ! 3rd stage: post_stage.
         !-------------------------------------------------------------------------
         ! this stage is called only once, NOT for each block.
-
 
         !-------------------------------------------------------------------------
         ! mean flow
@@ -240,37 +245,53 @@ subroutine STATISTICS_ACM( time, u, g, x0, dx, stage, work )
         tmp(1)= params_acm%enstrophy
         call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
+        tmp(1) = umag
+        call MPI_ALLREDUCE(tmp(1), umag, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
         !-------------------------------------------------------------------------
         ! write statistics to ascii files.
         if (params_acm%mpirank == 0) then
+            open(14,file='umag.t',status='unknown',position='append')
+            write(14,'(3(es15.8,1x))') time, sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+            close(14)
+
+            dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)
+            CFL   = dt * (sqrt(umag) + sqrt(params_acm%c_0**2 + umag)) / dx_min
+            CFL_nu = dt * params_acm%nu / dx_min**2
+            CFL_eta = dt / params_acm%C_eta
+
+            open(14,file='CFL.t',status='unknown',position='append')
+            write(14,'(4(es15.8,1x))') time, CFL, CFL_nu, CFL_eta
+            close(14)
+
             ! write mean flow to disk...
             open(14,file='meanflow.t',status='unknown',position='append')
-            write (14,'(4(es15.8,1x))') time, params_acm%mean_flow
+            write(14,'(4(es15.8,1x))') time, params_acm%mean_flow
             close(14)
 
             ! write forces to disk...
             open(14,file='forces.t',status='unknown',position='append')
-            write (14,'(4(es15.8,1x))') time, params_acm%force
+            write(14,'(4(es15.8,1x))') time, params_acm%force
             close(14)
 
             ! write kinetic energy to disk...
             open(14,file='e_kin.t',status='unknown',position='append')
-            write (14,'(2(es15.8,1x))') time, params_acm%e_kin
+            write(14,'(2(es15.8,1x))') time, params_acm%e_kin
             close(14)
 
             ! write enstrophy to disk...
             open(14,file='enstrophy.t',status='unknown',position='append')
-            write (14,'(2(es15.8,1x))') time, params_acm%enstrophy
+            write(14,'(2(es15.8,1x))') time, params_acm%enstrophy
             close(14)
 
             ! write mask_volume to disk...
             open(14,file='mask_volume.t',status='unknown',position='append')
-            write (14,'(2(es15.8,1x))') time, params_acm%mask_volume
+            write(14,'(2(es15.8,1x))') time, params_acm%mask_volume
             close(14)
 
             ! write residual velocity to disk...
             open(14,file='u_residual.t',status='unknown',position='append')
-            write (14,'(4(es15.8,1x))') time, params_acm%u_residual
+            write(14,'(4(es15.8,1x))') time, params_acm%u_residual
             close(14)
         end if
 

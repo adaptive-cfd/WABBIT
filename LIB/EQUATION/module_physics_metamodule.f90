@@ -213,13 +213,13 @@ end subroutine FIELD_NAMES_meta
  ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
  ! on individual blocks. This requires one to use the same staging concept as for the RHS.
  !-----------------------------------------------------------------------------
- subroutine STATISTICS_meta( physics, time, u, g, x0, dx, rhs, stage )
+ subroutine STATISTICS_meta( physics, time, dt, u, g, x0, dx, rhs, stage )
    implicit none
 
    character(len=*), intent(in) :: physics
    ! it may happen that some source terms have an explicit time-dependency
    ! therefore the general call has to pass time
-   real(kind=rk), intent (in) :: time
+   real(kind=rk), intent (in) :: time, dt
 
    ! block data, containg the state vector. In general a 4D field (3 dims+components)
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
@@ -242,7 +242,7 @@ end subroutine FIELD_NAMES_meta
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx, stage, rhs )
+     call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )

@@ -27,7 +27,7 @@
 !
 !**********************************************************************************************
 
-subroutine statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
 
 !----------------------------------------------------------------------------------------------
 ! modules
@@ -38,7 +38,7 @@ subroutine statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_a
    implicit none
 
     !> time variable
-    real(kind=rk), intent(in)           :: time
+    real(kind=rk), intent(in)           :: time, dt
     !> user defined parameter structure, hvy_active
     type (type_params), intent(in)      :: params
     !> heavy work data array - block data
@@ -74,7 +74,7 @@ subroutine statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_a
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
-    call STATISTICS_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx,&
+    call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx,&
         hvy_tmp(:,:,:,:,hvy_active(1)), "init_stage")
 
     !-------------------------------------------------------------------------
@@ -91,7 +91,7 @@ subroutine statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_a
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      call STATISTICS_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
+      call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
           hvy_tmp(:,:,:,:,hvy_active(k)), "integral_stage")
     enddo
 
@@ -100,7 +100,7 @@ subroutine statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_a
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
-    call STATISTICS_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx,&
+    call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx,&
         hvy_tmp(:,:,:,:,hvy_active(1)), "post_stage")
 
 

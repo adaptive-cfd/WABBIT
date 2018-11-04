@@ -50,7 +50,7 @@
 !! (up to RK of order 4)
 ! ********************************************************************************************
 
-subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
+subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
     hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -58,7 +58,7 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     implicit none
 
     !> time varible
-    real(kind=rk), intent(inout)        :: time
+    real(kind=rk), intent(inout)        :: time, dt
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -81,7 +81,7 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
     ! loop variables
     integer(kind=ik)                    :: k, j, Neqn
     ! time step, dx
-    real(kind=rk)                       :: dt, t
+    real(kind=rk)                       :: t
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save    :: rk_coeffs(:,:)
 

@@ -128,7 +128,7 @@ program main
     integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks, it
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, t4, tstart
+    real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data, test_failed, keep_running=.true.
 !---------------------------------------------------------------------------------------------
@@ -263,6 +263,12 @@ program main
         close(44)
         open (44, file='krylov_err.t', status='replace')
         close(44)
+        open (44, file='umag.t', status='replace')
+        write(44,'(3(A15,1x))') "%          time","u_max","u_eigen"
+        close(44)
+        open (44, file='CFL.t', status='replace')
+        write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
+        close(44)
     endif
 
     ! next write time for reloaded data
@@ -290,9 +296,6 @@ program main
 
     do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
         t2 = MPI_wtime()
-
-        ! new iteration
-        iteration = iteration + 1
 
         !***********************************************************************
         ! check redundant nodes
@@ -340,31 +343,31 @@ program main
         ! are usually filtered by the coarsening/refinement round trip. So if you do more than one time step
         ! on the grid, consider using a filter.
         do it = 1, params%N_dt_per_grid
-            !***********************************************************************
+            !*******************************************************************
             ! advance in time
-            !***********************************************************************
+            !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
             hvy_active, lgt_active, lgt_n, hvy_n )
             call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
+            iteration = iteration + 1
 
-
+            it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
-
                 it_is_time_to_save_data=.true.
-            else
-
-                it_is_time_to_save_data=.false.
             endif
 
+            !*******************************************************************
             ! filter
+            !*******************************************************************
             t4 = MPI_wtime()
-            if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
-                .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            if (params%filter_type /= "no_filter") then
+                if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
+                    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-                call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                    call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                end if
             end if
             call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
 
@@ -378,12 +381,14 @@ program main
                  close(14)
             end if
 
+            !*******************************************************************
             ! statistics
+            !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-                call statistics_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
         enddo
@@ -400,20 +405,19 @@ program main
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
 
-
         ! write data to disk
-        if ( it_is_time_to_save_data) then
-          ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        if (it_is_time_to_save_data) then
+            ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-          ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-          ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
-          ! slots. the state vector (hvy_block) is copied if desired.
-          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-          lgt_n, hvy_n, hvy_tmp, hvy_active )
+            ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+            ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
+            ! slots. the state vector (hvy_block) is copied if desired.
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+            lgt_n, hvy_n, hvy_tmp, hvy_active )
 
-          output_time = time
-          params%next_write_time = params%next_write_time + params%write_time
+            output_time = time
+            params%next_write_time = params%next_write_time + params%write_time
         endif
 
         ! at the end of a time step, we increase the total counters/timers for all measurements
@@ -447,8 +451,6 @@ program main
             if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
             keep_running = .false.
         endif
-
-
     end do
 
     !---------------------------------------------------------------------------

@@ -145,6 +145,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
                 ! kinetic energy
                 tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
 
+                ! maximum of velocity in the field
                 umag = max( umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
             enddo
             enddo
@@ -179,6 +180,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
 
                 tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
 
+                ! maximum of velocity in the field
                 umag = max( umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
             enddo
             enddo

@@ -155,6 +155,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                         !-----------------------------------------------------------
                         ! internal relation (no communication)
                         !-----------------------------------------------------------
+                        ! NOTE: 06/11/2018, Thomas. I checked that treating all neighbors external (ie passing by the buffers) is 10-15% slower
+                        ! than treating internal separately (on irene@TGCC, using Allinea MAP profiler, 3D testcase, 144 CPUs, infiniband)
                         call send_prepare_internal_neighbor( neighbor_rank+1, istage, sender_hvy_id, hvy_id_receiver, neighborhood, &
                         bounds_type, level_diff, entrySortInRound )
 

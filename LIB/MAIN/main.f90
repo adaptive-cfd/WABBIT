@@ -264,7 +264,7 @@ program main
         open (44, file='krylov_err.t', status='replace')
         close(44)
         open (44, file='umag.t', status='replace')
-        write(44,'(3(A15,1x))') "%          time","u_max","u_eigen"
+        write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
         close(44)
         open (44, file='CFL.t', status='replace')
         write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"

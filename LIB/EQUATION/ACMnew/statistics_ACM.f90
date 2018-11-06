@@ -230,11 +230,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
         !-------------------------------------------------------------------------
         ! residual velocity in solid domain
         tmp(1:3) = params_acm%u_residual
-        call MPI_ALLREDUCE(tmp(1:3), params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(tmp(1:3), params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! volume of mask (useful to see if it is properly generated)
-        tmp(1)= params_acm%mask_volume
+        tmp(1) = params_acm%mask_volume
         call MPI_ALLREDUCE(tmp(1), params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
@@ -248,13 +248,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
         call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         tmp(1) = umag
-        call MPI_ALLREDUCE(tmp(1), umag, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(tmp(1), umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! write statistics to ascii files.
         if (params_acm%mpirank == 0) then
             open(14,file='umag.t',status='unknown',position='append')
-            write(14,'(3(es15.8,1x))') time, sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+            write(14,'(5(es15.8,1x))') time, sqrt(umag), params_acm%c_0, &
+            params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
             close(14)
 
             dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)

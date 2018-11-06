@@ -49,6 +49,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
 
         params_acm%mean_flow = 0.0_rk
         params_acm%mean_p = 0.0_rk
+        params_acm%umax = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -71,11 +72,19 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
             params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
             params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 3))*dx(1)*dx(2)
+
+            tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)**2)
+            params_acm%umax = max( params_acm%umax, tmp2 )
         else
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
             params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
             params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
             params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 4))*dx(1)*dx(2)*dx(3)
+
+            tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2)**2 &
+                         + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3)**2 )
+
+            params_acm%umax = max( params_acm%umax, tmp2)
         endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
     case ("post_stage")
@@ -88,6 +97,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         tmp2 = params_acm%mean_p
         call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        tmp2 = sqrt(params_acm%umax)
+        call MPI_ALLREDUCE(tmp2, params_acm%umax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         if (params_acm%dim == 2) then
             params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
@@ -95,6 +106,13 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         else
             params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
             params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
+        endif
+
+        ! the speed of sound is usually a constant, but for numerics it might be a good idea to interpret
+        ! it as a mach number, relative to the largest velocity in the field. In this case, c0 = max(u)*MachNumber
+        ! and c0(t). The scaling is used if a MachNumber is given; otherwise, c0 is a constant
+        if (params_acm%MachNumber > 0.0_rk) then
+            params_acm%c_0 = params_acm%MachNumber * params_acm%umax
         endif
 
     case ("local_stage")
@@ -459,6 +477,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     dz2_inv = 1.0_rk / (dx(3)**2)
 
     eps_inv = 1.0_rk / eps
+
 
 !---------------------------------------------------------------------------------------------
 ! main body

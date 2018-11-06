@@ -47,7 +47,7 @@ module module_acm
   ! and the like. only visible here.
   type :: type_params
     real(kind=rk) :: CFL, T_end, CFL_eta
-    real(kind=rk) :: c_0
+    real(kind=rk) :: c_0, MachNumber = -1.0_rk
     real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu
@@ -70,7 +70,7 @@ module module_acm
     character(len=80) :: sponge_type=""
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
-    real(kind=rk) :: mean_flow(1:3), mean_p
+    real(kind=rk) :: mean_flow(1:3), mean_p, umax
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
@@ -145,6 +145,10 @@ contains
 
     ! speed of sound for acm
     call read_param_mpi(FILE, 'ACM-new', 'c_0', params_acm%c_0, 10.0_rk)
+    ! the speed of sound is usually a constant, but for numerics it might be a good idea to interpret
+    ! it as a mach number, relative to the largest velocity in the field. In this case, c0 = max(u)*MachNumber
+    ! and c0(t). The scaling is used if a MachNumber is given; otherwise, c0 is a constant
+    call read_param_mpi(FILE, 'ACM-new', 'MachNumber', params_acm%MachNumber, -1.0_rk)
     ! viscosity
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     ! gamma_p

@@ -256,8 +256,14 @@ contains
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
     u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
 
+
     ! ususal CFL condition
-    dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+    ! if the characteristic velocity is very small, avoid division by zero
+    if ( u_eigen >= 1.0e-6_rk ) then
+        dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+    else
+        dt = 1.0e-2_rk
+    endif
 
     ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)

@@ -29,23 +29,24 @@ end_color=$'\033[0m'
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=(
        "---navier-stokes---"
-      "TESTING/navier_stokes/simple_geometry/rhombus/rhombus_moving_shock.sh"
-      "TESTING/navier_stokes/simple_geometry/triangle/triangle_adapt.sh"
-      "TESTING/navier_stokes/pressure_blob/2D/pressure_blob.sh"
-      "TESTING/navier_stokes/pressure_blob/3D/pressure_blob3D.sh"
-      "TESTING/navier_stokes/funnel/2D/ion_funnel_light.sh"
-      "TESTING/navier_stokes/funnel/3D/ion_funnel_3D.sh"
-      "TESTING/navier_stokes/filter/bogey_shock/2D/bogey_shock.sh"
-      "TESTING/navier_stokes/filter/bogey_shock/3D/bogey_shock3D.sh"
-      "TESTING/navier_stokes/filter/explicit_5pt/explicit_5pt.sh"
-      "TESTING/navier_stokes/filter/explicit_7pt/explicit_7pt.sh"
-      "TESTING/navier_stokes/filter/explicit_9pt/explicit_9pt.sh"
-      "TESTING/navier_stokes/filter/explicit_11pt/explicit_11pt.sh"
+       "TESTING/navier_stokes/simple_geometry/rhombus/rhombus_moving_shock.sh"
+       "TESTING/navier_stokes/simple_geometry/triangle/triangle_adapt.sh"
+       "TESTING/navier_stokes/pressure_blob/2D/pressure_blob.sh"
+       "TESTING/navier_stokes/pressure_blob/3D/pressure_blob3D.sh"
+       "TESTING/navier_stokes/funnel/2D/ion_funnel_light.sh"
+       "TESTING/navier_stokes/funnel/3D/ion_funnel_3D.sh"
+       "TESTING/navier_stokes/filter/bogey_shock/2D/bogey_shock.sh"
+       "TESTING/navier_stokes/filter/bogey_shock/3D/bogey_shock3D.sh"
+       "TESTING/navier_stokes/filter/explicit_5pt/explicit_5pt.sh"
+       "TESTING/navier_stokes/filter/explicit_7pt/explicit_7pt.sh"
+       "TESTING/navier_stokes/filter/explicit_9pt/explicit_9pt.sh"
+       "TESTING/navier_stokes/filter/explicit_11pt/explicit_11pt.sh"
        "---acm---"
        "TESTING/acm/bumblebee_adaptive/bumblebee_adaptive.sh"
        "TESTING/acm/acm_cyl_equi/acm_cylinder_equi.sh"
        "TESTING/acm/acm_cyl_nonequi/acm_cylinder_nonequi.sh"
-       "TESTING/acm/acm_cyl_adaptive_newsponge/acm_cylinder_adaptive_newsponge.sh"
+       "TESTING/acm/acm_cyl_adaptive_newsponge/acm_cyl_adaptive_newsponge.sh"
+       "TESTING/acm/acm_cyl_adaptive_newsponge_mach/acm_cyl_adaptive_newsponge_mach.sh"
        "TESTING/acm/acm_cyl_adaptive_krylov/acm_cylinder_adaptive_krylov.sh"
        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"
        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh"
@@ -109,7 +110,7 @@ do
     fi
 done
 
-echo
+echo ""
 T="$(($(date +%s)-T))"
 echo "Time used in tests: ${T} seconds"
 

@@ -88,7 +88,7 @@ LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm -lblas -llapack
 FFLAGS += -I$(HDF_INC)
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
 # different pragmas are space-separated

@@ -1,18 +1,10 @@
 !> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_mesh.f90
-!> \version 0.4
-!> \author msr
 !
 !> \brief module for all mesh subroutines
 !
 !> \details
-!! = log ======================================================================================
-!! \n
-!! 24/11/16 - create
+!> \author msr
+!! \date 24/11/16 - create
 ! ********************************************************************************************
 
 module module_mesh
@@ -33,22 +25,24 @@ module module_mesh
     use module_treelib
     !
     use module_boundary_conditions
-!---------------------------------------------------------------------------------------------
-! variables
 
+    ! used in coarse_mesh
+    use module_helpers, only: most_common_element
 
     implicit none
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
     logical, private,save ::  mesh_has_changed=.false.
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 
     ! create all active (lgt/hvy) lists, create also sorted lgt data list
     include "create_active_and_sorted_lists.f90"
+
+#ifdef BLOCKINGSENDRECV
+    include "block_xfer_blocking.f90"
+#else
+    include "block_xfer_nonblocking.f90"
+#endif
 
     ! update neighbors, 2D/3D
     include "update_neighbors.f90"
@@ -126,10 +120,7 @@ contains
     ! find globally coarsest / finest levels
     include "max_active_level.f90"
     include "min_active_level.f90"
-
-    !
     include "get_free_local_light_id.f90"
-    include "gather_blocks_on_proc.f90"
     include "quicksort.f90"
 
     ! routines for creation of an initial grid

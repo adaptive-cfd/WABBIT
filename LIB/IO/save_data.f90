@@ -27,7 +27,7 @@
 !
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
 
     !---------------------------------------------------------------------------------------------
     ! modules
@@ -48,10 +48,10 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     integer(kind=ik), intent(inout)                 :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
-    !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), intent(inout)                    :: hvy_tmp(:, :, :, :, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
+    integer(kind=ik), intent(in)                    :: hvy_active(:)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)                 :: lgt_active(:)
     !> number of active blocks (light/heavy data)
@@ -63,7 +63,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     character(len=80)                               :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: t0, x0(1:3), dx(1:3)
-  
     !---------------------------------------------------------------------------------------------
     ! variables initialization
     ! start time
@@ -88,8 +87,8 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! to disk in the work array. This way, we can also store derived variables
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
-        call PREPARE_SAVE_DATA(params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
-        params%number_ghost_nodes, x0, dx, hvy_work(:,:,:,:,hvy_active(k)))
+        call PREPARE_SAVE_DATA_meta(params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
+        params%n_ghosts, x0, dx, hvy_tmp(:,:,:,:,hvy_active(k)))
 
     enddo
 
@@ -99,11 +98,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
         ! physics modules shall provide an interface for wabbit to know how to label
         ! the components to be stored to hard disk (in the work array)
-        call FIELD_NAMES(params%physics_type, k, tmp)
+        call FIELD_NAMES_meta(params%physics_type, k, tmp)
         ! create filename
         write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
         ! actual writing
-        call write_field( fname, time, iteration, k, params, lgt_block, hvy_WORK, lgt_active, lgt_n, hvy_n, hvy_active)
+        call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active)
 
     enddo
 

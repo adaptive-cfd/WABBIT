@@ -72,16 +72,25 @@ program main
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( 1:number_data_fields)
+    !                   -> dim 4: components ( 1:number_equations)
     ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
 
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: data type ( old data, k1, k2, k3, k4 )
-    ! heavy work array  -> dim 5: block id  ( 1:number_blocks )
-    real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :)
+    !                   -> dim 4: components ( 1:number_equations)
+    !                   -> dim 5: RHS slot (k1,k2 etc for RK4)
+    ! heavy work array  -> dim 6: block id  ( 1:number_blocks )
+    real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :, :)
+
+    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
+    !                   -> dim 4: components ( 1:number_equations)
+    ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
+    ! This array can be used for work data.
+    real(kind=rk), allocatable          :: hvy_tmp(:, :, :, :, :)
 
     ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
     !                             -> number_columns = 16 (...different neighbor relations:
@@ -116,10 +125,10 @@ program main
     character(len=80)                   :: filename
 
     ! loop variable
-    integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks
+    integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks, it
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: sub_t0, t4, tstart
+    real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data, test_failed, keep_running=.true.
 !---------------------------------------------------------------------------------------------
@@ -151,6 +160,11 @@ program main
     if (rank==0) then
         write(*,'(80("_"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
+#ifdef BLOCKINGSENDRECV
+        write(*,'("MPI: code build with blocking send/recv in transfer (block_xfer_blocking.f90)")')
+#else
+        write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
+#endif
     end if
 
 
@@ -162,7 +176,6 @@ program main
 
     ! unit test off
     params%unit_test    = .false.
-
 
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
@@ -178,12 +191,10 @@ program main
     call init_physics_modules( params, filename )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, .true., hvy_work)
+        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    ! initalize debugging ( this is mainly time measurements )
-    call allocate_init_debugging( params )
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
@@ -198,10 +209,11 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+        hvy_tmp, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
     endif
 
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
 
     !---------------------------------------------------------------------------
@@ -209,8 +221,9 @@ program main
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_work )
-    if (params%initial_cond /= "read_from_files" .or. params%adapt_inicond) then
+    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_tmp )
+
+    if (.not. params%read_from_files .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
@@ -219,7 +232,7 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
 
     end if
 
@@ -241,6 +254,20 @@ program main
         open (44, file='blocks_per_mpirank_rhs.t', status='replace')
         close(44)
         open (44, file='eps_norm.t', status='replace')
+        close(44)
+        open (44, file='block_dist.dat', status='replace')
+        close(44)
+        open (44, file='mask_volume.t', status='replace')
+        close(44)
+        open (44, file='u_residual.t', status='replace')
+        close(44)
+        open (44, file='krylov_err.t', status='replace')
+        close(44)
+        open (44, file='umag.t', status='replace')
+        write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
+        close(44)
+        open (44, file='CFL.t', status='replace')
+        write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
         close(44)
     endif
 
@@ -270,9 +297,6 @@ program main
     do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
         t2 = MPI_wtime()
 
-        ! new iteration
-        iteration = iteration + 1
-
         !***********************************************************************
         ! check redundant nodes
         !***********************************************************************
@@ -282,7 +306,7 @@ program main
             call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
 
             if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -290,11 +314,9 @@ program main
 
         !+++++++++++ serve any data request from the other side +++++++++++++
         if (params%bridge_exists) then
-            call MPI_Barrier(WABBIT_COMM,ierr)
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, &
+            call serve_data_request(lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active, &
                                     lgt_active, lgt_n, hvy_n,params)
-            call MPI_Barrier(WABBIT_COMM,ierr)
         endif
         !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -309,47 +331,67 @@ program main
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
             ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
-
         Nblocks_rhs = lgt_n
-        !***********************************************************************
-        ! advance in time
-        !***********************************************************************
-        t4 = MPI_wtime()
-        call time_stepper( time, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
-        hvy_active, lgt_active, lgt_n, hvy_n )
-        call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
 
+        ! internal loop over time steps: if desired, we perform more than one time step
+        ! before adapting the grid again. this can further reduce the overhead of adaptivity
+        ! Note: the non-linear terms can create finer scales than resolved on the grid. they
+        ! are usually filtered by the coarsening/refinement round trip. So if you do more than one time step
+        ! on the grid, consider using a filter.
+        do it = 1, params%N_dt_per_grid
+            !*******************************************************************
+            ! advance in time
+            !*******************************************************************
+            t4 = MPI_wtime()
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
+            hvy_active, lgt_active, lgt_n, hvy_n )
+            call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
+            iteration = iteration + 1
 
-        if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-            (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+            it_is_time_to_save_data = .false.
+            if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
+                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+                it_is_time_to_save_data=.true.
+            endif
 
-            it_is_time_to_save_data=.true.
-        else
+            !*******************************************************************
+            ! filter
+            !*******************************************************************
+            t4 = MPI_wtime()
+            if (params%filter_type /= "no_filter") then
+                if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
+                    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            it_is_time_to_save_data=.false.
-        endif
+                    call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                end if
+            end if
+            call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
 
-        ! filter
-        if ( (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0&
-            .or. it_is_time_to_save_data ) .and. params%filter_type/="no_filter") then
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            ! it is useful to save the number of blocks per rank into a log file.
+            call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+            if (rank==0) then
+                 open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
+                 write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
+                 min_active_level( lgt_block, lgt_active, lgt_n ), &
+                 max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
+                 close(14)
+            end if
 
-            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
-        end if
+            !*******************************************************************
+            ! statistics
+            !*******************************************************************
+            if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+                ! we need to sync ghost nodes for some derived qtys, for sure
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-        ! it is useful to save the number of blocks per rank into a log file.
-        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
-        if (rank==0) then
-             open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,1024(i4,1x))') time, iteration, lgt_n, &
-             min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-             close(14)
-        end if
+                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                params%next_stats_time = params%next_stats_time + params%tsave_stats
+            endif
+        enddo
 
         !***********************************************************************
         ! Adapt mesh (coarsening where possible)
@@ -358,32 +400,24 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_work )
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
         endif
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
 
-        ! statistics
-        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
-          ! we need to sync ghost nodes for some derived qtys, for sure
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-
-          call statistics_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
-          params%next_stats_time = params%next_stats_time + params%tsave_stats
-        endif
-
         ! write data to disk
-        if ( it_is_time_to_save_data) then
-          ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        if (it_is_time_to_save_data) then
+            ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-          ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-          ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
-          ! slots. the state vector (hvy_block) is copied if desired.
-          call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+            ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+            ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
+            ! slots. the state vector (hvy_block) is copied if desired.
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+            lgt_n, hvy_n, hvy_tmp, hvy_active )
 
-          output_time = time
-          params%next_write_time = params%next_write_time + params%write_time
+            output_time = time
+            params%next_write_time = params%next_write_time + params%write_time
         endif
 
         ! at the end of a time step, we increase the total counters/timers for all measurements
@@ -406,7 +440,7 @@ program main
              close(14)
 
              open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,1024(i4,1x))') time, iteration, lgt_n, &
+             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
              min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
              close(14)
@@ -417,8 +451,6 @@ program main
             if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
             keep_running = .false.
         endif
-
-
     end do
 
     !---------------------------------------------------------------------------
@@ -433,13 +465,13 @@ program main
 
         ! filter before write out
         if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_wrapper(time, params, hvy_block, hvy_work, lgt_block, hvy_active, hvy_n)
+            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
         end if
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-        ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
+        ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_work, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements
@@ -449,58 +481,12 @@ program main
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)
 
-    ! debug info output
-    if ( params%debug ) then
-        ! sum times
-        debug%comp_time(:,2) = 0.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,2), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
-        ! MPI Barrier before program ends
-        call MPI_Barrier(WABBIT_COMM, ierr)
-
-        ! average times
-        debug%comp_time(:,2) = debug%comp_time(:,2) / params%number_procs
-        ! standard deviation
-        debug%comp_time(:,3) = 0.0_rk
-        debug%comp_time(:,4) = (debug%comp_time(:,4) - debug%comp_time(:,2))**2.0_rk
-        call MPI_Allreduce(debug%comp_time(:,4), debug%comp_time(:,3), size(debug%comp_time,1), MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
-        ! MPI Barrier before program ends
-        call MPI_Barrier(WABBIT_COMM, ierr)
-
-        if (params%number_procs == 1) then
-            debug%comp_time(:,3) = 0.0_rk
-        else
-            debug%comp_time(:,3) = sqrt(debug%comp_time(:,3) / ( params%number_procs - 1 ))
-        end if
-
-        ! output
-        if (rank==0) then
-            write(*,'(80("_"))')
-            write(*, '("debug times (average value +- standard deviation) :")')
-            k = 1
-            do while ( debug%name_comp_time(k) /= "---" )
-
-                ! write name
-                write(*, '(a)', advance='no') debug%name_comp_time(k)
-                ! write average time
-                write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,2)
-                ! write standard deviation
-                write(*, '(2x,f12.3)', advance='no') debug%comp_time(k,3)
-                ! next line
-                write(*,*)
-                ! loop variable
-                k = k + 1
-
-            end do
-
-            write(*,'(80("_"))')
-            write(*, '("sum: ", 2x,f12.3)', advance='yes') sum(debug%comp_time(:,2))
-
-        end if
-
-    end if
+    ! make a summary of the program parts, which have been profiled using toc(...)
+    ! and print it to stdout
+    call summarize_profiling( params, WABBIT_COMM )
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work )
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp )
 
     ! computing time output on screen
     call cpu_time(t1)

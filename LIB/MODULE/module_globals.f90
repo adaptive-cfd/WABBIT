@@ -35,32 +35,40 @@ module module_globals
 
 contains
 
+!> use the abort function instead of stop!
+!> this is necessary since stop, does not kill
+!> the other processes
+subroutine abort1(code,msg)
+  implicit none
+  character(len=*), intent(in) :: msg
+  integer(kind=ik), intent(in) :: code
+  integer(kind=ik) :: mpierr
 
-    subroutine abort1(code,msg)
-        implicit none
-        character(len=*), intent(in) :: msg
-        integer(kind=ik), intent(in) :: code
-        integer(kind=ik) :: mpierr
+  ! you may be tempted to use (if mprank=0) to have nicer output: do not do that.
+  ! if root does not come to the error, then you will not see it. better all ranks
+  ! display it.
+  write(*,*) msg
+  call MPI_ABORT( WABBIT_COMM, code, mpierr)
+end subroutine
 
-        write(*,*) msg
-        call MPI_ABORT( WABBIT_COMM, code, mpierr)
-    end subroutine
+subroutine abort2(code)
+  implicit none
+  integer(kind=ik), intent(in) :: code
+  integer(kind=ik) :: mpierr
 
-    subroutine abort2(code)
-        implicit none
-        integer(kind=ik), intent(in) :: code
-        integer(kind=ik) :: mpierr
+  call MPI_ABORT( WABBIT_COMM, code, mpierr)
+end subroutine
 
-        call MPI_ABORT( WABBIT_COMM, code, mpierr)
-    end subroutine
+subroutine abort3(msg)
+  implicit none
+  character(len=*), intent(in) :: msg
+  integer(kind=ik) :: mpierr
 
-    subroutine abort3(msg)
-        implicit none
-        character(len=*), intent(in) :: msg
-        integer(kind=ik) :: mpierr
-
-        write(*,*) msg
-        call MPI_ABORT( WABBIT_COMM, 666, mpierr)
-    end subroutine
+  ! you may be tempted to use (if mprank=0) to have nicer output: do not do that.
+  ! if root does not come to the error, then you will not see it. better all ranks
+  ! display it.
+  write(*,*) msg
+  call MPI_ABORT( WABBIT_COMM, 666, mpierr)
+end subroutine
 
 end module module_globals

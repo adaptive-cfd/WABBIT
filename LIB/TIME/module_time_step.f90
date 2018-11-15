@@ -55,6 +55,7 @@ contains
     include "filter_wrapper.f90"
     include "statistics_wrapper.f90"
     include "final_stage_RK.f90"
+    include "krylov.f90"
 
     ! dt calculation
     include "calculate_time_step.f90"

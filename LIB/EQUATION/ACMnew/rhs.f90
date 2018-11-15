@@ -1,6 +1,6 @@
 !-----------------------------------------------------------------------------
 ! main level wrapper to set the right hand side on a block. Note this is completely
-! independent of the grid any an MPI formalism, neighboring relations and the like.
+! independent of the grid and any MPI formalism, neighboring relations and the like.
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
@@ -49,6 +49,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
 
         params_acm%mean_flow = 0.0_rk
         params_acm%mean_p = 0.0_rk
+        params_acm%umax = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -71,11 +72,19 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
             params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
             params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 3))*dx(1)*dx(2)
+
+            tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)**2)
+            params_acm%umax = max( params_acm%umax, tmp2 )
         else
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
             params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
             params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
             params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 4))*dx(1)*dx(2)*dx(3)
+
+            tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2)**2 &
+                         + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3)**2 )
+
+            params_acm%umax = max( params_acm%umax, tmp2)
         endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
     case ("post_stage")
@@ -88,13 +97,22 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         tmp2 = params_acm%mean_p
         call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        tmp2 = sqrt(params_acm%umax)
+        call MPI_ALLREDUCE(tmp2, params_acm%umax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         if (params_acm%dim == 2) then
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly)
-            params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly)
+            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
+            params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2))
         else
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
-            params_acm%mean_p = params_acm%mean_p / (params_acm%Lx*params_acm%Ly*params_acm%Lz)
+            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
+            params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
+        endif
+
+        ! the speed of sound is usually a constant, but for numerics it might be a good idea to interpret
+        ! it as a mach number, relative to the largest velocity in the field. In this case, c0 = max(u)*MachNumber
+        ! and c0(t). The scaling is used if a MachNumber is given; otherwise, c0 is a constant
+        if (params_acm%MachNumber > 0.0_rk) then
+            params_acm%c_0 = params_acm%MachNumber * params_acm%umax
         endif
 
     case ("local_stage")
@@ -339,8 +357,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
                         do ix = g+1, Bs+g
                             x = x0(1) + dble(ix-g-1) * dx(1)
                             y = x0(2) + dble(iy-g-1) * dx(2)
-                            call continue_periodic(x,params_acm%Lx)
-                            call continue_periodic(y,params_acm%Ly)
+                            call continue_periodic(x,params_acm%domain_size(1))
+                            call continue_periodic(y,params_acm%domain_size(2))
                             term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
                             forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) * dcos(y - params_acm%u_mean_set(2)*time) *term_2
                             forcing(2) = -dcos(x - params_acm%u_mean_set(1)*time) * dsin(y - params_acm%u_mean_set(2) * time) *term_2
@@ -366,14 +384,22 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
+        ! create the mask for the sponge on this block
         call sponge_2D(sponge, x0, dx, Bs, g)
+        ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
-        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
-        ! which is different from the penalization term, which acts only on ux,uy and not p
-        rhs(:,:,1) = rhs(:,:,1) - (phi(:,:,1)-params_acm%u_mean_set(1)) * sponge * eps_inv
-        rhs(:,:,2) = rhs(:,:,2) - (phi(:,:,2)-params_acm%u_mean_set(2)) * sponge * eps_inv
-        rhs(:,:,3) = rhs(:,:,3) - phi(:,:,3)*sponge*eps_inv
+        do iy = g+1, Bs+g
+            do ix = g+1, Bs+g
+                ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+                ! which is different from the penalization term, which acts only on ux,uy and not p
+                sponge(ix,iy) = sponge(ix,iy) * eps_inv
+
+                rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * sponge(ix,iy)
+                rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * sponge(ix,iy)
+                rhs(ix,iy,3) = rhs(ix,iy,3) - phi(ix,iy,3)*sponge(ix,iy)
+            enddo
+        enddo
     end if
 
 
@@ -451,6 +477,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     dz2_inv = 1.0_rk / (dx(3)**2)
 
     eps_inv = 1.0_rk / eps
+
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -610,16 +637,25 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
+        ! create the mask for the sponge on this block
         call sponge_3D(sponge, x0, dx, Bs, g)
+        ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
-        sponge = sponge * eps_inv
 
-        ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
-        ! which is different from the penalization term, which acts only on ux,uy and not p
-        rhs(:,:,:,1) = rhs(:,:,:,1) - (phi(:,:,:,1)-params_acm%u_mean_set(1)) * sponge
-        rhs(:,:,:,2) = rhs(:,:,:,2) - (phi(:,:,:,2)-params_acm%u_mean_set(2)) * sponge
-        rhs(:,:,:,3) = rhs(:,:,:,3) - (phi(:,:,:,3)-params_acm%u_mean_set(3)) * sponge
-        rhs(:,:,:,4) = rhs(:,:,:,4) - phi(:,:,:,4)*sponge
+        do iz = g+1, Bs+g
+            do iy = g+1, Bs+g
+                do ix = g+1, Bs+g
+                    ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+                    ! which is different from the penalization term, which acts only on ux,uy and not p
+                    sponge(ix,iy,iz) = sponge(ix,iy,iz) * eps_inv
+
+                    rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) - (phi(ix,iy,iz,3)-params_acm%u_mean_set(3)) * sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - phi(ix,iy,iz,4)*sponge(ix,iy,iz)
+                end do
+            end do
+        end do
     end if
 
 end subroutine RHS_3D_acm

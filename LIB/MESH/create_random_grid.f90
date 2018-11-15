@@ -6,7 +6,7 @@
 !> \name create_random_grid.f90
 !> \version 0.5
 !> \author engels
-subroutine create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+subroutine create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity, iterations )
 
     !---------------------------------------------------------------------------------------------
@@ -20,8 +20,10 @@ subroutine create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy work array  )
-    real(kind=rk),  intent(inout)       :: hvy_work (:, :, :, :, :)
+    !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
+    real(kind=rk), intent(out)          :: hvy_work(:, :, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), intent(out)          :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -42,7 +44,7 @@ subroutine create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_neigh
     integer :: l
 
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
 
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
@@ -60,11 +62,11 @@ subroutine create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_neigh
         endif
 
         ! refine some blocks
-        call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+        call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
              lgt_sortednumlist, hvy_active, hvy_n, "random" )
 
         ! random adapt some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_work )
+             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_tmp )
     end do
 end subroutine create_random_grid

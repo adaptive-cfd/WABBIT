@@ -10,7 +10,7 @@
 !
 !
 ! ********************************************************************************************
-subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, inicond, hvy_work, adapting)
+subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, adapting)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -24,13 +24,11 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
     !> heavy data array - block data
     real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
     !> heavy data array - work data
-    real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)         :: hvy_tmp(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)      :: hvy_active(:)
     !> number of heavy and light active blocks
     integer(kind=ik), intent(inout)      :: hvy_n
-    !> what function to use
-    character(len=*), intent(in)         :: inicond
     ! loop variable
     integer(kind=ik)                     :: k
     integer(kind=ik)                     :: Bs, g
@@ -42,8 +40,8 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
 
   !---------------------------------------------------------------------------------------------
   ! variables initialization
-    Bs    = params%number_block_nodes
-    g     = params%number_ghost_nodes
+    Bs    = params%Bs
+    g     = params%n_ghosts
 
   !---------------------------------------------------------------------------------------------
   ! main body
@@ -63,7 +61,7 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, i
 
         ! set the initial condition on this block
         call INICOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), g, &
-            x0, dx, hvy_work(:,:,:,:,hvy_id), adapting)
+            x0, dx, hvy_tmp(:,:,:,:,hvy_id), adapting)
     enddo
 
 end subroutine set_inicond_blocks

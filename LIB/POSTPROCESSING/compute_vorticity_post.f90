@@ -28,7 +28,7 @@ subroutine compute_vorticity_post(params)
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
-    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -76,12 +76,12 @@ subroutine compute_vorticity_post(params)
     if (order == "4") then
         params%order_discretization = "FD_4th_central_optimized"
         params%order_predictor = "multiresolution_4th"
-        params%number_ghost_nodes = 4_ik
+        params%n_ghosts = 4_ik
 
     elseif (order == "2") then
         params%order_discretization = "FD_2nd_central"
         params%order_predictor = "multiresolution_2nd"
-        params%number_ghost_nodes = 2_ik
+        params%n_ghosts = 2_ik
 
     else
         call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
@@ -89,11 +89,11 @@ subroutine compute_vorticity_post(params)
     end if
 
     params%max_treelevel = tc_length
-    params%number_data_fields = params%dim
+    params%n_eqn = params%dim
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%number_block_nodes = Bs
+    params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case
@@ -127,24 +127,24 @@ subroutine compute_vorticity_post(params)
         if (params%threeD_case) then
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
             hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
-            dx, params%number_block_nodes, params%number_ghost_nodes,&
-            params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k)))
+            dx, params%Bs, params%n_ghosts,&
+            params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k),1))
         else
             call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), hvy_work(:,:,:,3,hvy_active(k)),&
-            dx, params%number_block_nodes, params%number_ghost_nodes, &
-            params%order_discretization, hvy_work(:,:,:,:,hvy_active(k)))
+            hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,1,hvy_active(k)),&
+            dx, params%Bs, params%n_ghosts, &
+            params%order_discretization, hvy_work(:,:,:,:,hvy_active(k),1))
         end if
     end do
     write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
     call write_field(fname, time, iteration, 1, params, lgt_block,&
-    hvy_work, lgt_active, lgt_n, hvy_n, hvy_active )
+    hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
     if (params%threeD_case) then
         write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 2, params, lgt_block,&
-        hvy_work, lgt_active, lgt_n, hvy_n,  hvy_active)
+        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n,  hvy_active)
         write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 3, params, lgt_block, &
-        hvy_work, lgt_active, lgt_n, hvy_n, hvy_active)
+        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active)
     end if
 end subroutine compute_vorticity_post

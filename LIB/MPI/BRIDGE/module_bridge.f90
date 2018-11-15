@@ -51,15 +51,15 @@ contains
 
 
 
-!> @brief      Creates two mpi worlds by splitting the processes of the common
+!> \brief      Creates two mpi worlds by splitting the processes of the common
 !>             communicator in two subsets
 !
-!> @param      bridgeToSet  bridge which contains useful MPI parameters like
+!> \param      bridgeToSet  bridge which contains useful MPI parameters like
 !>                          commonWorld(,rank,size) or myWorld(,rank,size)
-!> @param      worldIndex world index which is a unique tag for the two
+!> \param      worldIndex world index which is a unique tag for the two
 !>                          groups (integer)
 !
-!> @return      bridgeToSet
+!> \return      bridgeToSet
 subroutine createMPIWorlds (bridgeToSet, worldIndex)
 !! distinguish between the sub-worlds by splitting the processes
 !! Subroutine-declarations
@@ -105,18 +105,18 @@ integer                                  :: commonComm             ! MPI common 
                             communicator_exchange, bridgeToSet%otherWorld, ierr)
 end subroutine createMPIWorlds
 
-!!!!-------------------------------------------------------------------------!!!!
 
 
-!> @brief      create a new set of processes (slave program)
+!-------------------------------------------------------------------------!!!!
+!> \brief      create a new set of processes (slave program)
 !>             called by a master program - master side
 !>             Subroutine-declarations
 !
-!> @param      bridgeToSet   type bridge to allocate in a world
-!> @param      slaveSize     index to chose the world in which the bridge is allocated
-!> @param      slaveCommand  command line of the slave program
+!> \param      bridgeToSet   type bridge to allocate in a world
+!> \param      slaveSize     index to chose the world in which the bridge is allocated
+!> \param      slaveCommand  command line of the slave program
 !
-!> @return     bridgeToSet
+!> \return     bridgeToSet
 subroutine createMPIWorldsMaster (bridgeToSet, slaveSize, slaveCommand)
 
 
@@ -223,4 +223,4 @@ integer                                  :: ierr                   ! MPI communi
 
 end subroutine getMinMaxCommonWorldRanks
 
-end module module_bridge
+end module

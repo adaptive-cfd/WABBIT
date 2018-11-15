@@ -39,6 +39,14 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
 
     u = 0.0_rk
 
+    if (params_acm%dim==2 .and. size(u,4)/=3) then
+        call abort(23091801,"ACM: state vector has not the right number of components")
+    endif
+
+    if (params_acm%dim==3 .and. size(u,4)/=4) then
+        call abort(23091801,"ACM: state vector has not the right number of components")
+    endif
+
     select case (params_acm%inicond)
     case("pressure-blob")
         if (params_acm%dim==2) then
@@ -46,14 +54,14 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
             do iy = 1, Bs+2*g
                 do ix = 1, Bs+2*g
                     ! compute x,y coordinates from spacing and origin
-                    x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%Lx/2.0_rk
-                    y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%Ly/2.0_rk
+                    x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0_rk
+                    y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk
 
-                    if (x<-params_acm%Lx/2.0) x = x + params_acm%Lx
-                    if (x>params_acm%Lx/2.0) x = x - params_acm%Lx
+                    if (x<-params_acm%domain_size(1)/2.0) x = x + params_acm%domain_size(1)
+                    if (x>params_acm%domain_size(1)/2.0) x = x - params_acm%domain_size(1)
 
-                    if (y<-params_acm%Ly/2.0) y = y + params_acm%Ly
-                    if (y>params_acm%Ly/2.0) y = y - params_acm%Ly
+                    if (y<-params_acm%domain_size(2)/2.0) y = y + params_acm%domain_size(2)
+                    if (y>params_acm%domain_size(2)/2.0) y = y - params_acm%domain_size(2)
 
                     ! set actual inicond gauss blob
                     ! here only for the pressure.
@@ -66,18 +74,18 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
                 do iy = 1, Bs+2*g
                     do ix = 1, Bs+2*g
                         ! compute x,y coordinates from spacing and origin
-                        x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%Lx/2.0_rk
-                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%Ly/2.0_rk
-                        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%Lz/2.0_rk
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0_rk
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk
+                        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%domain_size(3)/2.0_rk
 
-                        if (x<-params_acm%Lx/2.0) x = x + params_acm%Lx
-                        if (x>params_acm%Lx/2.0) x = x - params_acm%Lx
+                        if (x<-params_acm%domain_size(1)/2.0) x = x + params_acm%domain_size(1)
+                        if (x>params_acm%domain_size(1)/2.0) x = x - params_acm%domain_size(1)
 
-                        if (y<-params_acm%Ly/2.0) y = y + params_acm%Ly
-                        if (y>params_acm%Ly/2.0) y = y - params_acm%Ly
+                        if (y<-params_acm%domain_size(2)/2.0) y = y + params_acm%domain_size(2)
+                        if (y>params_acm%domain_size(2)/2.0) y = y - params_acm%domain_size(2)
 
-                        if (z<-params_acm%Lz/2.0) z = z + params_acm%Lz
-                        if (z>params_acm%Lz/2.0) z = z - params_acm%Lz
+                        if (z<-params_acm%domain_size(3)/2.0) z = z + params_acm%domain_size(3)
+                        if (z>params_acm%domain_size(3)/2.0) z = z - params_acm%domain_size(3)
 
                         ! set actual inicond gauss blob
                         u(ix,iy,iz,size(u,4)) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_acm%beta )
@@ -98,8 +106,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
                 do ix= 1, Bs+2*g
                     x = x0(1) + dble(ix-g-1)*dx(1)
                     y = x0(2) + dble(iy-g-1)*dx(2)
-                    u(ix,iy,1,1) = sin( 2.0_rk*pi*x/params_acm%Lx ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%Lx )
-                    u(ix,iy,1,2) = cos( 2.0_rk*pi*y/params_acm%Ly )*sin( 2.0_rk*pi*x/params_acm%Lx )
+                    u(ix,iy,1,1) = sin( 2.0_rk*pi*x/params_acm%domain_size(1) ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%domain_size(1) )
+                    u(ix,iy,1,2) = cos( 2.0_rk*pi*y/params_acm%domain_size(2) )*sin( 2.0_rk*pi*x/params_acm%domain_size(1) )
                 enddo
             enddo
         else
@@ -110,9 +118,9 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
                         y = x0(2) + dble(iy-g-1)*dx(2)
                         z = x0(3) + dble(iz-g-1)*dx(3)
 
-                        u(ix,iy,iz,1) = sin( 2.0_rk*pi*x/params_acm%Lx ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%Lx )
-                        u(ix,iy,iz,2) = cos( 2.0_rk*pi*y/params_acm%Ly )*sin( 2.0_rk*pi*x/params_acm%Lx )*sin( 2.0_rk*pi*z/params_acm%Lz )
-                        u(ix,iy,iz,3) = cos( 2.0_rk*pi*y/params_acm%Ly )*sin( 3.0_rk*pi*x/params_acm%Lx )*cos( 2.0_rk*pi*z/params_acm%Lz )
+                        u(ix,iy,iz,1) = sin( 2.0_rk*pi*x/params_acm%domain_size(1) ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%domain_size(1) )
+                        u(ix,iy,iz,2) = cos( 2.0_rk*pi*y/params_acm%domain_size(2) )*sin( 2.0_rk*pi*x/params_acm%domain_size(1) )*sin( 2.0_rk*pi*z/params_acm%domain_size(3) )
+                        u(ix,iy,iz,3) = cos( 2.0_rk*pi*y/params_acm%domain_size(2) )*sin( 3.0_rk*pi*x/params_acm%domain_size(1) )*cos( 2.0_rk*pi*z/params_acm%domain_size(3) )
                     enddo
                 enddo
             enddo
@@ -125,8 +133,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
                 x = x0(1) + dble(ix-g-1)*dx(1)
                 y = x0(2) + dble(iy-g-1)*dx(2)
 
-                call continue_periodic(x,params_acm%Lx)
-                call continue_periodic(y,params_acm%Ly)
+                call continue_periodic(x,params_acm%domain_size(1))
+                call continue_periodic(y,params_acm%domain_size(2))
 
                 u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
                 u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)

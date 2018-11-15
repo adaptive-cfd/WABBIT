@@ -34,7 +34,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    !> heavy work data array (expected to hold the VORTICITY if threhsolding is applied to vorticity)
+    !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
     !> block spacing and origin
     real(kind=rk), intent(in)           :: dx(1:3), x0(1:3)
@@ -46,20 +46,20 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     !> output is the refinement_status
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(inout)        :: norm(1:params%number_data_fields)
+    real(kind=rk), intent(inout)        :: norm(1:params%n_eqn)
 
     ! local variables
     integer(kind=ik) :: k, Jmax, d, j, hvy_id, Bs, g
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r
-    logical :: thresholding_component(1:params%number_data_fields)
+    logical :: thresholding_component(1:params%n_eqn)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
     Jmax = params%max_treelevel
-    Bs = params%number_block_nodes
-    g = params%number_ghost_nodes
+    Bs = params%Bs
+    g = params%n_ghosts
 
 
 !---------------------------------------------------------------------------------------------

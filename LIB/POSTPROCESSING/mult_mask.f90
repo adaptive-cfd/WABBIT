@@ -18,7 +18,7 @@ subroutine mult_mask(params)
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
-    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -69,11 +69,11 @@ subroutine mult_mask(params)
     end if
 
     params%max_treelevel = tc_length
-    params%number_data_fields = 2
+    params%n_eqn = 2
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%number_block_nodes = Bs
+    params%Bs = Bs
 
     allocate(params%butcher_tableau(1,1))
 

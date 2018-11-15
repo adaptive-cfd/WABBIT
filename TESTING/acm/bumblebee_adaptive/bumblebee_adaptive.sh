@@ -17,7 +17,7 @@ times=(000000000000 000000050000)
 
 # run actual test
 cp $dir/bumblebee_new_kinematics.ini .
-${mpi_command} ./wabbit ${params} --memory=5GB ${ghosts}
+${mpi_command} ./wabbit ${params} ${memory}
 rm bumblebee_new_kinematics.ini
 
 echo "============================"

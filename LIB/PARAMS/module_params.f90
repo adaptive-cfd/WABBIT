@@ -40,11 +40,14 @@ module module_params
         ! maximal time for main time loop
         real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
-        real(kind=rk)                                :: CFL=0.0_rk
+        real(kind=rk)                                :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
+        character(len=80)                            :: time_step_method="RungeKuttaGeneric"
+        character(len=80)                            :: krylov_subspace_dimension="fixed"
         ! dt
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
+        integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1
         ! data writing frequency
         integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
         ! data writing frequency
@@ -72,16 +75,14 @@ module module_params
         character(len=80)                            :: order_discretization=""
         character(len=80)                            :: coarsening_indicator="threshold-state-vector"
         logical, allocatable                         :: threshold_state_vector_component(:)
-        ! boundary condition
-        character(len=80)                            :: boundary_cond=""
-        ! initial condition
-        character(len=80)                            :: initial_cond=""
+        ! deside if WABBIT should start from input files
+        logical                                       :: read_from_files
         ! files we want to read for inital cond.
         character(len=80), dimension(:), allocatable :: input_files
 
         ! grid parameter
-        integer(kind=ik)                             :: number_block_nodes=0
-        integer(kind=ik)                             :: number_ghost_nodes=0
+        integer(kind=ik)                             :: Bs=0        ! number of block nodes
+        integer(kind=ik)                             :: n_ghosts=0 ! number of ghost nodes
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
@@ -89,14 +90,14 @@ module module_params
         integer(kind=ik)                             :: number_blocks=0_ik
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
-        integer(kind=ik)                             :: number_data_fields=0_ik
+        integer(kind=ik)                             :: n_eqn=0_ik
         integer(kind=ik)                             :: number_fields=0
 
         ! block distribution for load balancing (also used for start distribution)
         character(len=80)                            :: block_distribution=""
 
         ! debug flag
-        logical                                      :: debug=.false.
+        logical                                      :: debug=.false., write_individual_timings=.true.
 
         ! -------------------------------------------------------------------------------------
         ! physics
@@ -175,9 +176,9 @@ module module_params
         logical                                     :: save_filter_strength
 
         ! -------------------------------------------------------------------------------------
-        ! different BC can be assigned to each block
+        ! Boundary conditions
         ! -------------------------------------------------------------------------------------
-        logical                                     :: periodic_BC=.true.
+        logical,dimension(3)                        :: periodic_BC = .true.
 
     end type type_params
 

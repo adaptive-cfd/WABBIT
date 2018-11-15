@@ -27,7 +27,7 @@ module module_ini_files_parser
   ! maximum width of parameter file. note we have very long lines if we read long
   ! arrays, as it happens for example when we read fourier coefficients for insect
   ! kinematics
-  integer, parameter :: maxcolumns=4096
+  integer, parameter :: maxcolumns=16834
 
   ! is set to true, we'll produce some output on the screen (for documentation of runs)
   ! the flag is set with the read_ini_file routine
@@ -48,7 +48,8 @@ module module_ini_files_parser
   ! the generic call "read_param" redirects to these routines, depending on the data
   ! type and the dimensionality. vectors can be read without setting a default.
   interface read_param
-    module procedure param_sgl, param_dbl, param_int, param_vct, param_str, param_bool, param_matrix, param_vct_str
+    module procedure param_sgl, param_dbl, param_int, param_vct, param_str, &
+                     param_bool, param_matrix, param_vct_str,param_vct_bool
   end interface
 
 
@@ -651,6 +652,77 @@ end subroutine read_intarray_from_ascii_file
       write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
     endif
   end subroutine param_bool
+
+
+
+    !-------------------------------------------------------------------------------
+    ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
+    ! Displays what it does on stdout (so you can see whats going on)
+    ! Input:
+    !       PARAMS: the complete *.ini file
+    !       section: the section we're looking for
+    !       keyword: the keyword we're looking for
+    !       defaultvalue: if the we can't find a vector, we return this and warn
+    !       n: length of vector
+    ! Output:
+    !       params_vector: this is the parameter you were looking for
+    !-------------------------------------------------------------------------------
+    subroutine param_vct_bool (PARAMS, section, keyword, params_vector, defaultvalue)
+      implicit none
+      ! Contains the ascii-params file
+      type(inifile), intent(inout) :: PARAMS
+      character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+      character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+      logical, intent(in) :: defaultvalue(1:)
+      logical :: params_vector(1:)
+
+      integer :: n,m,i,index
+      character(len=maxcolumns) :: keyvalues,value
+      character(len=14)::formatstring
+
+      n = size(params_vector,1)
+      ! empty vector??
+      if (n==0) return
+
+      m = size(defaultvalue,1)
+      if (n/=m) then
+        write(*,*) "error: vector and default value are not of the same length"
+      endif
+
+      write(formatstring,'("(",i2.2,"(L1,1x))")') n
+
+      call GetValue(PARAMS, section, keyword, keyvalues)
+
+      if (keyvalues .ne. '') then
+            do i = 1, n
+              ! We split every value from the keyvalues string searching for
+              ! the delimiter between each keyvalue  (a blank space)
+              keyvalues=trim(keyvalues)
+              ! Find the index of the delimeter
+              index = SCAN(keyvalues,' ')
+              ! split the value from the key values
+              value = keyvalues(1:index-1)
+              keyvalues = keyvalues(index+1:)
+
+              select case (value)
+              case ("yes","1","true",".true.")
+                params_vector(i) = .true.
+              case ("no","0","false",".false.")
+                params_vector(i) = .false.
+              end select
+            end do
+            write (value,formatstring) params_vector
+      else
+              write (value,formatstring) defaultvalue
+              value = trim(value)//" (default!)"
+              params_vector = defaultvalue
+      endif
+
+      ! in verbose mode, inform about what we did
+      if (verbosity) then
+        write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+      endif
+    end subroutine param_vct_bool
 
 
   !-------------------------------------------------------------------------------

@@ -25,8 +25,9 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,&
-              STATISTICS_meta,FILTER_meta
+    PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
+              INICOND_meta, FIELD_NAMES_meta,&
+              STATISTICS_meta, FILTER_meta
     !**********************************************************************************************
 
 contains
@@ -35,7 +36,7 @@ contains
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
  !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
  !> the parameter struct for wabbit is not available.
- subroutine READ_PARAMETERS( physics, filename )
+ subroutine READ_PARAMETERS_meta( physics, filename )
    implicit none
    character(len=*), intent(in) :: physics
    character(len=*), intent(in) :: filename
@@ -55,7 +56,7 @@ contains
 
    end select
 
- end subroutine READ_PARAMETERS
+ end subroutine
 
 
  !-----------------------------------------------------------------------------
@@ -69,7 +70,7 @@ contains
  ! NOTE that as we have way more work arrays than actual state variables (typically
  ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
  !-----------------------------------------------------------------------------
- subroutine PREPARE_SAVE_DATA( physics, time, u, g, x0, dx, work )
+ subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work )
    implicit none
    character(len=*), intent(in) :: physics
 
@@ -117,7 +118,7 @@ contains
  ! the main routine save_fields has to know how you label the stuff you want to
  ! store from the work array, and this routine returns those strings
  !-----------------------------------------------------------------------------
- subroutine FIELD_NAMES( physics, N, name )
+ subroutine FIELD_NAMES_meta( physics, N, name )
    implicit none
    character(len=*), intent(in) :: physics
    ! component index
@@ -140,12 +141,12 @@ contains
 
    end select
 
- end subroutine FIELD_NAMES
+end subroutine FIELD_NAMES_meta
 
 
  !-----------------------------------------------------------------------------
  ! main level wrapper to set the right hand side on a block. Note this is completely
- ! independent of the grid any an MPI formalism, neighboring relations and the like.
+ ! independent of the grid and any MPI formalism, neighboring relations and the like.
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
@@ -193,7 +194,7 @@ contains
      call RHS_ACM( time, u, g, x0, dx,  rhs, stage )
 
    case ("ConvDiff-new")
-     call RHS_convdiff( time, u, g, x0, dx, rhs, stage )
+     call RHS_convdiff( time, u, g, x0, dx, rhs, stage,boundary_flag )
 
    case ("navier_stokes")
      call RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
@@ -212,13 +213,13 @@ contains
  ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
  ! on individual blocks. This requires one to use the same staging concept as for the RHS.
  !-----------------------------------------------------------------------------
- subroutine STATISTICS_meta( physics, time, u, g, x0, dx, rhs, stage )
+ subroutine STATISTICS_meta( physics, time, dt, u, g, x0, dx, rhs, stage )
    implicit none
 
    character(len=*), intent(in) :: physics
    ! it may happen that some source terms have an explicit time-dependency
    ! therefore the general call has to pass time
-   real(kind=rk), intent (in) :: time
+   real(kind=rk), intent (in) :: time, dt
 
    ! block data, containg the state vector. In general a 4D field (3 dims+components)
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
@@ -241,7 +242,7 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx, stage, rhs )
+     call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
@@ -262,7 +263,7 @@ contains
  ! condition, sometimes not. So each physic module must be able to decide on its
  ! time step. This routine is called for all blocks, the smallest returned dt is used.
  !-----------------------------------------------------------------------------
- subroutine GET_DT_BLOCK( physics, time, u, Bs, g, x0, dx, dt )
+ subroutine GET_DT_BLOCK_meta( physics, time, u, Bs, g, x0, dx, dt )
    implicit none
    character(len=*), intent(in) :: physics
    ! it may happen that some source terms have an explicit time-dependency
@@ -302,7 +303,7 @@ contains
 
    end select
 
- end subroutine GET_DT_BLOCK
+ end subroutine
 
 
  !-----------------------------------------------------------------------------
@@ -356,8 +357,12 @@ contains
 
  !-----------------------------------------------------------------------------
  ! wrapper for filter u -> u_tilde
+ ! Note this function is completely
+ ! independent of the grid and any MPI formalism, neighboring relations and the like.
+ ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
+ ! Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine FILTER_meta( physics, time, u, g, x0, dx, work_array)
+ subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array)
    implicit none
    !> physics type
    character(len=*), intent(in) :: physics
@@ -381,16 +386,16 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     !call filter_ACM( time, u, g, x0, dx,  work_array)
+     call filter_ACM( time, u, g, x0, dx,  work_array)
 
    case ("ConvDiff-new")
-     !call filter_convdiff( time, u, g, x0, dx, work_array)
+     call abort(1009181817, "filter not implemented for convection-diffusion.")
 
    case ("navier_stokes")
      call filter_NStokes( time, u, g, x0, dx, work_array)
 
    case default
-     call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown"//physics)
+     call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown "//trim(adjustl(physics)))
 
    end select
 

@@ -45,12 +45,12 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(inout)        :: norm(1:params%number_data_fields)
+    real(kind=rk), intent(inout)        :: norm(1:params%n_eqn)
 
     ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
     ! detail
-    real(kind=rk)                       :: detail(1:params%number_data_fields)
+    real(kind=rk)                       :: detail(1:params%n_eqn)
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
@@ -63,15 +63,15 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     ! start time
     t0 = MPI_Wtime()
     ! grid parameter
-    Bs = params%number_block_nodes
-    g  = params%number_ghost_nodes
+    Bs = params%Bs
+    g  = params%n_ghosts
 
 
     ! reset detail
     detail = 0.0_rk
 
     ! loop over all datafields
-    do dF = 1, params%number_data_fields
+    do dF = 1, params%n_eqn
         ! is this component of the block used for thresholding or not?
         if (thresholding_component(dF)) then
             if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero

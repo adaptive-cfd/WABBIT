@@ -57,9 +57,9 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi)
 ! variables initialization
 
     ! set parameters for readability
-    Bs              = params%number_block_nodes
-    g               = params%number_ghost_nodes
-    dF              = params%number_data_fields
+    Bs              = params%Bs
+    g               = params%n_ghosts
+    dF              = params%n_eqn
 
 !---------------------------------------------------------------------------------------------
 ! main body

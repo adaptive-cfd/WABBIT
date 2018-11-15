@@ -16,14 +16,118 @@
 !> \version 10/11/16 - switch to v0.4
 !! \version 12/17 - new convection diffusion module (new physics structure)
 ! ********************************************************************************************
-subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
 
-    !---------------------------------------------------------------------------------------------
-    ! modules
 
-    ! global parameters
-    ! use module_params
-    ! use module_operators
+  !-----------------------------------------------------------------------------
+  ! main level wrapper to set the right hand side on a block. Note this is completely
+  ! independent of the grid and any MPI formalism, neighboring relations and the like.
+  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
+  ! from that. Ghost nodes are assumed to be sync'ed.
+  !-----------------------------------------------------------------------------
+  subroutine RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag  )
+    implicit none
+
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+
+    ! block data, containg the state vector. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+    ! as you are allowed to compute the RHS only in the interior of the field
+    ! you also need to know where 'interior' starts: so we pass the number of ghost points
+    integer, intent(in) :: g
+
+    ! for each block, you'll need to know where it lies in physical space. The first
+    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+    ! output. Note assumed-shape arrays
+    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
+
+    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
+    ! terms that depend on global qtys, such as forces etc, which cannot be computed
+    ! from a single block alone, the first stage does that. the second stage can then
+    ! use these integral qtys for the actual RHS evaluation.
+    character(len=*), intent(in) :: stage
+
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=2), intent(in):: boundary_flag(3)
+
+    ! local variables
+    integer(kind=ik) :: Bs, mpierr
+    real(kind=rk) :: tmp(1:3)
+
+    ! compute the size of blocks
+    Bs = size(u,1) - 2*g
+
+    select case(stage)
+    case ("init_stage")
+      !-------------------------------------------------------------------------
+      ! 1st stage: init_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, not for each block.
+      ! performs initializations in the RHS module, such as resetting integrals
+
+      return
+
+    case ("integral_stage")
+      !-------------------------------------------------------------------------
+      ! 2nd stage: init_stage.
+      !-------------------------------------------------------------------------
+      ! For some RHS, the eqn depend not only on local, block based qtys, such as
+      ! the state vector, but also on the entire grid, for example to compute a
+      ! global forcing term (e.g. in FSI the forces on bodies). As the physics
+      ! modules cannot see the grid, (they only see blocks), in order to encapsulate
+      ! them nicer, two RHS stages have to be defined: integral / local stage.
+      !
+      ! called for each block.
+
+      return
+
+    case ("post_stage")
+      !-------------------------------------------------------------------------
+      ! 3rd stage: post_stage.
+      !-------------------------------------------------------------------------
+      ! this stage is called only once, not for each block.
+
+      return
+
+    case ("local_stage")
+      !-------------------------------------------------------------------------
+      ! 4th stage: local evaluation of RHS on all blocks
+      !-------------------------------------------------------------------------
+      ! the second stage then is what you would usually do: evaluate local differential
+      ! operators etc.
+      !
+      ! called for each block.
+
+      call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs, boundary_flag)
+
+
+    case default
+      call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
+    end select
+
+
+  end subroutine RHS_convdiff
+
+
+
+
+
+
+
+!> Actual implementation of the 2d/3d convdiff RHS
+subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
     implicit none
 
@@ -34,15 +138,24 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
     !> origin and spacing of the block
     real(kind=rk), intent(in)                      :: x0(:), dx(:)
     !> datafields
-    real(kind=rk), intent(in)                      :: phi(:,:,:,:)
+    real(kind=rk), intent(inout)                      :: phi(:,:,:,:)
     real(kind=rk), intent(inout)                   :: rhs(:,:,:,:)
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=2), intent(in):: boundary_flag(3)
 
     ! real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:2)
     real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu
     real(kind=rk) :: u_dx, u_dy, u_dz
     real(kind=rk) :: u_dxdx, u_dydy, u_dzdz
-    real(kind=rk) :: xcb, ycb, beta, x,y, sech
+    real(kind=rk) :: xcb, ycb, beta, x,y, sech,bc
     ! loop variables
     integer(kind=ik) :: ix, iy, iz, i, N, ia1, ia2, ib1, ib2, ia, ib
     ! coefficients for Tam&Webb
@@ -72,9 +185,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
 
+
     ! looop over components - they are independent scalars
     do i = 1, N
-        if (maxval(phi(:,:,:,i))>20.0_rk) call abort(666,"large values in phi. that cannot be good.")
 
         ! because p%nu might load the entire params in the cache and thus be slower:
         nu = params_convdiff%nu(i)
@@ -86,6 +199,10 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
             ! create the advection velocity field, which may be time and space dependent
             u0 = 0.0_rk
             call create_velocity_field_2D( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
+            ! sets the ghost node layer of the boundary blocks according to the specified BC
+            if (.not. ALL(boundary_flag(:)==0)) then
+              call compute_boundary_2D( time, g, Bs, dx, x0, phi(:,:,1,:), u0(:,:,1,1:2), i, boundary_flag)
+            endif
 
             select case(params_convdiff%discretization)
             case("FD_2nd_central")
@@ -111,11 +228,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
                         do ix = g+1, Bs+g
                             u_dx = (phi(ix+1,iy,1,i)-phi(ix-1,iy,1,i))*dx_inv*0.5_rk
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
-
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy
                         end do
                     end do
-
                 endif
             case("FD_4th_central_optimized")
                 !-----------------------------------------------------------------------
@@ -265,7 +380,10 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs)
                 call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
             end select
         endif
+
+        if (maxval(phi(:,:,:,i))>20.0_rk) call abort(666,"large values in phi. that cannot be good.")
     end do
+
 
 end subroutine RHS_convdiff_new
 
@@ -287,8 +405,8 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
     u0 = 0.0_rk
 
 
-    c0x = 0.5_rk*params_convdiff%Lx
-    c0y = 0.5_rk*params_convdiff%Ly
+    c0x = 0.5_rk*params_convdiff%domain_size(1)
+    c0y = 0.5_rk*params_convdiff%domain_size(2)
     T = params_convdiff%T_swirl
 
 
@@ -367,4 +485,87 @@ subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
     case default
         call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')
     end select
+end subroutine
+
+
+!> This function computes the boundary values for the ghost node layer of the
+!> boundary blocks
+subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
+    implicit none
+    real(kind=rk), intent(in) :: time
+    integer(kind=ik), intent(in) :: g, Bs,i
+    real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
+    !> datafields, and velocity field
+    real(kind=rk), intent(inout) :: phi(:,:,:), u0(:,:,:)
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    integer(kind=2), intent(in):: boundary_flag(3)
+
+    integer(kind=ik) :: ix,iy
+    real(kind=rk)   :: phi_boundary(4,Bs+2*g)
+
+  !##################################################
+  ! compute the boundary values
+  !##################################################
+  select case(params_convdiff%boundary_type)
+  case("constant-inflow")
+    if ( params_convdiff%velocity(i) == "constant" ) then
+      ! Boundary conditions for outflow extrapolation
+      phi_boundary(1,:)=phi(g+1,:,i)
+      phi_boundary(2,:)=phi(Bs+g,:,i)
+      if (params_convdiff%u0x(i)>0) then
+          phi_boundary(1,:)=params_convdiff%phi_boundary(i)
+      else
+          phi_boundary(2,:)=params_convdiff%phi_boundary(i)
+      endif
+      ! Boundary conditions for outflow extrapolation
+      phi_boundary(3,:)=phi(:,g+1,i)
+      phi_boundary(4,:)=phi(:,Bs+g,i)
+      if (params_convdiff%u0y(i)>0) then
+          phi_boundary(3,:)=params_convdiff%phi_boundary(i)
+      else
+          phi_boundary(4,:)=params_convdiff%phi_boundary(i)
+      endif
+    else
+      call abort(81020182,"no boundary conditions for velocity field: "// params_convdiff%velocity(i))
+    end if
+
+  case default
+    call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_convdiff%boundary_type)
+  end select
+
+
+  !##################################################
+  ! set the actual BC
+  !##################################################
+  if (boundary_flag(1) .ne. 0) then
+    if (boundary_flag(1)==-1) then
+      ! loop over the boundary layer
+      do ix = 1, g
+        phi(ix,:,i)= phi_boundary(1,:)
+      end do
+    else ! (boundary_flag(1)==1)
+      do ix = 1, g
+        phi(Bs+g+ix,:,i)= phi_boundary(2,:)
+      end do
+     endif
+  endif
+
+  if (boundary_flag(2) .ne. 0) then
+    if (boundary_flag(2)==-1) then
+      do iy = 1, g
+        phi(:,iy,i)= phi_boundary(3,:)
+      end do
+    else ! (boundary_flag(2)==1)
+      do iy = Bs+g+1, Bs+2*g
+        phi(:,iy,i)= phi_boundary(4,:)
+      end do
+    endif
+  endif
+
 end subroutine

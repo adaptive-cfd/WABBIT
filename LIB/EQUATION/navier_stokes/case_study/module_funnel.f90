@@ -2,22 +2,7 @@
 !-----------------------------------------------------------------
 !> \file
 !> \brief
-!! Module for volume penaliza \f$\chi(x,t)\f$
-!> \details
-!> This module implements the mask function on each Block
-!!          \f[
-!!                           \chi(x,t)\quad \forall\;  x\in\mathcal{–}^l
-!!            \f]
-!!                        for Volume penalization
-!> To increase peformance there are certain tasks:
-!> \todo
-!>       + include update flag: block_updated
-!>                - if true the mask needs to be computed again
-!>                - if false the grid has not changed on the proc rank and the mask function stays
-!!                  the same
-!!       + maybe it is better to have a global mask on the finest grid level and coarsen it for
-!!         lower levels on the specific Blocks
-!!
+!! Module of 2D/3D ion funnel
 !> \version 23.2.2018
 !> \author P.Krah
 !-----------------------------------------------------------------
@@ -43,7 +28,8 @@ module module_funnel
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: integrate_over_pump_area,init_funnel,mean_quantity,add_funnel,draw_funnel
+  PUBLIC :: integrate_over_pump_area,read_params_funnel,mean_quantity,draw_funnel, &
+            set_inicond_funnel,funnel_penalization2D,funnel_penalization3D
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
@@ -60,12 +46,12 @@ module module_funnel
 ! identifyers of the different parts of the funnel
 ! they are used in the array mask_color
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  integer(kind=2),save :: color_capillary  =6
-  integer(kind=2),save :: color_outlet     =5
-  integer(kind=2),save :: color_plates     =4
-  integer(kind=2),save :: color_walls      =3
-  integer(kind=2),save :: color_pumps      =2
-  integer(kind=2),save :: color_pumps_sink =1
+  integer(kind=2),parameter :: color_capillary  =6
+  integer(kind=2),parameter :: color_outlet     =5
+  integer(kind=2),parameter :: color_plates     =4
+  integer(kind=2),parameter :: color_walls      =3
+  integer(kind=2),parameter :: color_pumps      =2
+  integer(kind=2),parameter :: color_pumps_sink =1
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -120,55 +106,9 @@ contains
   include 'funnel3D.f90'
 
 
-  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  !> Allocate and compute mask for 2D/3D funnel. The different parts of the mask can be
-  !> colored if the boolean mask_is_colored is true. If the boolean is false then mask returns
-  !> only the mask of the solid objects (like walls and plates)
-    subroutine  draw_funnel(x0, dx, Bs, g, mask, mask_is_colored)
-        implicit none
-        ! -----------------------------------------------------------------
-        integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
-        real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
-        real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
-        logical, optional, intent(in) :: mask_is_colored
-        integer(kind=2),allocatable   :: mask_color(:,:,:)!< identifyers of mask parts (plates etc)
-        logical, save :: is_colored =.false.
-        real(kind=rk), allocatable  :: mask_tmp(:,:,:,:)    !< mask function for the statevector
-        ! -----------------------------------------------------------------
-        if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size!")
-        ! if variable is present the default (false) is overwritten by the input
-        if( present(mask_is_colored)) is_colored=mask_is_colored
-        ! allocate and compute mask and colored mask
-        if (params_ns%dim==3) then
-            if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-            if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g,5))
-            mask_tmp    = 0.0_rk
-            mask_color  = 0
-            call  draw_funnel3D(x0, dx, Bs, g, mask_tmp, mask_color)
-            call  draw_sponge3D(x0,dx,Bs,g,mask_tmp,mask_color)
-        else
-            if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
-            if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1,4))
-            mask_tmp    = 0.0_rk
-            mask_color  = 0
-            call  draw_funnel2D(x0, dx, Bs, g, mask_tmp(:,:,1,:), mask_color(:,:,1))
-        endif
-
-        ! mask coloring is optional, which is mainly used for plotting the different parts
-        ! of the funnel in paraview
-        if (is_colored) then
-          mask(:,:,:)= real(mask_color(:,:,:),kind=rk)
-        else
-          ! if the mask is not colored we use the mask of the solid obstacles
-          mask(:,:,:) = mask_tmp(:,:,:,UxF)
-        endif
-
-    end subroutine draw_funnel
-    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
     !> \brief reads parameters for mask function from file
-    subroutine init_funnel(params,FILE)
+    subroutine read_params_funnel(params,FILE)
 
       implicit none
 
@@ -255,31 +195,97 @@ contains
     end if
   !initialice geometry of ion funnel plates
   call init_plates(funnel)
-end subroutine init_funnel
+end subroutine read_params_funnel
 
 
-  !> This function adds constraints of the funnel geometry
-  subroutine add_funnel( penalization, x0, dx, Bs, g, phi )
-    implicit none
-    !---------------------------------------------------------------
-    integer(kind=ik), intent(in)                     :: Bs, g
-    real(kind=rk), dimension(3), intent(in)          :: x0, dx
-    real(kind=rk), dimension(:,:,:,:), intent(in)    :: phi
-    real(kind=rk), dimension(:,:,:,:), intent(inout) :: penalization
-    !---------------------------------------------------------------
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!> Allocate and compute mask for 2D/3D funnel. The different parts of the mask can be
+!> colored if the boolean mask_is_colored is true. If the boolean is false then mask returns
+!> only the mask of the solid objects (like walls and plates)
+subroutine  draw_funnel(x0, dx, Bs, g, mask, mask_is_colored)
+  implicit none
+  ! -----------------------------------------------------------------
+  integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+  real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
+  real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
+  logical, optional, intent(in) :: mask_is_colored
+  integer(kind=2),allocatable   :: mask_color(:,:,:)!< identifyers of mask parts (plates etc)
+  logical, save :: is_colored =.false.
+  real(kind=rk), allocatable  :: mask_tmp(:,:,:,:)    !< mask function for the statevector
+  ! -----------------------------------------------------------------
+  if (size(mask,1) /= Bs+2*g) call abort(127109,"wrong array size!")
+  ! if variable is present the default (false) is overwritten by the input
+  if( present(mask_is_colored)) is_colored=mask_is_colored
+  ! allocate and compute mask and colored mask
+  if (params_ns%dim==3) then
+    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
+    if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g,5))
+    mask_tmp    = 0.0_rk
+    mask_color  = 0
+    call  draw_funnel3D(x0, dx, Bs, g, mask_tmp, mask_color)
+    call  draw_sponge3D(x0,dx,Bs,g,mask_tmp,mask_color)
+  else
+    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
+    if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1,4))
+    mask_tmp    = 0.0_rk
+    mask_color  = 0
+    ! call  draw_sponge2D(x0,dx,Bs,g,mask_tmp(:,:,1,:), mask_color(:,:,1))
+    call  draw_funnel2D(x0, dx, Bs, g, mask_tmp(:,:,1,:), mask_color(:,:,1))
+  endif
 
-    if (params_ns%dim==3) then
-        call  funnel_penalization3D(penalization, x0, dx, Bs, g ,phi)
-    else
-        call  funnel_penalization2D(penalization(:,:,1,:), x0, dx, Bs, g , phi(:,:,1,:))
-    endif
+  ! mask coloring is optional, which is mainly used for plotting the different parts
+  ! of the funnel in paraview
+  if (is_colored) then
+    mask(:,:,:)= real(mask_color(:,:,:),kind=rk)
+  else
+    ! if the mask is not colored we use the mask of the solid obstacles
+    mask(:,:,:) = mask_tmp(:,:,:,UxF)
+  endif
+
+end subroutine draw_funnel
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-  end subroutine add_funnel
+  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  !> \brief Set the initial condition of a specific case
+  !> \details
+   subroutine set_inicond_funnel(x0, dx, Bs, g, u)
+       implicit none
+       ! -----------------------------------------------------------------
+       integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+       real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
+       real(kind=rk), intent(inout)  :: u(:,:,:,:)    !< Statevector for t=0
+       ! -----------------------------------------------------------------
+       real(kind=rk),allocatable:: mask(:,:,:)
+       real(kind=rk)            :: y_rel,p_init, rho_init,u_init(3),T_init,b
+       integer(kind=ik)         :: iy
 
+       p_init    =params_ns%initial_pressure
+       rho_init  =params_ns%initial_density
+       u_init    =params_ns%initial_velocity
+       T_init    =params_ns%initial_temp
 
-
-
+       allocate(mask(size(u,1), size(u,2), size(u,3)))
+      ! set velocity field u(x)=1 for x in mask
+      ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
+      call draw_funnel(x0, dx, Bs, g, mask)
+      u( :, :, :, pF) = p_init
+      u( :, :, :, rhoF) = sqrt(rho_init)
+      u( :, :, :, UxF) = ( 1 - mask ) * u_init(1)*sqrt(rho_init) !flow in x
+      u( :, :, :, UyF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in y
+      if (params_ns%dim==3) then
+        u( :, :, :, UzF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in z
+      endif
+      ! if ( params_ns%geometry=="funnel" ) then
+      !   do iy=g+1, Bs+g
+      !       !initial y-velocity negative in lower half and positive in upper half
+      !       y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%domain_size(2)*0.5_rk
+      !       b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
+      !       u( :, iy, 1, UyF) = (1-mask(:,iy,1))*b*u_init(2)*sqrt(rho_init)
+      !   enddo
+      ! endif
+    end subroutine set_inicond_funnel
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 

@@ -63,8 +63,8 @@ subroutine mask_post(params)
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case
     params%number_blocks = 4*lgt_n/params%number_procs
-    Bs = params%number_block_nodes
-    g = params%number_ghost_nodes
+    Bs = params%Bs
+    g = params%n_ghosts
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
@@ -91,7 +91,7 @@ subroutine mask_post(params)
     do k = 1, hvy_n
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-        call create_mask_3D( time, x0, dx, params%number_block_nodes, params%number_ghost_nodes, &
+        call create_mask_3D( time, x0, dx, params%Bs, params%n_ghosts, &
         hvy_work(:,:,:,1, hvy_active(k)), us )
     end do
 

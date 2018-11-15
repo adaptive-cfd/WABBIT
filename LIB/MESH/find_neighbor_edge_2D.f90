@@ -164,20 +164,20 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
     ! +++++++++++++++
     ! non periodic B
     ! +++++++++++++++
-    ! is a boundary of the domain in this direction? If yes then please dont comunicate in this direction
-    if ( params%periodic_BC .eqv. .false. ) then
-        if ( block_is_adjacent_to_boundary(dir,my_treecode,neighbor,max_treelevel) ) then
+    ! is a boundary of the domain in this direction? If yes then please dont comunicate
+    ! in this direction
+    if ( .not. All(params%periodic_BC) ) then
+        if ( block_is_adjacent_to_boundary(params,dir,my_treecode,neighbor,level,max_treelevel) ) then
             neighbor_light_id=-1
+            ! write(*,('("my=",2(i1)," neigbor ",2(i1)," dir=",A3)')) my_treecode,neighbor,dir
         endif
     end if
     ! +++++++++++++
 
     if (exists) then
-
         ! neighbor on same level
         ! write neighbor data, 2D: 16 possible neighbor relations
         hvy_neighbor( heavy_id, neighborID_sameLevel ) = neighbor_light_id
-
     else
 
         ! neighbor could be one level down

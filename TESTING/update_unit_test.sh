@@ -70,7 +70,7 @@ ln -s $curdir/../wabbit-post
 ln -s $curdir/create_ref_files.sh
 
 
-$mpi ./wabbit $inifile --memory=5.0GB
+$mpi ./wabbit $inifile ${memory}
 
 ./create_ref_files.sh
 

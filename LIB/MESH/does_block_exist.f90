@@ -49,26 +49,30 @@ subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n
     !> 2nd: binary search. start with the entire interval, then choose either right or left half
     i1 = 1
     i2 = lgt_n
-    ! if were sufficiently close (that means our interval is short)
-    ! we escape the loop and "walk" the remaining distance
-    do while ( abs(i2-i1)<3 )
+
+    ! if the interval is only two entries, check both and return the winner
+    do while ( abs(i2-i1) >= 2 )
         ! cut interval in two parts
         imid = (i1+i2) / 2
-        if (num_treecode < lgt_sortednumlist(imid,2)) then
-            i2 = imid
-        else
+        ! if (num_treecode < lgt_sortednumlist(imid,2)) then
+        if (lgt_sortednumlist(imid,2) < num_treecode) then
             i1 = imid
+        else
+            i2 = imid
         end if
     end do
 
-    ! now we need to check only the values between i1 and i2 and return if we
-    ! found the value.
-    do k = i1, i2
-        if ( num_treecode == lgt_sortednumlist(k,2) .and. lgt_sortednumlist(k,1) > 0) then
-            ! found the block we're looking for
-            exists = .true.
-            light_id = int( lgt_sortednumlist(k,1), kind=ik)
-            return
-        end if
-    end do
+    if ( num_treecode == lgt_sortednumlist(i1,2) .and. lgt_sortednumlist(i1,1) > 0) then
+        ! found the block we're looking for
+        exists = .true.
+        light_id = int( lgt_sortednumlist(i1,1), kind=ik)
+        return
+    end if
+
+    if ( num_treecode == lgt_sortednumlist(i2,2) .and. lgt_sortednumlist(i2,1) > 0) then
+        ! found the block we're looking for
+        exists = .true.
+        light_id = int( lgt_sortednumlist(i2,1), kind=ik)
+        return
+    end if
 end subroutine does_block_exist

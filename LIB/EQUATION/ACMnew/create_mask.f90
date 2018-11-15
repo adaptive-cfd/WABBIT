@@ -134,7 +134,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
            if (params_acm%smooth_mask) then
-               call smoothstep(mask(ix,iy), r, params_acm%R_cyl, h)
+               mask(ix,iy) = smoothstep(r, params_acm%R_cyl, h)
            else
                ! if point is inside the cylinder, set mask to 1
                if (r <= params_acm%R_cyl) then
@@ -184,12 +184,12 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
   ! main body
 
   ! center of the first cylinder
-  cx1 = 0.5884_rk*params_acm%Lx
-  cy1 = 0.4116_rk*params_acm%Ly
+  cx1 = 0.5884_rk*params_acm%domain_size(1)
+  cy1 = 0.4116_rk*params_acm%domain_size(2)
 
   ! center of the second cylinder
-  cx2 = 0.4116_rk*params_acm%Lx
-  cy2 = 0.5884_rk*params_acm%Ly
+  cx2 = 0.4116_rk*params_acm%domain_size(1)
+  cy2 = 0.5884_rk*params_acm%domain_size(2)
 
   ! radius of the cylinders
   R = params_acm%R_cyl
@@ -207,8 +207,8 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
       ! distance from center of cylinder 2
       r_2 = dsqrt(x2*x2 + y2*y2)
       if (params_acm%smooth_mask) then
-        call smoothstep(mask1, r_1, R, h)
-        call smoothstep(mask2, r_2, R, h)
+        mask1 = smoothstep( r_1, R, h)
+        mask2 = smoothstep( r_2, R, h)
         mask(ix,iy) = mask1 + mask2
       else
         ! if point is inside one of the cylinders, set mask to 1

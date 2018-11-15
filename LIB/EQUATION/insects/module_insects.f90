@@ -23,7 +23,7 @@ module module_insects
 
   ! size (global) of domain
   real(kind=rk) :: xl, yl, zl
-  ! viscosity (just for Reynolds number)
+  ! viscosity (just for printing the Reynolds number)
   real(kind=rk) :: nu
 
   ! arrays for fourier coefficients are fixed size (avoiding issues with allocatable
@@ -92,6 +92,10 @@ module module_insects
     real(kind=rk) :: phi_l=0.d0, alpha_l=0.d0, theta_l=0.d0, phi_dt_l=0.d0, alpha_dt_l=0.d0, theta_dt_l=0.d0
     ! stroke plane angle
     real(kind=rk) :: eta_stroke=0.d0
+    ! is the body motion state described be the STATE vector? This is the case if the
+    ! free-flight solver is used, and if its results are read in postprocessing or
+    ! if it used used to prescribe the body motion state from a different simulation
+    logical :: quaternion_solver_used = .false.
     ! angular velocity vectors (wings L+R, body)
     real(kind=rk), dimension(1:3) :: rot_body_b=0.d0, rot_body_g=0.d0
     real(kind=rk), dimension(1:3) :: rot_rel_wing_l_w=0.d0, rot_rel_wing_r_w=0.d0
@@ -172,6 +176,7 @@ module module_insects
     character(len=strlen) :: wing_thickness_distribution = "constant"
     character(len=strlen) :: pointcloudfile = "none"
     logical :: corrugated = .false.
+    real(kind=rk) :: corrugation_array_bbox(1:4)
 
     !--------------------------------------------------------------
     ! Wing kinematics
@@ -440,10 +445,19 @@ contains
   ! thickness (i.e., in the limit, steps=1 if x<t and steps=0 if x>t
   !-------------------------------------------------------
   real(kind=rk) function steps(x, t, h)
-     implicit none
-    real(kind=rk) :: f,x,t, h
-    call smoothstep(f,x,t,h)
-    steps=f
+      implicit none
+      real(kind=rk) :: x, t, h
+      ! f is 1 if x<=t-h
+      ! f is 0 if x>t+h
+      ! f is variable (smooth) in between
+      if (x<=t-h) then
+          steps = 1.d0
+      elseif (((t-h)<x).and.(x<(t+h))) then
+          steps = 0.5d0*(1.d0+dcos((x-t+h)*pi/(2.d0*h)) )
+      else
+          steps = 0.d0
+      endif
+
   end function
 
 
@@ -641,10 +655,11 @@ contains
     beta_dt = Insect%beta_dt
     gamma_dt = Insect%gamma_dt
 
-    if ( Insect%BodyMotion == "free_flight" ) then
+    if ( Insect%quaternion_solver_used ) then
       ! variant (a)
       rot_body_b = Insect%rot_body_b ! copy (useless, actually, but required for interface)
       rot_body_g = matmul( transpose(M_body), rot_body_b)
+
     else
       ! variant (b)
       ! in global frame
@@ -917,9 +932,10 @@ contains
     real(kind=rk),intent(out) :: M_body(1:3,1:3)
     real(kind=rk), dimension(1:3,1:3) :: M1_b, M2_b, M3_b
 
-    if (Insect%BodyMotion=="free_flight") then
+    if (Insect%quaternion_solver_used) then
       ! entries 7,8,9,10 of the Insect%STATE vector are the body quaternion
       call rotation_matrix_from_quaternion( Insect%STATE(7:10), M_body)
+
     else
       ! conventional yaw, pitch, roll. Note the order of matrices is important.
       ! first we yaw, then we pitch, then we roll the insect. Note that when the
@@ -1060,38 +1076,42 @@ contains
   ! and from this the body orientation, rotation matrix, etc can be computed. So here we read this file
   ! and return Insect%STATE at the desired time (linear interpolation is used)
   !-----------------------------------------------------------------------------
-  subroutine read_insect_STATE_from_file(time, Insect)
-    implicit none
-    real(kind=rk), intent(in) :: time
-    type(diptera),intent(inout) :: Insect
-    integer :: num_lines, n_header = 1, i
-    character(len=maxcolumns) :: dummy
-    real(kind=rk), allocatable, save :: data1(:,:)
+  subroutine read_insect_STATE_from_file(time, Insect, fname, verbose)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      type(diptera), intent(inout) :: Insect
+      character(len=*), intent(in) :: fname
+      logical, intent(in) :: verbose
 
-    if ( .not. allocated(data1) ) then
-      ! read rigidsolidsolver.t file
-      ! skip header, count lines, read
-      call count_lines_in_ascii_file_mpi('rigidsolidsolver.t', num_lines, n_header)
-      ! read contents of file
-      allocate( data1(1:num_lines,1:14))
-      call read_array_from_ascii_file_mpi('rigidsolidsolver.t', data1 , n_header)
-    endif
+      integer :: num_lines, n_header = 1, i
+      character(len=maxcolumns) :: dummy
+      real(kind=rk), allocatable, save :: data1(:,:)
 
-    ! interpolate in time
-    i = 1
-    do while (data1(i,1) <= time .and. i<size(data1,1)-1)
-      i=i+1
-    enddo
-    ! we now have data1(i-1,1) <= time < data1(i,1)
-    ! use linear interpolation
-    Insect%STATE = 0.d0
-    Insect%STATE(1:13) = data1(i-1,2:14) + (time - data1(i-1,1)) * (data1(i,2:14)-data1(i-1,2:14)) / (data1(i,1)-data1(i-1,1))
+      if ( .not. allocated(data1) ) then
+          if (root) write(*,*) "read_insect_STATE_from_file:", trim(adjustl(fname))
+          ! read rigidsolidsolver.t file
+          ! skip header, count lines, read
+          call count_lines_in_ascii_file_mpi(fname, num_lines, n_header)
+          ! read contents of file
+          allocate( data1(1:num_lines,1:14))
+          call read_array_from_ascii_file_mpi(fname, data1 , n_header)
+      endif
 
-    if (root) then
-        write(*,*) "The extracted Insect%STATE vector is:"
-        write(*,'(21(es12.4,1x))') time, Insect%STATE(1:13)
-    endif
-    ! deallocate (data)
+      ! interpolate in time
+      i = 1
+      do while (data1(i,1) <= time .and. i<size(data1,1)-1)
+          i=i+1
+      enddo
+
+      ! we now have data1(i-1,1) <= time < data1(i,1)
+      ! use linear interpolation
+      Insect%STATE = 0.d0
+      Insect%STATE(1:13) = data1(i-1,2:14) + (time - data1(i-1,1)) * (data1(i,2:14)-data1(i-1,2:14)) / (data1(i,1)-data1(i-1,1))
+
+      if (root .and. verbose) then
+          write(*,*) "The extracted Insect%STATE vector is:"
+          write(*,'(21(es12.4,1x))') time, Insect%STATE(1:13)
+      endif
   end subroutine
 
 

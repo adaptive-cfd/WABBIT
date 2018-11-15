@@ -69,22 +69,27 @@ subroutine ini_file_to_params( params, filename )
     !**************************************************************************
     ! read INITIAL CONDITION parameters
 
-    ! initial condition. NOTE: nowadays, there is only two distinct ones: read_from_files
-    ! which, well, reads some files. This is the same for all physics modules. The only
-    ! other initial condition is "physics-module", which means the modules decide what inicond
-    ! is set.
+    ! which physics module is used? (note that the initialization of different parameters takes
+    ! place in those modules, i.e., they are not read here.)
+    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
 
-    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "---" )
-    ! saving options.
-    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
+    ! if the initial condition is read from file, it is handled by wabbit itself, i.e. not
+    ! by the physics modules. the pyhsics modules cannot do this, because they just see 'blocks'
+    ! and never the entire grid as such.
+    call read_param_mpi(FILE, 'Physics', 'read_from_files', params%read_from_files, .false. )
 
-    if (params%initial_cond == 'read_from_files') then
+    if (params%read_from_files ) then
         ! read variable names
-        allocate( params%input_files( params%number_data_fields ) )
+        allocate( params%input_files( params%n_eqn ) )
 
         params%input_files = "---"
         call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
     end if
+
+    ! wabbit does need to know how many fiels are written to disk when saving is triggered.
+    ! e.g. saving ux, uy and p would mean 3. The names of these files as well as their contents
+    ! are defined by the physics modules.
+    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
 
     !***************************************************************************
     ! read DISCRETIZATION parameters
@@ -93,9 +98,6 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
     ! order of predictor for refinement
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
-    ! boundary condition
-    call read_param_mpi(FILE, 'Discretization', 'boundary_cond', params%boundary_cond, "---" )
-
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
     if (params%filter_type /= "no_filter") then
@@ -117,6 +119,7 @@ subroutine ini_file_to_params( params, filename )
     !
     ! debug flag
     call read_param_mpi(FILE, 'Debug', 'debug', params%debug, .true. )
+    call read_param_mpi(FILE, 'Debug', 'write_individual_timings', params%write_individual_timings, .false. )
     ! unit test time_stepper flag
     call read_param_mpi(FILE, 'Debug', 'test_time_stepper', params%test_time_stepper, .false.)
     ! unit test spatial flag
@@ -128,12 +131,6 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
     call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .true.)
 
-    !***************************************************************************
-    ! read PHYSICS parameters
-    !
-    ! first: read physics type
-    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
-    call read_param_mpi(FILE, 'Physics', 'initial_cond', params%initial_cond, "physics-module" )
     !***************************************************************************
     ! read MPI parameters
     !
@@ -173,13 +170,22 @@ subroutine ini_file_to_params( params, filename )
                 max_neighbors = 12.0
             endif
 
-            Bs      = params%number_block_nodes
-            g       = params%number_ghost_nodes
-            Neqn    = params%number_data_fields
-            Nrk     = max( Neqn*size(params%butcher_tableau,1), params%N_fields_saved )
+            Bs      = params%Bs
+            g       = params%n_ghosts
+            Neqn    = params%n_eqn
+
+            if (params%time_step_method == "RungeKuttaGeneric") then
+                Nrk = size(params%butcher_tableau,1)
+            elseif (params%time_step_method == "Krylov") then
+                Nrk = params%M_krylov + 3
+            else
+                call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+            endif
+
             nstages = 2.0
 
             mem_per_block = real(Neqn) * (real(Bs+2*g))**d & ! hvy_block
+            + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs+2*g))**d & ! hvy_tmp
             + real(Nrk) * (real(Bs+2*g))**d & ! hvy_work
             + 2.0 * nstages * real(Neqn) * real((Bs+2*g)**d - Bs**d) &  ! real buffer ghosts
             + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
@@ -194,6 +200,11 @@ subroutine ini_file_to_params( params, filename )
                 write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
                 params%number_blocks*params%number_procs
             endif
+
+            if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**d)) then
+                call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
+                & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
+            endif
         endif
     end do
 
@@ -204,13 +215,13 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    if ( (params%number_ghost_nodes < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
+    if ( (params%n_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%number_ghost_nodes < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%number_ghost_nodes < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
@@ -276,13 +287,14 @@ end subroutine ini_file_to_params
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")
     endif
-    
+
     params%domain_size=(/ 1.0_rk, 1.0_rk, 0.0_rk /) !default
     call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
                                                        params%domain_size(1:params%dim) )
 
-    call read_param_mpi(FILE, 'Domain ', 'periodic_BC', params%periodic_BC, .true. )
-
+    params%periodic_BC = .true.
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC(1:params%dim), &
+                                                       params%periodic_BC(1:params%dim) )
   end subroutine ini_domain
 
 
@@ -305,23 +317,26 @@ end subroutine ini_file_to_params
     endif
 
     ! read number_block_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%number_block_nodes, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%Bs, 1 )
     ! read number_ghost_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%number_ghost_nodes, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     ! read number_blocks
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
 
     ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params%number_data_fields, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
     ! set number of fields in heavy work data
     ! every datafield has 5 additional fields: old, k1, k2, k3, k4
-    params%number_fields = params%number_data_fields*5
+    params%number_fields = params%n_eqn*5
     ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
     ! read treelevel bounds
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    if ( params%max_treelevel < params%min_treelevel ) then
+      call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
+    end if
     ! read switch to turn on|off mesh refinement
     call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
     call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
@@ -331,15 +346,16 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
+    call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.
-    allocate(tmp(1:params%number_data_fields))
-    allocate(params%threshold_state_vector_component(1:params%number_data_fields))
+    allocate(tmp(1:params%n_eqn))
+    allocate(params%threshold_state_vector_component(1:params%n_eqn))
     ! as default, use ones (all components used for indicator)
     tmp = 1.0_rk
     call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
-    do i = 1, params%number_data_fields
+    do i = 1, params%n_eqn
         if (tmp(i)>0.0_rk) then
             params%threshold_state_vector_component(i) = .true.
         else
@@ -375,7 +391,10 @@ end subroutine ini_file_to_params
       ! number of time steps to be performed. default value is very large, so if not set
       ! the limit will not be reached
       call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
-
+      call read_param_mpi(FILE, 'Time', 'time_step_method', params%time_step_method, "RungeKuttaGeneric" )
+      call read_param_mpi(FILE, 'Time', 'M_krylov', params%M_krylov, 12 )
+      call read_param_mpi(FILE, 'Time', 'krylov_err_threshold', params%krylov_err_threshold, 1.0e-3_rk )
+      call read_param_mpi(FILE, 'Time', 'krylov_subspace_dimension', params%krylov_subspace_dimension, "fixed" )
       ! read output write method
       call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
       ! read output write frequency
@@ -397,6 +416,7 @@ end subroutine ini_file_to_params
       0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
+
 
 
     end subroutine ini_time

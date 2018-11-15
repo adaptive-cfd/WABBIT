@@ -46,25 +46,26 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
-    real(kind=rk), intent(in)           :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(in)           :: hvy_work(:, :, :, :, :, :)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: l, N_dF, k
+    integer(kind=ik)                    :: l, Neqn, k
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    N_dF  = params%number_data_fields
+    Neqn  = params%n_eqn
 !---------------------------------------------------------------------------------------------
 ! main body
 
     ! first: k_j = RHS(data_field(t) + ...
     ! loop over all active heavy data blocks
     do k = 1, hvy_n
-        hvy_block(:,:,:,1:N_dF,hvy_active(k)) = hvy_work(:,:,:,1:N_dF,hvy_active(k))
+        ! first slot in hvy_work is previous time step
+        hvy_block(:,:,:,:,hvy_active(k)) = hvy_work(:,:,:,:,hvy_active(k),1)
     end do
 
     do l = 2, j
@@ -75,8 +76,9 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
             do k = 1, hvy_n
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block(:, :, :, 1:N_dF, hvy_active(k)) = hvy_block(:, :, :, 1:N_dF, hvy_active(k)) &
-                + dt * rk_coeffs(l) * hvy_work(:, :, :, (l-1)*N_dF+1:l*N_dF, hvy_active(k))
+                hvy_block(:, :, :, :, hvy_active(k)) = hvy_block(:, :, :, :, hvy_active(k)) &
+                + dt * rk_coeffs(l) * hvy_work(:, :, :, :, hvy_active(k), l)
+
             end do
         end if
     end do

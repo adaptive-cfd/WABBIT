@@ -12,10 +12,10 @@ echo "testing ion funnel"
 # list of prefixes the test generates
 prefixes=(rho Ux Uy p vort mask sigmax sigmay)
 # list of possible times (no need to actually have them)
-times=(000000000010)
+times=(000000000000 000000000010)
 
 # run actual test
-${mpi_command} ./wabbit ${params} --memory=2GB ${ghosts}
+${mpi_command} ./wabbit ${params} ${memory}
 
 echo "============================"
 echo "run done, analyzing data now"

@@ -5,7 +5,7 @@
 !> \date 03/09/18 - removed unused variables (P.Krah) commit 0b79d945422eedda70fa5f874cd2889a10ef8287
 subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
 
-    use module_physics_metamodule, only : GET_DT_BLOCK
+    use module_physics_metamodule, only : GET_DT_BLOCK_meta
 
     !--------------------------------------------------------------
     implicit none
@@ -38,8 +38,8 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
           ! physics modules dictate some restrictions due to CFL conditions, penalization
           ! or other operators. Everything that is physics-dependent goes here. it is
           ! computed for each block, then the minimum is used.
-          call GET_DT_BLOCK( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
-              params%number_block_nodes,params%number_ghost_nodes, xx0, ddx, dt_tmp)
+          call GET_DT_BLOCK_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
+              params%Bs,params%n_ghosts, xx0, ddx, dt_tmp)
 
           dt = min( dt, dt_tmp )
       end do

@@ -31,7 +31,7 @@
 ! ********************************************************************************************
 
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_work)
+    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_tmp)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -45,7 +45,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   !> heavy data array - block data
   real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
   !> heavy work data array - block data.
-  real(kind=rk), intent(inout)         :: hvy_work(:, :, :, :, :)
+  real(kind=rk), intent(inout)         :: hvy_tmp(:, :, :, :, :)
   !> neighbor array (heavy data)
   integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
   !> list of active blocks light data)
@@ -78,15 +78,14 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     endif
 
     ! choose between reading from files and creating datafields analytically
-    if (params%initial_cond == 'read_from_files') then
+    if (params%read_from_files) then
         if (params%rank==0) write(*,*) "Initial condition is read from file!"
         !-----------------------------------------------------------------------
         ! read initial condition from file
         !-----------------------------------------------------------------------
         ! Note that reading from file is something all physics modules share - it
         ! is a wabbit routine and not affiliated with a specific physics module
-        ! therefore, there is still a grid-level (=wabbit) parameter "params%initial_cond"
-        ! which can be read_from_files or anything else.
+        ! therefore, there is still a grid-level (=wabbit) parameter read_from_files
         call get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
 
         ! create lists of active blocks (light and heavy data)
@@ -106,7 +105,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator,  hvy_work )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -120,7 +119,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! the statevector saved to file (rho,u,v,p)
         ! we therefore convert it once here
         if (params%physics_type == 'navier_stokes') then
-          call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond, hvy_work, .true.)
+          call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
         end if
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
@@ -133,7 +132,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
         !---------------------------------------------------------------------------
-        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, params%initial_cond, hvy_work, .true.)
+        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
 
         !---------------------------------------------------------------------------
         ! grid adaptation
@@ -150,20 +149,19 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             !! go up one level where a refinement indicator tells us to do so, but in the current code
             !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
             !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
 
             ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this
             ! corresponds to advancing the solution in time, it's just that here we know the exact
             ! solution (the inicond)
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
-                params%initial_cond, hvy_work, .true.)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
 
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator,  hvy_work )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator,  hvy_tmp )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -179,11 +177,10 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         if (params%inicond_refinements > 0) then
           do k = 1, params%inicond_refinements
             ! refine entire mesh.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, lgt_active, lgt_n, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
                 lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
             ! set initial condition
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
-                params%initial_cond, hvy_work, .true.)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
 
             if (params%rank == 0) then
              write(*,'(" did ",i2," refinement stage (beyond what is required for the &
@@ -200,8 +197,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! This is done here (after the refinements).
         if (params%physics_type == 'ACM-new') then
            ! apply inicond for one laste time
-           call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
-                params%initial_cond, hvy_work, .false.)
+           call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .false.)
         end if
     end if
 
@@ -224,7 +220,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! balance the load
-    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, hvy_active, hvy_n, hvy_work)
+    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks

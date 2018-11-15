@@ -38,8 +38,8 @@ module module_navier_stokes
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
-            CONVERT_STATEVECTOR, PACK_STATEVECTOR, INICOND_NSTOKES, FIELD_NAMES_NStokes,&
-            STATISTICS_NStokes,FILTER_NSTOKES,convert2format
+            INICOND_NSTOKES, FIELD_NAMES_NStokes,&
+            STATISTICS_NStokes,FILTER_NSTOKES
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
@@ -53,7 +53,7 @@ contains
   include "RHS_3D_navier_stokes.f90"
   include "RHS_2D_cylinder.f90"
   include "filter_block.f90"
-  include "inicond_shear_layer.f90"
+  include "inicond_NStokes.f90"
   include "save_data_ns.f90"
 !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
@@ -93,24 +93,26 @@ contains
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     ! open file
-    call read_ini_file_mpi(FILE, filename, .true.)
+    call read_ini_file_mpi( FILE, filename, .true.)
     ! init all parameters used in ns_equations
-    call init_navier_stokes_eq(params_ns, FILE)
+    call init_navier_stokes_eq( FILE )
     ! init all parameters used for penalization
-    call init_penalization(    params_ns, FILE)
+    call init_penalization( FILE )
     ! init all parameters used for the filter
-    call init_filter(   params_ns%filter, FILE)
+    call init_filter( params_ns%filter, FILE)
     ! init all params for organisation
-    call init_other_params(params_ns,     FILE )
+    call init_other_params( FILE )
     ! read in initial conditions
-    call init_initial_conditions(params_ns,file)
+    call init_initial_conditions( FILE )
     ! initialice parameters and fields of the specific case study
-    call set_case_parameters( params_ns , FILE )
+    call read_case_parameters( FILE )
+    ! read parameters for the boundatry CONDITIONS
+    call read_boundary_conditions( FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
-    call add_info(params_ns)
+    call add_info()
 
     ! set global parameters pF,rohF, UxF etc
-    do dF = 1, params_ns%number_data_fields
+    do dF = 1, params_ns%n_eqn
                 if ( params_ns%names(dF) == "p" ) pF = dF
                 if ( params_ns%names(dF) == "rho" ) rhoF = dF
                 if ( params_ns%names(dF) == "Ux" ) UxF = dF
@@ -118,7 +120,7 @@ contains
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
 
-    call check_parameters(params_ns)
+    call check_parameters()
 
     call clean_ini_file_mpi( FILE )
 
@@ -133,7 +135,7 @@ contains
 
   !-----------------------------------------------------------------------------
   ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid any an MPI formalism, neighboring relations and the like.
+  ! independent of the grid and any MPI formalism, neighboring relations and the like.
   ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
   ! from that. Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
@@ -147,7 +149,7 @@ contains
 
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
+    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -219,7 +221,7 @@ contains
       ! 3rd stage: post_stage.
       !-------------------------------------------------------------------------
       ! this stage is called only once, not for each block.
-      if (params_ns%geometry=="funnel") then
+      if (params_ns%case=="funnel") then
         ! reduce sum on each block to global sum
         call mean_quantity(integral,area)
       endif
@@ -235,21 +237,26 @@ contains
       if (params_ns%dim==2) then
         select case(params_ns%coordinates)
         case ("cartesian")
+          if (.not. ALL(boundary_flag(:)==0)) then
+            call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
+          endif
+
+
+
           call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
         case("cylindrical")
           call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
         case default
           call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
         end select
-        !call  RHS_1D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
       else
          call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
 
-      if (params_ns%penalization) then
-        ! add volume penalization
-        call add_constraints(rhs, Bs, g, x0, dx, u)
-      endif
+      ! if (params_ns%penalization) then
+      !   ! add volume penalization
+      !   call add_constraints(params_ns, rhs, Bs, g, x0, dx, u)
+      ! endif
 
     case default
       call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
@@ -257,6 +264,73 @@ contains
 
 
   end subroutine RHS_NStokes
+
+
+
+
+  !> This function computes the boundary values for the ghost node layer of the
+  !> boundary blocks
+  subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, boundary_flag)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      integer(kind=ik), intent(in) :: g, Bs
+      real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
+      !> datafields, and velocity field
+      real(kind=rk), intent(inout) :: phi(:,:,:)
+      ! when implementing boundary conditions, it is necessary to now if the local field (block)
+      ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+      ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+      ! boundary_flag(i) can be either 0, 1, -1,
+      !  0: no boundary in the direction +/-e_i
+      !  1: boundary in the direction +e_i
+      ! -1: boundary in the direction - e_i
+      integer(kind=2), intent(in):: boundary_flag(3)
+
+      integer(kind=ik) :: ix,iy
+      ! boundary ghost node layer in x direction
+      ! ---------------------------------
+      ! |  1  |                    |  2  |
+      ! |     |   ^                |     |
+      ! |     |   |                |     |
+      ! |<-g->|  Bs+2g             |<-g->|
+      ! |     |   |                |     |
+      ! |     |   v                |     |
+      ! ---------------------------------
+      ! x->
+      real(kind=rk)   :: phi_boundary_x(Bs+2*g,Bs+2*g,params_ns%n_eqn)
+
+    !##################################################
+    ! compute the boundary values
+    !##################################################
+    select case(params_ns%boundary_type)
+    case("symmetric-open")
+      ! ! first the symmetric BC:
+      ! ! u_-i = -u_i
+      ! ! v_-i = -v_i
+      !
+      !
+      !   ! Boundary conditions for outflow extrapolation
+      !   phi_boundary_x(1:g,:)=phi(g+1:2*g+1,:,i)
+      !   phi_boundary(2,:)=phi(Bs+g,:,i)
+      !   if (params_convdiff%u0x(i)>0) then
+      !       phi_boundary(1,:)=params_convdiff%phi_boundary(i)
+      !   else
+      !       phi_boundary(2,:)=params_convdiff%phi_boundary(i)
+      !   endif
+      !   ! Boundary conditions for outflow extrapolation
+      !   phi_boundary(3,:)=phi(:,g+1,i)
+      !   phi_boundary(4,:)=phi(:,Bs+g,i)
+      !   if (params_convdiff%u0y(i)>0) then
+      !       phi_boundary(3,:)=params_convdiff%phi_boundary(i)
+      !   else
+      !       phi_boundary(4,:)=params_convdiff%phi_boundary(i)
+      !   endif
+    case default
+      call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_ns%boundary_type)
+    end select
+
+
+  end subroutine
 
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------
@@ -328,7 +402,7 @@ contains
        if (params_ns%dim==3) allocate(mask(Bs+2*g, Bs+2*g, Bs+2*g))
      endif
       if ( params_ns%penalization ) then
-        call get_mask(x0, dx, Bs, g , mask)
+        call get_mask(params_ns, x0, dx, Bs, g , mask)
       else
         mask=0.0_rk
       end if
@@ -479,202 +553,15 @@ contains
   end subroutine GET_DT_BLOCK_NStokes
 
 
+
+
+
+
   !-----------------------------------------------------------------------------
-  ! main level wrapper for setting the initial condition on a block
-  !-----------------------------------------------------------------------------
-  subroutine INICOND_NStokes( time, u, g, x0, dx )
-    implicit none
-
-    ! it may happen that some source terms have an explicit time-dependency
-    ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
-
-    ! block data, containg the state vector. In general a 4D field (3 dims+components)
-    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
-
-    ! as you are allowed to compute the RHS only in the interior of the field
-    ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g
-
-    ! for each block, you'll need to know where it lies in physical space. The first
-    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    integer(kind=ik)          :: Bs,ix,iy,dF
-    real(kind=rk)             :: x,y_rel,tmp(1:3),b,p_init, rho_init,u_init(3),mach,x0_inicond, &
-                                radius,max_R,width
-    real(kind=rk),allocatable:: mask(:,:,:)
-
-    p_init    =params_ns%initial_pressure
-    rho_init  =params_ns%initial_density
-    u_init    =params_ns%initial_velocity
-    ! compute the size of blocks
-    Bs = size(u,1) - 2*g
-
-
-
-    ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
-    if ( params_ns%inicond=="read_from_files") then
-        call pack_statevector(u(:,:,:,:),'pure_variables')
-        return
-    else
-        u = 0.0_rk
-    endif
-
-
-    if (p_init<=0.0_rk .or. rho_init <=0.0) then
-      call abort(6032,  "Error [module_navier_stokes.f90]: initial pressure and density"//&
-                        "must be larger then 0")
-    endif
-
-
-
-    select case( params_ns%inicond )
-    case("shear_layer")
-      if (params_ns%dim==2) then
-        call inicond_shear_layer(  u, x0, dx ,Bs, g)
-      else
-        call abort(4832,"ERROR [navier_stokes_new.f90]: no 3d shear layer implemented")
-      endif
-
-    case ("zeros")
-      ! add ambient pressure
-      u( :, :, :, pF)   = params_ns%initial_pressure
-      u( :, :, :, rhoF) = sqrt(rho_init)
-      u( :, :, :, UxF)  = 0.0_rk
-      u( :, :, :, UyF)  = 0.0_rk
-      if (params_ns%dim==3)  u( :, :, :, UzF) = 0.0_rk
-
-    case ("standing-shock","moving-shock")
-      ! chooses values such that shock should not move
-      ! in space according to initial conditions
-      if ( params_ns%inicond == "standing-shock" ) then
-        call shockVals(rho_init,u_init(1)*0.5_rk,p_init,tmp(1),tmp(2),tmp(3),params_ns%gamma_)
-      else
-        call moving_shockVals(rho_init,u_init(1),p_init, &
-                             tmp(1),tmp(2),tmp(3),params_ns%gamma_,params_ns%machnumber)
-        params_ns%initial_velocity(1)=u_init(1)
-      end if
-      ! check for usefull inital values
-      if ( tmp(1)<0 .or. tmp(3)<0 ) then
-        write(*,*) "rho_right=",tmp(1), "p_right=",tmp(3)
-        call abort(3572,"ERROR [module_navier_stokes.f90]: initial values are insufficient for simple-shock")
-      end if
-      ! following values are imposed and smoothed with tangens:
-      ! ------------------------------------------
-      !   rhoL    | rhoR                  | rhoL
-      !   uL      | uR                    | uL
-      !   pL      | pR                    | pL
-      ! 0-----------------------------------------Lx
-      !           x0_inicond             x0_inicond+width
-      width       = params_ns%domain_size(1)*(1-params_ns%inicond_width-0.1)
-      x0_inicond  = params_ns%inicond_width*params_ns%domain_size(1)
-      max_R       = width*0.5_rk
-      do ix=g+1, Bs+g
-         x = dble(ix-(g+1)) * dx(1) + x0(1)
-         call continue_periodic(x,params_ns%domain_size(1))
-         ! left region
-         radius = abs(x-x0_inicond-width*0.5_rk)
-         b      = 0.5_rk*(1-tanh((radius-(max_R-10*dx(1)))*2*PI/(10*dx(1)) ))
-         u(ix, :, :, rhoF) = dsqrt(rho_init)-b*(dsqrt(rho_init)-dsqrt(tmp(1)))
-         u(ix, :, :, UxF)  =  u(ix, : , :, rhoF)*(u_init(1)-b*(u_init(1)-tmp(2)))
-         u(ix, :, :, UyF)  = 0.0_rk
-         u(ix, :, :, pF)   = p_init-b*(p_init - tmp(3))
-      end do
-
-    case ("sod_shock_tube")
-      ! Sods test case: shock tube
-      ! ---------------------------
-      !
-      ! Test case for shock capturing filter
-      ! The initial condition is devided into
-      ! Left part x<= Lx/2
-      !
-      ! rho=1
-      ! p  =1
-      ! u  =0
-      !
-      ! Rigth part x> Lx/2
-      !
-      ! rho=0.125
-      ! p  =0.1
-      ! u  =0
-      do ix=1, Bs+2*g
-         x = dble(ix-(g+1)) * dx(1) + x0(1)
-         call continue_periodic(x,params_ns%domain_size(1))
-         ! left region
-         if (x <= params_ns%domain_size(1)*0.5_rk) then
-           u( ix, :, :, rhoF) = 1.0_rk
-           u( ix, :, :, pF)   = 1.0_rk
-         else
-           u( ix, :, :, rhoF) = sqrt(0.125_rk)
-           u( ix, :, :, pF)   = 0.1_rk
-         endif
-      end do
-
-
-      ! velocity set to 0
-       u( :, :, :, UxF) = 0.0_rk
-       u( :, :, :, UyF) = 0.0_rk
-
-    case ("mask")
-      ! add ambient pressure
-      u( :, :, :, pF) = p_init
-      ! set rho
-      u( :, :, :, rhoF) = sqrt(rho_init)
-
-      ! set velocity field u(x)=1 for x in mask
-      if (params_ns%penalization) then
-        if (.not. allocated(mask))        allocate(mask(size(u,1), size(u,2), size(u,3)))
-        call get_mask(x0, dx, Bs, g , mask)
-      endif
-
-      ! u(x)=(1-mask(x))*u0 to make sure that flow is zero at mask values
-      u( :, :, :, UxF) = ( 1 - mask ) * u_init(1)*sqrt(rho_init) !flow in x
-      if ( params_ns%geometry=="funnel" ) then
-        do iy=g+1, Bs+g
-            !initial y-velocity negative in lower half and positive in upper half
-            y_rel = dble(iy-(g+1)) * dx(2) + x0(2) - params_ns%domain_size(2)*0.5_rk
-            b=tanh(y_rel*2.0_rk/(params_ns%inicond_width))
-            u( :, iy, 1, UyF) = (1-mask(:,iy,1))*b*u_init(2)*sqrt(rho_init)
-        enddo
-      else
-        u( :, :, :, UyF) = (1-mask)*u_init(2)*sqrt(rho_init) !flow in y
-      end if
-
-    case ("pressure_blob")
-
-        call inicond_gauss_blob( params_ns%inicond_width,Bs,g,(/ params_ns%domain_size(1), params_ns%domain_size(2), params_ns%domain_size(3)/), u(:,:,:,pF), x0, dx )
-        ! add ambient pressure
-         u( :, :, :, pF)  = params_ns%initial_pressure*(1.0_rk + 5.0_rk * u( :, :, :, pF))
-        u( :, :, :, rhoF)= sqrt(params_ns%initial_density)
-        u( :, :, :, UxF) = params_ns%initial_velocity(1)*sqrt(params_ns%initial_density)
-        u( :, :, :, UyF) = params_ns%initial_velocity(2)*sqrt(params_ns%initial_density)
-        if (params_ns%dim==3)  u( :, :, :, UzF) = params_ns%initial_velocity(3)*sqrt(params_ns%initial_density)
-    case default
-        call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))
-    end select
-
-    !check if initial conditions are set properly
-    do dF=1,params_ns%number_data_fields
-      if (  block_contains_NaN(u(:,:,:,dF)) ) then
-        call abort(46924,"ERROR [module_navier_stokes]: NaN in inicond!"//&
-        " Computer says NOOOOOOOOOOOOOOOO!")
-      endif
-    enddo
-  end subroutine INICOND_NStokes
-
-
-
-
-
-
- !-----------------------------------------------------------------------------
-  ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid any an MPI formalism, neighboring relations and the like.
-  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
-  ! from that. Ghost nodes are assumed to be sync'ed.
+  ! main level wrapper to filter a block. Note this is completely
+  ! independent of the grid and any MPI formalism, neighboring relations and the like.
+  ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
+  ! Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
   subroutine filter_NStokes( time, u, g, x0, dx, work_array )
     implicit none
@@ -705,158 +592,11 @@ contains
     Bs = size(u,1) - 2*g
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
-    u=work_array(:,:,:,1:params_ns%number_data_fields)
+
+    ! copy filtered state vector back to input state vector
+    u = work_array(:,:,:,1:params_ns%n_eqn)
 
   end subroutine filter_NStokes
-
-
-
-
-!> \brief convert the statevector \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
-!! to the desired format.
-subroutine convert_statevector(phi,convert2format)
-
-    implicit none
-    ! convert to type "conservative","pure_variables"
-    character(len=*), intent(in)   :: convert2format
-    !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
-    real(kind=rk), intent(inout)      :: phi(1:,1:,1:,1:)
-    ! vector containing the variables in the desired format
-    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3),size(phi,4))
-
-
-    select case( convert2format )
-    case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
-      ! density
-      converted_vector(:,:,:,rhoF)  =phi(:,:,:,rhoF)**2
-      ! rho u
-      converted_vector(:,:,:,UxF)   =phi(:,:,:,UxF)*phi(:,:,:,rhoF)
-      ! rho v
-      converted_vector(:,:,:,UyF)   =phi(:,:,:,UyF)*phi(:,:,:,rhoF)
-
-      if ( params_ns%dim==3 ) then
-        ! rho w
-        converted_vector(:,:,:,UzF)=phi(:,:,:,UzF)*phi(:,:,:,rhoF)
-        !kinetic energie
-        converted_vector(:,:,:,pF)=phi(:,:,:,UxF)**2+phi(:,:,:,UyF)**2+phi(:,:,:,UzF)**2
-      else
-        ! kinetic energie
-        converted_vector(:,:,:,pF)=phi(:,:,:,UxF)**2+phi(:,:,:,UyF)**2
-      end if
-      converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)*0.5_rk
-      ! total energie
-      ! e_tot=e_kin+p/(gamma-1)
-      converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)+phi(:,:,:,pF)/(params_ns%gamma_-1)
-    case ("pure_variables")
-      ! add ambient pressure
-      !rho
-      converted_vector(:,:,:,rhoF)= phi(:,:,:,rhoF)**2
-      !u
-      converted_vector(:,:,:,UxF)= phi(:,:,:, UxF)/phi(:,:,:,rhoF)
-      !v
-      converted_vector(:,:,:,UyF)= phi(:,:,:, UyF)/phi(:,:,:,rhoF)
-      !w
-      if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:, UzF)/phi(:,:,:,rhoF)
-      !p
-      converted_vector(:,:,:,pF)= phi(:,:,:, pF)
-    case default
-        call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
-    end select
-
-    phi=converted_vector
-
-end subroutine convert_statevector
-
-
-!> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from
-!>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$ or pure variables (rho,u,v,p)
-subroutine pack_statevector(phi,format)
-    implicit none
-    ! convert to type "conservative","pure_variables"
-    character(len=*), intent(in)   :: format
-    !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
-    real(kind=rk), intent(inout)   :: phi(1:,1:,1:,1:)
-    ! vector containing the variables in the desired format
-    real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3),size(phi,4))
-
-
-
-    select case( format )
-    case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
-      ! sqrt(rho)
-      if ( minval(phi(:,:,:,rhoF))<0 ) then
-        write(*,*) "minval=", minval(phi(:,:,:,rhoF))
-        call abort(457881,"ERROR [module_navier_stokes.f90]: density smaller then 0!!")
-      end if
-      converted_vector(:,:,:,rhoF)=sqrt(phi(:,:,:,rhoF))
-      ! sqrt(rho) u
-      converted_vector(:,:,:,UxF)=phi(:,:,:,UxF)/converted_vector(:,:,:,rhoF)
-      ! sqrt(rho) v
-      converted_vector(:,:,:,UyF)=phi(:,:,:,UyF)/converted_vector(:,:,:,rhoF)
-
-      if ( params_ns%dim==3 ) then
-        converted_vector(:,:,:,UzF)=phi(:,:,:,UzF)/converted_vector(:,:,:,rhoF)
-        ! kinetic energie
-        converted_vector(:,:,:,pF)=converted_vector(:,:,:,UxF)**2 &
-                                  +converted_vector(:,:,:,UyF)**2 &
-                                  +converted_vector(:,:,:,UzF)**2
-      else
-        ! kinetic energie
-        converted_vector(:,:,:,pF)=converted_vector(:,:,:,UxF)**2 &
-                                  +converted_vector(:,:,:,UyF)**2
-      end if
-      converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)*0.5_rk
-      ! p=(e_tot-e_kin)(gamma-1)/rho
-      converted_vector(:,:,:,pF)=(phi(:,:,:,pF)-converted_vector(:,:,:,pF))*(params_ns%gamma_-1)
-    case ("pure_variables") !phi=(rho,u,v,p)
-      ! add ambient pressure
-      ! sqrt(rho)
-      converted_vector(:,:,:,rhoF)= sqrt(phi(:,:,:,rhoF))
-      ! sqrt(rho) u
-      converted_vector(:,:,:,UxF)= phi(:,:,:,UxF)*converted_vector(:,:,:,rhoF)
-      ! sqrt(rho)v
-      converted_vector(:,:,:,UyF)= phi(:,:,:,UyF)*converted_vector(:,:,:,rhoF)
-      ! sqrt(rho)w
-      if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:,UzF)*converted_vector(:,:,:,rhoF)
-      !p
-      converted_vector(:,:,:,pF)= phi(:,:,:,pF)
-    case default
-        call abort(7771,"the format is unkown: "//trim(adjustl(format)))
-    end select
-
-    phi(:,:,:,rhoF) =converted_vector(:,:,:,rhoF)
-    phi(:,:,:,UxF)  =converted_vector(:,:,:,UxF )
-    phi(:,:,:,UyF)  =converted_vector(:,:,:,UyF )
-    if ( params_ns%dim==3 ) phi(:,:,:,UzF) = converted_vector(:,:,:,UzF)
-    phi(:,:,:,pF)   =converted_vector(:,:,:,pF)
-end subroutine pack_statevector
-
-
-
-subroutine convert2format(phi_in,format_in,phi_out,format_out)
-    implicit none
-    ! convert to type "conservative","pure_variables"
-    character(len=*), intent(in)   ::  format_in, format_out
-    !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
-    real(kind=rk), intent(in)      :: phi_in(1:,1:,1:,1:)
-    ! vector containing the variables in the desired format
-    real(kind=rk), intent(inout)   :: phi_out(:,:,:,:)
-
-    ! convert phi_in to skewsymetric variables  \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
-    if (format_in=="skew") then
-      phi_out  =  phi_in
-    else
-      phi_out  =  phi_in
-      call pack_statevector(phi_out,format_in)
-    endif
-
-    ! form skewsymetric variables convert to any other scheme
-    if (format_out=="skew") then
-      !do nothing because format is skew already
-    else
-      call convert_statevector(phi_out,format_out)
-    endif
-end subroutine convert2format
 
 
 

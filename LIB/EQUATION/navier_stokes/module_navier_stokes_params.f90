@@ -27,7 +27,7 @@ module module_navier_stokes_params
       ! name of filter
       character(len=80)                  :: name
       ! number or data fields to filter
-      integer(kind=ik)                   :: number_data_fields
+      integer(kind=ik)                   :: n_eqn
 
       ! explicit filters
       ! ----------------
@@ -70,7 +70,7 @@ module module_navier_stokes_params
         ! spatial domain%number_data_fields
         real(kind=rk)                               :: R_max, domain_size(3)=0.0_rk
         ! number data fields
-        integer(kind=ik)                            :: number_data_fields
+        integer(kind=ik)                            :: n_eqn
         ! number of block nodes
         integer(kind=ik)                            :: Bs
         ! maximal tree level
@@ -98,6 +98,7 @@ module module_navier_stokes_params
         !---------------------------------------------------------------------------------
         ! initial conditions
         !---------------------------------------------------------------------------------
+        logical                                     :: read_from_files
         ! înitial condition
         character(len=80)                           :: inicond
         ! width of initialcond
@@ -115,7 +116,7 @@ module module_navier_stokes_params
         ! --------------------------------------------------------------------------------
         logical                                     :: penalization,smooth_mask=.True., sponge_layer
         ! penalization parameter and sponge parameter
-        real(kind=rk)                               :: C_eta,C_sp
+        real(kind=rk)                               :: C_eta,C_sp,L_sponge=-1.0_rk
         ! geometry to display
         character(len=80)                           :: geometry="cylinder",case='--'
         ! geometric parameters for cylinder (x_0,r)
@@ -140,74 +141,31 @@ module module_navier_stokes_params
         real(kind=rk)                               :: machnumber
         ! smallest lattice spacing
         real(kind=rk)                               :: dx_min
+        ! -------------------------------------------------------------------------------------
+        ! Boundary conditions
+        ! -------------------------------------------------------------------------------------
+        logical,dimension(3)                        :: periodic_BC=(/.true.,.true.,.true./)
+        character(len=80)                           :: boundary_type
 
   end type type_params_ns
 
   ! statevector index
-  integer(kind=ik) ,save,public :: rhoF=-1,UxF=-1,UyF=-1,UzF=-1,pF=-1
+  integer(kind=ik), save, public :: rhoF=-1,UxF=-1,UyF=-1,UzF=-1,pF=-1
 
-  type(type_params_ns)          :: params_ns
+  type(type_params_ns), save :: params_ns
+
+
+  interface convert_statevector
+      module procedure convert_statevector2D, convert_statevector3D
+  end interface convert_statevector
 
 contains
 
-  include "initial_conditions.f90"
 
-
-  !> \brief reft and right shock values for 1D shock moving with mach to the right
-  !> \detail This function converts with the Rankine-Hugoniot Conditions
-  !>  values \f$\rho_L,p_L,Ma\f$ to the values of the right of the shock
-  !>  \f$\rho_R,u_R,p_R\f$ and \f$u_L\f$ .
-  !> See: formula 3.51-3.56 in Riemann Solvers and Numerical Methods for Fluid Dynamics
-  !> author F.Toro
-  subroutine moving_shockVals(rhoL,uL,pL,rhoR,uR,pR,gamma,mach)
-      implicit none
-      !> one side of the shock (density, pressure)
-      real(kind=rk), intent(in)      ::rhoL,pL
-      !> shock speed
-      real(kind=rk), intent(in)      :: mach
-      !> speed on
-      real(kind=rk), intent(inout)      :: uL
-      !> other side of the shock (density, velocity, pressure)
-      real(kind=rk), intent(out)      ::rhoR,uR,pR
-      !> heat capacity ratio
-      real(kind=rk), intent(in)      ::gamma
-
-      real(kind=rk)                ::c_R
-
-
-       uR    =   0
-       rhoR  =   ((gamma-1)*mach**2+2)/((gamma+1)*mach**2)*rhoL
-       pR    = (gamma+1)/(2*gamma*mach**2-gamma+1)*pL
-       c_R   = sqrt(gamma*pR/rhoR)
-       uL    = (1-rhoR/rhoL)*mach*c_R
-  end subroutine moving_shockVals
-
-  !> \brief This function calculates from \f$\rho_1,u_1,p_1\f$
-  !> values \f$\rho_2,u_2,p_2\f$ on the ohter side
-  !> of the shock
-  subroutine shockVals(rho1,u1,p1,rho2,u2,p2,gamma)
-      implicit none
-      !> one side of the shock (density, velocity, pressure)
-      real(kind=rk), intent(in)      ::rho1,u1,p1
-      !> other side of the shock (density, velocity, pressure)
-      real(kind=rk), intent(out)      ::rho2,u2,p2
-      !> heat capacity ratio
-      real(kind=rk), intent(in)      ::gamma
-      real(kind=rk)                ::cstar_sq
-
-      cstar_sq = 2*(gamma-1)/(gamma+1)*( p1/rho1*(gamma/(gamma-1))+u1**2/2 ) ;
-      !sqrt(cstar_sq)
-      u2 = cstar_sq /u1;
-      rho2 = (rho1*u1)/u2;
-      p2= (p1+ rho1*u1**2 )-rho2*u2**2;
-  end subroutine shockVals
-
-  subroutine init_navier_stokes_eq(params_ns, FILE )
+  subroutine init_navier_stokes_eq( FILE )
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)     :: FILE
-    !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params_ns
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
 
 
@@ -218,7 +176,7 @@ contains
       write(*,'(" -----------------------------------")')
     endif
     ! read number_data_fields
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_equations', params_ns%n_eqn, 1 )
     ! dimension
     call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
     !
@@ -247,38 +205,40 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'mu0', params_ns%mu0, 0.0_rk )
     ! read switch to turn on|off dissipation
     call read_param_mpi(FILE, 'Navier_Stokes', 'dissipation', params_ns%dissipation, .true. )
+    ! which case is studied in the NStokes module
+    call read_param_mpi(FILE, 'Navier_Stokes', 'case', params_ns%case, 'no' )
+
 
   end subroutine init_navier_stokes_eq
 
 
 
-  subroutine init_initial_conditions(params_ns, FILE )
+  subroutine init_initial_conditions( FILE )
       implicit none
       !> pointer to inifile
       type(inifile) ,intent(inout)        :: FILE
-      !> params structure of navier stokes
-      type(type_params_ns),intent(inout)  :: params_ns
       ! initial parameters
-      real(kind=rk)                       :: rho_init=1,p_init=1,u_init(3)=0,T_init=1,width
+      real(kind=rk)                       :: rho_init=-1,p_init=-1,u_init(3)=0,T_init=-1,width
+      character(len=*),parameter         :: section='Initial_Values'
 
       if (params_ns%mpirank==0) then
         write(*,*)
         write(*,*)
-        write(*,*) "PARAMS: initial conditions"
+        write(*,*) "PARAMS: "//section
         write(*,'(" ---------------------------")')
       endif
-      call read_param_mpi(FILE, 'Physics', 'initial_cond', params_ns%inicond, "read_from_files" )
-      if ( params_ns%inicond == "read_from_files") then
+      call read_param_mpi(FILE, 'Physics', 'read_from_files', params_ns%read_from_files, .false. )
+      if ( params_ns%read_from_files) then
         if (params_ns%mpirank==0) write(*,'("initial configuration is read from file!")')
         if (params_ns%mpirank==0) write(*,'("we read in (rho,u , v, p) and convert it to skew: (sqrt(rho),sqrt(rho)u, sqrt(rho)v, p)!")')
         return
       end if
-      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond'      , params_ns%inicond, "pressure_blob" )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'inicond_width',width, params_ns%domain_size(1)*0.1_rk )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_pressure' , p_init, p_init )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_velocity' , u_init(1:params_ns%dim), u_init(1:params_ns%dim) )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_temperature', T_init, T_init )
-      call read_param_mpi(FILE, 'Navier_Stokes', 'initial_density', rho_init, rho_init )
+      call read_param_mpi(FILE, section, 'inicond'      , params_ns%inicond, "no" )
+      call read_param_mpi(FILE, section, 'inicond_width',width, params_ns%domain_size(1)*0.1_rk )
+      call read_param_mpi(FILE, section, 'initial_pressure' , p_init, p_init )
+      call read_param_mpi(FILE, section, 'initial_velocity' , u_init(1:params_ns%dim), u_init(1:params_ns%dim) )
+      call read_param_mpi(FILE, section, 'initial_temperature', T_init, T_init )
+      call read_param_mpi(FILE, section, 'initial_density', rho_init, rho_init )
       params_ns%initial_density=rho_init
       params_ns%initial_velocity=u_init
       params_ns%initial_pressure=p_init
@@ -288,16 +248,37 @@ contains
     end subroutine init_initial_conditions
 
 
+subroutine read_boundary_conditions( FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)        :: FILE
+
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_ns%periodic_BC(1:params_ns%dim), &
+                                                       params_ns%periodic_BC(1:params_ns%dim) )
+
+    ! only read in parameters if we need them
+    if ( ALL(params_ns%periodic_BC) ) then
+      return
+    end if
+
+    if (params_ns%mpirank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Boundary Conditions"
+      write(*,'(" ---------------------------")')
+    endif
+
+    call read_param_mpi(FILE, 'Navier_Stokes', 'boundary_type', params_ns%boundary_type, "no" )
+
+end subroutine read_boundary_conditions
 
 
-subroutine init_other_params(params_ns, FILE )
+subroutine init_other_params( FILE )
 
     use module_helpers , only: list_contains_name
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)        :: FILE
-    !> params structure of navier stokes
-    type(type_params_ns),intent(inout)  :: params_ns
 
     if (params_ns%mpirank==0) then
       write(*,*)
@@ -314,8 +295,6 @@ subroutine init_other_params(params_ns, FILE )
     if (  list_contains_name(params_ns%names,'sigmax')>0 ) then
       params_ns%filter%save_filter_strength=.true.
     end if
-
-    call read_param_mpi(FILE, 'Blocks', 'number_data_fields', params_ns%number_data_fields, 1 )
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_ns%discretization, "FD_2nd_central")
 
@@ -356,11 +335,10 @@ subroutine init_other_params(params_ns, FILE )
 
 
 !> \brief Add additional info to navier stokes (initial Mach, Reynolds and speed of sound)
-  subroutine add_info(params_ns )
+  subroutine add_info(  )
       implicit none
-      !> params structure of navier stokes
-      type(type_params_ns),intent(inout)  :: params_ns
-          integer(kind=ik)                :: nx_max
+      integer(kind=ik)                :: nx_max
+
       ! compute min(dx,dy,dz)
       if ( params_ns%dim==2 ) then
         params_ns%dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%domain_size(1),params_ns%domain_size(2)) &
@@ -371,12 +349,14 @@ subroutine init_other_params(params_ns, FILE )
       end if
 
       ! initial speed of sound, Mach number, reynolds number
-      params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
-      params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
-                                +params_ns%initial_velocity(2)**2 &
-                                +params_ns%initial_velocity(3)**2)/params_ns%c0
-      params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
-                            params_ns%machnumber*params_ns%c0/params_ns%mu0
+      if ( params_ns%initial_density>0 ) then
+        params_ns%c0        = sqrt(params_ns%gamma_*params_ns%initial_pressure/params_ns%initial_density)
+        params_ns%Machnumber= sqrt(params_ns%initial_velocity(1)**2 &
+                                  +params_ns%initial_velocity(2)**2 &
+                                  +params_ns%initial_velocity(3)**2)/params_ns%c0
+        params_ns%Reynolds  = params_ns%initial_density*params_ns%domain_size(2)* &
+                              params_ns%machnumber*params_ns%c0/params_ns%mu0
+      endif
 
       if (params_ns%mpirank==0) then
         write(*,*)
@@ -399,17 +379,14 @@ subroutine init_other_params(params_ns, FILE )
 
 
     !> \brief Add additional info to navier stokes (initial Mach, Reynolds and speed of sound)
-      subroutine check_parameters(params_ns )
+      subroutine check_parameters()
           implicit none
-          !> params structure of navier stokes
-          type(type_params_ns),intent(inout)  :: params_ns
-
 
           if ( params_ns%dim==3 ) then
-            if( params_ns%number_data_fields<5 ) call abort(9898,'Please increase number of data fields (min 5)')
+            if( params_ns%n_eqn<5 ) call abort(9898,'Please increase number of data fields (min 5)')
             if( min(pF,UxF,UyF,UzF,rhoF)<0 )  call abort(9898,'Check names of data fields [p,Ux,Uy,Uz,rho]!')
           else
-            if( params_ns%number_data_fields<4 ) call abort(9898,'Please increase number of data fields (min 4)')
+            if( params_ns%n_eqn<4 ) call abort(9898,'Please increase number of data fields (min 4)')
             if( min(pF,UxF,UyF,rhoF)<0 )      call abort(9898,'Check names of data fields [p,Ux,Uy,rho]!')
           end if
 
@@ -427,12 +404,211 @@ subroutine init_other_params(params_ns, FILE )
 
         if (.not.allocated(data)) then
           if (params_ns%dim==3) then
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%number_data_fields))
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%n_eqn))
           else
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%number_data_fields))
+            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%n_eqn))
         endif
       endif
     end subroutine allocate_statevector_ns
+
+
+    !> \brief convert the statevector \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
+    !! to the desired format.
+    subroutine convert_statevector3D(phi,convert2format)
+
+      implicit none
+      ! convert to type "conservative","pure_variables"
+      character(len=*), intent(in)   :: convert2format
+      !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+      real(kind=rk), intent(inout)      :: phi(1:,1:,1:,1:)
+      ! vector containing the variables in the desired format
+      real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3),size(phi,4))
+
+
+      select case( convert2format )
+      case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
+        ! density
+        converted_vector(:,:,:,rhoF)  =phi(:,:,:,rhoF)**2
+        ! rho u
+        converted_vector(:,:,:,UxF)   =phi(:,:,:,UxF)*phi(:,:,:,rhoF)
+        ! rho v
+        converted_vector(:,:,:,UyF)   =phi(:,:,:,UyF)*phi(:,:,:,rhoF)
+
+        if ( params_ns%dim==3 ) then
+          ! rho w
+          converted_vector(:,:,:,UzF)=phi(:,:,:,UzF)*phi(:,:,:,rhoF)
+          !kinetic energie
+          converted_vector(:,:,:,pF)=phi(:,:,:,UxF)**2+phi(:,:,:,UyF)**2+phi(:,:,:,UzF)**2
+        else
+          ! kinetic energie
+          converted_vector(:,:,:,pF)=phi(:,:,:,UxF)**2+phi(:,:,:,UyF)**2
+        end if
+        converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)*0.5_rk
+        ! total energie
+        ! e_tot=e_kin+p/(gamma-1)
+        converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)+phi(:,:,:,pF)/(params_ns%gamma_-1)
+      case ("pure_variables")
+        ! add ambient pressure
+        !rho
+        converted_vector(:,:,:,rhoF)= phi(:,:,:,rhoF)**2
+        !u
+        converted_vector(:,:,:,UxF)= phi(:,:,:, UxF)/phi(:,:,:,rhoF)
+        !v
+        converted_vector(:,:,:,UyF)= phi(:,:,:, UyF)/phi(:,:,:,rhoF)
+        !w
+        if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:, UzF)/phi(:,:,:,rhoF)
+        !p
+        converted_vector(:,:,:,pF)= phi(:,:,:, pF)
+      case default
+          call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
+      end select
+
+      phi=converted_vector
+
+
+
+    end subroutine convert_statevector3D
+
+
+        !> \brief convert the statevector \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
+        !! to the desired format.
+        subroutine convert_statevector2D(phi,convert2format)
+
+            implicit none
+            ! convert to type "conservative","pure_variables"
+            character(len=*), intent(in)   :: convert2format
+            !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+            real(kind=rk), intent(inout)      :: phi(1:,1:,1:)
+            ! vector containing the variables in the desired format
+            real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3))
+
+
+            select case( convert2format )
+            case ("conservative") ! U=(rho, rho u, rho v, rho w, p)
+              ! density
+              converted_vector(:,:,rhoF)  =phi(:,:,rhoF)**2
+              ! rho u
+              converted_vector(:,:,UxF)   =phi(:,:,UxF)*phi(:,:,rhoF)
+              ! rho v
+              converted_vector(:,:,UyF)   =phi(:,:,UyF)*phi(:,:,rhoF)
+
+                ! kinetic energie
+              converted_vector(:,:,pF)=phi(:,:,UxF)**2+phi(:,:,UyF)**2
+              converted_vector(:,:,pF)=converted_vector(:,:,pF)*0.5_rk
+              ! total energie
+              ! e_tot=e_kin+p/(gamma-1)
+              converted_vector(:,:,pF)=converted_vector(:,:,pF)+phi(:,:,pF)/(params_ns%gamma_-1)
+            case ("pure_variables")
+              ! add ambient pressure
+              !rho
+              converted_vector(:,:,rhoF)= phi(:,:,rhoF)**2
+              !u
+              converted_vector(:,:,UxF)= phi(:,:, UxF)/phi(:,:,rhoF)
+              !v
+              converted_vector(:,:,UyF)= phi(:,:, UyF)/phi(:,:,rhoF)
+              !p
+              converted_vector(:,:,pF)= phi(:,:, pF)
+            case default
+                call abort(7771,"the format is unkown: "//trim(adjustl(convert2format)))
+            end select
+
+            phi=converted_vector
+
+        end subroutine convert_statevector2D
+
+
+    !> \brief pack statevector of skewsymetric scheme \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$ from
+    !>            + conservative variables \f$(\rho,\rho u,\rho v,e\rho )\f$ or pure variables (rho,u,v,p)
+    subroutine pack_statevector(phi,format)
+        implicit none
+        ! convert to type "conservative","pure_variables"
+        character(len=*), intent(in)   :: format
+        !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+        real(kind=rk), intent(inout)   :: phi(1:,1:,1:,1:)
+        ! vector containing the variables in the desired format
+        real(kind=rk)                  :: converted_vector(size(phi,1),size(phi,2),size(phi,3),size(phi,4))
+
+
+
+        select case( format )
+        case ("conservative") ! phi=(rho, rho u, rho v, e_tot)
+          ! sqrt(rho)
+          if ( minval(phi(:,:,:,rhoF))<0 ) then
+            write(*,*) "minval=", minval(phi(:,:,:,rhoF))
+            call abort(457881,"ERROR [module_navier_stokes.f90]: density smaller then 0!!")
+          end if
+          converted_vector(:,:,:,rhoF)=sqrt(phi(:,:,:,rhoF))
+          ! sqrt(rho) u
+          converted_vector(:,:,:,UxF)=phi(:,:,:,UxF)/converted_vector(:,:,:,rhoF)
+          ! sqrt(rho) v
+          converted_vector(:,:,:,UyF)=phi(:,:,:,UyF)/converted_vector(:,:,:,rhoF)
+
+          if ( params_ns%dim==3 ) then
+            converted_vector(:,:,:,UzF)=phi(:,:,:,UzF)/converted_vector(:,:,:,rhoF)
+            ! kinetic energie
+            converted_vector(:,:,:,pF)=converted_vector(:,:,:,UxF)**2 &
+                                      +converted_vector(:,:,:,UyF)**2 &
+                                      +converted_vector(:,:,:,UzF)**2
+          else
+            ! kinetic energie
+            converted_vector(:,:,:,pF)=converted_vector(:,:,:,UxF)**2 &
+                                      +converted_vector(:,:,:,UyF)**2
+          end if
+          converted_vector(:,:,:,pF)=converted_vector(:,:,:,pF)*0.5_rk
+          ! p=(e_tot-e_kin)(gamma-1)/rho
+          converted_vector(:,:,:,pF)=(phi(:,:,:,pF)-converted_vector(:,:,:,pF))*(params_ns%gamma_-1)
+        case ("pure_variables") !phi=(rho,u,v,p)
+          ! add ambient pressure
+          ! sqrt(rho)
+          converted_vector(:,:,:,rhoF)= sqrt(phi(:,:,:,rhoF))
+          ! sqrt(rho) u
+          converted_vector(:,:,:,UxF)= phi(:,:,:,UxF)*converted_vector(:,:,:,rhoF)
+          ! sqrt(rho)v
+          converted_vector(:,:,:,UyF)= phi(:,:,:,UyF)*converted_vector(:,:,:,rhoF)
+          ! sqrt(rho)w
+          if ( params_ns%dim==3 ) converted_vector(:,:,:,UzF)= phi(:,:,:,UzF)*converted_vector(:,:,:,rhoF)
+          !p
+          converted_vector(:,:,:,pF)= phi(:,:,:,pF)
+        case default
+            call abort(7771,"the format is unkown: "//trim(adjustl(format)))
+        end select
+
+        phi(:,:,:,rhoF) =converted_vector(:,:,:,rhoF)
+        phi(:,:,:,UxF)  =converted_vector(:,:,:,UxF )
+        phi(:,:,:,UyF)  =converted_vector(:,:,:,UyF )
+        if ( params_ns%dim==3 ) phi(:,:,:,UzF) = converted_vector(:,:,:,UzF)
+        phi(:,:,:,pF)   =converted_vector(:,:,:,pF)
+    end subroutine pack_statevector
+
+
+
+    subroutine convert2format(phi_in,format_in,phi_out,format_out)
+        implicit none
+        ! convert to type "conservative","pure_variables"
+        character(len=*), intent(in)   ::  format_in, format_out
+        !phi U=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
+        real(kind=rk), intent(in)      :: phi_in(1:,1:,1:,1:)
+        ! vector containing the variables in the desired format
+        real(kind=rk), intent(inout)   :: phi_out(:,:,:,:)
+
+        ! convert phi_in to skewsymetric variables  \f$(\sqrt(\rho),\sqrt(\rho)u,\sqrt(\rho)v,p )\f$
+        if (format_in=="skew") then
+          phi_out  =  phi_in
+        else
+          phi_out  =  phi_in
+          call pack_statevector(phi_out,format_in)
+        endif
+
+        ! form skewsymetric variables convert to any other scheme
+        if (format_out=="skew") then
+          !do nothing because format is skew already
+        else
+          call convert_statevector3D(phi_out,format_out)
+        endif
+    end subroutine convert2format
+
+
+
 
 
 

@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
+subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage, first_substep )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -32,6 +32,10 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
+    !> some operations might be done only in the first RK substep, hence we pass
+    !! this flag to check if this is the first call at the current time level.
+    logical, intent(in) :: first_substep
+
     ! local variables
     integer(kind=ik) :: Bs, mpierr
     real(kind=rk) :: tmp(1:3), tmp2
@@ -50,6 +54,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         params_acm%mean_flow = 0.0_rk
         params_acm%mean_p = 0.0_rk
         params_acm%umax = 0.0_rk
+        params_acm%urms = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -71,7 +76,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         if (params_acm%dim == 2) then
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
             params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
+            
             params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 3))*dx(1)*dx(2)
+
+            params_acm%urms(1) = params_acm%urms(1)  + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)**2)*dx(1)*dx(2)
+            params_acm%urms(2) = params_acm%urms(2)  + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)**2)*dx(1)*dx(2)
 
             tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)**2)
             params_acm%umax = max( params_acm%umax, tmp2 )
@@ -79,7 +88,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
             params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
             params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
+
             params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 4))*dx(1)*dx(2)*dx(3)
+
+            params_acm%urms(1) = params_acm%urms(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1)**2)*dx(1)*dx(2)*dx(3)
+            params_acm%urms(2) = params_acm%urms(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2)**2)*dx(1)*dx(2)*dx(3)
+            params_acm%urms(3) = params_acm%urms(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3)**2)*dx(1)*dx(2)*dx(3)
 
             tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2)**2 &
                          + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3)**2 )
@@ -99,6 +113,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         tmp2 = sqrt(params_acm%umax)
         call MPI_ALLREDUCE(tmp2, params_acm%umax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        tmp = params_acm%urms
+        call MPI_ALLREDUCE(tmp, params_acm%urms, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         if (params_acm%dim == 2) then
             params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
@@ -111,8 +127,23 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage )
         ! the speed of sound is usually a constant, but for numerics it might be a good idea to interpret
         ! it as a mach number, relative to the largest velocity in the field. In this case, c0 = max(u)*MachNumber
         ! and c0(t). The scaling is used if a MachNumber is given; otherwise, c0 is a constant
-        if (params_acm%MachNumber > 0.0_rk) then
-            params_acm%c_0 = params_acm%MachNumber * params_acm%umax
+        if (params_acm%MachNumber > 0.0_rk .and. first_substep) then
+            if (time<params_acm%t0_MachNumber) then
+                ! fixed c0 regime
+                params_acm%c_0 = params_acm%c_0_min
+
+            elseif (time>=params_acm%t0_MachNumber .and. time<=params_acm%t1_MachNumber) then
+                ! transitional regime
+                tmp2 = startup_conditioner(time, params_acm%t0_MachNumber, params_acm%t1_MachNumber-params_acm%t0_MachNumber)
+                params_acm%c_0 = (params_acm%c_0_min)*(1.0_rk-tmp2) + tmp2*(params_acm%MachNumber * params_acm%umax)
+
+            else
+                ! MachNumber regime
+                params_acm%c_0 = params_acm%MachNumber * params_acm%umax
+
+            endif
+
+            if (params_acm%mpirank==0) write(*,*) params_acm%c_0, params_acm%MachNumber, params_acm%umax
         endif
 
     case ("local_stage")

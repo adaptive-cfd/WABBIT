@@ -63,7 +63,8 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
 
     ! the very last slot (M+3) is the "reference right hand side"
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), lgt_block, hvy_active, hvy_n)
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), lgt_block, &
+    hvy_active, hvy_n, first_substep=.true. )
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
     ! NSF: this guy is called normuu

@@ -101,7 +101,10 @@ subroutine post_rhs(params)
 
     ! compute right hand side
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), lgt_block, hvy_active, hvy_n)
+    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), lgt_block, &
+    hvy_active, hvy_n, first_substep=.true. )
+
+    write(*,*) "Warning: if the RHS is different for the very first substep (e.g. in RK4), this routine gives the first substep"
 
     ! save result to disk
     do k = 1, params%n_eqn

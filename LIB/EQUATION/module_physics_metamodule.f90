@@ -150,7 +150,7 @@ end subroutine FIELD_NAMES_meta
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage, boundary_flag)
+ subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage, boundary_flag, first_substep)
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -187,14 +187,19 @@ end subroutine FIELD_NAMES_meta
    !  1: boundary in the direction +e_i
    ! -1: boundary in the direction - e_i
    ! currently only acessible in the local stage
-   integer(kind=2),optional          , intent(in):: boundary_flag(3)
+   integer(kind=2),optional, intent(in):: boundary_flag(3)
+
+   !> some operations might be done only in the first RK substep, hence we pass
+   !! this flag to check if this is the first call at the current time level.
+   !! It is currently used only in ACM module
+   logical, intent(in) :: first_substep
 
    select case(physics)
    case ("ACM-new")
-     call RHS_ACM( time, u, g, x0, dx,  rhs, stage )
+     call RHS_ACM( time, u, g, x0, dx,  rhs, stage, first_substep )
 
    case ("ConvDiff-new")
-     call RHS_convdiff( time, u, g, x0, dx, rhs, stage,boundary_flag )
+     call RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag )
 
    case ("navier_stokes")
      call RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )

@@ -99,9 +99,10 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
 ! main body
 
     if (params%time_step_method=="Krylov") then
-        ! use krylov time stepping
-        call krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
-            hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
+
+    ! use krylov time stepping
+    call krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
+        hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
 
 
     elseif (params%time_step_method=="RungeKuttaGeneric") then
@@ -115,7 +116,8 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
 
         ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
         ! slot after the copy of the state vector (hence 2)
-        call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), lgt_block, hvy_active, hvy_n)
+        call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), &
+        lgt_block, hvy_active, hvy_n, first_substep=.true. )
 
         ! save data at time t to heavy work array
         ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper

@@ -91,7 +91,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     endif
 
-    nwork      = max( 2*Neqn, params%N_fields_saved)
+    nwork = max( 2*Neqn, params%N_fields_saved)
 
     !---------------------------------------------------------------------------------------------
     ! main body
@@ -112,7 +112,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
         !---------------------------------------------------------------------------
         allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks ) )
-        hvy_block = 0.0_rk ! initialize: trigger memory crashes in the beginning, if they occur
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
@@ -122,14 +121,12 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks, nrhs_slots ) )
-            hvy_work = 0.0_rk ! initialize: trigger memory crashes in the beginning, if they occur
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
             endif
 
             allocate( hvy_tmp( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks )  )
-            hvy_tmp = 0.0_rk ! initialize: trigger memory crashes in the beginning, if they occur
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
@@ -139,7 +136,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! 3D: maximal 74 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 74 ) )
-        hvy_neighbor = -1_ik ! initialize: trigger memory crashes in the beginning, if they occur
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_neighbor", product(real(shape(hvy_neighbor)))*8.0e-9, shape(hvy_neighbor)
@@ -152,7 +148,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
         !---------------------------------------------------------------------------
         allocate( hvy_block( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks ) )
-        hvy_block = 2.0e99_rk ! initialize: trigger memory crashes in the beginning, if they occur
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
@@ -162,14 +157,12 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! work data (Runge-Kutta substeps and old time level)
         if (simulation) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks, nrhs_slots ) )
-            hvy_work = 8.0e99_rk ! initialize: trigger memory crashes in the beginning, if they occur
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",6(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
             endif
 
             allocate( hvy_tmp( Bs+2*g, Bs+2*g, 1, nwork, number_blocks )  )
-            hvy_tmp = 9.99e9_rk ! initialize: trigger memory crashes in the beginning, if they occur
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
@@ -179,7 +172,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! 2D: maximal 16 neighbors per block
         allocate( hvy_neighbor( params%number_blocks, 16 ) )
-        hvy_neighbor = -1_ik ! initialize: trigger memory crashes in the beginning, if they occur
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_neighbor", product(real(shape(hvy_neighbor)))*8.0e-9, shape(hvy_neighbor)
@@ -189,8 +181,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     !---------------------------------------------------------------------------)
     allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+extra_lgt_fields) )
-    lgt_block = -1_ik ! initialize: trigger memory crashes in the beginning, if they occur
-
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)
@@ -198,7 +188,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     !---------------------------------------------------------------------------
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
-    lgt_sortednumlist = -1_tsize ! initialize: trigger memory crashes in the beginning, if they occur
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
@@ -206,7 +195,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     !---------------------------------------------------------------------------
     allocate( lgt_active( size(lgt_block, 1) ) )
-    lgt_active = -1_ik ! initialize: trigger memory crashes in the beginning, if they occur
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
@@ -215,7 +203,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
     allocate( hvy_active( size(hvy_block, 5) ) )
-    hvy_active = -1_ik ! initialize: trigger memory crashes in the beginning, if they occur
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "hvy_active", product(real(shape(hvy_active)))*4.0e-9, shape(hvy_active)
@@ -227,7 +214,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
         write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
 
-        effective_memory = (dble(size(hvy_block)+size(hvy_work)) + & ! real data
+        effective_memory = (dble(size(hvy_block)+size(hvy_work)+size(hvy_tmp)) + & ! real data
         dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
         )*8.0e-9 ! in GB
 

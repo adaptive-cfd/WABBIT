@@ -181,9 +181,6 @@ subroutine init_ghost_nodes( params )
 
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
-        
-        ! fill arrays immediately to provoque crashes due to insufficient memory (and not after hours of computing)
-        tmp_block = 9.9_rk
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"
@@ -214,12 +211,6 @@ subroutine init_ghost_nodes( params )
         allocate( int_recv_buffer( 1:buffer_N_int, 1:Nstages), stat=status(2) )
         allocate( new_send_buffer( 1:buffer_N, 1:Nstages), stat=status(3) )
         allocate( new_recv_buffer( 1:buffer_N, 1:Nstages), stat=status(4) )
-
-        ! fill arrays immediately to provoque crashes due to insufficient memory (and not after hours of computing)
-        int_send_buffer = 92
-        int_recv_buffer = 92
-        new_send_buffer = 9.9_rk
-        new_recv_buffer = 9.9_rk
 
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
@@ -259,15 +250,6 @@ subroutine init_ghost_nodes( params )
         allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
         allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
 
-        ! fill arrays immediately to provoque crashes due to insufficient memory (and not after hours of computing)
-        communication_counter = 9
-        int_pos = 9
-        real_pos = 9
-        line_buffer = 9.9_rk
-        recv_counter = 9
-        send_counter = 9
-        int_recv_counter = 9
-        int_send_counter = 9
 
         !-----------------------------------------------------------------------
         ! set up constant arrays

@@ -50,9 +50,10 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neigh
 
 
     ! reset data
-    hvy_block = 9.99e99_rk
-    hvy_work = 9.99e99_rk
-    hvy_tmp =  9.99e99_rk
+    ! hvy_block = 9.99e99_rk ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
+    ! hvy_work = 9.99e99_rk
+    ! hvy_tmp =  9.99e99_rk
+    
     hvy_neighbor = -1
     ! as the grid has changed (we deleted it here), we now update the heavy and light
     ! active lists
@@ -86,8 +87,9 @@ subroutine reset_lgt_data(lgt_block, lgt_active,max_treelevel, lgt_n, lgt_sorted
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik)  , intent(in)         :: max_treelevel
 
-    lgt_block = -1
-    lgt_active = -1
+
+    ! lgt_block = -1 ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
+    ! lgt_active = -1
 
     ! reset data:
     ! all blocks are inactive, reset treecode

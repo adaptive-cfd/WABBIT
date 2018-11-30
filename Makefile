@@ -239,7 +239,7 @@ $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $
 	refinement_indicator.f90 block_coarsening_indicator.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90
+$(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o $(OBJDIR)/module_interpolation.o \

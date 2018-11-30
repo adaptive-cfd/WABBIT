@@ -86,6 +86,8 @@ subroutine reset_lgt_data(lgt_block, lgt_active,max_treelevel, lgt_n, lgt_sorted
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik)  , intent(in)         :: max_treelevel
 
+    lgt_block = -1
+    lgt_active = -1
 
     ! reset data:
     ! all blocks are inactive, reset treecode

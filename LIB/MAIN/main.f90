@@ -27,6 +27,7 @@ program main
 ! modules
 
     use mpi
+    use module_helpers
     use module_MPI
     ! global parameters
     use module_params
@@ -269,6 +270,7 @@ program main
         open (44, file='CFL.t', status='replace')
         write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
         close(44)
+        call Initialize_runtime_control_file()
     endif
 
     ! next write time for reloaded data
@@ -449,6 +451,15 @@ program main
         ! walltime limiter
         if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
             if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
+            keep_running = .false.
+        endif
+
+        ! it happens quite often that one wants to end a simulation prematurely, but
+        ! one also wants to be able to resume it. the usual "kill" on clusters will terminate
+        ! wabbit immediately and not write a backup. Hence, it is possible to terminate
+        ! wabbit by writing "save_stop" to "runtime_control"
+        if ( runtime_control_stop() ) then
+            if (rank==0) write(*,*) "WE RECVED THE STOP COMMAND: WRITE BACKUP; THEN BYEBYE"
             keep_running = .false.
         endif
     end do

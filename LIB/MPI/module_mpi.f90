@@ -169,8 +169,6 @@ subroutine init_ghost_nodes( params )
             Nneighbor = 74
 
             allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
-            ! fill arrays immediately to provoque crashes due to insufficient memory (and not after hours of computing)
-            tmp_block = 9.9_rk
         else
             !---2d---2d---
             ! space dimensions: used in the static arrays as index
@@ -183,6 +181,9 @@ subroutine init_ghost_nodes( params )
 
             allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
         end if
+        
+        ! fill arrays immediately to provoque crashes due to insufficient memory (and not after hours of computing)
+        tmp_block = 9.9_rk
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"

@@ -332,6 +332,7 @@ contains
         endif
 
     end subroutine check_file_exists
+
     !---------------------------------------------------------------------------
     ! wrapper for NaN checking (this may be compiler dependent)
     !---------------------------------------------------------------------------
@@ -361,4 +362,51 @@ contains
             end do
         end do
     end function block_contains_NaN
+
+    !-------------------------------------------------------------------------------
+    ! runtime control routines
+    ! flusi regularily reads from a file runtime_control.ini if it should do some-
+    ! thing, such as abort, reload_params or save data.
+    !-------------------------------------------------------------------------------
+    subroutine Initialize_runtime_control_file()
+      ! overwrites the file again with the standard runtime_control file
+      implicit none
+
+      open  (14,file='runtime_control',status='replace')
+      write (14,'(A)') "# This is wabbit's runtime control file"
+      write (14,'(A)') "# Stop the run but makes a backup first"
+      write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
+      write (14,'(A)') "#       runtime_control=save_stop;"
+      write (14,'(A)') ""
+      write (14,'(A)') "[runtime_control]"
+      write (14,'(A)') "runtime_control=nothing;"
+      close (14)
+
+    end subroutine Initialize_runtime_control_file
+
+
+
+    logical function runtime_control_stop(  )
+      ! reads runtime control command
+      use module_ini_files_parser_mpi
+      implicit none
+      character(len=80) :: command
+      character(len=80) :: file
+      type(inifile) :: CTRL_FILE
+
+      file ="runtime_control"
+
+      ! root reads in the control file
+      ! and fetched the command
+      call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
+      call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
+      call clean_ini_file_mpi( CTRL_FILE )
+
+      if (command == "save_stop") then
+          runtime_control_stop = .true.
+      else
+          runtime_control_stop = .false.
+      endif
+  end function runtime_control_stop
+
 end module module_helpers

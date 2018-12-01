@@ -256,6 +256,8 @@ program main
         close(44)
         open (44, file='eps_norm.t', status='replace')
         close(44)
+        open (44, file='div.t', status='replace')
+        close(44)
         open (44, file='block_dist.dat', status='replace')
         close(44)
         open (44, file='mask_volume.t', status='replace')
@@ -270,8 +272,8 @@ program main
         open (44, file='CFL.t', status='replace')
         write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
         close(44)
-        call Initialize_runtime_control_file()
     endif
+    call Initialize_runtime_control_file()
 
     ! next write time for reloaded data
     if (params%write_method == 'fixed_time') then

@@ -51,7 +51,7 @@ module module_acm
     real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3), urms(1:3)
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3), urms(1:3), div_max, div_min
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?

@@ -41,17 +41,19 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     real(kind=rk), save :: umag
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
-    real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
+    real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:), div(:,:,:)
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
     if (params_acm%dim==3) then
         if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
+        if (.not. allocated(div)) allocate(div(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
         if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
         dV = dx(1)*dx(2)*dx(3)
     else
         if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
+        if (.not. allocated(div)) allocate(div(1:Bs+2*g, 1:Bs+2*g, 1))
         if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
         dV = dx(1)*dx(2)
     endif
@@ -71,6 +73,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
         params_acm%enstrophy = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
+        params_acm%div_max = 0.0_rk
+        params_acm%div_min = 0.0_rk
         umag = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
@@ -121,6 +125,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
             eps_inv = 1.0_rk / params_acm%C_eta
 
+            ! note in 2D case, uz is ignored, so we pass p just for fun.
+            call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
             do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
             do ix = g+1, Bs+g-1
@@ -147,12 +153,19 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
 
                 ! maximum of velocity in the field
                 umag = max( umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
+
+                ! maximum/min divergence in velocity field
+                params_acm%div_max = max( params_acm%div_max, div(ix,iy,1) )
+                params_acm%div_min = min( params_acm%div_min, div(ix,iy,1) )
             enddo
             enddo
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
             call create_mask_3D( time, x0, dx, Bs, g, mask, us )
             eps_inv = 1.0_rk / params_acm%C_eta
+
+            ! compute divergence on this block
+            call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
             do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
             do iy = g+1, Bs+g-1
@@ -182,6 +195,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
 
                 ! maximum of velocity in the field
                 umag = max( umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
+
+                ! maximum/min divergence in velocity field
+                params_acm%div_max = max( params_acm%div_max, div(ix,iy,iz) )
+                params_acm%div_min = min( params_acm%div_min, div(ix,iy,iz) )
             enddo
             enddo
             enddo
@@ -243,6 +260,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
         call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
+        ! divergence
+        tmp(1) = params_acm%div_min
+        call MPI_ALLREDUCE(tmp(1), params_acm%div_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
+
+        tmp(1) = params_acm%div_max
+        call MPI_ALLREDUCE(tmp(1), params_acm%div_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+
+        !-------------------------------------------------------------------------
         ! kinetic enstrophy
         tmp(1)= params_acm%enstrophy
         call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -270,6 +295,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             ! write mean flow to disk...
             open(14,file='meanflow.t',status='unknown',position='append')
             write(14,'(4(es15.8,1x))') time, params_acm%mean_flow
+            close(14)
+
+            ! write divergence to disk...
+            open(14,file='div.t',status='unknown',position='append')
+            write(14,'(3(es15.8,1x))') time, params_acm%div_max, params_acm%div_min
             close(14)
 
             ! write forces to disk...

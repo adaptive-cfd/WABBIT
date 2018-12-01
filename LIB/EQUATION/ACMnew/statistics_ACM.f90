@@ -129,7 +129,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
-            div = div*(1.0_rk-mask)
+            where (mask>0.0_rk)
+                div = 0.00_rk
+            end where
 
             do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
             do ix = g+1, Bs+g-1
@@ -171,7 +173,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
-            div = div*(1.0_rk-mask)
+            where (mask>0.0_rk)
+                div = 0.00_rk
+            end where
 
             do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
             do iy = g+1, Bs+g-1

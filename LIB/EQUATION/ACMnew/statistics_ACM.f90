@@ -128,6 +128,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             ! note in 2D case, uz is ignored, so we pass p just for fun.
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
+            ! mask divergence inside the solid body
+            div = div*(1.0_rk-mask)
+
             do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
             do ix = g+1, Bs+g-1
                 ! compute mean flow for output in statistics
@@ -166,6 +169,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
 
             ! compute divergence on this block
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
+
+            ! mask divergence inside the solid body
+            div = div*(1.0_rk-mask)
 
             do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
             do iy = g+1, Bs+g-1

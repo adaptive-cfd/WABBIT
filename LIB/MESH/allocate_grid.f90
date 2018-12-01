@@ -125,13 +125,13 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
             endif
-
-            allocate( hvy_tmp( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks )  )
-            if (rank==0) then
-                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-                "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
-            endif
         end if
+
+        allocate( hvy_tmp( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks )  )
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+            "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
+        endif
 
         !---------------------------------------------------------------------------
         ! 3D: maximal 74 neighbors per block
@@ -161,13 +161,13 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",6(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
             endif
-
-            allocate( hvy_tmp( Bs+2*g, Bs+2*g, 1, nwork, number_blocks )  )
-            if (rank==0) then
-                write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-                "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
-            endif
         end if
+
+        allocate( hvy_tmp( Bs+2*g, Bs+2*g, 1, nwork, number_blocks )  )
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+            "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
+        endif
 
         !---------------------------------------------------------------------------
         ! 2D: maximal 16 neighbors per block

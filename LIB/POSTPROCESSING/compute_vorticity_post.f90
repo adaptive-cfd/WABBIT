@@ -22,13 +22,13 @@ subroutine compute_vorticity_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: file_ux, file_uy, file_uz
+    character(len=80)      :: file_ux, file_uy, file_uz, operator
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, Bs, tc_length
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
-    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -39,13 +39,14 @@ subroutine compute_vorticity_post(params)
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
+    call get_command_argument(1, operator)
     call get_command_argument(2, file_ux)
     ! does the user need help?
     if (file_ux=='--help' .or. file_ux=='--h') then
         if (params%rank==0) then
             write(*,*) "wabbit postprocessing routine for subsequent vorticity calculation"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --vorticity source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --vorticity source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence] source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence] source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
         end if
         return
     endif
@@ -103,13 +104,14 @@ subroutine compute_vorticity_post(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work)
+    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
 
     ! read mesh and field
     call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
     call read_field(file_ux, 1, params, hvy_block, hvy_n)
     call read_field(file_uy, 2, params, hvy_block, hvy_n)
     if (params%threeD_case) call read_field(file_uz, 3, params, hvy_block, hvy_n)
+
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
@@ -121,30 +123,58 @@ subroutine compute_vorticity_post(params)
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
     ! calculate vorticity from velocities
-    do k=1,hvy_n
+    do k = 1, hvy_n
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-        if (params%threeD_case) then
-            call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
-            dx, params%Bs, params%n_ghosts,&
-            params%order_discretization, hvy_work(:,:,:,1:3,hvy_active(k),1))
-        else
-            call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,1,hvy_active(k)),&
+
+        if (operator == "--vorticity") then
+            if (params%threeD_case) then
+                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
+                hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
+                dx, params%Bs, params%n_ghosts,&
+                params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_active(k)))
+
+            else
+
+                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
+                hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,1,hvy_active(k)),&
+                dx, params%Bs, params%n_ghosts, &
+                params%order_discretization, hvy_tmp(:,:,:,:,hvy_active(k)))
+            end if
+
+        elseif (operator == "--divergence") then
+            call divergence( hvy_block(:,:,:,1,hvy_active(k)), &
+            hvy_block(:,:,:,2,hvy_active(k)), &
+            hvy_block(:,:,:,3,hvy_active(k)),&
             dx, params%Bs, params%n_ghosts, &
-            params%order_discretization, hvy_work(:,:,:,:,hvy_active(k),1))
-        end if
+            params%order_discretization, hvy_tmp(:,:,:,1,hvy_active(k)))
+
+        else
+            call abort(1812011,"operator is neither --vorticity nor --divergence")
+            
+        endif
     end do
-    write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
-    call write_field(fname, time, iteration, 1, params, lgt_block,&
-    hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
-    if (params%threeD_case) then
-        write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
-        call write_field(fname, time, iteration, 2, params, lgt_block,&
-        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n,  hvy_active)
-        write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
-        call write_field(fname, time, iteration, 3, params, lgt_block, &
-        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active)
-    end if
+
+
+    if (operator == "--vorticity") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
+
+        call write_field(fname, time, iteration, 1, params, lgt_block,&
+        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+
+        if (params%threeD_case) then
+            write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
+            call write_field(fname, time, iteration, 2, params, lgt_block,&
+            hvy_tmp, lgt_active, lgt_n, hvy_n,  hvy_active)
+            write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
+            call write_field(fname, time, iteration, 3, params, lgt_block, &
+            hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active)
+        end if
+
+    elseif (operator=="--divergence") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'divu', nint(time * 1.0e6_rk)
+
+        call write_field(fname, time, iteration, 1, params, lgt_block,&
+        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+    endif
 end subroutine compute_vorticity_post

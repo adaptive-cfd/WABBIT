@@ -331,7 +331,7 @@ end subroutine draw_funnel
       call MPI_ALLREDUCE(tmp  ,integral, Nq , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
       call MPI_ALLREDUCE(area ,A       , 1  , MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
-      if ( .not. abs(A) > 0) then
+      if ( .not. A > 0 ) then
         call abort(24636,"Error [funnel.f90]: only chuck norris can devide by zero!!")
       endif
 
@@ -339,6 +339,7 @@ end subroutine draw_funnel
       integral = integral / A
       funnel%pump_density = integral(rhoF)
       funnel%pump_pressure = integral(pF)
+
   end subroutine mean_quantity
 
 

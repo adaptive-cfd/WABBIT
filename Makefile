@@ -34,6 +34,11 @@ ifndef $(FC)
 FC = mpif90
 endif
 
+
+#Place of Sparse BLAS objects
+SB_LIB = -L../../sblas/SOFTWARE -lSparseBLAS_GNU
+#Place of Sparse BLAS modules
+SB_INCL = -I../../sblas/SOFTWARE
 #-------------------------------------------------------------------------------
 # PRAGMAS part.
 #-------------------------------------------------------------------------------
@@ -66,8 +71,8 @@ FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument 
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm -lblas -llapack
-FFLAGS += -I$(HDF_INC)
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm -lblas -llapack
+FFLAGS += -I$(HDF_INC) $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
 PRAGMAS = #-DBLOCKINGSENDRECV
@@ -269,7 +274,7 @@ $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_pa
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_debug.o \
-	volume_integral.f90 compute_vorticity.f90 divergence.f90
+	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

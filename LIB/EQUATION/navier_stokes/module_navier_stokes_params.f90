@@ -20,6 +20,51 @@ module module_navier_stokes_params
   implicit none
 
   !=========================================================
+  !               BOUNDARYCONDITIONS Parameter
+  !---------------------------------------------------------
+  ! filter structure
+  type :: type_boundary
+
+      ! Boundary type
+      ! -----------------
+      ! Type of boundary is an array of dimension 3.
+      ! Each boundary direction e_i (i=1,2 in 2D)
+      ! has a type:
+      !                 + periodic (if ghostnodes in direction are periodically synched)
+      !                 + symmetric-open (symmetric in -e_i and open in +e_i)
+      !                 + open (open at both sides)
+      character(len=80), dimension(3)  :: name
+
+      ! Boundary values
+      ! ----------------
+      ! possible values of the statevector at the boundaries:
+      !  + e_x direction
+      real(kind=rk),allocatable  :: phi_xplus(:)
+      !  + -e_x direction
+      real(kind=rk),allocatable  :: phi_xminus(:)
+      !  + e_y direction
+      real(kind=rk),allocatable  :: phi_yplus(:)
+      !  + -e_y direction
+      real(kind=rk),allocatable  :: phi_yminus(:)
+      !  + e_z direction
+      real(kind=rk),allocatable  :: phi_zplus(:)
+      !  + -e_z direction
+      real(kind=rk),allocatable  :: phi_zminus(:)
+
+      ! How to initialice Boundaryvalues?
+      ! ----------------------------------
+      ! Boundary values can be initialiced with parameters red from
+      ! parameter file (choose "paramsfile") or taken from the initial condition (choose "inicond")
+      ! Currently not supported, but possible: choose new BC in every timestep (choose "time-dependent")
+      character(len=80)       :: ref_type
+
+end type type_boundary
+  !=========================================================
+
+
+
+
+  !=========================================================
   !               FILTER PARAMETER
   !---------------------------------------------------------
   ! filter structure
@@ -68,11 +113,13 @@ module module_navier_stokes_params
         ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
         ! spatial domain%number_data_fields
-        real(kind=rk)                               :: R_max, domain_size(3)=0.0_rk
+        real(kind=rk)                               :: domain_size(3)=0.0_rk
+        ! minimal and maximal radius in the case of cylindrical coordinates
+        real(kind=rk)                               :: R_max, R_min
         ! number data fields
         integer(kind=ik)                            :: n_eqn
         ! number of block nodes
-        integer(kind=ik)                            :: Bs
+        integer(kind=ik)                            :: Bs,g
         ! maximal tree level
         integer(kind=ik)                            :: Jmax
         ! dimension
@@ -130,6 +177,9 @@ module module_navier_stokes_params
         !---------------------------------------------------------
         ! filter structure containing all parameters of the filter
         type(type_params_filter)                    :: filter
+        !---------------------------------------------------------
+        ! filter structure containing all parameters of the filter
+        type(type_boundary)                         :: bound
         ! --------------------------------------------------------------------------------
         ! dimensionless scales (see function add_info)
         ! --------------------------------------------------------------------------------
@@ -145,8 +195,6 @@ module module_navier_stokes_params
         ! Boundary conditions
         ! -------------------------------------------------------------------------------------
         logical,dimension(3)                        :: periodic_BC=(/.true.,.true.,.true./)
-        character(len=80)                           :: boundary_type
-
   end type type_params_ns
 
   ! statevector index
@@ -182,6 +230,7 @@ contains
     !
     call read_param_mpi(FILE, 'Navier_Stokes', 'Coordinate_system', params_ns%coordinates, &
                                                                     params_ns%coordinates )
+
     ! spatial domain size
     call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
@@ -207,7 +256,6 @@ contains
     call read_param_mpi(FILE, 'Navier_Stokes', 'dissipation', params_ns%dissipation, .true. )
     ! which case is studied in the NStokes module
     call read_param_mpi(FILE, 'Navier_Stokes', 'case', params_ns%case, 'no' )
-
 
   end subroutine init_navier_stokes_eq
 
@@ -250,14 +298,19 @@ contains
 
 subroutine read_boundary_conditions( FILE )
     implicit none
-    !> pointer to inifile
-    type(inifile) ,intent(inout)        :: FILE
+    !------------------------------------------------
+    type(inifile) ,intent(inout)        :: FILE !> pointer to inifile
+    !------------------------------------------------
+    integer :: dim,i
 
-    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_ns%periodic_BC(1:params_ns%dim), &
-                                                       params_ns%periodic_BC(1:params_ns%dim) )
+    dim=params_ns%dim
+
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_ns%periodic_BC(1:dim), &
+                                                       params_ns%periodic_BC(1:dim) )
 
     ! only read in parameters if we need them
     if ( ALL(params_ns%periodic_BC) ) then
+      params_ns%bound%name="periodic"
       return
     end if
 
@@ -268,7 +321,81 @@ subroutine read_boundary_conditions( FILE )
       write(*,'(" ---------------------------")')
     endif
 
-    call read_param_mpi(FILE, 'Navier_Stokes', 'boundary_type', params_ns%boundary_type, "no" )
+    params_ns%bound%name="---"
+    call read_param_mpi(FILE, 'Boundary_Conditions', 'boundary_type', params_ns%bound%name(1:dim), &
+                                                                params_ns%bound%name(1:dim) )
+
+    do i = 1, dim
+      if ( .not. params_ns%periodic_BC(i) .and. params_ns%bound%name(i)=="periodic" ) then
+        call abort(251020181,"ERROR: Try to asign periodic BC to a boundary which is not periodic!"// &
+                              "Tip: Change either boundary_type or parameter periodic_BC")
+      end if
+    end do
+
+
+    ! ==========================================
+    ! set boundary values
+    ! ==========================================
+    ! call read_param_mpi(FILE, 'Boundary_Conditions', 'reference_type',phi_tmp,phi_tmp)
+    ! if ( .not.params_ns%bound%ref_type=='paramsfile' ) then
+    !       return
+    ! end if
+
+    ! + at the e_x direction boundaries
+    if ( .not. params_ns%periodic_BC(1) ) then
+      select case(params_ns%bound%name(1))
+      case("open")
+            allocate(params_ns%bound%phi_xminus(params_ns%n_eqn))
+            params_ns%bound%phi_xminus=-222.222_rk
+            call read_param_mpi(FILE, 'Boundary_Conditions', 'state_xminus', &
+                                    params_ns%bound%phi_xminus,params_ns%bound%phi_xminus)
+
+            allocate(params_ns%bound%phi_xplus(params_ns%n_eqn))
+            params_ns%bound%phi_xplus=-222.222_rk
+            call read_param_mpi(FILE, 'Boundary_Conditions', 'state_xplus', &
+                                    params_ns%bound%phi_xplus,params_ns%bound%phi_xplus)
+
+      case("symmetric-open")
+            ! no boundary conditions at yminus since yminus is symetric
+            allocate(params_ns%bound%phi_xplus(params_ns%n_eqn))
+            params_ns%bound%phi_xplus=-222.222_rk
+            call read_param_mpi(FILE, 'Boundary_Conditions', 'state_xplus', &
+                                    params_ns%bound%phi_xplus,params_ns%bound%phi_xplus)
+
+      case("wall")
+            ! to implement
+      case default
+            call abort(81020166,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+      end select
+    endif
+
+    ! + at the e_y direction boundaries
+    if ( .not. params_ns%periodic_BC(2) ) then
+      select case(params_ns%bound%name(2))
+      case("open")
+            allocate(params_ns%bound%phi_yminus(params_ns%n_eqn))
+            params_ns%bound%phi_yminus=-222.222_rk
+            call read_param_mpi(FILE, 'Boundary_Conditions', 'state_yminus', &
+                                    params_ns%bound%phi_yminus,params_ns%bound%phi_yminus)
+
+            allocate(params_ns%bound%phi_yplus(params_ns%n_eqn))
+            params_ns%bound%phi_yplus=-222.222_rk
+            call read_param_mpi(FILE, 'Boundary_Conditions', 'state_yplus', &
+                                    params_ns%bound%phi_yplus,params_ns%bound%phi_yplus)
+      case("symmetric-open")
+            ! no boundary conditions at yminus since yminus is symetric
+            allocate(params_ns%bound%phi_yplus(params_ns%n_eqn))
+            params_ns%bound%phi_yplus=-222.222_rk
+            call read_param_mpi(FILE, 'Boundary_Conditions', 'state_yplus', &
+                                    params_ns%bound%phi_yplus,params_ns%bound%phi_yplus)
+
+      case("wall")
+           ! to implement
+      case default
+           call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+      end select
+    endif
+
 
 end subroutine read_boundary_conditions
 
@@ -303,6 +430,7 @@ subroutine init_other_params( FILE )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_ns%Bs, 1   )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_ns%g, 1   )
 
 
   end subroutine init_other_params

@@ -57,8 +57,7 @@ tests=( "---convection---"
         "TESTING/acm/acm_cyl_adaptive_newsponge/acm_cyl_adaptive_newsponge.sh"
         "TESTING/acm/acm_cyl_adaptive_krylov/acm_cylinder_adaptive_krylov.sh"
         "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"
-        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh"
-        )
+        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh" )
 
 happy_sum=0
 sad_sum=0

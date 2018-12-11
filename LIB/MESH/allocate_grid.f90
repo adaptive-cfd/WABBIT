@@ -30,7 +30,7 @@
 !
 ! ********************************************************************************************
 subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, simulation, hvy_work, hvy_tmp)
+    lgt_sortednumlist, hvy_work, hvy_tmp)
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -58,8 +58,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! local shortcuts:
     integer(kind=ik)                                    :: Bs, g, Neqn, number_blocks,&
                                                       rank, number_procs,number_trees
-    !> do we have to allocate everything?
-    logical, intent(in) :: simulation
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
     integer             :: status, nrhs_slots, nwork
@@ -101,6 +99,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'(80("_"))')
         write(*,'(A)') "INIT: Beginning memory allocation and initialization."
         write(*,'("INIT: mpisize=",i6)') params%number_procs
+        write(*,'("INIT: nwork=",i6)') nwork
         write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
@@ -119,7 +118,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
-        if (simulation) then
+        if (present(hvy_work)) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks, nrhs_slots ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -127,10 +126,12 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             endif
         end if
 
+        if ( present(hvy_tmp) ) then
         allocate( hvy_tmp( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
+        endif
         endif
 
         !---------------------------------------------------------------------------
@@ -155,7 +156,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
-        if (simulation) then
+        if ( present(hvy_work) ) then
             allocate( hvy_work( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks, nrhs_slots ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",6(i9,1x))') &
@@ -163,10 +164,12 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             endif
         end if
 
+        if ( present(hvy_tmp) ) then
         allocate( hvy_tmp( Bs+2*g, Bs+2*g, 1, nwork, number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
+        endif
         endif
 
         !---------------------------------------------------------------------------
@@ -209,14 +212,17 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
 
-    if (rank == 0 .and. simulation) then
+    if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
         write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
 
-        effective_memory = (dble(size(hvy_block)+size(hvy_work)+size(hvy_tmp)) + & ! real data
+        effective_memory = (dble(size(hvy_block)) + & ! real data
         dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
         )*8.0e-9 ! in GB
+
+        if (present(hvy_tmp)) effective_memory = effective_memory + dble(size(hvy_tmp))*8.0e-9 ! in GB
+        if (present(hvy_work)) effective_memory = effective_memory + dble(size(hvy_work))*8.0e-9 ! in GB
 
         ! note we currently use 8byte per real and integer by default, so all the same bytes per point
         write(*,'("INIT: Measured (true) local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB per mpirank")') &

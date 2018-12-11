@@ -78,7 +78,7 @@ module module_params
         ! deside if WABBIT should start from input files
         logical                                       :: read_from_files
         ! files we want to read for inital cond.
-        character(len=80), dimension(:), allocatable :: input_files
+        character(len=80), dimension(:), allocatable  :: input_files
 
         ! grid parameter
         integer(kind=ik)                             :: Bs=0        ! number of block nodes
@@ -103,14 +103,14 @@ module module_params
         ! physics
         ! -------------------------------------------------------------------------------------
         ! physics type
-        character(len=80)                            :: physics_type=""
+        character(len=80) :: physics_type=""
 
         ! domain length
-        real(kind=rk)                                :: domain_size(3)=0.0_rk
+        real(kind=rk)     :: domain_size(3)=0.0_rk
 
         ! use third dimension
-        logical                                     :: threeD_case=.false.
-        integer(kind=ik)                            :: dim=2 ! can be 2 or 3
+        logical           :: threeD_case=.false.
+        integer(kind=ik)  :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------
         ! statistics
@@ -122,16 +122,16 @@ module module_params
         ! MPI
         ! -------------------------------------------------------------------------------------
         ! process rank
-        integer(kind=ik)                            :: rank=-1
+        integer(kind=ik) :: rank=-1
         ! number of processes
-        integer(kind=ik)                            :: number_procs=-1
+        integer(kind=ik) :: number_procs=-1
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
         ! bridge for connecting WABBIT to outdoor MPI_WORLD
-        type(bridgeMPI)                             :: bridge
+        type(bridgeMPI)  :: bridge
         !
-        logical                                     :: bridge_exists = .false.
+        logical          :: bridge_exists = .false.
         !--------------------------------------------------------------------------------------
                !! particle connection
         !--------------------------------------------------------------------------------------

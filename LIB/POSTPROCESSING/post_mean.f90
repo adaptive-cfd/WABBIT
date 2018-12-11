@@ -79,7 +79,7 @@ subroutine post_mean(params)
     params%number_blocks = 2_ik*lgt_n/params%number_procs
 
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-    hvy_active, lgt_sortednumlist, .false.)
+    hvy_active, lgt_sortednumlist)
 
     call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call read_field(fname, 1, params, hvy_block, hvy_n )

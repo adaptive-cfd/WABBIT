@@ -40,7 +40,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -104,6 +104,7 @@ contains
   include "save_data_ACM.f90"
   include "statistics_ACM.f90"
   include "filter_ACM.f90"
+  include "update_grid_qtys_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads

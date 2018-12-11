@@ -77,7 +77,7 @@ subroutine post_rhs(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work)
+    lgt_active, hvy_active, lgt_sortednumlist, hvy_work=hvy_work)
 
     ! read mesh and field
     call read_mesh(fname_input, params, lgt_n, hvy_n, lgt_block)

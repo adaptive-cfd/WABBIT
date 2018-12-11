@@ -104,7 +104,7 @@ subroutine compute_vorticity_post(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
+    lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
     ! read mesh and field
     call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
@@ -151,7 +151,7 @@ subroutine compute_vorticity_post(params)
 
         else
             call abort(1812011,"operator is neither --vorticity nor --divergence")
-            
+
         endif
     end do
 

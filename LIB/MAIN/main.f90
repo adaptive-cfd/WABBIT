@@ -192,7 +192,7 @@ program main
     call init_physics_modules( params, filename )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp)
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -340,6 +340,20 @@ program main
         endif
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
         Nblocks_rhs = lgt_n
+
+        ! While the state vector and many work variables (such as the mask function for penalization)
+        ! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
+        ! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
+        ! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
+        ! time step.
+        ! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
+        ! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
+        ! generated at every time t. This example generalizes to any combination of stationary and moving
+        ! obstacle, i.e. insect behind fractal tree.
+        ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces, 
+        ! if they require such qantities. In many cases, the grid_qtys are probably not used.
+        ! Please noe that in the current implementation, hvy_tmp also plays the role of a work array
+        call update_grid_qyts( params, lgt_block, hvy_tmp, hvy_active, hvy_n )
 
         ! internal loop over time steps: if desired, we perform more than one time step
         ! before adapting the grid again. this can further reduce the overhead of adaptivity

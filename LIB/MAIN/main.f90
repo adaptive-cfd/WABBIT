@@ -450,7 +450,10 @@ program main
              close(14)
         end if
 
-        ! walltime limiter
+        ! walltime limiter. maximum walltime allowed for simulations (in hours). The run will be stopped if this duration
+        ! is exceeded. This is useful on real clusters, where the walltime of a job is limited, and the
+        ! system kills the job regardless of whether we're done or not. If WABBIT itself ends execution,
+        ! a backup is written and you can resume the simulation right where it stopped
         if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
             if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
             keep_running = .false.

@@ -79,7 +79,6 @@ module module_acm
     integer(kind=ik) :: mpirank, mpisize
     !
     integer(kind=ik) :: Jmax, Bs
-
   end type type_params
 
   ! parameters for this module. they should not be seen outside this physics module

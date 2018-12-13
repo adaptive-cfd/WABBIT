@@ -357,7 +357,7 @@ program main
         ! obstacle, i.e. insect behind fractal tree.
         ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
         ! if they require such qantities. In many cases, the grid_qtys are probably not used.
-        ! Please noe that in the current implementation, hvy_tmp also plays the role of a work array
+        ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
         call update_grid_qyts( params, lgt_block, hvy_tmp, hvy_active, hvy_n )
 
 
@@ -374,7 +374,7 @@ program main
             ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, &
             hvy_active, lgt_active, lgt_n, hvy_n )
             call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1

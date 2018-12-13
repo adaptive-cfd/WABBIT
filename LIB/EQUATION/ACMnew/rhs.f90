@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage, first_substep )
+subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage, first_substep )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -31,6 +31,20 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage, first_substep )
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
+
+    ! While the state vector and many work variables (such as the mask function for penalization)
+    ! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
+    ! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
+    ! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
+    ! time step.
+    ! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
+    ! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
+    ! generated at every time t. This example generalizes to any combination of stationary and moving
+    ! obstacle, i.e. insect behind fractal tree.
+    ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
+    ! if they require such qantities. In many cases, the grid_qtys are probably not used.
+    real(kind=rk), intent(in) :: grid_qty(1:,1:,1:,1:)
+
 
     !> some operations might be done only in the first RK substep, hence we pass
     !! this flag to check if this is the first call at the current time level.
@@ -139,7 +153,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, stage, first_substep )
 
         else
             ! this is a 3d case (ux,uy,uz,p)
-            call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs)
+            call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, grid_qty)
 
         endif
 
@@ -417,7 +431,7 @@ end subroutine RHS_2D_acm
 
 
 
-subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
+subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_qty)
     implicit none
 
     !> grid parameter
@@ -427,6 +441,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:,:)
+    real(kind=rk), intent(in)               :: grid_qty(:,:,:,:)
     !> discretization order
     character(len=80), intent(in)           :: order_discretization
     !> time
@@ -493,7 +508,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
 
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask_3D(time, x0, dx, Bs, g, mask, us)
+        call create_mask_3D(time, x0, dx, Bs, g, mask, us, grid_qty)
         mask = mask * eps_inv
     end if
 

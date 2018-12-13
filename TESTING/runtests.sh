@@ -28,15 +28,15 @@ end_color=$'\033[0m'
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=( "---convection---"
-        "TESTING/conv/blob_3D_adaptive/blob3d-adaptive.sh"
-        "TESTING/conv/blob_3D_equi/blob3d.sh"
-        "TESTING/conv/blob_3D_nonequi/blob3d.sh"
         "TESTING/conv/blob_convection_boundary/blob_convection_boundary.sh"
         "TESTING/conv/blob_convection_equi/blob-convection-equi.sh"
         "TESTING/conv/blob_convection_2nd_serial/blob-conv-adaptive-serial.sh"
         "TESTING/conv/blob_convection/blob-convection-adaptive.sh"
         "TESTING/conv/blob_convection_2nd/blob-convection-adaptive-2nd.sh"
         "TESTING/conv/blob_convection_2nd_zcurve/blob-conv-adaptive-2nd-zcurve.sh"
+        "TESTING/conv/blob_3D_adaptive/blob3d-adaptive.sh"
+        "TESTING/conv/blob_3D_equi/blob3d.sh"
+        "TESTING/conv/blob_3D_nonequi/blob3d.sh"
         "---navier-stokes---"
         "TESTING/navier_stokes/simple_geometry/rhombus/rhombus_moving_shock.sh"
         "TESTING/navier_stokes/simple_geometry/triangle/triangle_adapt.sh"
@@ -57,7 +57,8 @@ tests=( "---convection---"
         "TESTING/acm/acm_cyl_adaptive_newsponge/acm_cyl_adaptive_newsponge.sh"
         "TESTING/acm/acm_cyl_adaptive_krylov/acm_cylinder_adaptive_krylov.sh"
         "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"
-        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh" )
+        "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh"
+        )
 
 happy_sum=0
 sad_sum=0

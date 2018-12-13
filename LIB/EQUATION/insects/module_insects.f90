@@ -258,66 +258,67 @@ contains
   end subroutine Allocate_Arrays
 
 
-    !-----------------------------------------------------------------------------
-    ! Many parts of the insect mask generation are done only once per time step (i.e.
-    ! per mask generation). Now, the adaptive code calls Draw_Insect several times, on each
-    ! block of the grid. Draw_Insect is thus called SEVERAL times per mask generation.
-    ! Therefore, we outsource the parts that need to be done only once to this routine,
-    ! and call it BEFORE calling Draw_Insect. For FLUSI, this does not have any effect
-    ! other than having two routines.
-    !-----------------------------------------------------------------------------
-    subroutine Update_Insect( time, Insect )
-        implicit none
+  !-----------------------------------------------------------------------------
+  ! Many parts of the insect mask generation are done only once per time step (i.e.
+  ! per mask generation). Now, the adaptive code calls Draw_Insect several times, on each
+  ! block of the grid. Draw_Insect is thus called SEVERAL times per mask generation.
+  ! Therefore, we outsource the parts that need to be done only once to this routine,
+  ! and call it BEFORE calling Draw_Insect. For FLUSI, this does not have any effect
+  ! other than having two routines.
+  !-----------------------------------------------------------------------------
+  subroutine Update_Insect( time, Insect )
+      implicit none
 
-        real(kind=rk), intent(in) :: time
-        type(diptera),intent(inout) :: Insect
-        logical, save :: first_call = .true.
+      real(kind=rk), intent(in)   :: time
+      type(diptera),intent(inout) :: Insect
 
-        !-----------------------------------------------------------------------------
-        ! fetch current motion state
-        !-----------------------------------------------------------------------------
-        call BodyMotion (time, Insect)
-        call FlappingMotion_right (time, Insect)
-        call FlappingMotion_left (time, Insect)
-        call StrokePlane (time, Insect)
+      logical, save :: first_call = .true.
 
-        !-----------------------------------------------------------------------------
-        ! define the rotation matrices to change between coordinate systems
-        !-----------------------------------------------------------------------------
-        call body_rotation_matrix( Insect, Insect%M_body )
-        call wing_right_rotation_matrix( Insect, Insect%M_wing_r )
-        call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
+      !-----------------------------------------------------------------------------
+      ! fetch current motion state
+      !-----------------------------------------------------------------------------
+      call BodyMotion (time, Insect)
+      call FlappingMotion_right (time, Insect)
+      call FlappingMotion_left (time, Insect)
+      call StrokePlane (time, Insect)
 
-        ! inverse of the body rotation matrices
-        Insect%M_body_inv = transpose(Insect%M_body)
+      !-----------------------------------------------------------------------------
+      ! define the rotation matrices to change between coordinate systems
+      !-----------------------------------------------------------------------------
+      call body_rotation_matrix( Insect, Insect%M_body )
+      call wing_right_rotation_matrix( Insect, Insect%M_wing_r )
+      call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
 
-        ! body angular velocity vector in b/g coordinate system
-        call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, Insect%M_body )
-        ! rel+abs wing angular velocities in the w/b/g coordinate system
-        call wing_angular_velocities ( time, Insect, Insect%M_body )
-        ! angular acceleration for wings (required for inertial power)
-        call wing_angular_accel( time, Insect )
+      ! inverse of the body rotation matrices
+      Insect%M_body_inv = transpose(Insect%M_body)
 
-        !-----------------------------------------------------------------------------
-        ! vector from body centre to left/right pivot point in global reference frame,
-        ! for aerodynamic power
-        !-----------------------------------------------------------------------------
-        Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
-        Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
+      ! body angular velocity vector in b/g coordinate system
+      call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, Insect%M_body )
+      ! rel+abs wing angular velocities in the w/b/g coordinate system
+      call wing_angular_velocities ( time, Insect, Insect%M_body )
+      ! angular acceleration for wings (required for inertial power)
+      call wing_angular_accel( time, Insect )
+
+      !-----------------------------------------------------------------------------
+      ! vector from body centre to left/right pivot point in global reference frame,
+      ! for aerodynamic power
+      !-----------------------------------------------------------------------------
+      Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
+      Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
 
 
-        if (first_call) then
-            ! print some important numbers, routine exectuted only once during a simulation
-            call print_insect_reynolds_numbers( Insect )
-            first_call = .false.
-        endif
+      if (first_call) then
+          ! print some important numbers, routine exectuted only once during a simulation
+          call print_insect_reynolds_numbers( Insect )
+          first_call = .false.
+      endif
 
-        ! save time to insect, then we can check if the update routine has been called
-        ! or not (this is not necessary if Update_Insect is called, but helpful to prevent
-        ! human errors)
-        Insect%time = time
+      ! save time to insect, then we can check if the update routine has been called
+      ! or not (this is not necessary if Update_Insect is called, but helpful to prevent
+      ! human errors)
+      Insect%time = time
 
-    end subroutine Update_Insect
+  end subroutine Update_Insect
 
   !-------------------------------------------------------------------------------
   ! Main routine for drawing insects. Loops over the entire domain, computes
@@ -325,19 +326,26 @@ contains
   ! subroutines doing the actual job of defining the mask. Note all surfaces are
   ! smoothed.
   !-------------------------------------------------------------------------------
-  subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us)
+  subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us, &
+      with_wings, with_body, delete_before_drawing )
       implicit none
 
-      real(kind=rk), intent(in) :: time
-      type(diptera),intent(inout) :: Insect
-      real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-      real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-      real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-      integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+      real(kind=rk), intent(in)      :: time
+      type(diptera), intent(inout)   :: Insect
+      real(kind=rk), intent(in)      :: xx0(1:3), ddx(1:3)
+      real(kind=rk), intent(inout)   :: mask(0:,0:,0:)
+      real(kind=rk), intent(inout)   :: us(0:,0:,0:,1:)
+      integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
+      ! the insect datastructure contains the information if the insect has a body and a left/right
+      ! wing or not. computationally, one sometimes wants to create the body or wings ONLY, i.e.
+      ! decompose the insect creation in a series of calls to this routine.
+      ! Use the follwing switches for this type of control. By default, the whole insect
+      ! is generated.
+      logical, optional, intent(in) :: with_wings, with_body, delete_before_drawing
 
       real(kind=rk) :: t1
       real(kind=rk),dimension(1:3) :: x, x_body, v_tmp
-      ! real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
+      logical :: with_wings2, with_body2, delete_before_drawing2
       integer :: ix, iy, iz
       integer(kind=2) :: c
 
@@ -349,8 +357,29 @@ contains
       Insect%smooth = 1.0d0*maxval(ddx)
       Insect%safety = 3.5d0*Insect%smooth
 
+      if (present(with_wings)) then
+          with_wings2 = with_wings
+      else
+          with_wings2 = .true.
+      endif
+
+      if (present(with_body)) then
+          with_body2 = with_body
+      else
+          with_body2 = .true.
+      endif
+
+      if (present(delete_before_drawing)) then
+          delete_before_drawing2 = delete_before_drawing
+      else
+          delete_before_drawing2 = .true.
+      endif
+
+
       ! delete old mask
-      call delete_old_mask( time, mask, mask_color, us, Insect )
+      if (delete_before_drawing2) then
+          call delete_old_mask( time, mask, mask_color, us, Insect )
+      endif
 
       !-----------------------------------------------------------------------------
       ! Draw individual parts of the Diptera. Separate loops are faster
@@ -362,35 +391,39 @@ contains
       ! load balancing problems, since many cores do not draw the body at all.
       ! We thus try to draw it only once and then simply not to erase it later.
       !-----------------------------------------------------------------------------
-      if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
-          if (.not. Insect%body_already_drawn) then
-              ! the body is at rest, but it is the first call to this routine, so
-              ! draw it now.
-              if (root .and. (.not. Insect%body_already_drawn) ) then
-                  write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
-                  write(*,*) "the body once: we do that now, and skip draw_body"
-                  write(*,*) "from now on. time=", time
-              endif
+      if (with_body2) then
+          if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
+              if (.not. Insect%body_already_drawn) then
+                  ! the body is at rest, but it is the first call to this routine, so
+                  ! draw it now.
+                  if (root .and. (.not. Insect%body_already_drawn) ) then
+                      write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
+                      write(*,*) "the body once: we do that now, and skip draw_body"
+                      write(*,*) "from now on. time=", time
+                  endif
 
-              call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
-              Insect%body_already_drawn = .true.
+                  call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
+                  Insect%body_already_drawn = .true.
+              endif
+          else
+              ! the body moves, draw it
+              call draw_body(xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
           endif
-      else
-          ! the body moves, draw it
-          call draw_body(xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
       endif
 
       !-----------------------------------------------------------------------------
       ! Wings
       !-----------------------------------------------------------------------------
-      if (Insect%RightWing == "yes") then
-          call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, Insect%M_body, &
-          Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
-      endif
+      if (with_wings2) then
+          if (Insect%RightWing == "yes") then
+              call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, Insect%M_body, &
+              Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
+          endif
 
-      if (Insect%LeftWing == "yes") then
-          call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, Insect%M_body, &
-          Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+          if (Insect%LeftWing == "yes") then
+              call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, Insect%M_body, &
+              Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+          endif
       endif
 
       !-----------------------------------------------------------------------------

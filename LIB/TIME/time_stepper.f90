@@ -81,7 +81,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tm
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, j, Neqn
+    integer(kind=ik)                    :: k, j, Neqn, Bs, g, z1, z2
     ! time step, dx
     real(kind=rk)                       :: t
     ! array containing Runge-Kutta coefficients
@@ -91,6 +91,16 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tm
 ! variables initialization
 
     Neqn = params%n_eqn
+    Bs    = params%Bs
+    g     = params%n_ghosts
+
+    if (params%dim==2) then
+        z1 = 1
+        z2 = 1
+    else
+        z1 = g+1
+        z2 = Bs+g
+    endif
 
     if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
     dt = 9.0e9_rk
@@ -127,7 +137,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tm
         ! if the copy part is above, the changes in state vector are ignored
         do k = 1, hvy_n
             ! first slot in hvy_work is previous time step
-            hvy_work( :, :, :, :, hvy_active(k), 1 ) = hvy_block( :, :, :, :, hvy_active(k) )
+            hvy_work( g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k), 1 ) = hvy_block( g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k) )
         end do
 
 

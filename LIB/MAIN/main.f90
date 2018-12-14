@@ -358,7 +358,7 @@ program main
         ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
         ! if they require such qantities. In many cases, the grid_qtys are probably not used.
         ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
-        call update_grid_qyts( params, lgt_block, hvy_tmp, hvy_active, hvy_n )
+        call update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n )
 
 
         !***********************************************************************

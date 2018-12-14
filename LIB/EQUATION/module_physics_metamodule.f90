@@ -72,8 +72,10 @@ contains
 ! interfaces, if they require such qantities. In many cases, the grid_qtys are probably not used.
 ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
 !-------------------------------------------------------------------------------
- subroutine UPDATE_GRID_QTYS_meta( physics, u, g, x0, dx )
+ subroutine UPDATE_GRID_QTYS_meta( time, physics, u, g, x0, dx )
      implicit none
+     !> even though it is a bit odd, since those qtys shall be TIME INDEPENDENT, we pass time for debugging
+     real(kind=rk), intent(in)    :: time
      character(len=*), intent(in) :: physics
 
      ! the grid-dependent qtys that are computed in this routine:
@@ -90,7 +92,7 @@ contains
 
      select case(physics)
      case ('ACM-new')
-       call update_grid_qtys_ACM(u, g, x0, dx )
+       call update_grid_qtys_ACM(time, u, g, x0, dx )
 
      case ('ConvDiff-new')
          ! not implemented yet

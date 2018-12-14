@@ -9,7 +9,9 @@
 ! generated at every time t. This example generalizes to any combination of stationary and moving
 ! obstacle, i.e. insect behind fractal tree.
 !-------------------------------------------------------------------------------
-subroutine update_grid_qyts( params, lgt_block, hvy_tmp, hvy_active, hvy_n )
+subroutine update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n )
+    !> even though it is a bit odd, since those qtys shall be TIME INDEPENDENT, we pass time for debugging
+    real(kind=rk), intent(in)              :: time
     !> user defined parameter structure
     type (type_params), intent(in)         :: params
     !> light data array
@@ -38,7 +40,7 @@ subroutine update_grid_qyts( params, lgt_block, hvy_tmp, hvy_active, hvy_n )
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        call UPDATE_GRID_QTYS_meta( params%physics_type, hvy_tmp(:, :, :, :, hvy_active(k)), g, x0, dx )
+        call UPDATE_GRID_QTYS_meta( time, params%physics_type, hvy_tmp(:, :, :, :, hvy_active(k)), g, x0, dx )
     enddo
 
 end subroutine

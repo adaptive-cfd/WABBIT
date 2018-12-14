@@ -9,8 +9,11 @@
 ! obstacle, i.e. insect behind fractal tree.
 ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces, if they require such qantities. In many cases, the grid_qtys are probably not used.
 ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
-subroutine update_grid_qtys_ACM( field, g, x0, dx )
+subroutine update_grid_qtys_ACM( time, field, g, x0, dx )
     implicit none
+
+    !> even though it is a bit odd, since those qtys shall be TIME INDEPENDENT, we pass time for debugging
+    real(kind=rk), intent(in) :: time
 
     ! the grid-dependent qtys that are computed in this routine:
     real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)
@@ -26,8 +29,6 @@ subroutine update_grid_qtys_ACM( field, g, x0, dx )
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     integer :: Bs
-    real(kind=rk) :: time
-
     ! compute the size of blocks
     Bs = size(field,1) - 2*g
 
@@ -40,14 +41,11 @@ subroutine update_grid_qtys_ACM( field, g, x0, dx )
 
         if (.not. allocated(mask_color)) allocate(mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
 
-        ! as it is time independent, use zero
-        time = 0.0_rk
-
         ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
         ! know that the first g points are in fact ghost nodes...
         call Draw_Insect( time, Insect, x0, dx, field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1), &
-        mask_color, field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,2:4), with_body = .true., &
-        with_wings = .false., delete_before_drawing = .true. )
+             mask_color, field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,2:4), with_body = .true., &
+             with_wings = .false., delete_before_drawing = .true. )
 
         ! copy mask color array as well
         ! NOTE: I am not yet sure if I need this.

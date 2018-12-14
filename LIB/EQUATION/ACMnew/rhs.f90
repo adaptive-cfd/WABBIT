@@ -149,7 +149,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage, first_substep )
 
         if (params_acm%dim == 2) then
             ! this is a 2d case (ux,uy,p)
-            call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, time, rhs(:,:,1,:))
+            call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
+                 time, rhs(:,:,1,:), grid_qty(:,:,1,:))
 
         else
             ! this is a 3d case (ux,uy,uz,p)
@@ -187,7 +188,7 @@ end subroutine RHS_ACM
 !> \author sm, engels
 !--------------------------------------------------------------------------------------------
 
-subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
+subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_qty)
 
     !---------------------------------------------------------------------------------------------
     ! variables
@@ -201,6 +202,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:)
+    real(kind=rk), intent(in)               :: grid_qty(:,:,:)
     !> discretization order
     character(len=80), intent(in)           :: order_discretization
     !> time
@@ -215,7 +217,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     !>
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2
+                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo
     ! loop variables
     integer(kind=rk) :: ix, iy, idir
     ! coefficients for Tam&Webb
@@ -233,11 +235,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     nu          = params_acm%nu
     eps         = params_acm%C_eta
     gamma       = params_acm%gamma_p
-
-    mask   = 0.0_rk
-    us     = 0.0_rk
-    sponge = 0.0_rk
-    rhs = 0.0_rk
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
@@ -266,6 +263,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
         call create_mask_2D(time, x0, dx, Bs, g, mask, us)
+    else
+        mask   = 0.0_rk
+        us     = 0.0_rk
     end if
 
 
@@ -408,7 +408,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
         ! create the mask for the sponge on this block
-        call sponge_2D(sponge, x0, dx, Bs, g)
+!        call sponge_2D(sponge, x0, dx, Bs, g)
+
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
@@ -416,11 +417,11 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs)
             do ix = g+1, Bs+g
                 ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                 ! which is different from the penalization term, which acts only on ux,uy and not p
-                sponge(ix,iy) = sponge(ix,iy) * eps_inv
+                spo = grid_qty(ix,iy,6) * eps_inv
 
-                rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * sponge(ix,iy)
-                rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * sponge(ix,iy)
-                rhs(ix,iy,3) = rhs(ix,iy,3) - phi(ix,iy,3)*sponge(ix,iy)
+                rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
+                rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
+                rhs(ix,iy,3) = rhs(ix,iy,3) - phi(ix,iy,3)*spo
             enddo
         enddo
     end if
@@ -458,7 +459,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
-                     nu, eps, eps_inv, gamma
+                     nu, eps, eps_inv, gamma, spo
     !> derivatives
     real(kind=rk) :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
@@ -487,11 +488,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     eps         = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
-    ! note setting zero is required if params_acm%penalization = .false.
-    mask = 0.0_rk
-    us   = 0.0_rk
-    rhs = 0.0_rk
-
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
     dz_inv = 1.0_rk / dx(3)
@@ -510,6 +506,10 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         ! create mask term for every grid point in this block
         call create_mask_3D(time, x0, dx, Bs, g, mask, us, grid_qty)
         mask = mask * eps_inv
+    else
+        ! note setting zero is required if params_acm%penalization = .false.
+        mask = 0.0_rk
+        us   = 0.0_rk
     end if
 
     if (order_discretization == "FD_2nd_central" ) then
@@ -519,7 +519,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         do iz = g+1, Bs+g
             do iy = g+1, Bs+g
                 do ix = g+1, Bs+g
-
                     ! first and second derivatives of u,v,w
                     u_dx = (phi(ix+1, iy,   iz  , 1) - phi(ix-1, iy,   iz  , 1))*dx_inv*0.5_rk
                     u_dy = (phi(ix  , iy+1, iz  , 1) - phi(ix,   iy-1, iz  , 1))*dy_inv*0.5_rk
@@ -662,7 +661,11 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
         ! create the mask for the sponge on this block
-        call sponge_3D(sponge, x0, dx, Bs, g)
+!        call sponge_3D(sponge, x0, dx, Bs, g)
+
+        ! NOTE: as of 14/12/2018 the sponge mask is generated in the grid qtys
+        ! because it is generally time-independent.
+
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
@@ -671,12 +674,13 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
                 do ix = g+1, Bs+g
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
-                    sponge(ix,iy,iz) = sponge(ix,iy,iz) * eps_inv
+                    ! NOTE: sponge mask set in grid_qty
+                    spo = grid_qty(ix,iy,iz,6) * eps_inv
 
-                    rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * sponge(ix,iy,iz)
-                    rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * sponge(ix,iy,iz)
-                    rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) - (phi(ix,iy,iz,3)-params_acm%u_mean_set(3)) * sponge(ix,iy,iz)
-                    rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - phi(ix,iy,iz,4)*sponge(ix,iy,iz)
+                    rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * spo
+                    rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * spo
+                    rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) - (phi(ix,iy,iz,3)-params_acm%u_mean_set(3)) * spo
+                    rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - (phi(ix,iy,iz,4))*spo
                 end do
             end do
         end do

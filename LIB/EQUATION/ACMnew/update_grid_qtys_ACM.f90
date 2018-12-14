@@ -33,7 +33,7 @@ subroutine update_grid_qtys_ACM( time, field, g, x0, dx )
     Bs = size(field,1) - 2*g
 
 
-    if ( params_acm%geometry == "Insect" .and. Insect%body_moves == "no") then
+    if ( params_acm%geometry == "Insect" .and. Insect%body_moves == "no" .and. params_acm%dim==3 ) then
         ! in the tethered case, construct the body in the first 4 registers of
         ! grid_qty: mask, usx, usy, usz, color
 
@@ -53,5 +53,13 @@ subroutine update_grid_qtys_ACM( time, field, g, x0, dx )
         field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,5) = dble( mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g) )
     endif
 
+
+    if ( params_acm%use_sponge ) then
+        if ( params_acm%dim==3 ) then
+            call sponge_3D( field(:, :, :, 6), x0, dx, Bs, g )
+        else
+            call sponge_2D( field(:, :, 1, 6), x0, dx, Bs, g )
+        endif
+    endif
 
 end subroutine update_grid_qtys_ACM

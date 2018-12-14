@@ -19,6 +19,7 @@ module module_insects
 
   ! we use this so only root prints write statements...
   logical :: root = .false.
+  logical :: periodic_insect = .false.
 
 
   ! size (global) of domain

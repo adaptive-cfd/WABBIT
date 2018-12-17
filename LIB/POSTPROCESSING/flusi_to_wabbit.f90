@@ -4,7 +4,7 @@
 !> \version 0.5
 !> \author sm
 !
-!> \brief postprocessing routine that generates a WABBIT-readable .h5 file (a field composed in blocks) 
+!> \brief postprocessing routine that generates a WABBIT-readable .h5 file (a field composed in blocks)
 !! from a .h5 file where all data is stored in one block
 !
 ! = log ======================================================================================
@@ -65,7 +65,7 @@ subroutine flusi_to_wabbit(params)
         call get_attributes_flusi(file_in, nxyz, time, domain)
         if (nxyz(1)/=1) then
             params%threeD_case = .true.
-        else       
+        else
             params%threeD_case = .false.
         end if
 
@@ -95,7 +95,7 @@ subroutine flusi_to_wabbit(params)
         params%number_blocks = lgt_n
 
         call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            hvy_active, lgt_sortednumlist, .false.)
+            hvy_active, lgt_sortednumlist)
 
         ! create an equidistant grid (order of light id is important!)
         call create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor,&

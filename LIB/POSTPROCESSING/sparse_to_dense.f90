@@ -126,8 +126,7 @@ subroutine sparse_to_dense(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
-    deallocate(hvy_work)
+        hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
     ! read field
     call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)

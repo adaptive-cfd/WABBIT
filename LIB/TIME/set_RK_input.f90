@@ -53,31 +53,41 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: l, Neqn, k
+    integer(kind=ik)                    :: l, Neqn, k, Bs, g, z1, z2
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
     Neqn  = params%n_eqn
+    Bs    = params%Bs
+    g     = params%n_ghosts
+
 !---------------------------------------------------------------------------------------------
 ! main body
+
+    if (params%dim==2) then
+        z1 = 1
+        z2 = 1
+    else
+        z1 = g+1
+        z2 = Bs+g
+    endif
 
     ! first: k_j = RHS(data_field(t) + ...
     ! loop over all active heavy data blocks
     do k = 1, hvy_n
         ! first slot in hvy_work is previous time step
-        hvy_block(:,:,:,:,hvy_active(k)) = hvy_work(:,:,:,:,hvy_active(k),1)
+        hvy_block(g+1:Bs+g,g+1:Bs+g,z1:z2,:,hvy_active(k)) = hvy_work(g+1:Bs+g,g+1:Bs+g,z1:z2,:,hvy_active(k),1)
     end do
 
     do l = 2, j
         ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
-        if (abs(rk_coeffs(l)) < 1e-8_rk) then
-        else
+        if (abs(rk_coeffs(l)) > 1e-8_rk) then
             ! loop over all active heavy data blocks
             do k = 1, hvy_n
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block(:, :, :, :, hvy_active(k)) = hvy_block(:, :, :, :, hvy_active(k)) &
-                + dt * rk_coeffs(l) * hvy_work(:, :, :, :, hvy_active(k), l)
+                hvy_block(g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k)) = hvy_block(g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k)) &
+                + dt * rk_coeffs(l) * hvy_work(g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k), l)
 
             end do
         end if

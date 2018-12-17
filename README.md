@@ -77,7 +77,9 @@ wabbit [2D|3D] [your_filename.ini] --memory=2.0GB
 where the --memory options allows you to approximately control how much memory is globally allocated, i.e., on all ranks. Note that WABBIT does not free memory which is once allocated again during runtime. This is because we intent to use clusters, where the globally available memory is reserved for the exectution.
 
 ## Additional Information
-If you are new to WABBIT it is recommended to read the [information for newcomers](https://github.com/adaptive-cfd/WABBIT/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+the+newcomers%22 "newcomer issues")!  
+If you are new to WABBIT it is recommended to read the [information for newcomers](https://github.com/adaptive-cfd/WABBIT/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+the+newcomers%22 "newcomer issues")!
+
+In case you have problems with the preparation to use WABBIT, have a look at the informations given in the  [wiki](https://github.com/adaptive-cfd/WABBIT/wiki "additional information for WABBIT on fedora/ubuntu")
 
 For further Information see the documentation. Therefor it is necessary to have [Doxygen](http://www.stack.nl/~dimitri/doxygen/ "Doxygen") installed.
 

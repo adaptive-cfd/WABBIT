@@ -80,7 +80,7 @@ subroutine keyvalues(fname, params)
     params%number_blocks = (dim**2) * (lgt_n/params%number_procs)
 
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, .false.)
+    hvy_active, lgt_sortednumlist)
 
     ! the work array needs to be allocated as balance load requires a buffer.
     ! it can However be smaller than what is allocated in allocate_grid.

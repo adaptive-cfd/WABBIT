@@ -1,5 +1,5 @@
 subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
-    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
+    hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
     ! use module_blas
     implicit none
 
@@ -14,6 +14,8 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
+    !> hvy_tmp are qty that depend on the grid and not explicitly on time.
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
     !> list of active blocks (heavy data)
@@ -63,7 +65,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
 
     ! the very last slot (M+3) is the "reference right hand side"
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), lgt_block, &
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), hvy_tmp, lgt_block, &
     hvy_active, hvy_n, first_substep=.true. )
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
@@ -92,7 +94,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
         call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active, hvy_n )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
-        lgt_block, hvy_active, hvy_n)
+        hvy_tmp, lgt_block, hvy_active, hvy_n)
 
         ! linearization of RHS slot (M_max+1)
         do k = 1, hvy_n

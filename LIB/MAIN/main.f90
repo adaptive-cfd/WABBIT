@@ -27,6 +27,7 @@ program main
 ! modules
 
     use mpi
+    use module_helpers
     use module_MPI
     ! global parameters
     use module_params
@@ -191,7 +192,7 @@ program main
     call init_physics_modules( params, filename )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, .true., hvy_work, hvy_tmp)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp)
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -255,6 +256,8 @@ program main
         close(44)
         open (44, file='eps_norm.t', status='replace')
         close(44)
+        open (44, file='div.t', status='replace')
+        close(44)
         open (44, file='block_dist.dat', status='replace')
         close(44)
         open (44, file='mask_volume.t', status='replace')
@@ -270,6 +273,7 @@ program main
         write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
         close(44)
     endif
+    call Initialize_runtime_control_file()
 
     ! next write time for reloaded data
     if (params%write_method == 'fixed_time') then
@@ -312,13 +316,15 @@ program main
         endif
         call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
-        !+++++++++++ serve any data request from the other side +++++++++++++
+
+        !***********************************************************************
+        ! MPI bridge (used e.g. for particle-fluid coupling)
+        !***********************************************************************
         if (params%bridge_exists) then
             call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
             call serve_data_request(lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active, &
                                     lgt_active, lgt_n, hvy_n,params)
         endif
-        !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
         !***********************************************************************
@@ -337,6 +343,29 @@ program main
         call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
         Nblocks_rhs = lgt_n
 
+        !***********************************************************************
+        ! update grid quantities
+        !***********************************************************************
+        ! While the state vector and many work variables (such as the mask function for penalization)
+        ! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
+        ! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
+        ! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
+        ! time step.
+        ! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
+        ! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
+        ! generated at every time t. This example generalizes to any combination of stationary and moving
+        ! obstacle, i.e. insect behind fractal tree.
+        ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
+        ! if they require such qantities. In many cases, the grid_qtys are probably not used.
+        ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
+        t4 = MPI_wtime()
+        call update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n )
+        call toc( params, "TOPLEVEL: update_grid_qyts", MPI_wtime()-t4)
+
+
+        !***********************************************************************
+        ! evolve solution in time
+        !***********************************************************************
         ! internal loop over time steps: if desired, we perform more than one time step
         ! before adapting the grid again. this can further reduce the overhead of adaptivity
         ! Note: the non-linear terms can create finer scales than resolved on the grid. they
@@ -344,14 +373,15 @@ program main
         ! on the grid, consider using a filter.
         do it = 1, params%N_dt_per_grid
             !*******************************************************************
-            ! advance in time
+            ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_neighbor, &
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, &
             hvy_active, lgt_active, lgt_n, hvy_n )
             call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1
 
+            ! determine if it is time to save data our not.
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
@@ -405,7 +435,9 @@ program main
         call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
 
-        ! write data to disk
+        !***********************************************************************
+        ! Write fields to HDF5 file
+        !***********************************************************************
         if (it_is_time_to_save_data) then
             ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
@@ -446,16 +478,34 @@ program main
              close(14)
         end if
 
+        !***********************************************************************
         ! walltime limiter
+        !***********************************************************************
+        ! maximum walltime allowed for simulations (in hours). The run will be stopped if this duration
+        ! is exceeded. This is useful on real clusters, where the walltime of a job is limited, and the
+        ! system kills the job regardless of whether we're done or not. If WABBIT itself ends execution,
+        ! a backup is written and you can resume the simulation right where it stopped
         if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
             if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
             keep_running = .false.
         endif
+
+        !***********************************************************************
+        ! runtime control
+        !***********************************************************************
+        ! it happens quite often that one wants to end a simulation prematurely, but
+        ! one also wants to be able to resume it. the usual "kill" on clusters will terminate
+        ! wabbit immediately and not write a backup. Hence, it is possible to terminate
+        ! wabbit by writing "save_stop" to "runtime_control"
+        if ( runtime_control_stop() ) then
+            if (rank==0) write(*,*) "WE RECVED THE STOP COMMAND: WRITE BACKUP; THEN BYEBYE"
+            keep_running = .false.
+        endif
     end do
 
-    !---------------------------------------------------------------------------
+    !***************************************************************************
     ! end of main time loop
-    !---------------------------------------------------------------------------
+    !***************************************************************************
     if (rank==0) write(*,*) "This is the end of the main time loop!"
 
     ! save end field to disk, only if timestep is not saved already

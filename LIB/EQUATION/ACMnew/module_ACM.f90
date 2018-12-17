@@ -40,18 +40,18 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params
     real(kind=rk) :: CFL, T_end, CFL_eta
-    real(kind=rk) :: c_0, c_0_min, MachNumber = -1.0_rk, t0_MachNumber =0.0_rk, t1_MachNumber =0.0_rk
+    real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3), urms(1:3)
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3), urms(1:3), div_max, div_min
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
@@ -79,7 +79,6 @@ module module_acm
     integer(kind=ik) :: mpirank, mpisize
     !
     integer(kind=ik) :: Jmax, Bs
-
   end type type_params
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -104,6 +103,7 @@ contains
   include "save_data_ACM.f90"
   include "statistics_ACM.f90"
   include "filter_ACM.f90"
+  include "update_grid_qtys_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -145,13 +145,6 @@ contains
 
     ! speed of sound for acm
     call read_param_mpi(FILE, 'ACM-new', 'c_0', params_acm%c_0, 10.0_rk)
-    params_acm%c_0_min = params_acm%c_0
-    ! the speed of sound is usually a constant, but for numerics it might be a good idea to interpret
-    ! it as a mach number, relative to the largest velocity in the field. In this case, c0 = max(u)*MachNumber
-    ! and c0(t). The scaling is used if a MachNumber is given; otherwise, c0 is a constant
-    call read_param_mpi(FILE, 'ACM-new', 'MachNumber', params_acm%MachNumber, -1.0_rk)
-    call read_param_mpi(FILE, 'ACM-new', 't0_MachNumber', params_acm%t0_MachNumber, 0.0_rk)
-    call read_param_mpi(FILE, 'ACM-new', 't1_MachNumber', params_acm%t1_MachNumber, 0.0_rk)
     ! viscosity
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     ! gamma_p

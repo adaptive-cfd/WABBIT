@@ -50,7 +50,7 @@
 !! (up to RK of order 4)
 ! ********************************************************************************************
 
-subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
+subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tmp, &
     hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -67,6 +67,8 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
+    !> hvy_tmp are qty that depend on the grid and not explicitly on time
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
     !> list of active blocks (heavy data)
@@ -79,7 +81,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
     integer(kind=ik), intent(in)        :: lgt_n
 
     ! loop variables
-    integer(kind=ik)                    :: k, j, Neqn
+    integer(kind=ik)                    :: k, j, Neqn, Bs, g, z1, z2
     ! time step, dx
     real(kind=rk)                       :: t
     ! array containing Runge-Kutta coefficients
@@ -89,6 +91,16 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
 ! variables initialization
 
     Neqn = params%n_eqn
+    Bs    = params%Bs
+    g     = params%n_ghosts
+
+    if (params%dim==2) then
+        z1 = 1
+        z2 = 1
+    else
+        z1 = g+1
+        z2 = Bs+g
+    endif
 
     if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
     dt = 9.0e9_rk
@@ -102,7 +114,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
 
     ! use krylov time stepping
     call krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
-        hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
+        hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
 
 
     elseif (params%time_step_method=="RungeKuttaGeneric") then
@@ -117,7 +129,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
         ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
         ! slot after the copy of the state vector (hence 2)
         call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), &
-        lgt_block, hvy_active, hvy_n, first_substep=.true. )
+        hvy_tmp, lgt_block, hvy_active, hvy_n, first_substep=.true. )
 
         ! save data at time t to heavy work array
         ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
@@ -125,7 +137,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
         ! if the copy part is above, the changes in state vector are ignored
         do k = 1, hvy_n
             ! first slot in hvy_work is previous time step
-            hvy_work( :, :, :, :, hvy_active(k), 1 ) = hvy_block( :, :, :, :, hvy_active(k) )
+            hvy_work( g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k), 1 ) = hvy_block( g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k) )
         end do
 
 
@@ -141,8 +153,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
             ! note substeps are at different times, use temporary time "t"
             t = time + dt*rk_coeffs(j,1)
 
-            call RHS_wrapper(t, params, hvy_block, &
-                hvy_work(:,:,:,:,:,j+1), lgt_block, hvy_active, hvy_n)
+            call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_tmp, lgt_block, hvy_active, hvy_n)
         end do
 
         ! final stage

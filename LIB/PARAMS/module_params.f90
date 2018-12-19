@@ -154,15 +154,6 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test
         ! -------------------------------------------------------------------------------------
-        ! unit test params struct
-        logical                                     :: unit_test=.false.
-        ! unit test time_stepper convergence flag
-        logical                                     :: test_time_stepper=.false.
-        ! unit test spatial convergence flag
-        logical                                     :: test_spatial=.false.
-        ! unit test wavelet compression
-        logical                                     :: test_wavelet_comp=.false.
-        ! unit test treecode flag
         logical :: test_treecode=.false., test_ghost_nodes_synch=.false., check_redundant_nodes=.false.
 
         ! -------------------------------------------------------------------------------------

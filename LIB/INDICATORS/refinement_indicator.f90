@@ -88,7 +88,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
 
       case ("random")
           ! randomized refinement. This can be used to generate debug meshes for
-          ! testing purposes. For example the unit tests use that
+          ! testing purposes. For example the unit tests use this.
           ref_chance = 0.10_rk
           ! random refinement can set at most this many blocks to refine (avoid errors
           ! due to insufficient memory) (since we already have lgt_n blocks we can set the status

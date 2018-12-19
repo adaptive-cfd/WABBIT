@@ -363,6 +363,22 @@ contains
         end do
     end function block_contains_NaN
 
+    ! fill a 4D array of any size with random numbers
+    subroutine random_data( field )
+        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)
+        integer :: ix,iy,iz,id
+
+        do id = 1, size(field,4)
+            do iz = 1, size(field,3)
+                do iy = 1, size(field,2)
+                    do ix = 1, size(field,1)
+                        field(ix,iy,iz,id) = rand_nbr()
+                    enddo
+                enddo
+            enddo
+        enddo
+    end subroutine
+
     !-------------------------------------------------------------------------------
     ! runtime control routines
     ! flusi regularily reads from a file runtime_control.ini if it should do some-
@@ -383,7 +399,6 @@ contains
       close (14)
 
     end subroutine Initialize_runtime_control_file
-
 
 
     logical function runtime_control_stop(  )

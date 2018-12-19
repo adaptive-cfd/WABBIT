@@ -126,7 +126,7 @@ program main
     character(len=80)                   :: filename
 
     ! loop variable
-    integer(kind=ik)                    :: k, max_neighbors, Nblocks_rhs, Nblocks, it
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
@@ -173,10 +173,6 @@ program main
     sub_t0 = MPI_Wtime()
     call cpu_time(t0)
     tstart = MPI_wtime()
-
-
-    ! unit test off
-    params%unit_test    = .false.
 
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
@@ -281,13 +277,6 @@ program main
         params%next_stats_time = floor(time/params%next_stats_time)*params%next_stats_time + params%next_stats_time
     end if
 
-    ! max neighbor num
-    !> \todo move max neighbor num to params struct
-    if ( params%threeD_case ) then
-        max_neighbors = 74 ! 3D
-    else
-        max_neighbors = 12 ! 2D
-    end if
 
     ! timing
     call toc( params, "init_data", MPI_wtime()-sub_t0 )
@@ -467,8 +456,8 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n )
 
              open(14,file='timesteps_info.t',status='unknown',position='append')
-             write (14,'(2(g15.8,1x),i6,1x,i5,1x,i2,1x,i2)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n )
+             write (14,'(2(g15.8,1x),i6,1x,i5,1x,i2,1x,i2,1x,i5)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             max_active_level( lgt_block, lgt_active, lgt_n ), params%number_procs
              close(14)
 
              open(14,file='blocks_per_mpirank.t',status='unknown',position='append')

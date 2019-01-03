@@ -278,6 +278,9 @@ subroutine deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (allocated(lgt_active)) deallocate( lgt_active )
     if (allocated(hvy_active)) deallocate( hvy_active )
 
+    if (allocated(params%threshold_state_vector_component)) deallocate( params%threshold_state_vector_component )
+    if (allocated(params%input_files)) deallocate( params%input_files )
+
     if (params%rank == 0) then
         write(*,'(A)') "All memory is cleared!"
         write(*,'(80("-"))')

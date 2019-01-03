@@ -53,6 +53,11 @@ program main_post
     if (rank==0) then
         write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
+#ifdef BLOCKINGSENDRECV
+        write(*,'("MPI: code build with blocking send/recv in transfer (block_xfer_blocking.f90)")')
+#else
+        write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
+#endif
     end if
 
     !---------------------------------------------------------------------------

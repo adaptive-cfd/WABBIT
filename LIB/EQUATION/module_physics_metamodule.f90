@@ -72,7 +72,7 @@ contains
 ! interfaces, if they require such qantities. In many cases, the grid_qtys are probably not used.
 ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
 !-------------------------------------------------------------------------------
- subroutine UPDATE_GRID_QTYS_meta( time, physics, u, g, x0, dx )
+ subroutine UPDATE_GRID_QTYS_meta( time, physics, u, g, x0, dx, stage )
      implicit none
      !> even though it is a bit odd, since those qtys shall be TIME INDEPENDENT, we pass time for debugging
      real(kind=rk), intent(in)    :: time
@@ -89,10 +89,12 @@ contains
      ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
      real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
+     character(len=*), intent(in) :: stage
+
 
      select case(physics)
      case ('ACM-new')
-       call update_grid_qtys_ACM(time, u, g, x0, dx )
+       call update_grid_qtys_ACM(time, u, g, x0, dx, stage )
 
      case ('ConvDiff-new')
          ! not implemented yet

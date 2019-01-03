@@ -139,6 +139,7 @@ contains
 
     ! --- saving ----
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_acm%N_fields_saved, 3 )
+    if (allocated(params_acm%names)) deallocate(params_acm%names)
     allocate( params_acm%names(1:params_acm%N_fields_saved) )
     call read_param_mpi(FILE, 'Saving', 'field_names', params_acm%names, (/"ux","uy","p "/) )
 
@@ -151,6 +152,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     ! want to add a forcing term?
     call read_param_mpi(FILE, 'ACM-new', 'forcing', params_acm%forcing, .false.)
+    if (allocated(params_acm%forcing_type)) deallocate(params_acm%forcing_type)
     allocate( params_acm%forcing_type(1:3) )
     call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )

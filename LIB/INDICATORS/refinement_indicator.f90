@@ -60,12 +60,12 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
 
     ! reset refinement status to "stay", unless its status is +11. This special
     ! status indicates that the block is on Jmax and has not been interpolated.
-    ! NOTE: resetting the refinement status is in fact not necessary.
-    do k = 1, lgt_n
-        if (lgt_block( lgt_active(k), Jmax+idx_refine_sts ) /= 11) then
-            lgt_block( lgt_active(k), Jmax+idx_refine_sts ) = 0
-        endif
-    enddo
+    ! resetting the refinement status is in fact not necessary.
+    !do k = 1, lgt_n
+    !    if (lgt_block( lgt_active(k), Jmax+idx_refine_sts ) /= 11) then
+    !        lgt_block( lgt_active(k), Jmax+idx_refine_sts ) = 0
+    !    endif
+    !enddo
 
 
     !> (a) loop over the blocks and set their refinement status.
@@ -88,7 +88,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
 
       case ("random")
           ! randomized refinement. This can be used to generate debug meshes for
-          ! testing purposes. For example the unit tests use that
+          ! testing purposes. For example the unit tests use this.
           ref_chance = 0.10_rk
           ! random refinement can set at most this many blocks to refine (avoid errors
           ! due to insufficient memory) (since we already have lgt_n blocks we can set the status

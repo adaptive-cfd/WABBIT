@@ -33,14 +33,19 @@ subroutine update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n
     Bs = params%Bs
     g  = params%n_ghosts
 
+    ! stage 1: initialization. called once and not for every block
+    call UPDATE_GRID_QTYS_meta( time, params%physics_type, hvy_tmp(:, :, :, :, hvy_active(1)), &
+    g, x0, dx, "init_stage" )
 
+    ! stage 2: local stage, called for each block.
     do k = 1, hvy_n
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        call UPDATE_GRID_QTYS_meta( time, params%physics_type, hvy_tmp(:, :, :, :, hvy_active(k)), g, x0, dx )
+        call UPDATE_GRID_QTYS_meta( time, params%physics_type, hvy_tmp(:, :, :, :, hvy_active(k)), &
+        g, x0, dx, "main_stage" )
     enddo
 
 end subroutine

@@ -19,6 +19,7 @@ module module_insects
 
   ! we use this so only root prints write statements...
   logical :: root = .false.
+  logical :: periodic_insect = .false.
 
 
   ! size (global) of domain
@@ -92,6 +93,10 @@ module module_insects
     real(kind=rk) :: phi_l=0.d0, alpha_l=0.d0, theta_l=0.d0, phi_dt_l=0.d0, alpha_dt_l=0.d0, theta_dt_l=0.d0
     ! stroke plane angle
     real(kind=rk) :: eta_stroke=0.d0
+    ! is the body motion state described be the STATE vector? This is the case if the
+    ! free-flight solver is used, and if its results are read in postprocessing or
+    ! if it used used to prescribe the body motion state from a different simulation
+    logical :: quaternion_solver_used = .false.
     ! angular velocity vectors (wings L+R, body)
     real(kind=rk), dimension(1:3) :: rot_body_b=0.d0, rot_body_g=0.d0
     real(kind=rk), dimension(1:3) :: rot_rel_wing_l_w=0.d0, rot_rel_wing_r_w=0.d0
@@ -172,6 +177,7 @@ module module_insects
     character(len=strlen) :: wing_thickness_distribution = "constant"
     character(len=strlen) :: pointcloudfile = "none"
     logical :: corrugated = .false.
+    real(kind=rk) :: corrugation_array_bbox(1:4)
 
     !--------------------------------------------------------------
     ! Wing kinematics
@@ -253,66 +259,67 @@ contains
   end subroutine Allocate_Arrays
 
 
-    !-----------------------------------------------------------------------------
-    ! Many parts of the insect mask generation are done only once per time step (i.e.
-    ! per mask generation). Now, the adaptive code calls Draw_Insect several times, on each
-    ! block of the grid. Draw_Insect is thus called SEVERAL times per mask generation.
-    ! Therefore, we outsource the parts that need to be done only once to this routine,
-    ! and call it BEFORE calling Draw_Insect. For FLUSI, this does not have any effect
-    ! other than having two routines.
-    !-----------------------------------------------------------------------------
-    subroutine Update_Insect( time, Insect )
-        implicit none
+  !-----------------------------------------------------------------------------
+  ! Many parts of the insect mask generation are done only once per time step (i.e.
+  ! per mask generation). Now, the adaptive code calls Draw_Insect several times, on each
+  ! block of the grid. Draw_Insect is thus called SEVERAL times per mask generation.
+  ! Therefore, we outsource the parts that need to be done only once to this routine,
+  ! and call it BEFORE calling Draw_Insect. For FLUSI, this does not have any effect
+  ! other than having two routines.
+  !-----------------------------------------------------------------------------
+  subroutine Update_Insect( time, Insect )
+      implicit none
 
-        real(kind=rk), intent(in) :: time
-        type(diptera),intent(inout) :: Insect
-        logical, save :: first_call = .true.
+      real(kind=rk), intent(in)   :: time
+      type(diptera),intent(inout) :: Insect
 
-        !-----------------------------------------------------------------------------
-        ! fetch current motion state
-        !-----------------------------------------------------------------------------
-        call BodyMotion (time, Insect)
-        call FlappingMotion_right (time, Insect)
-        call FlappingMotion_left (time, Insect)
-        call StrokePlane (time, Insect)
+      logical, save :: first_call = .true.
 
-        !-----------------------------------------------------------------------------
-        ! define the rotation matrices to change between coordinate systems
-        !-----------------------------------------------------------------------------
-        call body_rotation_matrix( Insect, Insect%M_body )
-        call wing_right_rotation_matrix( Insect, Insect%M_wing_r )
-        call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
+      !-----------------------------------------------------------------------------
+      ! fetch current motion state
+      !-----------------------------------------------------------------------------
+      call BodyMotion (time, Insect)
+      call FlappingMotion_right (time, Insect)
+      call FlappingMotion_left (time, Insect)
+      call StrokePlane (time, Insect)
 
-        ! inverse of the body rotation matrices
-        Insect%M_body_inv = transpose(Insect%M_body)
+      !-----------------------------------------------------------------------------
+      ! define the rotation matrices to change between coordinate systems
+      !-----------------------------------------------------------------------------
+      call body_rotation_matrix( Insect, Insect%M_body )
+      call wing_right_rotation_matrix( Insect, Insect%M_wing_r )
+      call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
 
-        ! body angular velocity vector in b/g coordinate system
-        call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, Insect%M_body )
-        ! rel+abs wing angular velocities in the w/b/g coordinate system
-        call wing_angular_velocities ( time, Insect, Insect%M_body )
-        ! angular acceleration for wings (required for inertial power)
-        call wing_angular_accel( time, Insect )
+      ! inverse of the body rotation matrices
+      Insect%M_body_inv = transpose(Insect%M_body)
 
-        !-----------------------------------------------------------------------------
-        ! vector from body centre to left/right pivot point in global reference frame,
-        ! for aerodynamic power
-        !-----------------------------------------------------------------------------
-        Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
-        Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
+      ! body angular velocity vector in b/g coordinate system
+      call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, Insect%M_body )
+      ! rel+abs wing angular velocities in the w/b/g coordinate system
+      call wing_angular_velocities ( time, Insect, Insect%M_body )
+      ! angular acceleration for wings (required for inertial power)
+      call wing_angular_accel( time, Insect )
+
+      !-----------------------------------------------------------------------------
+      ! vector from body centre to left/right pivot point in global reference frame,
+      ! for aerodynamic power
+      !-----------------------------------------------------------------------------
+      Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
+      Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
 
 
-        if (first_call) then
-            ! print some important numbers, routine exectuted only once during a simulation
-            call print_insect_reynolds_numbers( Insect )
-            first_call = .false.
-        endif
+      if (first_call) then
+          ! print some important numbers, routine exectuted only once during a simulation
+          call print_insect_reynolds_numbers( Insect )
+          first_call = .false.
+      endif
 
-        ! save time to insect, then we can check if the update routine has been called
-        ! or not (this is not necessary if Update_Insect is called, but helpful to prevent
-        ! human errors)
-        Insect%time = time
+      ! save time to insect, then we can check if the update routine has been called
+      ! or not (this is not necessary if Update_Insect is called, but helpful to prevent
+      ! human errors)
+      Insect%time = time
 
-    end subroutine Update_Insect
+  end subroutine Update_Insect
 
   !-------------------------------------------------------------------------------
   ! Main routine for drawing insects. Loops over the entire domain, computes
@@ -320,19 +327,26 @@ contains
   ! subroutines doing the actual job of defining the mask. Note all surfaces are
   ! smoothed.
   !-------------------------------------------------------------------------------
-  subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us)
+  subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us, &
+      with_wings, with_body, delete_before_drawing )
       implicit none
 
-      real(kind=rk), intent(in) :: time
-      type(diptera),intent(inout) :: Insect
-      real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-      real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-      real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-      integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+      real(kind=rk), intent(in)      :: time
+      type(diptera), intent(inout)   :: Insect
+      real(kind=rk), intent(in)      :: xx0(1:3), ddx(1:3)
+      real(kind=rk), intent(inout)   :: mask(0:,0:,0:)
+      real(kind=rk), intent(inout)   :: us(0:,0:,0:,1:)
+      integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
+      ! the insect datastructure contains the information if the insect has a body and a left/right
+      ! wing or not. computationally, one sometimes wants to create the body or wings ONLY, i.e.
+      ! decompose the insect creation in a series of calls to this routine.
+      ! Use the follwing switches for this type of control. By default, the whole insect
+      ! is generated.
+      logical, optional, intent(in) :: with_wings, with_body, delete_before_drawing
 
       real(kind=rk) :: t1
       real(kind=rk),dimension(1:3) :: x, x_body, v_tmp
-      ! real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
+      logical :: with_wings2, with_body2, delete_before_drawing2
       integer :: ix, iy, iz
       integer(kind=2) :: c
 
@@ -344,8 +358,29 @@ contains
       Insect%smooth = 1.0d0*maxval(ddx)
       Insect%safety = 3.5d0*Insect%smooth
 
+      if (present(with_wings)) then
+          with_wings2 = with_wings
+      else
+          with_wings2 = .true.
+      endif
+
+      if (present(with_body)) then
+          with_body2 = with_body
+      else
+          with_body2 = .true.
+      endif
+
+      if (present(delete_before_drawing)) then
+          delete_before_drawing2 = delete_before_drawing
+      else
+          delete_before_drawing2 = .true.
+      endif
+
+
       ! delete old mask
-      call delete_old_mask( time, mask, mask_color, us, Insect )
+      if (delete_before_drawing2) then
+          call delete_old_mask( time, mask, mask_color, us, Insect )
+      endif
 
       !-----------------------------------------------------------------------------
       ! Draw individual parts of the Diptera. Separate loops are faster
@@ -357,35 +392,39 @@ contains
       ! load balancing problems, since many cores do not draw the body at all.
       ! We thus try to draw it only once and then simply not to erase it later.
       !-----------------------------------------------------------------------------
-      if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
-          if (.not. Insect%body_already_drawn) then
-              ! the body is at rest, but it is the first call to this routine, so
-              ! draw it now.
-              if (root .and. (.not. Insect%body_already_drawn) ) then
-                  write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
-                  write(*,*) "the body once: we do that now, and skip draw_body"
-                  write(*,*) "from now on. time=", time
-              endif
+      if (with_body2) then
+          if (Insect%body_moves=="no" .and. avoid_drawing_static_body) then
+              if (.not. Insect%body_already_drawn) then
+                  ! the body is at rest, but it is the first call to this routine, so
+                  ! draw it now.
+                  if (root .and. (.not. Insect%body_already_drawn) ) then
+                      write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
+                      write(*,*) "the body once: we do that now, and skip draw_body"
+                      write(*,*) "from now on. time=", time
+                  endif
 
-              call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
-              Insect%body_already_drawn = .true.
+                  call draw_body( xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
+                  Insect%body_already_drawn = .true.
+              endif
+          else
+              ! the body moves, draw it
+              call draw_body(xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
           endif
-      else
-          ! the body moves, draw it
-          call draw_body(xx0, ddx, mask, mask_color, us, Insect, Insect%color_body, Insect%M_body)
       endif
 
       !-----------------------------------------------------------------------------
       ! Wings
       !-----------------------------------------------------------------------------
-      if (Insect%RightWing == "yes") then
-          call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, Insect%M_body, &
-          Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
-      endif
+      if (with_wings2) then
+          if (Insect%RightWing == "yes") then
+              call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, Insect%M_body, &
+              Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
+          endif
 
-      if (Insect%LeftWing == "yes") then
-          call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, Insect%M_body, &
-          Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+          if (Insect%LeftWing == "yes") then
+              call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, Insect%M_body, &
+              Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+          endif
       endif
 
       !-----------------------------------------------------------------------------
@@ -432,6 +471,28 @@ contains
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
   end subroutine Draw_Insect
 
+
+
+  !-------------------------------------------------------
+  ! short for the smooth step function.
+  ! the smooting is defined in Insect%smooth, here we need only x, and the
+  ! thickness (i.e., in the limit, steps=1 if x<t and steps=0 if x>t
+  !-------------------------------------------------------
+  real(kind=rk) function steps(x, t, h)
+      implicit none
+      real(kind=rk) :: x, t, h
+      ! f is 1 if x<=t-h
+      ! f is 0 if x>t+h
+      ! f is variable (smooth) in between
+      if (x<=t-h) then
+          steps = 1.d0
+      elseif (((t-h)<x).and.(x<(t+h))) then
+          steps = 0.5d0*(1.d0+dcos((x-t+h)*pi/(2.d0*h)) )
+      else
+          steps = 0.d0
+      endif
+
+  end function
 
 
   !-------------------------------------------------------
@@ -628,10 +689,11 @@ contains
     beta_dt = Insect%beta_dt
     gamma_dt = Insect%gamma_dt
 
-    if ( Insect%BodyMotion == "free_flight" ) then
+    if ( Insect%quaternion_solver_used ) then
       ! variant (a)
       rot_body_b = Insect%rot_body_b ! copy (useless, actually, but required for interface)
       rot_body_g = matmul( transpose(M_body), rot_body_b)
+
     else
       ! variant (b)
       ! in global frame
@@ -904,9 +966,10 @@ contains
     real(kind=rk),intent(out) :: M_body(1:3,1:3)
     real(kind=rk), dimension(1:3,1:3) :: M1_b, M2_b, M3_b
 
-    if (Insect%BodyMotion=="free_flight") then
+    if (Insect%quaternion_solver_used) then
       ! entries 7,8,9,10 of the Insect%STATE vector are the body quaternion
       call rotation_matrix_from_quaternion( Insect%STATE(7:10), M_body)
+
     else
       ! conventional yaw, pitch, roll. Note the order of matrices is important.
       ! first we yaw, then we pitch, then we roll the insect. Note that when the
@@ -1047,38 +1110,42 @@ contains
   ! and from this the body orientation, rotation matrix, etc can be computed. So here we read this file
   ! and return Insect%STATE at the desired time (linear interpolation is used)
   !-----------------------------------------------------------------------------
-  subroutine read_insect_STATE_from_file(time, Insect)
-    implicit none
-    real(kind=rk), intent(in) :: time
-    type(diptera),intent(inout) :: Insect
-    integer :: num_lines, n_header = 1, i
-    character(len=maxcolumns) :: dummy
-    real(kind=rk), allocatable, save :: data1(:,:)
+  subroutine read_insect_STATE_from_file(time, Insect, fname, verbose)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      type(diptera), intent(inout) :: Insect
+      character(len=*), intent(in) :: fname
+      logical, intent(in) :: verbose
 
-    if ( .not. allocated(data1) ) then
-      ! read rigidsolidsolver.t file
-      ! skip header, count lines, read
-      call count_lines_in_ascii_file_mpi('rigidsolidsolver.t', num_lines, n_header)
-      ! read contents of file
-      allocate( data1(1:num_lines,1:14))
-      call read_array_from_ascii_file_mpi('rigidsolidsolver.t', data1 , n_header)
-    endif
+      integer :: num_lines, n_header = 1, i
+      character(len=maxcolumns) :: dummy
+      real(kind=rk), allocatable, save :: data1(:,:)
 
-    ! interpolate in time
-    i = 1
-    do while (data1(i,1) <= time .and. i<size(data1,1)-1)
-      i=i+1
-    enddo
-    ! we now have data1(i-1,1) <= time < data1(i,1)
-    ! use linear interpolation
-    Insect%STATE = 0.d0
-    Insect%STATE(1:13) = data1(i-1,2:14) + (time - data1(i-1,1)) * (data1(i,2:14)-data1(i-1,2:14)) / (data1(i,1)-data1(i-1,1))
+      if ( .not. allocated(data1) ) then
+          if (root) write(*,*) "read_insect_STATE_from_file:", trim(adjustl(fname))
+          ! read rigidsolidsolver.t file
+          ! skip header, count lines, read
+          call count_lines_in_ascii_file_mpi(fname, num_lines, n_header)
+          ! read contents of file
+          allocate( data1(1:num_lines,1:14))
+          call read_array_from_ascii_file_mpi(fname, data1 , n_header)
+      endif
 
-    if (root) then
-        write(*,*) "The extracted Insect%STATE vector is:"
-        write(*,'(21(es12.4,1x))') time, Insect%STATE(1:13)
-    endif
-    ! deallocate (data)
+      ! interpolate in time
+      i = 1
+      do while (data1(i,1) <= time .and. i<size(data1,1)-1)
+          i=i+1
+      enddo
+
+      ! we now have data1(i-1,1) <= time < data1(i,1)
+      ! use linear interpolation
+      Insect%STATE = 0.d0
+      Insect%STATE(1:13) = data1(i-1,2:14) + (time - data1(i-1,1)) * (data1(i,2:14)-data1(i-1,2:14)) / (data1(i,1)-data1(i-1,1))
+
+      if (root .and. verbose) then
+          write(*,*) "The extracted Insect%STATE vector is:"
+          write(*,'(21(es12.4,1x))') time, Insect%STATE(1:13)
+      endif
   end subroutine
 
 

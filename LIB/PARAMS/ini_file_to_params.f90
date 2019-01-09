@@ -119,12 +119,7 @@ subroutine ini_file_to_params( params, filename )
     !
     ! debug flag
     call read_param_mpi(FILE, 'Debug', 'debug', params%debug, .true. )
-    ! unit test time_stepper flag
-    call read_param_mpi(FILE, 'Debug', 'test_time_stepper', params%test_time_stepper, .false.)
-    ! unit test spatial flag
-    call read_param_mpi(FILE, 'Debug', 'test_spatial', params%test_spatial, .false.)
-    ! unit test wavelet compression flag
-    call read_param_mpi(FILE, 'Debug', 'test_wavelet_comp', params%test_wavelet_comp, .false.)
+    call read_param_mpi(FILE, 'Debug', 'write_individual_timings', params%write_individual_timings, .false. )
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
@@ -172,11 +167,20 @@ subroutine ini_file_to_params( params, filename )
             Bs      = params%Bs
             g       = params%n_ghosts
             Neqn    = params%n_eqn
-            Nrk     = max( Neqn*size(params%butcher_tableau,1), params%N_fields_saved )
+
+            if (params%time_step_method == "RungeKuttaGeneric") then
+                Nrk = size(params%butcher_tableau,1)
+            elseif (params%time_step_method == "Krylov") then
+                Nrk = params%M_krylov + 3
+            else
+                call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+            endif
+
             nstages = 2.0
 
             mem_per_block = real(Neqn) * (real(Bs+2*g))**d & ! hvy_block
-            + real(Nrk) * (real(Bs+2*g))**d & ! hvy_work
+            + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs+2*g))**d & ! hvy_tmp
+            + real(Neqn) * real(Nrk) * (real(Bs+2*g))**d & ! hvy_work
             + 2.0 * nstages * real(Neqn) * real((Bs+2*g)**d - Bs**d) &  ! real buffer ghosts
             + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
 
@@ -336,6 +340,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
+    call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
 
     ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
     ! use? in ACM, it can be good NOT to apply it to the pressure.
@@ -380,7 +385,10 @@ end subroutine ini_file_to_params
       ! number of time steps to be performed. default value is very large, so if not set
       ! the limit will not be reached
       call read_param_mpi(FILE, 'Time', 'nt', params%nt, 99999999_ik )
-
+      call read_param_mpi(FILE, 'Time', 'time_step_method', params%time_step_method, "RungeKuttaGeneric" )
+      call read_param_mpi(FILE, 'Time', 'M_krylov', params%M_krylov, 12 )
+      call read_param_mpi(FILE, 'Time', 'krylov_err_threshold', params%krylov_err_threshold, 1.0e-3_rk )
+      call read_param_mpi(FILE, 'Time', 'krylov_subspace_dimension', params%krylov_subspace_dimension, "fixed" )
       ! read output write method
       call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
       ! read output write frequency
@@ -402,6 +410,7 @@ end subroutine ini_file_to_params
       0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
+
 
 
     end subroutine ini_time

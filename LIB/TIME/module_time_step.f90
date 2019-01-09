@@ -31,7 +31,7 @@ module module_time_step
     use module_mesh, only : get_block_spacing_origin, max_active_level
 
     ! to call RHS routines:
-    use module_physics_metamodule, only : RHS_meta, STATISTICS_meta, FILTER_meta
+    use module_physics_metamodule, only : RHS_meta, STATISTICS_meta, FILTER_meta, UPDATE_GRID_QTYS_meta
 
     use module_boundary_conditions, only: get_adjacent_boundary_surface_normal
 
@@ -55,9 +55,8 @@ contains
     include "filter_wrapper.f90"
     include "statistics_wrapper.f90"
     include "final_stage_RK.f90"
-
-    ! dt calculation
+    include "krylov.f90"
+    include "update_grid_qtys.f90"
     include "calculate_time_step.f90"
-
 
 end module module_time_step

@@ -5,7 +5,7 @@
 !> \date 03/09/18 - removed unused variables (P.Krah) commit 0b79d945422eedda70fa5f874cd2889a10ef8287
 subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
 
-    use module_physics_metamodule, only : GET_DT_BLOCK
+    use module_physics_metamodule, only : GET_DT_BLOCK_meta
 
     !--------------------------------------------------------------
     implicit none
@@ -38,7 +38,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
           ! physics modules dictate some restrictions due to CFL conditions, penalization
           ! or other operators. Everything that is physics-dependent goes here. it is
           ! computed for each block, then the minimum is used.
-          call GET_DT_BLOCK( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
+          call GET_DT_BLOCK_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
               params%Bs,params%n_ghosts, xx0, ddx, dt_tmp)
 
           dt = min( dt, dt_tmp )
@@ -57,6 +57,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
       if (params%dt_max > 0.0) dt = min( params%dt_max, dt)
     endif
 
+
     if ( params%write_method == 'fixed_time' ) then
         ! time step should also fit in output time step size
         ! criterion: check in time+dt above next output time
@@ -65,6 +66,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
             dt = params%next_write_time - time
         end if
     end if
+
 
     if ( abs(params%tsave_stats-9999999.9_rk)>1e-1_rk ) then
         ! time step should also fit in statistics output time step size
@@ -75,8 +77,10 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
         end if
     end if
 
+
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time
+
 
     if (dt <= 0.0_rk) then
       call abort(12131,"For some reason, we ended up with a negative or zero time step. This is not back to the future!!!")

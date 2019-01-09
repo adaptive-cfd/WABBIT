@@ -872,7 +872,9 @@ contains
     Bs = size(u,1) - 2*g
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
-    u=work_array(:,:,:,1:params_ns%n_eqn)
+
+    ! copy filtered state vector back to input state vector
+    u = work_array(:,:,:,1:params_ns%n_eqn)
 
   end subroutine filter_NStokes
 

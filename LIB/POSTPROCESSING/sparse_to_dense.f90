@@ -27,7 +27,8 @@ subroutine sparse_to_dense(params)
     integer(kind=ik)       :: iteration
 
     integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
@@ -125,7 +126,7 @@ subroutine sparse_to_dense(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, .true., hvy_work)
+        hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
     ! read field
     call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
@@ -141,7 +142,7 @@ subroutine sparse_to_dense(params)
 
     ! balance the load
     call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp)
 
     ! create lists of active blocks (light and heavy data) after load balancing (have changed)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
@@ -164,7 +165,7 @@ subroutine sparse_to_dense(params)
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, hvy_work)
+        hvy_active, hvy_n, hvy_tmp)
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
             hvy_active, hvy_n, lgt_sortednumlist, .true. )
         ! update neighbor relations
@@ -197,7 +198,7 @@ subroutine sparse_to_dense(params)
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_work )
+        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp )
     call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
@@ -212,5 +213,5 @@ subroutine sparse_to_dense(params)
     end if
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp)
 end subroutine sparse_to_dense

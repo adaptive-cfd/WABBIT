@@ -208,10 +208,10 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                     end if ! if neighbor exists
                 end do ! loop over neighbors
 
-        !-----------------------------------------------------------------------
-        ! this block wants to stay on its level
-        !-----------------------------------------------------------------------
-        elseif (lgt_block( lgt_id , Jmax + idx_refine_sts ) == 0 .or. lgt_block( lgt_id , Jmax + idx_refine_sts ) == 11 ) then
+                !-----------------------------------------------------------------------
+                ! this block wants to stay on its level
+                !-----------------------------------------------------------------------
+            elseif (lgt_block( lgt_id , Jmax + idx_refine_sts ) == 0 .or. lgt_block( lgt_id , Jmax + idx_refine_sts ) == 11 ) then
                 ! loop over all neighbors
                 do i = 1, neighbor_num
                     ! neighbor exists ? If not, this is a bad error

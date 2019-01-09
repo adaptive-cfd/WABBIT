@@ -25,8 +25,9 @@ module module_physics_metamodule
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: READ_PARAMETERS, PREPARE_SAVE_DATA, RHS_meta, GET_DT_BLOCK, INICOND_meta, FIELD_NAMES,&
-              STATISTICS_meta,FILTER_meta
+    PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
+              INICOND_meta, FIELD_NAMES_meta,&
+              STATISTICS_meta, FILTER_meta, UPDATE_GRID_QTYS_meta
     !**********************************************************************************************
 
 contains
@@ -35,7 +36,7 @@ contains
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
  !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
  !> the parameter struct for wabbit is not available.
- subroutine READ_PARAMETERS( physics, filename )
+ subroutine READ_PARAMETERS_meta( physics, filename )
    implicit none
    character(len=*), intent(in) :: physics
    character(len=*), intent(in) :: filename
@@ -55,7 +56,58 @@ contains
 
    end select
 
- end subroutine READ_PARAMETERS
+ end subroutine
+
+!-------------------------------------------------------------------------------
+! While the state vector and many work variables (such as the mask function for penalization)
+! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
+! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
+! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
+! time step.
+! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
+! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
+! generated at every time t. This example generalizes to any combination of stationary and moving
+! obstacle, i.e. insect behind fractal tree.
+! Updating those grid-depend quantities is a task for the physics modules: they should provide
+! interfaces, if they require such qantities. In many cases, the grid_qtys are probably not used.
+! Please note that in the current implementation, hvy_tmp also plays the role of a work array
+!-------------------------------------------------------------------------------
+ subroutine UPDATE_GRID_QTYS_meta( time, physics, u, g, x0, dx, stage )
+     implicit none
+     !> even though it is a bit odd, since those qtys shall be TIME INDEPENDENT, we pass time for debugging
+     real(kind=rk), intent(in)    :: time
+     character(len=*), intent(in) :: physics
+
+     ! the grid-dependent qtys that are computed in this routine:
+     real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+     ! set the qty only in the interior of the field
+     ! you also need to know where 'interior' starts: so we pass the number of ghost points
+     integer, intent(in) :: g
+
+     ! for each block, you'll need to know where it lies in physical space. The first
+     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+     character(len=*), intent(in) :: stage
+
+
+     select case(physics)
+     case ('ACM-new')
+       call update_grid_qtys_ACM(time, u, g, x0, dx, stage )
+
+     case ('ConvDiff-new')
+         ! not implemented yet
+
+     case ('navier_stokes')
+         ! not implemented yet
+
+     case default
+       call abort(88119, "[PREPARE_SAVE_DATA (metamodule)] unknown physics....")
+
+     end select
+
+ end subroutine
 
 
  !-----------------------------------------------------------------------------
@@ -69,7 +121,7 @@ contains
  ! NOTE that as we have way more work arrays than actual state variables (typically
  ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
  !-----------------------------------------------------------------------------
- subroutine PREPARE_SAVE_DATA( physics, time, u, g, x0, dx, work )
+ subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work )
    implicit none
    character(len=*), intent(in) :: physics
 
@@ -117,7 +169,7 @@ contains
  ! the main routine save_fields has to know how you label the stuff you want to
  ! store from the work array, and this routine returns those strings
  !-----------------------------------------------------------------------------
- subroutine FIELD_NAMES( physics, N, name )
+ subroutine FIELD_NAMES_meta( physics, N, name )
    implicit none
    character(len=*), intent(in) :: physics
    ! component index
@@ -140,7 +192,7 @@ contains
 
    end select
 
- end subroutine FIELD_NAMES
+end subroutine FIELD_NAMES_meta
 
 
  !-----------------------------------------------------------------------------
@@ -149,7 +201,8 @@ contains
  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, stage, boundary_flag)
+ subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, grid_qty, stage, &
+                      boundary_flag, first_substep)
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -172,6 +225,20 @@ contains
    ! output. Note assumed-shape arrays
    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
 
+   ! While the state vector and many work variables (such as the mask function for penalization)
+   ! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
+   ! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
+   ! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
+   ! time step.
+   ! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
+   ! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
+   ! generated at every time t. This example generalizes to any combination of stationary and moving
+   ! obstacle, i.e. insect behind fractal tree.
+   ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
+   ! if they require such qantities. In many cases, the grid_qtys are probably not used.
+   real(kind=rk), intent(in) :: grid_qty(1:,1:,1:,1:)
+
+
    ! stage. there is 3 stages, init_stage, integral_stage and local_stage. If the PDE has
    ! terms that depend on global qtys, such as forces etc, which cannot be computed
    ! from a single block alone, the first stage does that. the second stage can then
@@ -186,14 +253,19 @@ contains
    !  1: boundary in the direction +e_i
    ! -1: boundary in the direction - e_i
    ! currently only acessible in the local stage
-   integer(kind=2),optional          , intent(in):: boundary_flag(3)
+   integer(kind=2), optional, intent(in):: boundary_flag(3)
+
+   !> some operations might be done only in the first RK substep, hence we pass
+   !! this flag to check if this is the first call at the current time level.
+   !! It is currently used only in ACM module
+   logical, intent(in) :: first_substep
 
    select case(physics)
    case ("ACM-new")
-     call RHS_ACM( time, u, g, x0, dx,  rhs, stage )
+     call RHS_ACM( time, u, g, x0, dx,  rhs, grid_qty, stage, first_substep )
 
    case ("ConvDiff-new")
-     call RHS_convdiff( time, u, g, x0, dx, rhs, stage,boundary_flag )
+     call RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag )
 
    case ("navier_stokes")
      call RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
@@ -212,13 +284,13 @@ contains
  ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
  ! on individual blocks. This requires one to use the same staging concept as for the RHS.
  !-----------------------------------------------------------------------------
- subroutine STATISTICS_meta( physics, time, u, g, x0, dx, rhs, stage )
+ subroutine STATISTICS_meta( physics, time, dt, u, g, x0, dx, rhs, stage )
    implicit none
 
    character(len=*), intent(in) :: physics
    ! it may happen that some source terms have an explicit time-dependency
    ! therefore the general call has to pass time
-   real(kind=rk), intent (in) :: time
+   real(kind=rk), intent (in) :: time, dt
 
    ! block data, containg the state vector. In general a 4D field (3 dims+components)
    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
@@ -241,7 +313,7 @@ contains
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, u, g, x0, dx, stage, rhs )
+     call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
@@ -262,7 +334,7 @@ contains
  ! condition, sometimes not. So each physic module must be able to decide on its
  ! time step. This routine is called for all blocks, the smallest returned dt is used.
  !-----------------------------------------------------------------------------
- subroutine GET_DT_BLOCK( physics, time, u, Bs, g, x0, dx, dt )
+ subroutine GET_DT_BLOCK_meta( physics, time, u, Bs, g, x0, dx, dt )
    implicit none
    character(len=*), intent(in) :: physics
    ! it may happen that some source terms have an explicit time-dependency
@@ -302,7 +374,7 @@ contains
 
    end select
 
- end subroutine GET_DT_BLOCK
+ end subroutine
 
 
  !-----------------------------------------------------------------------------

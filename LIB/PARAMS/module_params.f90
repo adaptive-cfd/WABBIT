@@ -40,11 +40,14 @@ module module_params
         ! maximal time for main time loop
         real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
-        real(kind=rk)                                :: CFL=0.0_rk
+        real(kind=rk)                                :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
+        character(len=80)                            :: time_step_method="RungeKuttaGeneric"
+        character(len=80)                            :: krylov_subspace_dimension="fixed"
         ! dt
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
+        integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1
         ! data writing frequency
         integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
         ! data writing frequency
@@ -75,7 +78,7 @@ module module_params
         ! deside if WABBIT should start from input files
         logical                                       :: read_from_files
         ! files we want to read for inital cond.
-        character(len=80), dimension(:), allocatable :: input_files
+        character(len=80), dimension(:), allocatable  :: input_files
 
         ! grid parameter
         integer(kind=ik)                             :: Bs=0        ! number of block nodes
@@ -94,20 +97,20 @@ module module_params
         character(len=80)                            :: block_distribution=""
 
         ! debug flag
-        logical                                      :: debug=.false.
+        logical                                      :: debug=.false., write_individual_timings=.true.
 
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------
         ! physics type
-        character(len=80)                            :: physics_type=""
+        character(len=80) :: physics_type=""
 
         ! domain length
-        real(kind=rk)                                :: domain_size(3)=0.0_rk
+        real(kind=rk)     :: domain_size(3)=0.0_rk
 
         ! use third dimension
-        logical                                     :: threeD_case=.false.
-        integer(kind=ik)                            :: dim=2 ! can be 2 or 3
+        logical           :: threeD_case=.false.
+        integer(kind=ik)  :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------
         ! statistics
@@ -119,16 +122,16 @@ module module_params
         ! MPI
         ! -------------------------------------------------------------------------------------
         ! process rank
-        integer(kind=ik)                            :: rank=-1
+        integer(kind=ik) :: rank=-1
         ! number of processes
-        integer(kind=ik)                            :: number_procs=-1
+        integer(kind=ik) :: number_procs=-1
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
         ! bridge for connecting WABBIT to outdoor MPI_WORLD
-        type(bridgeMPI)                             :: bridge
+        type(bridgeMPI)  :: bridge
         !
-        logical                                     :: bridge_exists = .false.
+        logical          :: bridge_exists = .false.
         !--------------------------------------------------------------------------------------
                !! particle connection
         !--------------------------------------------------------------------------------------
@@ -151,15 +154,6 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test
         ! -------------------------------------------------------------------------------------
-        ! unit test params struct
-        logical                                     :: unit_test=.false.
-        ! unit test time_stepper convergence flag
-        logical                                     :: test_time_stepper=.false.
-        ! unit test spatial convergence flag
-        logical                                     :: test_spatial=.false.
-        ! unit test wavelet compression
-        logical                                     :: test_wavelet_comp=.false.
-        ! unit test treecode flag
         logical :: test_treecode=.false., test_ghost_nodes_synch=.false., check_redundant_nodes=.false.
 
         ! -------------------------------------------------------------------------------------

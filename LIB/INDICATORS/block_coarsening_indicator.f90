@@ -34,7 +34,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    !> heavy work data array (expected to hold the VORTICITY if threhsolding is applied to vorticity)
+    !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
     !> block spacing and origin
     real(kind=rk), intent(in)           :: dx(1:3), x0(1:3)

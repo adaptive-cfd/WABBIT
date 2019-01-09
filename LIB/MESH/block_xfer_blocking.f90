@@ -10,7 +10,7 @@
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
 subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_work )
+    lgt_n, lgt_sortednumlist, hvy_tmp )
     implicit none
 
     !> user defined parameter structure
@@ -29,7 +29,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
     !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
 
     integer(kind=ik) :: k, l, lgt_id, neq, heavy_id, com_N, data_size, &
     hvy_free_id, ierr, lgt_free_id, myrank, tag, mpirank_recver, mpirank_sender
@@ -83,7 +83,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
                     ! as the blocks which are consecutive in the list are not necessarily
                     ! consecutive in the hvy_block array, we first collect them in the bufffer
                     ! array. Then they are contiguous.
-                    hvy_work(:, :, :, 1:neq, l+1 ) = hvy_block(:, :, :, 1:neq, heavy_id )
+                    hvy_tmp(:, :, :, 1:neq, l+1 ) = hvy_block(:, :, :, 1:neq, heavy_id )
                     ! ... light data
                     buffer_light( l+1 ) = lgt_id
 
@@ -96,7 +96,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
 
                 ! send data
                 call MPI_Send( buffer_light(1:l), l, MPI_INTEGER4, mpirank_recver, tag, WABBIT_COMM, ierr)
-                call MPI_Send( hvy_work(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, mpirank_recver, tag, WABBIT_COMM, ierr)
+                call MPI_Send( hvy_tmp(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, mpirank_recver, tag, WABBIT_COMM, ierr)
 
                 ! delete all com list elements
                 xfer_list(k:k+l-1, :) = -1
@@ -116,7 +116,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
 
                 ! receive data
                 call MPI_Recv( buffer_light(1:l), l, MPI_INTEGER4, mpirank_sender, tag, WABBIT_COMM, status, ierr)
-                call MPI_Recv( hvy_work(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, mpirank_sender, tag, WABBIT_COMM, status, ierr)
+                call MPI_Recv( hvy_tmp(:,:,:,1:neq,1:l), data_size*l, MPI_REAL8, mpirank_sender, tag, WABBIT_COMM, status, ierr)
 
                 ! delete first com list element after receiving data
                 xfer_list(k, :) = -1
@@ -132,7 +132,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, lgt_act
 
                     ! copy the data from the buffers
                     lgt_block( lgt_free_id, :) = lgt_block( buffer_light(l), : )
-                    hvy_block(:, :, :, 1:neq, hvy_free_id) = hvy_work(:, :, :, 1:neq, l)
+                    hvy_block(:, :, :, 1:neq, hvy_free_id) = hvy_tmp(:, :, :, 1:neq, l)
 
                 end do
             else

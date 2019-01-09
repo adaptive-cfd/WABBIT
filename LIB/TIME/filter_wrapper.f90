@@ -12,7 +12,7 @@
 !
 !**********************************************************************************************
 
-subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_active, hvy_n)
+subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
 
 !----------------------------------------------------------------------------------------------
 ! modules
@@ -26,10 +26,10 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
     real(kind=rk), intent(in)           :: time
     !> user defined parameter structure, hvy_active
     type (type_params), intent(in)      :: params
-    !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
     !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_state(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> list of active blocks (heavy data)
@@ -48,9 +48,6 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
     integer(kind=ik)                    :: Bs, g
 
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     ! grid parameter
     Bs    = params%Bs
     g     = params%n_ghosts
@@ -62,10 +59,8 @@ subroutine filter_wrapper(time, params, hvy_state, hvy_work, lgt_block, hvy_acti
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      call filter_meta(params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
-          hvy_work(:,:,:,:,hvy_active(k)))
+      call filter_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
+          hvy_tmp(:,:,:,:,hvy_active(k)))
     enddo
-
-    !update state vector
 
 end subroutine filter_wrapper

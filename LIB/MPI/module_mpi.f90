@@ -250,6 +250,7 @@ subroutine init_ghost_nodes( params )
         allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
         allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
 
+
         !-----------------------------------------------------------------------
         ! set up constant arrays
         !-----------------------------------------------------------------------
@@ -279,6 +280,7 @@ subroutine init_ghost_nodes( params )
         k = maxval( ijkGhosts(2,3,:,:,:,RESPRE) )*2
 
         allocate( res_pre_data( i, j, k, Neqn) )
+        res_pre_data = 9.9_rk
 
         ! this output can be plotted using the python script
         if (params%rank==0) Then

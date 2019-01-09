@@ -192,7 +192,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
       endif
     case('explicit_5pt','explicit_7pt','explicit_9pt','explicit_11pt') ! explicit filtering
       do dF = 1, N_dF
-          dF_old=dF+N_dF
+          dF_old = dF+N_dF
               !block_old = hvy_block(:, :, :, dF, hvy_active(k) )
               ! 3D or 2D case
               if (params_ns%dim==3 ) then

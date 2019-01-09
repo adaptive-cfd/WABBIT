@@ -18,7 +18,7 @@ subroutine mult_mask(params)
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
-    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -84,7 +84,7 @@ subroutine mult_mask(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, .true., hvy_work)
+    lgt_active, hvy_active, lgt_sortednumlist, hvy_work=hvy_work)
 
     ! read mesh and field
     call read_mesh(fname_input, params, lgt_n, hvy_n, lgt_block)

@@ -71,11 +71,12 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
     ! Body
     !-----------------------------------------------------------------------------
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_body,x_glob)
 
@@ -133,7 +134,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
 
                     ! smoothing
                     if (( R < R0 + Insect%safety ).and.(R0>0.d0)) then
-                        R_tmp = smoothstep(R, R0, Insect%smooth)
+                        R_tmp = steps(R, R0, Insect%smooth)
                         mask(ix,iy,iz)= max( R_tmp , mask(ix,iy,iz) )
                         mask_color(ix,iy,iz) = color_body
                     endif
@@ -155,11 +156,12 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
     dz_head = 0.5d0 * 0.297d0
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                !-- define the head coordinate systems we are going to use
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 x_body   = matmul(M_body,x_glob)
                 x_head   = x_body
 
@@ -174,7 +176,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
                             if ( ((x_head(1)-xx_head)/dx_head)**2 <= 1.d0) then
                                 R0 = dz_head*dsqrt(1.d0- ((x_head(1)-xx_head)/dx_head)**2 )
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -272,11 +274,12 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
 
     ! Assign values to mask pointwise
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                !-- define the head coordinate systems we are going to use
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 x_body   = matmul(M_body,x_glob)
 
                 !-- check bounds
@@ -351,7 +354,7 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
     real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     integer :: ix,iy,iz
-    real(kind=rk) :: x,y,z,s,s1, a_body, R,R0,R_tmp,x1
+    real(kind=rk) :: x,y,z,s,s1, a_body, R,R0,R_tmp,x1, a_body0
     real(kind=rk) :: x_glob(1:3),x_body(1:3),x_head(1:3)
     real(kind=rk) :: rbc,thbc1,thbc2,x0bc,z0bc,xcs,zcs
     real(kind=rk) :: xx_head,zz_head,dx_head,dz_head,a_head
@@ -360,12 +363,19 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
     !-----------------------------------------------------------------------------
     ! Body
     !-----------------------------------------------------------------------------
+    if (Insect%BodyType == 'drosophila_slim') then
+        a_body0 = 1.09d0
+    else
+        a_body0 = 1.0d0
+    endif
+
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_body,x_glob)
 
@@ -396,12 +406,7 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
                 ! check if inside body bounds (in s-direction)
                 if ( (s>=-Insect%safety) .and. (s<=1.075d0+Insect%safety) ) then
                     R0 = 0.0d0
-                    ! round section by default
-                    if (Insect%BodyType == 'drosophila_slim') then
-                        a_body = 1.09d0
-                    else
-                        a_body = 1.0d0
-                    endif
+                    a_body = a_body0
                     ! distortion of s
                     s1 = 1.0d0 - ( s + 0.08d0*dtanh(30.0d0*s) ) / (1.0d0+0.08d0*dtanh(30.0d0))
                     s1 = ( s1 + 0.04d0*dtanh(60.0d0*s1) ) / (1.0d0+0.04d0*dtanh(60.0d0))
@@ -430,7 +435,7 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
 
                     ! smoothing
                     if (( R < R0 + Insect%safety ).and.(R0>0.d0)) then
-                        R_tmp = smoothstep(R,R0, Insect%smooth)
+                        R_tmp = steps(R,R0, Insect%smooth)
                         mask(ix,iy,iz)= max( R_tmp , mask(ix,iy,iz) )
                         mask_color(ix,iy,iz) = color_body
                     endif
@@ -456,11 +461,12 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
     dz_head = 0.5d0 * 0.27d0
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                !-- define the head coordinate systems we are going to use
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_body,x_glob)
                 x_head   = x_body
@@ -476,7 +482,7 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
                             if ( ((x_head(1)-xx_head)/dx_head)**2 <= 1.d0) then
                                 R0 = dz_head*dsqrt(1.d0- ((x_head(1)-xx_head)/dx_head)**2 )
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -530,13 +536,16 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect, color_body, 
     ! Jerry's body is an ellipsoid
     !-----------------------------------------------------------------------------
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
+
                 ! check if inside the surrounding box (save comput. time)
                 if ( dabs(x_body(2)) <= Insect%b_body + Insect%safety ) then
                     if ( dabs(x_body(3)) <= Insect%b_body + Insect%safety ) then
@@ -548,7 +557,7 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect, color_body, 
                                 R0 = dsqrt( Insect%b_body**2 *(1.d0- (x_body(1)/a_body)**2 ) )
 
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -627,7 +636,7 @@ subroutine draw_cylinder( xp,x1,y1,z1,x2,y2,z2,R0,mask_val,color_val,icolor,safe
         zvp = xab*yu-yab*xu
         R = sqrt((xvp*xvp+yvp*yvp+zvp*zvp)/(xu*xu+yu*yu+zu*zu))
         if ( R <= R0+safety ) then
-            mask_val = max(smoothstep(R,R0,h_smooth),mask_val)
+            mask_val = max(steps(R,R0,h_smooth),mask_val)
             color_val = icolor
         endif
     endif
@@ -639,7 +648,7 @@ subroutine draw_cylinder( xp,x1,y1,z1,x2,y2,z2,R0,mask_val,color_val,icolor,safe
             if (dabs(x(3)) <= R0+safety) then
                 R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
                 if ( R <= R0+safety ) then
-                    mask_val = max(smoothstep(R,R0,h_smooth),mask_val)
+                    mask_val = max(steps(R,R0,h_smooth),mask_val)
                     color_val = icolor
                 endif
             endif
@@ -651,7 +660,7 @@ subroutine draw_cylinder( xp,x1,y1,z1,x2,y2,z2,R0,mask_val,color_val,icolor,safe
             if (dabs(x(3)) <= R0+safety) then
                 R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
                 if ( R <= R0+safety ) then
-                    mask_val = max(smoothstep(R,R0,h_smooth),mask_val)
+                    mask_val = max(steps(R,R0,h_smooth),mask_val)
                     color_val = icolor
                 endif
             endif
@@ -842,7 +851,7 @@ subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect, color_bod
     !   do iz = 0, size(mask,3)-1
     !     do iy = 0, size(mask,2)-1
     !       do ix = 0, size(mask,1)-1
-    !         mask(ix,iy,iz) = smoothstep( mask(ix,iy,iz),0.d0 )
+    !         mask(ix,iy,iz) = steps( mask(ix,iy,iz),0.d0 )
     !       enddo
     !     enddo
     !   enddo
@@ -874,12 +883,13 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect, color_bod
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
 
     do iz = 0, size(mask,3)-1
+        x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x is in the global coordinate system
-                x = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                ! x is now centered in the plate's center point
-                x = periodize_coordinate(x - Insect%xc_body_g, (/xl,yl,zl/))
+                x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_body,x)
 
@@ -892,7 +902,7 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect, color_bod
                             dabs(x_body(2))-Insect%L_body/2.d0,&
                             dabs(x_body(1))-Insect%L_span/2.d0 &
                             /) )
-                            mask(ix,iy,iz) = max(smoothstep(R,0.d0, Insect%smooth),mask(ix,iy,iz))
+                            mask(ix,iy,iz) = max(steps(R,0.d0, Insect%smooth),mask(ix,iy,iz))
                             mask_color(ix,iy,iz) = color_body
                         endif
                     endif
@@ -927,12 +937,12 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect, color_body, M
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
 
     do iz = 0, size(mask,3)-1
+        x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x is in the global coordinate system
-                x = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                ! x is now centered in the sphere's center point
-                x = periodize_coordinate(x - Insect%xc_body_g, (/xl,yl,zl/))
+                x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_body,x)
 
@@ -943,7 +953,7 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect, color_body, M
                             R = maxval( (/ dabs(x_body(3)) - Insect%WingThickness/2.d0,&
                             dsqrt(x_body(2)**2 + x_body(1)**2)-0.5d0 &
                             /) )
-                            mask(ix,iy,iz) = max(smoothstep(R,0.d0, Insect%smooth),mask(ix,iy,iz))
+                            mask(ix,iy,iz) = max(steps(R,0.d0, Insect%smooth),mask(ix,iy,iz))
                             mask_color(ix,iy,iz) = color_body
                         endif
                     endif
@@ -980,18 +990,20 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect, color_b
     RR0 = 0.5d0*Insect%WingThickness
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
 
                 if ( dabs(x_body(1))<=0.5d0+Insect%safety) then
                     R = x_body(2)**2 + x_body(3)**2
                     if ( R < R0) then
-                        a = smoothstep(dsqrt(R),RR0, Insect%smooth)
+                        a = steps(dsqrt(R),RR0, Insect%smooth)
                         if (mask(ix,iy,iz)<=a) then
                             mask(ix,iy,iz) = a
                             mask_color(ix,iy,iz) = color_body
@@ -1039,11 +1051,13 @@ subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect, color_bod
     ! The body is an ellipsoid
     !-----------------------------------------------------------------------------
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
                 ! check if inside the surrounding box (save comput. time)
@@ -1057,7 +1071,7 @@ subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect, color_bod
                                 R0 = dsqrt( Insect%b_body**2 *(1.d0- (x_body(1)/a_body)**2 ) )
 
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -1141,11 +1155,13 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, colo
     c = b ! HACK: for simplicity, assume b=c, otherwise it can be very tough to draw
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
                 ! translate to origin of thorax
@@ -1161,7 +1177,7 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, colo
                             if ( x_body(3)/a <= 1.d0) then
                                 R0 = b * dsqrt( 1.d0 - (x_body(3)/a)**2 )
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -1182,11 +1198,13 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, colo
     alpha = deg2rad(-30.44d0)
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul(M_body, x_glob)
                 ! translate to origin of abdomen
@@ -1205,7 +1223,7 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, colo
                             if ( x_body(1)/a <= 1.d0) then
                                 R0 = b * dsqrt( 1.d0 - (x_body(1)/a)**2 )
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -1262,11 +1280,13 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect, color_body, M
     endif
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
                 ! shift x body to the center of gravity
@@ -1282,9 +1302,9 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect, color_body, M
                             R0 = max( -a*sin(alpha)*x_body(3) + (2.d0/3.d0)*H*a*sin(alpha) , 0.d0 )
                             ! define the mask. note w shifted the system to the center of gravity
                             ! therefore -H/3 <= z <= 2H/3
-                            mask(ix,iy,iz)= max(smoothstep(dabs(R-R0),0.5d0*thick, Insect%smooth)&
-                            *smoothstep(x_body(3),H*2.d0/3.d0, Insect%smooth)&
-                            *smoothstep(-x_body(3),H/3.d0, Insect%smooth),mask(ix,iy,iz))
+                            mask(ix,iy,iz)= max(steps(dabs(R-R0),0.5d0*thick, Insect%smooth)&
+                            *steps(x_body(3),H*2.d0/3.d0, Insect%smooth)&
+                            *steps(-x_body(3),H/3.d0, Insect%smooth),mask(ix,iy,iz))
 
                             mask_color(ix,iy,iz) = color_body
                         endif
@@ -1326,11 +1346,13 @@ subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect, color_body, 
     ! The seed's core is an ellipsoid
     !-----------------------------------------------------------------------------
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
                 ! check if inside the surrounding box (save comput. time)
@@ -1343,7 +1365,7 @@ subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect, color_body, 
                             if ( (x_body(1)/a_body)**2 <= 1.d0) then
                                 R0 = dsqrt( Insect%b_body**2 *(1.d0- (x_body(1)/a_body)**2 ) )
                                 if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(smoothstep(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
                                     mask_color(ix,iy,iz) = color_body
                                 endif
                             endif
@@ -1401,11 +1423,13 @@ subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect, color_body
     endif
 
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_body, x_glob)
                 ! shift x body to the center of gravity
@@ -1432,7 +1456,7 @@ subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect, color_body
                             ! note maxval(di) is the union of all the triangles' interiors (thus a solid filled pyramid results),
                             ! and abs(maxval(di))-t/2 is the shell operator which gives us just the shell (negative values are inside the solid, by convention)
                             ! we also directly take the CHI(delta) here.
-                            mask(ix,iy,iz)= smoothstep( abs(maxval(di)) -thick/2.d0, 0.d0, Insect%smooth)
+                            mask(ix,iy,iz)= steps( abs(maxval(di)) -thick/2.d0, 0.d0, Insect%smooth)
                             mask_color(ix,iy,iz) = color_body
                             ! please note that the solid body velocity will be added elsewhere in the code
                         endif
@@ -1491,12 +1515,13 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
 
     ! first we draw the cylinder, then the endpoint spheres
     do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - x1(3)
         do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - x1(2)
             do ix = 0, size(mask,1)-1
-                ! x_glob is in the global coordinate system
-                ! note origin is shifted to x1
-                x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /) - x1
-                x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - x1(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
 
                 ! position on cylinder axis (projection of x-x1 on e_x)
                 ceta1 = dot_product(x_glob, e_x)
@@ -1524,7 +1549,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
                     ! actual signed distance, saved in mask array. we would thus take min(R-R0, mask(ix,iy,iz))
                     ! is the mask contained the distance. BUT the mask contains chi, and chi is a monotonous function
                     ! of -R, we take the max operator
-                    t = smoothstep(R,R0, Insect%smooth)
+                    t = steps(R,R0, Insect%smooth)
                     if (t >= mask(ix,iy,iz)) then
                         mask(ix,iy,iz) = t
                         mask_color(ix,iy,iz) = color_val
@@ -1569,14 +1594,13 @@ subroutine drawsphere( xc,R0,xx0, ddx, mask, mask_color, us,Insect,icolor )
     if (xc(3)>=zl) xc(3)=xc(3)-zl
 
 
-
     do iz = 0, size(mask,3)-1
+        x(3) = xx0(3) + dble(iz)*ddx(3) - xc(3)
         do iy = 0, size(mask,2)-1
+            x(2) = xx0(2) + dble(iy)*ddx(2) - xc(2)
             do ix = 0, size(mask,1)-1
-                ! x is in the global coordinate system
-                x = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-                ! x is now centered in the sphere's center point
-                x = periodize_coordinate(x - xc, (/xl,yl,zl/))
+                x(1) = xx0(1) + dble(ix)*ddx(1) - xc(1)
+                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 ! bounding box check
                 if (dabs(x(1)) <= R0+Insect%safety) then
@@ -1585,7 +1609,7 @@ subroutine drawsphere( xc,R0,xx0, ddx, mask, mask_color, us,Insect,icolor )
                             ! compute radius
                             R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
                             if ( R <= R0+Insect%safety ) then
-                                tmp = smoothstep(R,R0, Insect%smooth)
+                                tmp = steps(R,R0, Insect%smooth)
                                 if (tmp>=mask(ix,iy,iz)) then
                                     ! set new value
                                     mask(ix,iy,iz) = tmp

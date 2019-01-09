@@ -40,18 +40,18 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params
-    real(kind=rk) :: CFL, T_end
+    real(kind=rk) :: CFL, T_end, CFL_eta
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3)
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), force(1:3), urms(1:3), div_max, div_min
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
@@ -70,7 +70,7 @@ module module_acm
     character(len=80) :: sponge_type=""
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
-    real(kind=rk) :: mean_flow(1:3), mean_p
+    real(kind=rk) :: mean_flow(1:3), mean_p, umax
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
@@ -79,7 +79,6 @@ module module_acm
     integer(kind=ik) :: mpirank, mpisize
     !
     integer(kind=ik) :: Jmax, Bs
-
   end type type_params
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -104,6 +103,7 @@ contains
   include "save_data_ACM.f90"
   include "statistics_ACM.f90"
   include "filter_ACM.f90"
+  include "update_grid_qtys_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -136,12 +136,10 @@ contains
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_acm%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    ! call read_param_mpi(FILE, 'DomainSize', 'Lx', params_acm%domain_size(1), 1.0_rk )
-    ! call read_param_mpi(FILE, 'DomainSize', 'Ly', params_acm%domain_size(2), 1.0_rk )
-    ! call read_param_mpi(FILE, 'DomainSize', 'Lz', params_acm%domain_size(3), 0.0_rk )
 
     ! --- saving ----
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_acm%N_fields_saved, 3 )
+    if (allocated(params_acm%names)) deallocate(params_acm%names)
     allocate( params_acm%names(1:params_acm%N_fields_saved) )
     call read_param_mpi(FILE, 'Saving', 'field_names', params_acm%names, (/"ux","uy","p "/) )
 
@@ -154,6 +152,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     ! want to add a forcing term?
     call read_param_mpi(FILE, 'ACM-new', 'forcing', params_acm%forcing, .false.)
+    if (allocated(params_acm%forcing_type)) deallocate(params_acm%forcing_type)
     allocate( params_acm%forcing_type(1:3) )
     call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
@@ -183,6 +182,7 @@ contains
     call read_param_mpi(FILE, 'Sponge', 'p_sponge', params_acm%p_sponge, 20.0_rk )
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
+    call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
 
@@ -254,21 +254,27 @@ contains
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
     u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
 
+
     ! ususal CFL condition
-    dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+    ! if the characteristic velocity is very small, avoid division by zero
+    if ( u_eigen >= 1.0e-6_rk ) then
+        dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+    else
+        dt = 1.0e-2_rk
+    endif
 
     ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
     if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
 
     ! just for completeness...this condition should never be active (gamma ~ 1)
-    if (params_acm%gamma_p>0) dt = min( dt, 0.99_rk*params_acm%gamma_p )
+    if (params_acm%gamma_p>0) dt = min( dt, params_acm%CFL_eta*params_acm%gamma_p )
 
     ! penalization
-    if (params_acm%penalization) dt = min( dt, 0.99_rk*params_acm%C_eta )
+    if (params_acm%penalization) dt = min( dt, params_acm%CFL_eta*params_acm%C_eta )
 
     ! sponge
-    if (params_acm%use_sponge) dt = min( dt, 0.99_rk*params_acm%C_sponge )
+    if (params_acm%use_sponge) dt = min( dt, params_acm%CFL_eta*params_acm%C_sponge )
 
   end subroutine GET_DT_BLOCK_ACM
 

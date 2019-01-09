@@ -97,7 +97,13 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
+    if ( .not. All(params%periodic_BC) ) then
+        !!! if we have boundary conditions it is important to reset hvy_work.
+        !!! this is important because hvy_work saves the RHS also in the ghost node layer of the
+        !!! boundary blocks which is not synchronized. if RHS would be not 0 in the ghost node layer
+        !!! then the integrator would change the values in the ghost node layer.
+        hvy_work(:, :, :, :, :)=0.0_rk
+    endif
     ! synchronize ghost nodes
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -120,7 +126,6 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
       hvy_work( :, :, :, 1:neq, hvy_active(k) ) = hvy_block( :, :, :, 1:neq, hvy_active(k) )
     end do
 
-
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1)-1
         ! prepare input for the RK substep
@@ -138,7 +143,6 @@ subroutine time_stepper(time, params, lgt_block, hvy_block, hvy_work, &
 
     ! final stage
     call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk_coeffs)
-
 
     ! increase time variable after all RHS substeps
     time = time + dt

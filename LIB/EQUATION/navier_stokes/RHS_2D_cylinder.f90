@@ -1,7 +1,9 @@
-!--------------------------------------------------------------------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------
 !> \file
 !> \brief Right hand side for 2D navier stokes equation in cylindrical coordinates
 !>        -------------------------------------------------------------------------
+!> The original author of the rotational symmetric formulation of the RHS
+!> is Paul Schwarz (e-mail: schwarz@tnt.tu-berlin.de)
 !>\f{eqnarray*}{
 !! \frac{\partial \sqrt{\rho}}{\partial t} &=- \left(\frac{1}{r} \frac{\partial (\rho r u_r)}{\partial r} + \frac{\partial (\rho u_z)}{\partial z}\right)  \frac{1}{2\sqrt{\rho}}	\\
 !! \frac{\partial (\sqrt{\rho} u_r)}{\partial t}   &= \left[-\frac{1}{2}\left(   \frac{1}{r}\frac{\partial (r \rho u_r u_r)}{\partial r} + \frac{\partial (\rho u_r u_z)}{\partial z} +  \rho u_r \frac{\partial ( u_r)}{\partial r} + \rho u_z \frac{\partial (u_r)}{\partial z}  \right)  -\frac{\partial p}{\partial r} + F_r\right]\frac{1}{\sqrt{\rho}}\\
@@ -26,7 +28,7 @@
 !!\f}
 !! \date 08.12.18 - creation
 !> \author Pkrah
-!--------------------------------------------------------------------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------
 !>\brief main function of RHS_2D_cylinders
 subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
 
@@ -34,7 +36,7 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     !--------------------------------------------------------
     integer(kind=ik), intent(in)            :: g, Bs         !< # ghost and bulk points
     real(kind=rk), dimension(2), intent(in) :: x0, dx        !< grid coordinates
-    real(kind=rk), intent(in)               :: phi(:, :, :)  !< statevector
+    real(kind=rk), intent(inout)               :: phi(:, :, :)  !< statevector
     real(kind=rk), intent(inout)            :: rhs(:, :, :)  !< rhs array
     ! when implementing boundary conditions, it is necessary to now if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
@@ -55,7 +57,8 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
                    fric_p(Bs+2*g, Bs+2*g), fric_u(Bs+2*g, Bs+2*g), fric_v(Bs+2*g, Bs+2*g), &
                    lambdaT_r(Bs+2*g, Bs+2*g), lambdaT_z(Bs+2*g, Bs+2*g), &
                    tau_rr(Bs+2*g, Bs+2*g), tau_zz(Bs+2*g, Bs+2*g), &
-                   tau_tt(Bs+2*g, Bs+2*g), tau_rz(Bs+2*g, Bs+2*g)
+                   tau_tt(Bs+2*g, Bs+2*g), tau_rz(Bs+2*g, Bs+2*g), &
+                   heat_flux_r(Bs+2*g, Bs+2*g), heat_flux_z(Bs+2*g, Bs+2*g)
     ! derivatives
     real(kind=rk)  :: rho_v(Bs+2*g, Bs+2*g), rho_u(Bs+2*g, Bs+2*g), &
                    u_z(Bs+2*g, Bs+2*g), u_r(Bs+2*g, Bs+2*g), &
@@ -65,7 +68,7 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     real(kind=rk)  :: r(Bs+2*g,Bs+2*g), r_inv(Bs+2*g, Bs+2*g), r0
     ! tmp1 field
     real(kind=rk)       :: tmp1(Bs+2*g, Bs+2*g)
-    integer(kind=ik)    :: i,j
+    integer(kind=ik)    :: ir,iz
     !----------------------------------------------------------
 
     ! pysical constants
@@ -83,17 +86,17 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     r0 = x0(2) + params_ns%R_min
 
     ! preperation of physical fields and arrays
-    do j = 1, Bs+2*g  ! index of radial component
-        do i = 1, Bs+2*g  ! index of axial component
-            r(i,j)     = dble(j-(g+1)) * dr + r0
-            r_inv(i,j) = 1/r(i,j)
-            rho(i,j)       = phi(i,j,rhoF) * phi(i,j,rhoF)
-            sqrt_rho_inv(i,j)  = 1.0_rk / phi(i,j,rhoF)
-            u(i,j)         = phi(i,j,UyF) * sqrt_rho_inv(i,j)
-            v(i,j)         = phi(i,j,UxF) * sqrt_rho_inv(i,j)
-            p(i,j)         = phi(i,j,pF)
-            rho_v(i,j)     = rho(i,j)*v(i,j)
-            rho_u(i,j)     = rho(i,j)*u(i,j)
+    do ir = 1, Bs+2*g  ! index of radial component
+        do iz = 1, Bs+2*g  ! index of axial component
+            r(iz,ir)     = dble(ir-(g+1)) * dr + r0
+            r_inv(iz,ir) = 1.0_rk/r(iz,ir)
+            rho(iz,ir)       = phi(iz,ir,rhoF) * phi(iz,ir,rhoF)
+            sqrt_rho_inv(iz,ir)  = 1.0_rk / phi(iz,ir,rhoF)
+            u(iz,ir)         = phi(iz,ir,UyF) * sqrt_rho_inv(iz,ir)
+            v(iz,ir)         = phi(iz,ir,UxF) * sqrt_rho_inv(iz,ir)
+            p(iz,ir)         = phi(iz,ir,pF)
+            rho_v(iz,ir)     = rho(iz,ir)*v(iz,ir)
+            rho_u(iz,ir)     = rho(iz,ir)*u(iz,ir)
         end do
     end do
 
@@ -141,22 +144,24 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
          lambdaT_z = lambda * tmp1
 
          call D_r(lambdaT_r, tmp1)
-         fric_p = r_inv * tmp1
+         heat_flux_r = r_inv * tmp1
          call D_z(lambdaT_z, tmp1)
-         fric_p = fric_p + tmp1
+         heat_flux_z = tmp1
 
-         ! Friction terms because of stress (at work)
+
+         ! Friction terms because of stress (at work (: !)
          call D_r(u*tau_rr + v*tau_rz, tmp1)
-         fric_p = fric_p + tmp1
+         fric_p = tmp1
          call D_z(u*tau_rz + v*tau_zz, tmp1)
          fric_p = fric_p + tmp1
 
          fric_p = fric_p + r_inv * (u*tau_rr + v*tau_rz)
-
     else
          fric_p = 0.0_rk
          fric_u = 0.0_rk
          fric_v = 0.0_rk
+         heat_flux_r = 0.0_rk
+         heat_flux_z = 0.0_rk
     end if
 
     ! momentum in radial direction
@@ -175,15 +180,23 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     call D_z(p, p_z)
     rhs(:, :, UxF) = -(rhs(:, :, UxF)*0.5_rk + p_z - fric_v)*sqrt_rho_inv
 
-    ! ---------- energy equation -------------- !
+    ! energy equation
     call D_r(u*p, tmp1)
-    rhs(:, :, pF) = (gamma_ -1) * (-u*p_r - v*p_z + u*fric_u + v*fric_v - fric_p ) &
+    rhs(:, :, pF) = (gamma_ -1) * (-u*p_r - v*p_z + u*fric_u + v*fric_v - fric_p - heat_flux_r - heat_flux_z) &
                   + gamma_*tmp1
     call D_z(v*p, tmp1)
     rhs(:, :, pF) = -(rhs(:, :, pF) + gamma_*(u*p*r_inv + tmp1))
 
-    contains
 
+    !+++++++++++++++++++++++++
+    call set_penalization()     ! add the penalization terms
+    call set_bound_cylinder()   ! correct radial boundary for rotational symmetry
+    !+++++++++++++++++++++++++
+
+
+    !-----------------------------------------------------------------------------------!
+    !-----------------------------------------------------------------------------------!
+    contains
         ! ----------- inline functions ------------!
         ! for better readabillity we redefine the
         ! derivatives:
@@ -191,21 +204,120 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
         !   # D_z - axial derivative
 
         !> Derivative in the radial direction
-        subroutine  D_r( u, dudr)
-            real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
-            real(kind=rk), intent(out)      :: dudr(Bs+2*g, Bs+2*g)
+        subroutine  D_r( q, dqdr)
+            real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
+            real(kind=rk), intent(out)      :: dqdr(Bs+2*g, Bs+2*g)
+#ifdef SBLAS
             !> \details Note Bs, g, dz, boundary_flag are defined in the supfunction!
-            call diffy_c_opt( Bs, g, dr, u, dudr, boundary_flag(2))
-
+            call diffy_c_opt( Bs, g, dr, q, dqdr, boundary_flag(2))
+#else
+            call abort(8012019,"Enable Sparse Blase during compile (Pragma -DSBLAS) ")
+#endif
         end subroutine D_r
 
         !> Derivative in the axial direction
-        subroutine  D_z( u, dudz)
-            real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
-            real(kind=rk), intent(out)      :: dudz(Bs+2*g, Bs+2*g)
+        subroutine  D_z( q, dqdz)
+            real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
+            real(kind=rk), intent(out)      :: dqdz(Bs+2*g, Bs+2*g)
             !> \details Note Bs, g, dz, boundary_flag are defined in the supfunction!
-            call diffx_c_opt( Bs, g, dz, u, dudz, boundary_flag(1))
-
+#ifdef SBLAS
+            call diffx_c_opt( Bs, g, dz, q, dqdz, boundary_flag(1))
+#else
+            call abort(8012019,"Enable Sparse Blase during compile (Pragma -DSBLAS) ")
+#endif
         end subroutine D_z
+
+
+        !> Function to correct the rhs for boundary conditions
+        subroutine set_bound_cylinder()
+          integer(kind=ik) :: iy
+          !##################################################
+          ! compute the boundary values in r direction
+          ! boundary at r=0+eps
+          !##################################################
+          if ( boundary_flag(2) == -1 ) then
+              select case(params_ns%bound%name(2))
+              case("symmetryAxis-wall")
+                  ! slip wall condition: keep velocity
+                  rhs(:, g+1, UyF) = 0
+                  rhs(:, g+1, pF)  = rhs(:, g+1, pF) + heat_flux_r(:, g+1)*(gamma_ - 1.0_rk)
+                  phi(:, g+1, UyF) = 0
+
+              case default
+                  call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+              end select
+              ! Because this is a boundary block, which is not synchronized
+              ! we have to do something with the ghost nodes of this block.
+              ! An easy way to fill them is to use the last availavble point
+              ! inside the domain.
+              do iy = 1, g
+                  phi(:, iy, :)=phi(:, g+1, :)
+              end do
+          end if
+
+          !##################################################
+          ! compute the boundary values in y direction
+          ! boundary at y=L_y
+          !##################################################
+          if ( boundary_flag(2) == 1 ) then
+
+              select case(params_ns%bound%name(2))
+              case("symmetryAxis-wall")
+                  !rhs(:, Bs+g, UxF) = 0
+                  rhs(:, Bs+g, UyF) = 0
+                  rhs(:, Bs+g, pF)  = rhs(:, Bs+g, pF) - heat_flux_r(:, Bs+g )*(gamma_ - 1.0_rk)
+                  phi(:, Bs+g, UxF) = 0
+                  phi(:, Bs+g, UyF) = 0
+              case default
+                  call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+              end select
+              ! Because this is a boundary block, which is not synchronized
+              ! we have to do something with the ghost nodes of this block.
+              ! An easy way to fill them is to use the last availavble point
+              ! inside the domain.
+              do iy = Bs+g+1, Bs+2*g
+                  phi(:,iy,:)=phi(:,Bs+g,:)
+              end do
+          end if
+        end subroutine
+
+
+        !> Inline function adds penalization terms to RHS
+        subroutine set_penalization()
+            integer(kind=ik) :: ir, iz, n_eqn
+            real(kind=rk), allocatable, save :: phi_prime(:, :, :), phi_ref(:,:,:), mask(:,:,:)
+            logical ,save :: allocated_penal_fields=.false.
+
+            if (params_ns%penalization) then
+                ! add volume penalization
+                if (.not. allocated_penal_fields) then
+                  allocated_penal_fields=.true.
+                  n_eqn=params_ns%n_eqn
+                  allocate( mask(Bs+2*g,Bs+2*g,n_eqn), &
+                            phi_prime(Bs+2*g,Bs+2*g,n_eqn),&
+                            phi_ref(Bs+2*g,Bs+2*g,n_eqn))
+                endif
+                phi_prime(:, :, rhoF)= rho
+                phi_prime(:, :, UxF )= u
+                phi_prime(:, :, UyF )= v
+                phi_prime(:, :, pF  )= p
+
+                call compute_mask_and_ref2D(params_ns, Bs, g, x0, dx, phi_prime, mask, phi_ref)
+                do ir = g+1, Bs+g
+                  do iz = g+1, Bs+g
+                    ! density
+                    rhs(iz, ir, rhoF)=rhs(iz, ir, rhoF) -0.5_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, rhoF)*(rho(iz, ir)-Phi_ref(iz, ir, rhoF) )
+                    ! x-velocity
+                    rhs(iz, ir, UxF)=rhs(iz, ir, UxF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UxF)*(rho(iz, ir)*u(iz, ir)-Phi_ref(iz, ir, UxF) )
+                    ! y-velocity
+                    rhs(iz, ir, UyF)=rhs(iz, ir, UyF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UyF)*(rho(iz, ir)*v(iz, ir)-Phi_ref(iz, ir, UyF) )
+                    ! pressure
+                    rhs(iz, ir, pF)=rhs(iz, ir, pF)                        -mask(iz, ir, pF)*(p(iz, ir)-Phi_ref(iz, ir, pF) )
+                  end do
+                end do
+            endif
+
+      end subroutine set_penalization
+
 
 end subroutine RHS_2D_cylinder

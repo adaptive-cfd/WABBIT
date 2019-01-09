@@ -12,6 +12,7 @@ module module_navier_stokes_cases
     use module_ns_penalization
     use module_simple_geometry
     use module_shock
+    use module_pipe_flow
 
 
     implicit none
@@ -43,6 +44,8 @@ contains
     call read_params_geometry(params_ns,FILE)
   case('shock_tube')
     call read_params_shock_tube(params_ns,FILE)
+  case('pipe_flow')
+    call read_params_pipe_flow(params_ns,FILE)
   case('no')
 
   case default
@@ -100,7 +103,6 @@ end subroutine read_case_parameters
      real(kind=rk), intent(in)       :: x0(2), dx(2)   !< spacing and origin of block
      type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure
      !--------------------------------------------------------
-
      ! compute mask and reference statevector for volume penalization
      ! term for the different case studies
      select case( params%CASE )
@@ -110,6 +112,8 @@ end subroutine read_case_parameters
        call geometry_penalization2D(Bs, g, x0, dx, phi(:,:,rhoF), mask, phi_ref)
      case('funnel')
        call funnel_penalization2D(Bs, g, x0, dx, phi, mask, phi_ref)
+     case('pipe_flow')
+       call pipe_flow_penalization2D(Bs, g, x0, dx, mask, phi_ref)
      case('no')
        return
      case default
@@ -156,7 +160,7 @@ end subroutine read_case_parameters
  !> \details Many routines depend on the geometry and need to know the
  !>          mask function. For example for calculation of the force on an obstacle or the
  !>          density within the obstacle, as well as outside the obstacle.
-  subroutine get_mask(params,x0, dx, Bs, g, mask,mask_is_colored)
+  subroutine get_mask(params,x0, dx, Bs, g, mask, mask_is_colored)
       implicit none
       ! -----------------------------------------------------------------
       integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
@@ -169,6 +173,8 @@ end subroutine read_case_parameters
       if( present(mask_is_colored)) is_colored=mask_is_colored
 
       select case(params%CASE)
+      case('pipe_flow')
+        call draw_pipe_sponges(mask, x0, dx, Bs, g )
       case('simple_geometry')
         call draw_geometry(x0, dx, Bs, g, mask)
       case('funnel')

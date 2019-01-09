@@ -389,10 +389,10 @@ subroutine read_boundary_conditions( FILE )
             call read_param_mpi(FILE, 'Boundary_Conditions', 'state_yplus', &
                                     params_ns%bound%phi_yplus,params_ns%bound%phi_yplus)
 
-      case("wall")
+      case("symmetryAxis-wall")
            ! to implement
       case default
-           call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+           call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(2))
       end select
     endif
 

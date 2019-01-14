@@ -30,7 +30,7 @@
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 !>\brief main function of RHS_2D_navier_stokes
-subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
+subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
 !---------------------------------------------------------------------------------------------
 !
     implicit none
@@ -43,16 +43,6 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     real(kind=rk), intent(in)                               :: phi(:, :, :)
     !> rhs array
     real(kind=rk), intent(inout)                            :: rhs(:, :, :)
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
-    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-    ! boundary_flag(i) can be either 0, 1, -1,
-    !  0: no boundary in the direction +/-e_i
-    !  1: boundary in the direction +e_i
-    ! -1: boundary in the direction - e_i
-    ! currently only acessible in the local stage
-    integer(kind=2), intent(in)                             :: boundary_flag(3)
-
     ! adiabatic coefficient
     real(kind=rk)                                           :: gamma_
     ! specific gas constant
@@ -351,7 +341,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         end do
     endif
 
-end subroutine RHS_2D_navier_stokes
+end subroutine RHS_2D_navier_stokes_periodic
 
 !---------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------
@@ -438,110 +428,3 @@ subroutine  diffy_c_opt( Bs, g, dy, u, dudy)
     end do
 
 end subroutine diffy_c_opt
-
-!---------------------------------------------------------------------------------------------
-!---------------------------------------------------------------------------------------------
-! OLD stuff
-!---------------------------------------------------------------------------------------------
-!---------------------------------------------------------------------------------------------
-
-subroutine grad_zentral(Bs, g, dx, dy, q, qx, qy)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dx, dy
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qx(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qy(Bs+2*g, Bs+2*g)
-
-    !! XXX !!
-    call diffx_c( Bs, g, dx, q, qx)
-
-    !! YYY !!
-    call diffy_c( Bs, g, dy, q, qy)
-
-end subroutine grad_zentral
-
-!---------------------------------------------------------------------------------------------
-
-subroutine diff1x_zentral(Bs, g, dx, q, qx)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qx(Bs+2*g, Bs+2*g)
-
-    !! XXX !!
-    call diffx_c( Bs, g, dx, q, qx)
-
-end subroutine diff1x_zentral
-
-!---------------------------------------------------------------------------------------------
-
-subroutine diff1y_zentral(Bs, g, dy, q, qy)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qy(Bs+2*g, Bs+2*g)
-
-    !! XXX !!
-    call diffy_c( Bs, g, dy, q, qy)
-
-end subroutine diff1y_zentral
-
-!---------------------------------------------------------------------------------------------
-
-subroutine  diffx_c( Bs, g, dx, u, dudx)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g)
-
-    integer                         :: i, n
-
-    n = size(u,1)
-
-    !dudx(1,:) = ( u(n-1,:) - 8.0_rk*u(n,:) + 8.0_rk*u(2,:) - u(3,:) ) / (12.0_rk*dx)
-    !dudx(2,:) = ( u(n,:)   - 8.0_rk*u(1,:) + 8.0_rk*u(3,:) - u(4,:) ) / (12.0_rk*dx)
-    dudx(1,:) = ( u(2,:) - u(1,:) ) / (dx)
-    dudx(2,:) = ( u(3,:) - u(1,:) ) / (2.0_rk*dx)
-
-    forall ( i = 3:n-2 )
-       dudx(i,:) = ( u(i-2,:) - 8.0_rk*u(i-1,:) + 8.0_rk*u(i+1,:) - u(i+2,:) ) / (12.0_rk*dx)
-    end forall
-
-    !dudx(n-1,:) = ( u(n-3,:) - 8.0_rk*u(n-2,:) + 8.0_rk*u(n,:) - u(1,:) ) / (12.0_rk*dx)
-    !dudx(n,:)   = ( u(n-2,:) - 8.0_rk*u(n-1,:) + 8.0_rk*u(1,:) - u(2,:) ) / (12.0_rk*dx)
-    dudx(n-1,:) = ( u(n,:) - u(n-2,:) ) / (2.0_rk*dx)
-    dudx(n,:)   = ( u(n,:) - u(n-1,:) ) / (dx)
-
-end subroutine diffx_c
-
-
-subroutine  diffy_c( Bs, g, dy, u, dudy)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudy(Bs+2*g, Bs+2*g)
-
-    integer                         :: i, n
-
-    n = size(u,1)
-
-    !dudy(:,1) = ( u(:,n-1) - 8.0_rk*u(:,n) + 8.0_rk*u(:,2) - u(:,3) ) / (12.0_rk*dy)
-    !dudy(:,2) = ( u(:,n)   - 8.0_rk*u(:,1) + 8.0_rk*u(:,3) - u(:,4) ) / (12.0_rk*dy)
-    dudy(:,1) = ( u(:,2) - u(:,1) ) / (dy)
-    dudy(:,2) = ( u(:,3) - u(:,1) ) / (2.0_rk*dy)
-
-    forall ( i = 3:n-2 )
-       dudy(:,i) = ( u(:,i-2) - 8.0_rk*u(:,i-1) + 8.0_rk*u(:,i+1) - u(:,i+2) ) / (12.0_rk*dy)
-    end forall
-
-    !dudy(:,n-1) = ( u(:,n-3) - 8.0_rk*u(:,n-2) + 8.0_rk*u(:,n) - u(:,1) ) / (12.0_rk*dy)
-    !dudy(:,n)   = ( u(:,n-2) - 8.0_rk*u(:,n-1) + 8.0_rk*u(:,1) - u(:,2) ) / (12.0_rk*dy)
-    dudy(:,n-1) = ( u(:,n) - u(:,n-2) ) / (2.0_rk*dy)
-    dudy(:,n)   = ( u(:,n) - u(:,n-1) ) / (dy)
-
-end subroutine diffy_c

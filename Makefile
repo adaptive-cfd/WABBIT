@@ -18,7 +18,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
-	module_simple_geometry.f90 module_shock.f90
+	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -34,6 +34,11 @@ ifndef $(FC)
 FC = mpif90
 endif
 
+
+#Place of Sparse BLAS objects
+SB_LIB = #-L../../sblas/SOFTWARE -lSparseBLAS_GNU
+#Place of Sparse BLAS modules
+SB_INCL = #-I../../sblas/SOFTWARE
 #-------------------------------------------------------------------------------
 # PRAGMAS part.
 #-------------------------------------------------------------------------------
@@ -66,11 +71,11 @@ FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument 
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm -llapack -lblas
-FFLAGS += -I$(HDF_INC)
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm -lblas -llapack
+FFLAGS += -I$(HDF_INC) $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
-PRAGMAS = #-DBLOCKINGSENDRECV
+PRAGMAS = #-DSBLAS#-DBLOCKINGSENDRECV
 endif
 
 #-------------------------------------------------------------------------------
@@ -165,7 +170,7 @@ $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o\
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_sparse_operators.o\
 	inicond_NStokes.f90 filter_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -177,15 +182,18 @@ $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJD
 	funnel2D.f90 funnel3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_pipe_flow.o: module_pipe_flow.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)/module_funnel.o $(OBJDIR)/module_ns_penalization.o\
-	$(OBJDIR)/module_shock.o $(OBJDIR)/module_simple_geometry.o
+	$(OBJDIR)/module_shock.o $(OBJDIR)/module_simple_geometry.o $(OBJDIR)/module_pipe_flow.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
-	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes.f90 RHS_3D_navier_stokes.f90 inicond_NStokes.f90 save_data_ns.f90
+	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes_periodic.f90 RHS_2D_navier_stokes_bc.f90 RHS_3D_navier_stokes.f90 inicond_NStokes.f90 save_data_ns.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
@@ -269,8 +277,13 @@ $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_pa
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	volume_integral.f90 compute_vorticity.f90 divergence.f90
+	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
+	$(OBJDIR)/module_helpers.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)

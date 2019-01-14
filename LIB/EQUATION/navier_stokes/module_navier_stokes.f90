@@ -24,10 +24,13 @@ module module_navier_stokes
   ! modules
   use module_navier_stokes_params
   use module_helpers, only: block_contains_NaN
-  use module_operators, only : compute_vorticity
   use module_ns_penalization
   use module_navier_stokes_cases
+  use module_operators
 
+#ifdef SBLAS
+  use module_sparse_operators, only: initialice_derivatives
+#endif
   implicit none
 
   ! I usually find it helpful to use the private keyword by itself initially, which specifies
@@ -49,12 +52,16 @@ module module_navier_stokes
 contains
 
 
-  include "RHS_2D_navier_stokes.f90"
+  include "RHS_2D_navier_stokes_periodic.f90"
   include "RHS_3D_navier_stokes.f90"
-  include "RHS_2D_cylinder.f90"
   include "filter_block.f90"
   include "inicond_NStokes.f90"
   include "save_data_ns.f90"
+
+#ifdef SBLAS
+  include "RHS_2D_cylinder.f90"
+  include "RHS_2D_navier_stokes_bc.f90"
+#endif
 !-----------------------------------------------------------------------------
   !> \brief Reads in parameters of physics module
   !> \details
@@ -110,7 +117,10 @@ contains
     call read_boundary_conditions( FILE )
     ! computes initial mach+reynolds number, speed of sound and smallest lattice spacing
     call add_info()
-
+#ifdef SBLAS
+    ! initialize the operators needed for the computation of the RHS
+    call initialice_derivatives(params_ns%bound%name,params_ns%Bs,params_ns%g)
+#endif
     ! set global parameters pF,rohF, UxF etc
     do dF = 1, params_ns%n_eqn
                 if ( params_ns%names(dF) == "p" ) pF = dF
@@ -119,6 +129,17 @@ contains
                 if ( params_ns%names(dF) == "Uy" ) UyF = dF
                 if ( params_ns%names(dF) == "Uz" ) UzF = dF
     end do
+
+
+    if (params_ns%coordinates == "cylindrical") then
+      ! We use slip wall conditions at the symmetry axis
+      ! to avoid singular grid points at r=0.
+      ! For this reason we have to define the radius of the small slip wall zylinder
+      ! arround the symmetrie axis.
+      ! The cylinder is smaller then the smalles lattice spacing
+      params_ns%R_min=0.1_rk*params_ns%dx_min
+      if (params_ns%mpirank==0) write(*,'("grid is shifted by r_min :", T40, g12.4)') params_ns%R_min
+    endif
 
     call check_parameters()
 
@@ -232,23 +253,31 @@ contains
       !-------------------------------------------------------------------------
       ! the second stage then is what you would usually do: evaluate local differential
       ! operators etc.
-
       ! called for each block.
       if (params_ns%dim==2) then
-        select case(params_ns%coordinates)
-        case ("cartesian")
-          if (.not. ALL(boundary_flag(:)==0)) then
-            call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
-          endif
-
-
-
-          call  RHS_2D_navier_stokes(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:),boundary_flag)
-        case("cylindrical")
-          call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
-        case default
-          call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
-        end select
+        ! In the 2D case we have a RHS which is optimized (very fast) for
+        ! periodic boundary conditions and one for various boundaries conditions.
+        ! The latter one makes use of sparse implementation of the stencil and
+        ! we therefore use sparse Blas implementation for the matrix multiplication.
+        if (.not. ALL(boundary_flag(:)==0)) then
+          ! RHS using various boundary conditions
+#ifdef SBLAS
+          call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
+          select case(params_ns%coordinates)
+          case ("cartesian")
+            call  RHS_2D_navier_stokes_bc(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:), boundary_flag)
+          case("cylindrical")
+            call RHS_2D_cylinder(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:), boundary_flag)
+          case default
+            call abort(7772,"ERROR [module_navier_stokes]: This coordinate system is not known!")
+          end select
+#else
+          call abort(8012019,"Enable Sparse Blase during compile (Pragma -DSBLAS) ")
+#endif
+        else
+          ! RHS fully periodic on every boundary
+          call  RHS_2D_navier_stokes_periodic(g, Bs,x0, (/dx(1),dx(2)/),u(:,:,1,:), rhs(:,:,1,:))
+        endif
       else
          call RHS_3D_navier_stokes(g, Bs,x0, (/dx(1),dx(2),dx(3)/), u, rhs)
       endif
@@ -257,80 +286,331 @@ contains
       !   ! add volume penalization
       !   call add_constraints(params_ns, rhs, Bs, g, x0, dx, u)
       ! endif
-
     case default
       call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
     end select
-
 
   end subroutine RHS_NStokes
 
 
 
 
-  !> This function computes the boundary values for the ghost node layer of the
-  !> boundary blocks
-  subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, boundary_flag)
-      implicit none
-      real(kind=rk), intent(in) :: time
-      integer(kind=ik), intent(in) :: g, Bs
-      real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
-      !> datafields, and velocity field
-      real(kind=rk), intent(inout) :: phi(:,:,:)
-      ! when implementing boundary conditions, it is necessary to now if the local field (block)
-      ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-      ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-      ! boundary_flag(i) can be either 0, 1, -1,
-      !  0: no boundary in the direction +/-e_i
-      !  1: boundary in the direction +e_i
-      ! -1: boundary in the direction - e_i
-      integer(kind=2), intent(in):: boundary_flag(3)
-
-      integer(kind=ik) :: ix,iy
-      ! boundary ghost node layer in x direction
-      ! ---------------------------------
-      ! |  1  |                    |  2  |
-      ! |     |   ^                |     |
-      ! |     |   |                |     |
-      ! |<-g->|  Bs+2g             |<-g->|
-      ! |     |   |                |     |
-      ! |     |   v                |     |
-      ! ---------------------------------
-      ! x->
-      real(kind=rk)   :: phi_boundary_x(Bs+2*g,Bs+2*g,params_ns%n_eqn)
-
-    !##################################################
-    ! compute the boundary values
-    !##################################################
-    select case(params_ns%boundary_type)
-    case("symmetric-open")
-      ! ! first the symmetric BC:
-      ! ! u_-i = -u_i
-      ! ! v_-i = -v_i
-      !
-      !
-      !   ! Boundary conditions for outflow extrapolation
-      !   phi_boundary_x(1:g,:)=phi(g+1:2*g+1,:,i)
-      !   phi_boundary(2,:)=phi(Bs+g,:,i)
-      !   if (params_convdiff%u0x(i)>0) then
-      !       phi_boundary(1,:)=params_convdiff%phi_boundary(i)
-      !   else
-      !       phi_boundary(2,:)=params_convdiff%phi_boundary(i)
-      !   endif
-      !   ! Boundary conditions for outflow extrapolation
-      !   phi_boundary(3,:)=phi(:,g+1,i)
-      !   phi_boundary(4,:)=phi(:,Bs+g,i)
-      !   if (params_convdiff%u0y(i)>0) then
-      !       phi_boundary(3,:)=params_convdiff%phi_boundary(i)
-      !   else
-      !       phi_boundary(4,:)=params_convdiff%phi_boundary(i)
-      !   endif
-    case default
-      call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_ns%boundary_type)
-    end select
 
 
-  end subroutine
+
+    !> This function computes the boundary values for the ghost node layer of the
+    !> boundary blocks
+    subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, boundary_flag)
+        implicit none
+        real(kind=rk), intent(in) :: time
+        integer(kind=ik), intent(in) :: g, Bs
+        real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
+        !> datafields, and velocity field
+        real(kind=rk), intent(inout) :: phi(:,:,:)
+        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+        ! boundary_flag(i) can be either 0, 1, -1,
+        !  0: no boundary in the direction +/-e_i
+        !  1: boundary in the direction +e_i
+        ! -1: boundary in the direction - e_i
+        integer(kind=2), intent(in):: boundary_flag(3)
+
+        integer(kind=ik) :: ix,iy
+        ! boundary ghost node layer in x direction
+        ! ---------------------------------
+        ! |  1  |                    |  2  |
+        ! |     |   ^                |     |
+        ! |     |   |                |     |
+        ! |<-g->|  Bs+2g             |<-g->|
+        ! |     |   |                |     |
+        ! |     |   v                |     |
+        ! ---------------------------------
+        ! x->
+        real(kind=rk)   :: phi_bound(Bs+2*g,params_ns%n_eqn),normal_vector(Bs+2*g,2)
+
+      !##################################################
+      ! compute the boundary values in x direction
+      !##################################################
+      if ( boundary_flag(1) .ne. 0 ) then
+        select case(params_ns%bound%name(1))
+          case("symmetric-open")
+            if (boundary_flag(1) == -1) then
+              do ix = 1, g
+                !symmetric components:
+                !---------------------
+                phi( g+1-ix, :, rhoF) = phi( g+ix, :, rhoF ) ! rho(x,y)=rho(-x,y)
+                phi( g+1-ix, :,  UyF) = phi( g+ix, :, UyF ) !  v(x,y)  = v(-x,y)
+                phi( g+1-ix, :,   pF) = phi( g+ix, :,  pF ) ! p(x,y)  = p(-x,y)
+                ! antysymmetric components
+                !-------------------------
+                phi( g+1-ix, :, UxF) = - phi( g+ix, :, UxF ) ! u(x,y)  =-u(-x,y)
+              end do
+            else
+              ! normal vector is pointing outside the domain
+              normal_vector(:,1) = 1.0_rk ! x component
+              normal_vector(:,2) = 0.0_rk ! y-component
+
+              ! set values at the boundarys:
+              ! Currently the values are constant on one boundary.
+              ! This should be changed so phi_xminus can be a function of
+              ! time and space.
+              if (.true.) then
+                phi_bound=phi(Bs+g-1,:,:)
+                phi_bound(:,UxF)  = phi_bound(:,UxF) / phi_bound(:,rhoF)
+                phi_bound(:,UyF)  = phi_bound(:,UyF) / phi_bound(:,rhoF)
+                phi_bound(:,rhoF) = phi_bound(:,rhoF) * phi_bound(:,rhoF)
+              else
+                phi_bound(:,rhoF)=params_ns%bound%phi_xplus(rhoF)
+                phi_bound(:, UxF)=params_ns%bound%phi_xplus( UxF)
+                phi_bound(:, UyF)=params_ns%bound%phi_xplus( UyF)
+                phi_bound(:,  pF)=params_ns%bound%phi_xplus(  pF)
+              endif
+              ! compute the ingoing and outgoing characteristics and changes the state vector
+              call set_bound_open( normal_vector, phi(Bs+g,:,:), phi_bound)
+              ! Because this is a boundary block, which is not synchronized
+              ! we have to do something with the ghost nodes of this block.
+              ! An easy way to fill them is to use the last availavble point
+              ! inside the domain.
+              do ix = Bs+g+1, Bs+2*g
+                phi(ix,:,:)=phi(Bs+g,:,:)
+              end do
+            endif
+
+          case("open")
+          ! open boundary conditions at the x=0 and x=L boundary:
+
+          ! boundary condition at x=0
+          if (boundary_flag(1) == -1) then
+
+            ! normal vector is pointing outside the domain
+            normal_vector(:,1) = -1.0_rk ! x component
+            normal_vector(:,2) =  0.0_rk ! y-component
+
+            ! set values at the boundarys:
+            ! Currently the values are constant on one boundary.
+            ! This should be changed so phi_xminus can be a function of
+            ! time and space.
+            if (.true.) then
+              phi_bound=phi(g+2,:,:)
+              phi_bound(:,UxF)  = phi_bound(:,UxF) / phi_bound(:,rhoF)
+              phi_bound(:,UyF)  = phi_bound(:,UyF) / phi_bound(:,rhoF)
+              phi_bound(:,rhoF)   = phi_bound(:,rhoF) * phi_bound(:,rhoF)
+            else
+              phi_bound(:,rhoF)=params_ns%bound%phi_xminus(rhoF)
+              phi_bound(:, UxF)=params_ns%bound%phi_xminus( UxF)
+              phi_bound(:, UyF)=params_ns%bound%phi_xminus( UyF)
+              phi_bound(:,  pF)=params_ns%bound%phi_xminus(  pF)
+            endif
+            ! now we compute the open boundarys using ingoing and outgoing
+            ! charactersitics
+            call set_bound_open(normal_vector, phi(g+1,:,:), phi_bound)
+
+            ! Because this is a boundary block, which is not synchronized
+            ! we have to do something with the ghost nodes of this block.
+            ! An easy way to fill them is to use the last availavble point
+            ! inside the domain.
+            do ix = 1, g
+              phi(ix,:,:)=phi(g+1,:,:)
+            end do
+          endif
+
+          ! boundary condition at x=L
+          if (boundary_flag(1) == 1) then
+
+            ! normal vector is pointing outside the domain
+            normal_vector(:,1) = 1.0_rk ! x component
+            normal_vector(:,2) = 0.0_rk ! y-component
+
+            ! set values at the boundarys:
+            ! Currently the values are constant on one boundary.
+            ! This should be changed so phi_xminus can be a function of
+            ! time and space.
+            if (.true.) then
+              phi_bound=phi(Bs+g-1,:,:)
+              phi_bound(:,UxF)  = phi_bound(:,UxF) / phi_bound(:,rhoF)
+              phi_bound(:,UyF)  = phi_bound(:,UyF) / phi_bound(:,rhoF)
+              phi_bound(:,rhoF) = phi_bound(:,rhoF) * phi_bound(:,rhoF)
+            else
+              phi_bound(:,rhoF)=params_ns%bound%phi_xplus(rhoF)
+              phi_bound(:, UxF)=params_ns%bound%phi_xplus( UxF)
+              phi_bound(:, UyF)=params_ns%bound%phi_xplus( UyF)
+              phi_bound(:,  pF)=params_ns%bound%phi_xplus(  pF)
+            endif
+            ! compute the ingoing and outgoing characteristics and changes the state vector
+            call set_bound_open( normal_vector, phi(Bs+g,:,:), phi_bound)
+            ! Because this is a boundary block, which is not synchronized
+            ! we have to do something with the ghost nodes of this block.
+            ! An easy way to fill them is to use the last availavble point
+            ! inside the domain.
+            do ix = Bs+g+1, Bs+2*g
+              phi(ix,:,:)=phi(Bs+g,:,:)
+            end do
+          endif
+          ! to implement
+        case("wall")
+          ! to implement
+        case default
+          call abort(81020163,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+        end select
+      end if
+
+      !##################################################
+      ! compute the boundary values in y direction
+      ! boundary at y=0
+      !##################################################
+      if ( boundary_flag(2) == -1 ) then
+
+        select case(params_ns%bound%name(2))
+        case("symmetryAxis-wall")
+          ! slip wall condition: keep velocity
+          !rhs(:, g+1, UxF) = 0
+          phi(:, g+1, UyF) = 0
+
+        case default
+          call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+        end select
+        ! Because this is a boundary block, which is not synchronized
+        ! we have to do something with the ghost nodes of this block.
+        ! An easy way to fill them is to use the last availavble point
+        ! inside the domain.
+        do iy = 1, g
+          phi(:,iy,:)=phi(:,g+1,:)
+        end do
+      end if
+
+      !##################################################
+      ! compute the boundary values in y direction
+      ! boundary at y=L_y
+      !##################################################
+      if ( boundary_flag(2) == 1 ) then
+
+        select case(params_ns%bound%name(2))
+        case("symmetryAxis-wall")
+            phi(:,Bs+g,UxF) = 0
+            phi(:,Bs+g,UyF) = 0
+
+        !  to implement
+        !case("open")
+        ! to implement
+        !case("wall")
+        ! to implement
+        case default
+          call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+        end select
+        ! Because this is a boundary block, which is not synchronized
+        ! we have to do something with the ghost nodes of this block.
+        ! An easy way to fill them is to use the last availavble point
+        ! inside the domain.
+        do iy = Bs+g+1, Bs+2*g
+          phi(:,iy,:)=phi(:,Bs+g,:)
+        end do
+      end if
+
+
+    end subroutine
+
+
+    !> This function computes the an open boundary with inlet values specified by phi_bound.
+    subroutine set_bound_open( normal_vector, phi, phi_bound)
+        implicit none
+        !-------------------------------------------------------------
+        !> normal vector of the boundary face: normal_vector(ib,ei)
+        !> first index (ib) labels the boundary point
+        !> last index (ei) labels the component k=k_i*e_i
+        real(kind=rk), intent(in) :: normal_vector(:,:)
+        real(kind=rk), intent(inout) :: phi(:,:)        !< statevector
+        real(kind=rk), intent(inout) :: phi_bound(:,:)  !< primary variables of the reference values
+        !-------------------------------------------------------------
+        real(kind=rk)    :: phi1_inv,rho,rho2,u,v,p,drho,du,dv, dp,normk, kx,ky,ku,c
+        real(kind=rk)    :: lambdaM, lambdaP, lambdaS,rm,rp,rq,rs
+
+        integer(kind=ik) :: ib,Nbound
+
+        Nbound=size(phi,1)
+
+        if (size(normal_vector,2).ne.2 .or. size(normal_vector,1).ne.Nbound) then
+          call abort(031118,"Format of normalvector is not as assued")
+        endif
+
+        do ib = 1,Nbound
+          ! convert to primary variables
+          rho   = phi(ib,rhoF) * phi(ib,rhoF)
+          phi1_inv   = 1.0_rk / phi(ib,rhoF)
+          u     = phi(ib,UxF) * phi1_inv
+          v     = phi(ib,UyF) * phi1_inv
+          p     = phi(ib,pF)
+
+          ! normalize boundary normal
+          kx = normal_vector(ib,1)
+          ky = normal_vector(ib,2)
+
+          normk = sqrt( kx ** 2 + ky ** 2)
+
+          kx = kx / normk
+          ky = ky / normk
+
+          ! compute the displacement
+          drho  = rho - phi_bound(ib,rhoF)
+          du    = u - phi_bound(ib,UxF)
+          dv    = v - phi_bound(ib,UyF)
+          dp    = p - phi_bound(ib,pF)
+
+          ! speed of sound
+          if ( p*rho<0.0 ) then
+            write(*,*) "p,rho=",p, rho, ib
+            call abort(4573)
+          end if
+          c = sqrt(params_ns%gamma_*p/rho)
+
+          ! boundary normal velocity:
+          ku = kx * u + ky * v
+
+          ! eigenvalues
+          lambdaS = ku
+          lambdaP = ku + c
+          lambdaM = ku - c
+
+          ! left EV projectors
+          if ( lambdaS > 0 ) then
+            rs = 1 * drho                         - 1/c**2*dp
+            rq =          + ky*du - kx*dv
+          else
+            rs = 0
+            rq = 0
+          end if
+          if ( lambdaP > 0 ) then
+            rp =          + kx*du + ky*dv + 1/(rho*c)*dp
+          else
+            rp = 0
+          end if
+          if ( lambdaM > 0 ) then
+            rm =          - kx*du - ky*dv + 1/(rho*c)*dp
+          else
+            rm = 0
+          end if
+
+          ! set the displacement with right ev
+          drho = rs + rho*(rp+rm)/(2*c)
+          du   =    + ky*rq + (rp-rm)*kx*0.5
+          dv   =    - kx*rq + (rp-rm)*ky*0.5
+          dp   =              + rho*c*0.5*(rp+rm)
+          ! shift values and pack in conservative variables
+          rho2=phi_bound(ib,rhoF) + drho
+          if( rho2<0 ) then
+            call abort(611181,"Problems in set_bound_open")
+          endif
+
+          phi(ib,rhoF) = sqrt( rho2)
+          phi(ib, UxF) =     ( phi_bound(ib,UxF)  + du) * phi(ib,rhoF)
+          phi(ib, UyF) =     ( phi_bound(ib,UyF)  + dv) * phi(ib,rhoF)
+          phi(ib,  pF) =     ( phi_bound(ib, pF)  + dp)
+        end do
+
+    end subroutine set_bound_open
+
+
+
 
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------

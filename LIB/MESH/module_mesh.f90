@@ -16,7 +16,7 @@ module module_mesh
     ! global parameters
     use module_params
     ! debug module
-    use module_debug
+    use module_timing
     ! interpolation routines
     use module_interpolation
     ! use MPI module, since thrshold_block needs to synch ghosts
@@ -130,5 +130,10 @@ contains
     ! allocate and reset all memory required for the gird
     include "reset_grid.f90"
     include "allocate_grid.f90"
+
+    include "write_block_distribution.f90"
+
+    ! lgt_block synchronization
+    include "check_lgt_block_synchronization.f90"
 
 end module module_mesh

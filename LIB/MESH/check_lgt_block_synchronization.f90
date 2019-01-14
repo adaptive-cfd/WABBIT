@@ -12,6 +12,7 @@
 !>
 !!  proc 0 gather all data and compare the data to his own light data \n
 !!
+!!  is currently unused, very helpful routine for development of block structures, lgt/hvy data
 !!
 !! input:    - params, light data \n
 !! output:   - status of lgt_block synchronzation \n
@@ -23,13 +24,7 @@
 ! ********************************************************************************************
 
 subroutine check_lgt_block_synchronization( params, lgt_block)
-
     !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -48,7 +43,7 @@ subroutine check_lgt_block_synchronization( params, lgt_block)
     integer(kind=ik), allocatable, save :: lgt_all(:,:,:), lgt_all2(:,:,:)
 
     !---------------------------------------------------------------------------------------------
-    ! interfaces
+
     if (.not. allocated(lgt_all)) Then
         allocate(lgt_all(1:params%number_procs, size(lgt_block,1), size(lgt_block,2)))
         allocate(lgt_all2(1:params%number_procs, size(lgt_block,1), size(lgt_block,2)))

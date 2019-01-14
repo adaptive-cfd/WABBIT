@@ -23,8 +23,8 @@ module module_operators
 use mpi
 ! global parameters
 use module_params
-! debug module
-use module_debug
+! timing module
+use module_timing
 ! use mesh module, since we want to compute origin/spacing of blocks
 ! use module_mesh, only : get_block_spacing_origin
 implicit none

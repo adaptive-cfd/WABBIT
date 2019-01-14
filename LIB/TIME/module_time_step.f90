@@ -23,8 +23,8 @@ module module_time_step
     use mpi
     ! global parameters
     use module_params
-    ! debug module
-    use module_debug
+    ! timing module
+    use module_timing
     ! MPI module
     use module_MPI
     ! use mesh module, since we need to compute dx and origin of blocks

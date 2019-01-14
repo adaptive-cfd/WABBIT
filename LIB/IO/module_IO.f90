@@ -24,8 +24,8 @@ module module_IO
     use hdf5
     ! global parameters
     use module_params
-    ! debug module
-    use module_debug
+    ! timing module
+    use module_timing
     ! hdf5 file wrapper
     use module_hdf5_wrapper
     ! own MPI module

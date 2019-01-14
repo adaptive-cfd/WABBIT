@@ -56,21 +56,20 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     end if
 
 
-    if (params%debug) then
-        call MPI_Allreduce(error, error2, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierror )
+    call MPI_Allreduce(error, error2, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierror )
 
-        if (error2) then
-            write(*,*) "DUMPING DEBUG DATA TO *_ERROR.dat"
-            call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
-            call write_lgt_data(params, lgt_block, 'lgt_block_ERROR.dat')
+    if (error2) then
+        write(*,*) "DUMPING DEBUG DATA TO *_ERROR.dat"
+        call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
+        call write_lgt_data(params, lgt_block, 'lgt_block_ERROR.dat')
 
-            call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
-            & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
-        endif
-    else
-        if (error) then
-            call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
-            & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
-        endif
+        call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
+        & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
     endif
+
+    if (error) then
+        call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
+        & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
+    endif
+
 end subroutine update_neighbors

@@ -23,8 +23,8 @@ module module_MPI
     use mpi
     ! global parameters
     use module_params
-    ! debug module
-    use module_debug
+    ! timing module
+    use module_timing
     ! interpolation routines
     use module_interpolation
     use module_treelib

@@ -137,5 +137,5 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     end if
 
     ! timings
-    call toc( params, "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )
+    call toc( "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )
 end subroutine threshold_block

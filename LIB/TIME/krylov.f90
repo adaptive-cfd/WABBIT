@@ -140,7 +140,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
             t0 = MPI_wtime()
             phiMat(1:M_iter+2, 1:M_iter+2) = expM_pade( dt*H_tmp(1:M_iter+2, 1:M_iter+2) )
             phiMat(M_iter+1, M_iter+1)     = h_klein*phiMat(M_iter, M_iter+2)
-            call toc( params, "Krylov: matrix exponential", MPI_wtime()-t0)
+            call toc( "Krylov: matrix exponential", MPI_wtime()-t0)
 
 
             ! *** Error estimate ***!

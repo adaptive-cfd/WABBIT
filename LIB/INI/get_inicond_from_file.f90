@@ -97,5 +97,5 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     end do
 
     ! timing
-    call toc( params, "read_data", MPI_wtime()-t0 )
+    call toc( "read_data", MPI_wtime()-t0 )
 end subroutine get_inicond_from_file

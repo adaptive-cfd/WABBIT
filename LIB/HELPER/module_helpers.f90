@@ -15,53 +15,53 @@ module module_helpers
 
 contains
 
-    include "most_common_element.f90"
-    include "rotation_matrices.f90"
+  include "most_common_element.f90"
+  include "rotation_matrices.f90"
 
-    !-----------------------------------------------------------------------------
-    !> This function computes the factorial of n
-    !-----------------------------------------------------------------------------
-    function factorial (n) result (res)
+  !-----------------------------------------------------------------------------
+  !> This function computes the factorial of n
+  !-----------------------------------------------------------------------------
+  function factorial (n) result (res)
 
-      implicit none
-      integer, intent (in) :: n
-      integer :: res
-      integer :: i
+    implicit none
+    integer, intent (in) :: n
+    integer :: res
+    integer :: i
 
-      res = product ((/(i, i = 1, n)/))
+    res = product ((/(i, i = 1, n)/))
 
-    end function factorial
+  end function factorial
 
-    !-----------------------------------------------------------------------------
-    !> This function computes the binomial coefficients
-    !-----------------------------------------------------------------------------
-    function choose (n, k) result (res)
+  !-----------------------------------------------------------------------------
+  !> This function computes the binomial coefficients
+  !-----------------------------------------------------------------------------
+  function choose (n, k) result (res)
 
-      implicit none
-      integer, intent (in) :: n
-      integer, intent (in) :: k
-      integer :: res
+    implicit none
+    integer, intent (in) :: n
+    integer, intent (in) :: k
+    integer :: res
 
-      res = factorial (n) / (factorial (k) * factorial (n - k))
+    res = factorial (n) / (factorial (k) * factorial (n - k))
 
-    end function choose
+  end function choose
 
-    !-----------------------------------------------------------------------------
-    !> This function returns 0 if name is not contained in list, otherwise the index for which
-    !> a substring
-    !-----------------------------------------------------------------------------
-    function list_contains_name (list, name) result (index)
+  !-----------------------------------------------------------------------------
+  !> This function returns 0 if name is not contained in list, otherwise the index for which
+  !> a substring
+  !-----------------------------------------------------------------------------
+  function list_contains_name (list, name) result (index)
 
-      implicit none
-      character(len=*), intent (in) :: list(:)
-      character(len=*), intent (in) :: name
-      integer :: index
+    implicit none
+    character(len=*), intent (in) :: list(:)
+    character(len=*), intent (in) :: name
+    integer :: index
 
-      do index = 1, size(list)
-        if (trim(list(index))==trim(name))  return
-      end do
-      index=0
-    end function list_contains_name
+    do index = 1, size(list)
+      if (trim(list(index))==trim(name))  return
+    end do
+    index=0
+  end function list_contains_name
 
 
 

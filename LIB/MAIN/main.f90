@@ -31,8 +31,8 @@ program main
     use module_MPI
     ! global parameters
     use module_params
-    ! debug module
-    use module_debug
+    ! timing module
+    use module_timing
     ! init data module
     use module_initialization
     ! mesh manipulation subroutines
@@ -131,7 +131,9 @@ program main
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
-    logical                             :: it_is_time_to_save_data, test_failed, keep_running=.true.
+    logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
+    ! flag of write_individual_timings to pass value from params to module_timing
+    logical                             :: write_indiv_timings=.false.
 !---------------------------------------------------------------------------------------------
 ! interfaces
 
@@ -184,6 +186,8 @@ program main
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
+    ! read flag write_individual_timings from params, to be used in module_timings
+    call setup_indiv_timings( write_indiv_timings = params%write_individual_timings )
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename )
     ! allocate memory for heavy, light, work and neighbor data
@@ -279,7 +283,7 @@ program main
 
 
     ! timing
-    call toc( params, "init_data", MPI_wtime()-sub_t0 )
+    call toc( "init_data", MPI_wtime()-sub_t0 )
 
     !---------------------------------------------------------------------------
     ! main time loop
@@ -303,7 +307,7 @@ program main
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
-        call toc( params, "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
 
 
         !***********************************************************************
@@ -329,7 +333,7 @@ program main
             call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
-        call toc( params, "TOPLEVEL: refinement", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
         Nblocks_rhs = lgt_n
 
         !***********************************************************************
@@ -349,7 +353,7 @@ program main
         ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
         t4 = MPI_wtime()
         call update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n )
-        call toc( params, "TOPLEVEL: update_grid_qyts", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: update_grid_qyts", MPI_wtime()-t4)
 
 
         !***********************************************************************
@@ -367,14 +371,14 @@ program main
             t4 = MPI_wtime()
             call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, &
             hvy_active, lgt_active, lgt_n, hvy_n )
-            call toc( params, "TOPLEVEL: time stepper", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1
 
             ! determine if it is time to save data our not.
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
-                it_is_time_to_save_data=.true.
+                it_is_time_to_save_data= .true.
             endif
 
             !*******************************************************************
@@ -388,7 +392,7 @@ program main
                     call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
                 end if
             end if
-            call toc( params, "TOPLEVEL: filter", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
 
             ! it is useful to save the number of blocks per rank into a log file.
             call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
@@ -421,7 +425,7 @@ program main
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
         endif
-        call toc( params, "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
 
         !***********************************************************************
@@ -443,7 +447,7 @@ program main
 
         ! at the end of a time step, we increase the total counters/timers for all measurements
         ! by what has been done in the last time step, then we flush the current timing to disk.
-        call timing_next_timestep( params, iteration )
+        call timing_next_timestep( iteration )
 
         ! it is useful to save the number of blocks per rank into a log file.
         call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
@@ -515,14 +519,14 @@ program main
 
     ! at the end of a time step, we increase the total counters/timers for all measurements
     ! by what has been done in the last time step, then we flush the current timing to disk.
-    call timing_next_timestep( params, iteration )
+    call timing_next_timestep( iteration )
 
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout
-    call summarize_profiling( params, WABBIT_COMM )
+    call summarize_profiling( WABBIT_COMM )
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
         hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp )

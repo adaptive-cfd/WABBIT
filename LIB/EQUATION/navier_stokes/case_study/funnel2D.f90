@@ -1,82 +1,83 @@
 !#########################################################################################
 !                     2D FUNNEL IMPLEMENTATION
 !#########################################################################################
-subroutine  funnel_penalization2D(Bs, g, x0, dx, phi, mask, phi_ref)
+subroutine  funnel_penalization2D(Bs, g, x_0, delta_x, phi, mask, phi_ref)
   use module_helpers
   implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)     :: x_0(2), delta_x(2)   !< coordinates of block and block spacinf
     real(kind=rk), intent(in)     :: phi(:,:,:)     !< state vector
     real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
     real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
     integer(kind=2), allocatable,save:: mask_color(:,:)!< identifyers of mask parts (plates etc)
     logical                       :: mesh_was_adapted=.true.
+    real(kind=rk)                 :: x0, dx, r0, dr
     ! -----------------------------------------------------------------
+    call cartesian2cylinder( x_0, delta_x, dx, dr, x0, r0 )
+
     if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g))
     !!> todo implement function check_if_mesh_adapted (true/false) in adapt mesh
     if ( mesh_was_adapted .eqv. .true. ) then
       ! dont switch the order of draw_funnel3D and draw_sponge3D,
       ! because mask and color are reset in the draw_funnel
-      call draw_funnel2D(x0, dx, Bs, g, mask, mask_color)
-      call draw_sponge2D(x0, dx, Bs, g, mask, mask_color)
+      call draw_funnel2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
+      call draw_sponge2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     end if
 
-    call compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,phi_ref)
+    call compute_penal2D(mask_color, mask, phi, r0, dr, x0, dx, Bs, g ,phi_ref)
 
 end subroutine  funnel_penalization2D
 
 
 
-subroutine draw_funnel2D(x0, dx, Bs, g, mask, mask_color)
+subroutine draw_funnel2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)             :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)                :: x0(2), dx(2)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)                :: r0, x0, dr, dx !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)             :: mask(:,:,:)    !< mask function
     integer(kind=2), intent(inout), optional :: mask_color(:,:)!< identifyers of mask parts (plates etc)
     ! -----------------------------------------------------------------
-    real(kind=rk)     :: x, y, r, h
+    real(kind=rk)     :: x, r, h
     real(kind=rk)     :: chi
-    integer(kind=ik)  :: ix, iy,n ! loop variables
+    integer(kind=ik)  :: ix, ir,n ! loop variables
   ! -----------------------------------------------------------------
 
     ! parameter for smoothing function (width)
-    h  = 1.5_rk*max(dx(1), dx(2))
-
+    h  = 1.5_rk*max(dx, dr)
     ! smooth width in x and y direction
-    do iy=g+1, Bs+g
-       y = dble(iy-(g+1)) * dx(2) + x0(2)
-       r = abs(y-domain_size(2)*0.5_rk)
-       do ix=g+1, Bs+g
-            x = dble(ix-(g+1)) * dx(1) + x0(1)
+    do ir = g+1, Bs+g
+       ! calculate the radial distance from the coordinate origin
+       r = abs(dble(ir-(g+1)) * dr + r0)
 
+       do ix = g+1, Bs+g
+            x = dble(ix-(g+1)) * dx + x0
             !=============================
 !     /\     reset the mask function!
 !    /  \    caution! Reseting should only be done once
 !   /    \   for optimal performance
 !  / stop \
 ! +--------+
-            mask_color(ix,iy)=0
-            mask(ix,iy,:)=0.0_rk
+            mask_color(ix,ir)=0
+            mask(ix,ir,:)=0.0_rk
             !=============================
-
 
             ! plates
             ! ------
             chi = draw_funnel_plates(x,r,funnel,h)
             if (chi>0.0_rk) then
-              mask_color(ix,iy)  = color_plates
-              mask(ix,iy,2:4)    = mask(ix,iy,2:4) + chi
+              mask_color(ix,ir)  = color_plates
+              mask(ix,ir,2:4)    = mask(ix,ir,2:4) + chi
             endif                                           ! the temperature of the funnel
 
             ! Walls
             ! -----
-            chi = draw_walls(x,r,funnel,h)
-            if (chi>0.0_rk) then                       ! default values on the walls
-              mask_color(ix,iy)  = color_walls
-              mask(ix,iy,2:4)    = mask(ix,iy,2:4) + chi
-            endif                                           ! the temperature of the funnel
+             chi = draw_walls(x,r,funnel,h)
+             if (chi>0.0_rk) then                       ! default values on the walls
+               mask_color(ix,ir)  = color_walls
+               mask(ix,ir,2:4)    = mask(ix,ir,2:4) + chi
+             endif                                           ! the temperature of the funnel
 
        end do
     end do
@@ -86,52 +87,52 @@ end subroutine  draw_funnel2D
 
 
 
-subroutine draw_sponge2D(x0, dx, Bs, g, mask, mask_color)
+subroutine draw_sponge2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)             :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)                :: x0(2), dx(2)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)                :: r0, x0, dr, dx !< coordinates of block and block spacing
     real(kind=rk), intent(inout)             :: mask(:,:,:)    !< mask function
     integer(kind=2), intent(inout), optional :: mask_color(:,:)!< identifyers of mask parts (plates etc)
     ! -----------------------------------------------------------------
-    real(kind=rk)     :: x, y, r, h
+    real(kind=rk)     :: x, r, h
     real(kind=rk)     :: chi
-    integer(kind=ik)  :: ix, iy,n ! loop variables
+    integer(kind=ik)  :: ix, ir, n ! loop variables
   ! -----------------------------------------------------------------
 
     ! parameter for smoothing function (width)
-    h  = 1.5_rk*max(dx(1), dx(2))
+    h  = 1.5_rk*max(dx, dr)
 
     ! smooth width in x and y direction
-    do iy=g+1, Bs+g
-       y = dble(iy-(g+1)) * dx(2) + x0(2)
-       r = abs(y-domain_size(2)*0.5_rk)
-       do ix=g+1, Bs+g
-            x = dble(ix-(g+1)) * dx(1) + x0(1)
-                                       ! the temperature of the funnel
+    do ir=g+1, Bs+g
+      ! calculate the radial distance from the coordinate origin
+      r = abs(dble(ir-(g+1)) * dr + r0)
 
+       do ix=g+1, Bs+g
+            x = dble(ix-(g+1)) * dx + x0
+                                       ! the temperature of the funnel
             ! Outlet flow: PUMPS
             ! ------------------
             ! pump volume flow
             chi=  draw_pumps_volume_flow(x,r,funnel,h)
             if (chi>0.0_rk) then
-              mask(ix,iy,2:3)   = mask(ix,iy,2:3)+chi
-              mask_color(ix,iy) = color_pumps
+              mask(ix,ir,2:3)   = mask(ix,ir,2:3)+chi
+              mask_color(ix,ir) = color_pumps
             endif
             ! mass and energy sink
             chi=  draw_pumps_sink(x,r,funnel,h)
             if (chi>0.0_rk) then
-              mask_color(ix,iy) = color_pumps_sink
-              mask(ix,iy,1) = mask(ix,iy,1)+chi
-              mask(ix,iy,4) = mask(ix,iy,4)+chi
+              mask_color(ix,ir) = color_pumps_sink
+              mask(ix,ir,1) = mask(ix,ir,1)+chi
+              mask(ix,ir,4) = mask(ix,ir,4)+chi
             endif
 
             ! Inlet flow: Capillary
             ! ---------------------
             chi=  draw_jet(x,r,funnel,h)
             if (chi>0.0_rk) then
-              mask_color(ix,iy) = color_capillary
-              mask(ix,iy,1:4)   =  mask(ix,iy,1:4)+chi
+              mask_color(ix,ir) = color_capillary
+              mask(ix,ir,1:4)   =  mask(ix,ir,1:4)+chi
             endif
 
             ! Outlet flow: Transition to 2pump
@@ -139,9 +140,9 @@ subroutine draw_sponge2D(x0, dx, Bs, g, mask, mask_color)
             chi=  draw_outlet(x,r,funnel,h)
             !   chi=  draw_sink(x,y,funnel,h)
               if (chi>0.0_rk) then
-                mask_color(ix,iy) = color_outlet
-                mask(ix,iy,1)     = mask(ix,iy,1)+chi
-                mask(ix,iy,3:4)   = mask(ix,iy,3:4)+chi
+                mask_color(ix,ir) = color_outlet
+                mask(ix,ir,1)     = mask(ix,ir,1)+chi
+                mask(ix,ir,3:4)   = mask(ix,ir,3:4)+chi
               endif
 
        end do
@@ -154,11 +155,11 @@ end subroutine  draw_sponge2D
 
 
 !> Computes the 2D funnel mask with reference values of the penalized system
-subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,phi_ref)
+subroutine  compute_penal2D(mask_color, mask, phi, r0, dr, x0, dx, Bs, g ,phi_ref)
     implicit none
     ! -----------------------------------------------------------------
     integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
-    real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
+    real(kind=rk), intent(in)     :: r0, x0, dr, dx !< coordinates of block and block spacing
     integer(kind=2), intent(inout):: mask_color(:,:)!< identifyers of mask parts (plates etc)
     real(kind=rk), intent(in)     :: phi(:,:,:)     !< state vector
     real(kind=rk), intent(inout)  :: mask(:,:,:)     !< mask
@@ -166,7 +167,7 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,phi_ref)
     ! -----------------------------------------------------------------
     real(kind=rk)     :: x, y, r, h,velocity
     real(kind=rk)     :: rho,chi,v_ref,dq,u,v,p,C_inv
-    integer(kind=ik)  :: ix, iy,n                                    ! loop variables
+    integer(kind=ik)  :: ix, ir,n                                    ! loop variables
     real(kind=rk)     :: velocity_pump,rho_pump,pressure_pump, &    ! outlets and inlets
                       rho_capillary,u_capillary,v_capillary,p_capillary, &
                       p_2nd_pump_stage,rho_2nd_pump_stage
@@ -186,85 +187,86 @@ subroutine  compute_penal2D(mask_color,mask,phi, x0, dx, Bs, g ,phi_ref)
     rho_2nd_pump_stage=funnel%outlet_density
 
     ! parameter for smoothing function (width)
-    h  = 1.5_rk*max(dx(1), dx(2))
-    if (3*dx(2)<=0.05_rk*funnel%jet_radius) then
+    h  = 1.5_rk*max(dx, dr)
+    if (3*dr<=0.05_rk*funnel%jet_radius) then
       jet_smooth_width = 0.05_rk*funnel%jet_radius
     else
-      jet_smooth_width = 3*dx(2)
+      jet_smooth_width = 3*dr
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
     endif
 
-    if (3*dx(1)<=0.1_rk*funnel%pump_diameter) then
+    if (3*dx <=0.1_rk*funnel%pump_diameter) then
       pump_smooth_width = 0.025_rk*funnel%pump_diameter
     else
-      pump_smooth_width = 3*h
+      pump_smooth_width = 3.0_rk*h
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
     endif
     ! smooth width in x and y direction
-    do iy=1, Bs+2*g
-       y = dble(iy-(g+1)) * dx(2) + x0(2)
-       r = abs(y-domain_size(2)*0.5_rk)
+    do ir=1, Bs+2*g
+      ! calculate the radial distance from the coordinate origin
+       r = abs(dble(ir-(g+1)) * dr + r0)
+
        do ix=1, Bs+2*g
-            x = dble(ix-(g+1)) * dx(1) + x0(1)
-            rho = phi(ix,iy,rhoF)
-            u   = phi(ix,iy,UxF)
-            v   = phi(ix,iy,UyF)
-            p   = phi(ix,iy,pF)
+            x = dble(ix-(g+1)) * dx + x0
+            rho = phi(ix,ir,rhoF)
+            u   = phi(ix,ir,UxF)
+            v   = phi(ix,ir,UyF)
+            p   = phi(ix,ir,pF)
 
             C_inv=C_sp_inv
 
             !solid obstacles: walls and plates
             ! ------
-            if  (mask_color(ix,iy) == color_plates &
-            .or. mask_color(ix,iy) == color_walls ) then
-              Phi_ref(ix,iy,2) = 0.0_rk                     ! no velocity in x
-              Phi_ref(ix,iy,3) = 0.0_rk                     ! no velocity in y
-              Phi_ref(ix,iy,4) = rho*Rs*funnel%temperatur   ! pressure set according to
+            if  (mask_color(ix,ir) == color_plates &
+            .or. mask_color(ix,ir) == color_walls ) then
+              Phi_ref(ix,ir,2) = 0.0_rk                     ! no velocity in x
+              Phi_ref(ix,ir,3) = 0.0_rk                     ! no velocity in y
+              Phi_ref(ix,ir,4) = rho*Rs*funnel%temperatur   ! pressure set according to
               C_inv=C_eta_inv
             endif                                           ! the temperature of the funnel
 
             ! Outlet flow: PUMPS
             ! ------------------
-            if (mask_color(ix,iy) == color_pumps) then
+            if (mask_color(ix,ir) == color_pumps) then
               v_ref=velocity_pump*jet_stream(abs(x-funnel%pump_x_center), &
                                              funnel%pump_diameter*0.5_rk,pump_smooth_width)
-               Phi_ref(ix,iy,2) = 0
+               Phi_ref(ix,ir,UxF) = 0
                C_inv=C_eta_inv
-              if (y>R_domain) then
-                Phi_ref(ix,iy,3) = rho*v_ref
+              if (r0 > 0.0_rk) then
+                Phi_ref(ix,ir,UyF) = rho*v_ref
               else
-                Phi_ref(ix,iy,3) = -rho*v_ref
+                Phi_ref(ix,ir,UyF) = -rho*v_ref
               endif
             endif
             ! mass and energy sink
-            if (mask_color(ix,iy)==color_pumps_sink) then
-              Phi_ref(ix,iy,1) = rho_pump
-              Phi_ref(ix,iy,4) = pressure_pump
-              C_inv=C_eta_inv
+            if (mask_color(ix,ir)==color_pumps_sink) then
+              Phi_ref(ix,ir,1) = rho_pump
+              Phi_ref(ix,ir,4) = pressure_pump
+              C_inv=C_eta_inv!C_sp_inv
             endif
 
             ! Inlet flow: Capillary
             ! ---------------------
-            if (mask_color(ix,iy)==color_capillary) then
+            if (mask_color(ix,ir)==color_capillary) then
               dq               =jet_stream(r,funnel%jet_radius,jet_smooth_width)
               C_inv=C_sp_inv
-              Phi_ref(ix,iy,1) =  rho_capillary
-              Phi_ref(ix,iy,2) =  rho_capillary*u_capillary*dq
-              Phi_ref(ix,iy,3) =  rho_capillary*v_capillary
-              Phi_ref(ix,iy,4) =  p_capillary  !rho*Rs*funnel%temperatur * (1 - dq) + p_capillary * dq
+              Phi_ref(ix,ir,1) =  rho_capillary
+              Phi_ref(ix,ir,2) =  rho_capillary*u_capillary*dq
+              Phi_ref(ix,ir,3) =  rho_capillary*v_capillary
+              Phi_ref(ix,ir,4) =  p_capillary  !rho*Rs*funnel%temperatur * (1 - dq) + p_capillary * dq
             endif
 
             ! Outlet flow: Transition to 2pump
             ! ---------------------
-              if (mask_color(ix,iy)==color_outlet) then
-                Phi_ref(ix,iy,1) = rho_2nd_pump_stage
-                !Phi_ref(ix,iy,2) = 0
-                Phi_ref(ix,iy,3) = 0
-                Phi_ref(ix,iy,4) = p_2nd_pump_stage
+              if (mask_color(ix,ir)==color_outlet) then
+                Phi_ref(ix,ir,1) = rho_2nd_pump_stage
+                !Phi_ref(ix,ir,2) = 0
+                Phi_ref(ix,ir,3) = 0
+                Phi_ref(ix,ir,4) = p_2nd_pump_stage
                 C_inv=C_sp_inv
               endif
               ! add penalization strength to mask
-              mask(ix,iy,:)=C_inv*mask(ix,iy,:)
+              mask(ix,ir,:)=C_inv*mask(ix,ir,:)
        end do
     end do
 end subroutine  compute_penal2D
@@ -356,7 +358,7 @@ function draw_walls(x,r,funnel,h)
         ! mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
   endif
 
-   ! is needed because mask off walls overlap
+   ! is needed because mask of walls overlap
   if (mask>1) then
          mask=1
   endif
@@ -524,21 +526,21 @@ end function draw_sink
       !temporal data field
       real(kind=rk),dimension(5)                       :: tmp
 
-      integer(kind=ik)                                 :: ix,iy
+      integer(kind=ik)                                 :: ix,ir
 
        h  = 1.5_rk*max(dx(1), dx(2))
       ! calculate mean density close to the pump
       width =funnel%wall_thickness
       tmp   =  0.0_rk
       r0    =(R_domain-2*funnel%wall_thickness)
-       do iy=g+1, Bs+g
-         y = dble(iy-(g+1)) * dx(2) + x0(2)
+       do ir=g+1, Bs+g
+         y = dble(ir-(g+1)) * dx(2) + x0(2)
          r = abs(y-R_domain)
          do ix=g+1, Bs+g
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
                   r>r0 .and. r<r0+width) then
-                tmp(1:4)  = tmp(1:4)+ u(ix,iy,:)
+                tmp(1:4)  = tmp(1:4)+ u(ix,ir,:)
                 tmp(5)    = tmp(5)  + 1.0_rk
               endif
           enddo
@@ -548,3 +550,31 @@ end function draw_sink
 
   end subroutine integrate_over_pump_area2D
   !==========================================================================
+
+
+!########################################################################
+!> Transform computational coordinates to cylindrical coords
+subroutine cartesian2cylinder(x_0, delta_x, dx, dr, x0, r0)
+
+  implicit none
+  !--------------------------------------------------------
+  real(kind=rk), intent(in) :: x_0(2), delta_x(2)     !<cartesian coords
+  real(kind=rk), intent(out) :: dx, dr, r0, x0  !<cylindrical coords
+  !--------------------------------------------------------
+  ! Set the lattice spacing and coordinate origin:
+  x0 = x_0(1)
+  dx = delta_x(1)
+  dr = delta_x(2)
+  ! The coordinate origin is dependent on the coordinate system
+  if ( params_ns%coordinates=="cylindrical" ) then
+    ! The total grid is shifted by R_min, which accounts for the
+    ! infinitesimal cylinder centered arround the symmetrie axis.
+    ! The origin is therefore shifted to (x,r) = (0, R_min)
+    r0 = x_0(2) + params_ns%R_min
+  else
+    ! The coordinate system is centered at (x,r) = (0, L_r/2) and -L_r/2<r<L_r/2
+    r0 = x_0(2) - params_ns%domain_size(2)*0.5_rk
+  end if
+
+end subroutine cartesian2cylinder
+!########################################################################

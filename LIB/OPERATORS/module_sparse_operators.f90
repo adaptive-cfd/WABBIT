@@ -6,10 +6,12 @@
 !-----------------------------------------------------------------
 
 module module_sparse_operators
-#ifdef SBLAS
+
 use mpi
 ! global parameters
 use module_params
+
+#ifdef SBLAS
 use blas_sparse
 
 implicit none
@@ -19,7 +21,7 @@ PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: initialice_derivatives,DUS_Dx,DUS_Dy
+PUBLIC :: initialice_derivatives, DUS_Dx, DUS_Dy
 !####################
 ! Derivative Matrices
 !####################
@@ -692,7 +694,7 @@ contains
 
 
     !> derivative in x direction in sparse blas representation
-    subroutine  DUS_Dx(u_x,dx, u, boundary)
+    subroutine  DUS_Dx(u_x, dx, u, boundary)
 
         real(kind=rk), intent(in)       :: dx
         real(kind=rk), intent(in)       :: u(:,:)
@@ -1175,7 +1177,7 @@ subroutine  test_sparse_kron()
   b_shape=(/2,2/)
   call print_mat(DUS_full(b_val,b_indx,b_jndx,b_shape))
   !B_val=    1.000     2.000
-  !                  3.000     4.000
+  !          3.000     4.000
 
 
   call DUS_kron(A_VAL,A_INDX,A_JNDX,A_SHAPE,B_VAL,B_INDX,B_JNDX,B_SHAPE,AB_VAL,AB_INDX,AB_JNDX,AB_SHAPE)
@@ -1191,6 +1193,7 @@ subroutine  test_sparse_kron()
 
 
 end subroutine test_sparse_kron
+
 #endif
 
 

@@ -65,10 +65,9 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    !! This routine sets the -1 coarsening flat on a block. it uses different methods to
+    !> This routine sets the -1 coarsening flat on a block. it uses different methods to
     !! decide where to coarsen, each act on one block. Note due to gradedness and completeness
-    !! this status may be revoked later in the computation. If coarsening goes through, the -1
-    !! will be set to a -2
+    !! this status may be revoked later in the computation.
     select case (indicator)
     case ("threshold-vorticity")
         !! use thresholding, but on the vorticity rather than the state vector.
@@ -98,7 +97,10 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 
     case ("random")
         !! randomly coarse some blocks. used for testing. note we tag for coarsening
-        !! only once in the first iteration.
+        !! only once in the first iteration. this is important: as adapt_mesh is an iterative
+        !! routine that calls the coarsening until the grid does not change anymore. without
+        !! the iteration==0 check, it will always keep on coarsening.
+
         if (iteration == 0) then
             ! call init_random_seed()
             ! the chance for coarsening:

@@ -157,7 +157,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
     real(kind=rk), intent(in)           :: time
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: work_array(:, :, :, :)
-    real(kind=rk), intent(inout)           :: u(:, :, :, :)
+    real(kind=rk), intent(inout)        :: u(:, :, :, :)
     !> grid parameter
     integer(kind=ik),intent(in)         :: Bs, g
     ! spacing and origin of a block
@@ -190,6 +190,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
         call bogey_filter2D_(filter, u, g, Bs, N_dF, x0, dx, work_array) !new bogey_filter
       !  call bogey_filter2D(filter, Bs, g, N_dF ,work_array,x0,dx) !old bogey filter
       endif
+      
     case('explicit_5pt','explicit_7pt','explicit_9pt','explicit_11pt') ! explicit filtering
       do dF = 1, N_dF
           dF_old = dF+N_dF
@@ -233,6 +234,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
       do dF = 1, N_dF
           call wavelet_filter(filter%order_predictor, Bs, g, work_array(:,:,:,dF))
       enddo
+
     case default
       call abort(100918,"No filter called: "//filter%name //" is known.")
 

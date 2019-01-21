@@ -53,7 +53,7 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neigh
     ! hvy_block = 9.99e99_rk ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
     ! hvy_work = 9.99e99_rk
     ! hvy_tmp =  9.99e99_rk
-    
+
     hvy_neighbor = -1
     ! as the grid has changed (we deleted it here), we now update the heavy and light
     ! active lists

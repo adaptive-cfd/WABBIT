@@ -111,11 +111,13 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tm
 ! main body
 
     if ( .not. All(params%periodic_BC) ) then
-        !!! if we have boundary conditions it is important to reset hvy_work.
+        !!! if we have NON-PERIODIC boundary conditions it is important to reset hvy_work.
         !!! this is important because hvy_work saves the RHS also in the ghost node layer of the
         !!! boundary blocks which is not synchronized. if RHS would be not 0 in the ghost node layer
         !!! then the integrator would change the values in the ghost node layer.
-        hvy_work(:, :, :, :, :, :)=0.0_rk
+        do k = 1, hvy_n
+            hvy_work(:, :, :, :, hvy_active(k), :) = 0.0_rk
+        enddo
     endif
 
 

@@ -138,7 +138,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     !> origin and spacing of the block
     real(kind=rk), intent(in)                      :: x0(:), dx(:)
     !> datafields
-    real(kind=rk), intent(inout)                      :: phi(:,:,:,:)
+    real(kind=rk), intent(inout)                   :: phi(:,:,:,:)
     real(kind=rk), intent(inout)                   :: rhs(:,:,:,:)
     ! when implementing boundary conditions, it is necessary to now if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.

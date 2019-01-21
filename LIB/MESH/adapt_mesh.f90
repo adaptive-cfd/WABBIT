@@ -96,7 +96,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 !---------------------------------------------------------------------------------------------
 ! main body
 
-    !> we iterate until the number of blocks is constant (note: as only coarseing
+    !> we iterate until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are refined)
     do while ( lgt_n_old /= lgt_n )
@@ -142,7 +142,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         call toc( "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
 
-        ! the following calls are indeed required (threshold->ghosts->neighbors->active)
+        ! the following calls are indeed required
         ! update lists of active blocks (light and heavy data)
         ! update list of sorted nunmerical treecodes, used for finding blocks
         t0 = MPI_Wtime()

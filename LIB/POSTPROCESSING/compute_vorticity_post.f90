@@ -1,4 +1,4 @@
-!> \file
+    !> \file
 ! WABBIT
 !> \name compute_vorticity_post.f90
 !> \version 0.5
@@ -45,8 +45,8 @@ subroutine compute_vorticity_post(params)
     if (file_ux=='--help' .or. file_ux=='--h') then
         if (params%rank==0) then
             write(*,*) "wabbit postprocessing routine for subsequent vorticity calculation"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence] source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence] source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence|--vor-abs] source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence|--vor-abs] source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
         end if
         return
     endif
@@ -98,7 +98,7 @@ subroutine compute_vorticity_post(params)
     allocate(params%butcher_tableau(1,1))
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case
-    params%number_blocks = 4_ik*lgt_n/params%number_procs
+    params%number_blocks = 2_ik*lgt_n/params%number_procs
     if (params%rank==0) params%number_blocks = params%number_blocks + &
     mod(lgt_n, params%number_procs)
 
@@ -127,7 +127,7 @@ subroutine compute_vorticity_post(params)
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        if (operator == "--vorticity") then
+        if (operator == "--vorticity" .or. operator == "--vor-abs") then
             if (params%threeD_case) then
                 call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
                 hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
@@ -170,6 +170,23 @@ subroutine compute_vorticity_post(params)
             call write_field(fname, time, iteration, 3, params, lgt_block, &
             hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active)
         end if
+
+    elseif (operator == "--vor-abs") then
+
+        if (.not. params%threeD_case) then
+            call abort(221218, "--vor-abs makes no sense for 2D data...")
+        endif
+
+        ! compute magnitude of vorticity
+        do k = 1, hvy_n
+            hvy_tmp(:,:,:,1,hvy_active(k)) = sqrt( hvy_tmp(:,:,:,1,hvy_active(k))**2 &
+            + hvy_tmp(:,:,:,2,hvy_active(k))**2 + hvy_tmp(:,:,:,3,hvy_active(k))**2 )
+        enddo
+
+        write( fname,'(a, "_", i12.12, ".h5")') 'vorabs', nint(time * 1.0e6_rk)
+
+        call write_field(fname, time, iteration, 1, params, lgt_block,&
+        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
 
     elseif (operator=="--divergence") then
         write( fname,'(a, "_", i12.12, ".h5")') 'divu', nint(time * 1.0e6_rk)

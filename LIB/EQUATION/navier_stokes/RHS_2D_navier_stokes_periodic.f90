@@ -46,7 +46,7 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     ! adiabatic coefficient
     real(kind=rk)                                           :: gamma_
     ! specific gas constant
-    real(kind=rk)                                           :: Rs
+    real(kind=rk)                                           :: Rs_inv
     ! isochoric heat capacity
     real(kind=rk)                                           :: Cv
     ! isobaric heat capacity
@@ -88,7 +88,7 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
 
     ! set physics parameters for readability
     gamma_      = params_ns%gamma_
-    Rs          = 1.0_rk/params_ns%Rs
+    Rs_inv      = 1.0_rk/params_ns%Rs
     Cv          = params_ns%Cv
     Cp          = params_ns%Cp
     Pr          = params_ns%Pr
@@ -110,7 +110,7 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     if (dissipation) then
         do j = 1, Bs+2*g
             do i = 1, Bs+2*g
-                T(i,j) = p(i,j) * phi1_inv(i,j) * phi1_inv(i,j) * Rs
+                T(i,j) = p(i,j) * phi1_inv(i,j) * phi1_inv(i,j) * Rs_inv
             end do
         end do
         mu   = mu0

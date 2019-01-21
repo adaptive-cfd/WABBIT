@@ -135,7 +135,7 @@ contains
       ! For this reason we have to define the radius of the small slip wall zylinder
       ! arround the symmetrie axis.
       ! The cylinder is smaller then the smalles lattice spacing
-      params_ns%R_min=0.01_rk*params_ns%dx_min
+      params_ns%R_min=0.1_rk*params_ns%dx_min
       if (params_ns%mpirank==0) write(*,'("grid is shifted by r_min :", T40, g12.4)') params_ns%R_min
     endif
 
@@ -472,7 +472,7 @@ contains
         ! An easy way to fill them is to use the last availavble point
         ! inside the domain.
         do iy = 1, g
-          !phi(:,iy,:)=phi(:,g+1,:)
+          phi(:,iy,:)=phi(:,g+1,:)
         end do
       end if
 
@@ -500,7 +500,7 @@ contains
         ! An easy way to fill them is to use the last availavble point
         ! inside the domain.
         do iy = Bs+g+1, Bs+2*g
-          !phi(:,iy,:)=phi(:,Bs+g,:)
+          phi(:,iy,:)=phi(:,Bs+g,:)
         end do
       end if
 

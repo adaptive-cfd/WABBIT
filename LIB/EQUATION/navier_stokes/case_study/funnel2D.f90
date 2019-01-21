@@ -202,11 +202,11 @@ subroutine  compute_penal2D(mask_color, mask, phi, r0, dr, x0, dx, Bs, g ,phi_re
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
     endif
     ! smooth width in x and y direction
-    do ir=1, Bs+2*g
+    do ir=g+1, Bs+g
       ! calculate the radial distance from the coordinate origin
        r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix=1, Bs+2*g
+       do ix=g+1, Bs+g
             x = dble(ix-(g+1)) * dx + x0
             rho = phi(ix,ir,rhoF)
             u   = phi(ix,ir,UxF)

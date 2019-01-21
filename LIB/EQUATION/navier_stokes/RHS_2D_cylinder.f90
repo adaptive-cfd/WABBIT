@@ -113,7 +113,6 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     rhs(:,:,rhoF) =  rhs(:,:,rhoF) + tmp1 + rho_u*r_inv
     rhs(:,:,rhoF) = -rhs(:,:,rhoF) * 0.5_rk * sqrt_rho_inv
 
-
     ! ------------- momentum equation ---------------- !
     if (dissipation) then
          ! Compute mu
@@ -147,7 +146,6 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
          heat_flux_r = r_inv * tmp1
          call D_z(lambdaT_z, tmp1)
          heat_flux_z = tmp1
-
 
          ! Friction terms because of stress (at work (: !)
          call D_r(u*tau_rr + v*tau_rz, tmp1)
@@ -209,7 +207,6 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
             real(kind=rk), intent(out)      :: dqdr(Bs+2*g, Bs+2*g)
             !> \details Note Bs, g, dz, boundary_flag are defined in the supfunction!
             call diffy( Bs, g, dr, q, dqdr, boundary_flag(2))
-
         end subroutine D_r
 
         !> Derivative in the axial direction
@@ -243,9 +240,9 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
               ! we have to do something with the ghost nodes of this block.
               ! An easy way to fill them is to use the last availavble point
               ! inside the domain.
-              ! do ir = 1, g
-              !     phi(:, ir, :)=phi(:, g+1, :)
-              ! end do
+               do ir = 1, g
+                   phi(:, ir, :)=phi(:, g+1, :)
+               end do
           end if
 
           !##################################################
@@ -268,16 +265,16 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
               ! we have to do something with the ghost nodes of this block.
               ! An easy way to fill them is to use the last availavble point
               ! inside the domain.
-              ! do ir = Bs+g+1, Bs+2*g
-              !     phi(:,ir,:)=phi(:,Bs+g,:)
-              ! end do
+               do ir = Bs+g+1, Bs+2*g
+                   phi(:,ir,:)=phi(:,Bs+g,:)
+               end do
           end if
         end subroutine
 
 
         !> Inline function adds penalization terms to RHS
         subroutine set_penalization()
-            integer(kind=ik) :: ir, iz, n_eqn
+            integer(kind=ik) :: n_eqn
             real(kind=rk), allocatable, save :: phi_prime(:, :, :), phi_ref(:,:,:), mask(:,:,:)
             logical ,save :: allocated_penal_fields=.false.
 
@@ -300,9 +297,9 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
                 ! density
                 rhs(iz, ir, rhoF)=rhs(iz, ir, rhoF) -0.5_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, rhoF)*(rho(iz, ir)-Phi_ref(iz, ir, rhoF) )
                 ! x-velocity
-                rhs(iz, ir, UxF)=rhs(iz, ir, UxF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UxF)*(rho(iz, ir)*u(iz, ir)-Phi_ref(iz, ir, UxF) )
+                rhs(iz, ir, UxF)=rhs(iz, ir, UxF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UxF)*(rho_v(iz, ir)-Phi_ref(iz, ir, UxF) )
                 ! y-velocity
-                rhs(iz, ir, UyF)=rhs(iz, ir, UyF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UyF)*(rho(iz, ir)*v(iz, ir)-Phi_ref(iz, ir, UyF) )
+                rhs(iz, ir, UyF)=rhs(iz, ir, UyF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UyF)*(rho_u(iz, ir)-Phi_ref(iz, ir, UyF) )
                 ! pressure
                 rhs(iz, ir, pF)=rhs(iz, ir, pF)                        -mask(iz, ir, pF)*(p(iz, ir)-Phi_ref(iz, ir, pF) )
               end do

@@ -179,7 +179,7 @@ $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o\
-	$(OBJDIR)/module_ini_files_parser_mpi.o RHS_2D_cylinder.f90
+	$(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
@@ -199,7 +199,7 @@ $(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90 $(OBJDIR)/module_ns_penalization.o\
 	$(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_sparse_operators.o \
 	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_funnel.o RHS_2D_navier_stokes_periodic.f90\
-	RHS_2D_navier_stokes_bc.f90 RHS_3D_navier_stokes.f90 inicond_NStokes.f90 save_data_ns.f90
+	RHS_2D_navier_stokes_bc.f90 RHS_3D_navier_stokes.f90 RHS_2D_cylinder.f90 inicond_NStokes.f90 save_data_ns.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \

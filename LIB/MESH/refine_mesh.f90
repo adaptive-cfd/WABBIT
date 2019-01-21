@@ -89,13 +89,13 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
     call refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
-    call toc( params, "refine_mesh (refinement_indicator)", MPI_Wtime()-t1 )
+    call toc( "refine_mesh (refinement_indicator)", MPI_Wtime()-t1 )
 
 
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     t1 = MPI_Wtime()
     call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-    call toc( params, "refine_mesh (respect_min_max_treelevel)", MPI_Wtime()-t1 )
+    call toc( "refine_mesh (respect_min_max_treelevel)", MPI_Wtime()-t1 )
 
 
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
@@ -106,7 +106,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
       call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
       lgt_sortednumlist, hvy_active, hvy_n )
     endif
-    call toc( params, "refine_mesh (ensure_gradedness)", MPI_Wtime()-t1 )
+    call toc( "refine_mesh (ensure_gradedness)", MPI_Wtime()-t1 )
 
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
@@ -118,7 +118,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     else
         call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
     end if
-    call toc( params, "refine_mesh (refinement_execute)", MPI_Wtime()-t1 )
+    call toc( "refine_mesh (refinement_execute)", MPI_Wtime()-t1 )
 
 
     !> (e) as the grid changed now with the refinement, we have to update the list of
@@ -146,7 +146,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
         t1 = MPI_Wtime()
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_active, hvy_n, hvy_tmp )
-        call toc( params, "refine_mesh (balance_load)", MPI_Wtime()-t1 )
+        call toc( "refine_mesh (balance_load)", MPI_Wtime()-t1 )
 
         t2 = MPI_wtime()
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
@@ -159,7 +159,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     endif
 
 
-    call toc( params, "refine_mesh (lists+neighbors)", t_misc )
-    call toc( params, "refine_mesh (TOTAL)", MPI_wtime()-t0 )
+    call toc( "refine_mesh (lists+neighbors)", t_misc )
+    call toc( "refine_mesh (TOTAL)", MPI_wtime()-t0 )
 
 end subroutine refine_mesh

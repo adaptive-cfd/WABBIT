@@ -30,9 +30,10 @@
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 !>\brief main function of RHS_2D_navier_stokes
-subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
+subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 !---------------------------------------------------------------------------------------------
 !
+
     implicit none
 
     !> grid parameter
@@ -105,6 +106,10 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     mu0         = params_ns%mu0
     dissipation = params_ns%dissipation
 
+    dummy=0
+    dummy2=0
+    dummy3=0
+    dummy4=0
     ! primitive variables
     do j = 1, Bs+2*g
         do i = 1, Bs+2*g
@@ -139,7 +144,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     ! derivatives
     ! u_x, u_y
     !---------------------------------------------------------------------------------------------
-    call diffxy_c_opt( Bs, g, dx, dy, u, dummy, dummy2)
+    call diffxy( Bs, g, dx, dy, u, dummy, dummy2,boundary_flag)
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -158,7 +163,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 
     ! v_x, v_y
     !---------------------------------------------------------------------------------------------
-    call diffxy_c_opt( Bs, g, dx, dy, v, dummy, dummy2)
+    call diffxy( Bs, g, dx, dy, v, dummy, dummy2,boundary_flag)
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -177,7 +182,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 
     ! p_x, p_y
     !---------------------------------------------------------------------------------------------
-    call diffxy_c_opt( Bs, g, dx, dy, p, dummy, dummy2)
+    call diffxy( Bs, g, dx, dy, p, dummy, dummy2,boundary_flag)
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -193,7 +198,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         ! Friction terms for Momentum equation = div(tau_i*)/(J*srho)
         ! tau11_x
         !---------------------------------------------------------------------------------------------
-        call diffx_c_opt( Bs, g, dx, tau11, dummy)
+        call diffx( Bs, g, dx, tau11, dummy,boundary_flag(1))
 
         do j = g+1, Bs+g
             do i = g+1, Bs+g
@@ -204,7 +209,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 
         ! tau12_y
         !---------------------------------------------------------------------------------------------
-        call diffy_c_opt( Bs, g, dy, tau12, dummy)
+        call diffy( Bs, g, dy, tau12, dummy, boundary_flag(2))
 
         do j = g+1, Bs+g
             do i = g+1, Bs+g
@@ -215,7 +220,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 
         ! tau12_x
         !---------------------------------------------------------------------------------------------
-        call diffx_c_opt( Bs, g, dx, tau12, dummy)
+        call diffx( Bs, g, dx, tau12, dummy, boundary_flag(1))
 
         do j = g+1, Bs+g
             do i = g+1, Bs+g
@@ -226,7 +231,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 
         ! tau22_y
         !---------------------------------------------------------------------------------------------
-        call diffy_c_opt( Bs, g, dy, tau22, dummy)
+        call diffy( Bs, g, dy, tau22, dummy, boundary_flag(2))
 
         do j = g+1, Bs+g
             do i = g+1, Bs+g
@@ -237,7 +242,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
 
         ! Friction terms for the energy equation
         ! Heat Flux
-        call diffxy_c_opt( Bs, g, dx, dy, T, dummy, dummy2)
+        call diffxy( Bs, g, dx, dy, T, dummy, dummy2, boundary_flag)
 
         do j = g-1, Bs+g+2
             do i = g-1, Bs+g+2
@@ -245,8 +250,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
                 dummy4(i,j) = u(i,j)*tau12(i,j) + v(i,j)*tau22(i,j) + lambda * dummy2(i,j)
             end do
         end do
-        call diffx_c_opt( Bs, g, dx, dummy3, dummy)
-        call diffy_c_opt( Bs, g, dy, dummy4, dummy2)
+        call diffx( Bs, g, dx, dummy3, dummy, boundary_flag(1))
+        call diffy( Bs, g, dy, dummy4, dummy2, boundary_flag(2))
 
         do j = g+1, Bs+g
             do i = g+1, Bs+g
@@ -265,8 +270,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
             dummy2(i,j) = rho(i,j)*v(i,j)
         end do
     end do
-    call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
-    call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
+    call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
+    call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -281,8 +286,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
             dummy2(i,j) = v(i,j)*rho(i,j)*u(i,j)
         end do
     end do
-    call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
-    call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
+    call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
+    call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -297,8 +302,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
             dummy2(i,j) = v(i,j)*rho(i,j)*v(i,j)
         end do
     end do
-    call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
-    call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
+    call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
+    call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -313,8 +318,8 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
             dummy2(i,j) = v(i,j)*p(i,j)
         end do
     end do
-    call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
-    call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
+    call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
+    call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
     do j = g+1, Bs+g
         do i = g+1, Bs+g
@@ -351,7 +356,7 @@ subroutine RHS_2D_navier_stokes( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         end do
     endif
 
-end subroutine RHS_2D_navier_stokes
+end subroutine RHS_2D_navier_stokes_BC
 
 !---------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------
@@ -359,9 +364,10 @@ end subroutine RHS_2D_navier_stokes
 !---------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------
 
-subroutine  diffxy_c_opt( Bs, g, dx, dy, u, dudx, dudy)
+subroutine  diffxy( Bs, g, dx, dy, u, dudx, dudy, boundary_flag)
 
     integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=2), intent(in)     :: boundary_flag(3)
     real(kind=rk), intent(in)       :: dx, dy
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
     real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g), dudy(Bs+2*g, Bs+2*g)
@@ -375,21 +381,27 @@ subroutine  diffxy_c_opt( Bs, g, dx, dy, u, dudx, dudy)
     ! - use multiplication for dx
     ! - access array in column-major order
 
-    dx_inv = 1.0_rk/(12.0_rk*dx)
-    dy_inv = 1.0_rk/(12.0_rk*dy)
+    call DUS_Dx(dudx,dx,u,boundary_flag(1))
+    call DUS_Dy(dudy,dy,u,boundary_flag(2))
 
-    do j = g-1, Bs+g+2
-        do i = g-1, Bs+g+2
-            dudx(i,j) = ( u(i-2,j) - 8.0_rk*u(i-1,j) + 8.0_rk*u(i+1,j) - u(i+2,j) ) * dx_inv
-            dudy(i,j) = ( u(i,j-2) - 8.0_rk*u(i,j-1) + 8.0_rk*u(i,j+1) - u(i,j+2) ) * dy_inv
-        end do
-    end do
+    ! dudx=0
+    ! dudy=0
+    ! dx_inv = 1.0_rk/(12.0_rk*dx)
+    ! dy_inv = 1.0_rk/(12.0_rk*dy)
+    !
+    ! do j = g-1, Bs+g+2
+    !     do i = g-1, Bs+g+2
+    !         dudx(i,j) = ( u(i-2,j) - 8.0_rk*u(i-1,j) + 8.0_rk*u(i+1,j) - u(i+2,j) ) * dx_inv
+    !         dudy(i,j) = ( u(i,j-2) - 8.0_rk*u(i,j-1) + 8.0_rk*u(i,j+1) - u(i,j+2) ) * dy_inv
+    !     end do
+    ! end do
 
-end subroutine diffxy_c_opt
+end subroutine diffxy
 
-subroutine  diffx_c_opt( Bs, g, dx, u, dudx)
+subroutine  diffx( Bs, g, dx, u, dudx,boundary_flag)
 
     integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=2), intent(in)     :: boundary_flag
     real(kind=rk), intent(in)       :: dx
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
     real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g)
@@ -402,20 +414,22 @@ subroutine  diffx_c_opt( Bs, g, dx, u, dudx)
     ! - write loops explicitly,
     ! - use multiplication for dx
     ! - access array in column-major order
+    call DUS_Dx(dudx,dx,u,boundary_flag)
+    ! dx_inv = 1.0_rk/(12.0_rk*dx)
+    !
+    ! do j = g+1, Bs+g
+    !     do i = g+1, Bs+g
+    !         dudx(i,j) = ( u(i-2,j) - 8.0_rk*u(i-1,j) + 8.0_rk*u(i+1,j) - u(i+2,j) ) * dx_inv
+    !     end do
+    ! end do
+    !
 
-    dx_inv = 1.0_rk/(12.0_rk*dx)
+end subroutine diffx
 
-    do j = g+1, Bs+g
-        do i = g+1, Bs+g
-            dudx(i,j) = ( u(i-2,j) - 8.0_rk*u(i-1,j) + 8.0_rk*u(i+1,j) - u(i+2,j) ) * dx_inv
-        end do
-    end do
-
-end subroutine diffx_c_opt
-
-subroutine  diffy_c_opt( Bs, g, dy, u, dudy)
+subroutine  diffy( Bs, g, dy, u, dudy, boundary_flag)
 
     integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=2), intent(in)     :: boundary_flag
     real(kind=rk), intent(in)       :: dy
     real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
     real(kind=rk), intent(out)      :: dudy(Bs+2*g, Bs+2*g)
@@ -428,120 +442,14 @@ subroutine  diffy_c_opt( Bs, g, dy, u, dudy)
     ! - write loops explicitly,
     ! - use multiplication for dx
     ! - access array in column-major order
+    call DUS_Dy(dudy,dy,u,boundary_flag)
+    ! dudy=0
+    ! dy_inv = 1.0_rk/(12.0_rk*dy)
+    !
+    ! do j = g+1, Bs+g
+    !     do i = g+1, Bs+g
+    !         dudy(i,j) = ( u(i,j-2) - 8.0_rk*u(i,j-1) + 8.0_rk*u(i,j+1) - u(i,j+2) ) * dy_inv
+    !     end do
+    ! end do
 
-    dy_inv = 1.0_rk/(12.0_rk*dy)
-
-    do j = g+1, Bs+g
-        do i = g+1, Bs+g
-            dudy(i,j) = ( u(i,j-2) - 8.0_rk*u(i,j-1) + 8.0_rk*u(i,j+1) - u(i,j+2) ) * dy_inv
-        end do
-    end do
-
-end subroutine diffy_c_opt
-
-!---------------------------------------------------------------------------------------------
-!---------------------------------------------------------------------------------------------
-! OLD stuff
-!---------------------------------------------------------------------------------------------
-!---------------------------------------------------------------------------------------------
-
-subroutine grad_zentral(Bs, g, dx, dy, q, qx, qy)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dx, dy
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qx(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qy(Bs+2*g, Bs+2*g)
-
-    !! XXX !!
-    call diffx_c( Bs, g, dx, q, qx)
-
-    !! YYY !!
-    call diffy_c( Bs, g, dy, q, qy)
-
-end subroutine grad_zentral
-
-!---------------------------------------------------------------------------------------------
-
-subroutine diff1x_zentral(Bs, g, dx, q, qx)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qx(Bs+2*g, Bs+2*g)
-
-    !! XXX !!
-    call diffx_c( Bs, g, dx, q, qx)
-
-end subroutine diff1x_zentral
-
-!---------------------------------------------------------------------------------------------
-
-subroutine diff1y_zentral(Bs, g, dy, q, qy)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qy(Bs+2*g, Bs+2*g)
-
-    !! XXX !!
-    call diffy_c( Bs, g, dy, q, qy)
-
-end subroutine diff1y_zentral
-
-!---------------------------------------------------------------------------------------------
-
-subroutine  diffx_c( Bs, g, dx, u, dudx)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g)
-
-    integer                         :: i, n
-
-    n = size(u,1)
-
-    !dudx(1,:) = ( u(n-1,:) - 8.0_rk*u(n,:) + 8.0_rk*u(2,:) - u(3,:) ) / (12.0_rk*dx)
-    !dudx(2,:) = ( u(n,:)   - 8.0_rk*u(1,:) + 8.0_rk*u(3,:) - u(4,:) ) / (12.0_rk*dx)
-    dudx(1,:) = ( u(2,:) - u(1,:) ) / (dx)
-    dudx(2,:) = ( u(3,:) - u(1,:) ) / (2.0_rk*dx)
-
-    forall ( i = 3:n-2 )
-       dudx(i,:) = ( u(i-2,:) - 8.0_rk*u(i-1,:) + 8.0_rk*u(i+1,:) - u(i+2,:) ) / (12.0_rk*dx)
-    end forall
-
-    !dudx(n-1,:) = ( u(n-3,:) - 8.0_rk*u(n-2,:) + 8.0_rk*u(n,:) - u(1,:) ) / (12.0_rk*dx)
-    !dudx(n,:)   = ( u(n-2,:) - 8.0_rk*u(n-1,:) + 8.0_rk*u(1,:) - u(2,:) ) / (12.0_rk*dx)
-    dudx(n-1,:) = ( u(n,:) - u(n-2,:) ) / (2.0_rk*dx)
-    dudx(n,:)   = ( u(n,:) - u(n-1,:) ) / (dx)
-
-end subroutine diffx_c
-
-
-subroutine  diffy_c( Bs, g, dy, u, dudy)
-    use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
-    real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudy(Bs+2*g, Bs+2*g)
-
-    integer                         :: i, n
-
-    n = size(u,1)
-
-    !dudy(:,1) = ( u(:,n-1) - 8.0_rk*u(:,n) + 8.0_rk*u(:,2) - u(:,3) ) / (12.0_rk*dy)
-    !dudy(:,2) = ( u(:,n)   - 8.0_rk*u(:,1) + 8.0_rk*u(:,3) - u(:,4) ) / (12.0_rk*dy)
-    dudy(:,1) = ( u(:,2) - u(:,1) ) / (dy)
-    dudy(:,2) = ( u(:,3) - u(:,1) ) / (2.0_rk*dy)
-
-    forall ( i = 3:n-2 )
-       dudy(:,i) = ( u(:,i-2) - 8.0_rk*u(:,i-1) + 8.0_rk*u(:,i+1) - u(:,i+2) ) / (12.0_rk*dy)
-    end forall
-
-    !dudy(:,n-1) = ( u(:,n-3) - 8.0_rk*u(:,n-2) + 8.0_rk*u(:,n) - u(:,1) ) / (12.0_rk*dy)
-    !dudy(:,n)   = ( u(:,n-2) - 8.0_rk*u(:,n-1) + 8.0_rk*u(:,1) - u(:,2) ) / (12.0_rk*dy)
-    dudy(:,n-1) = ( u(:,n) - u(:,n-2) ) / (2.0_rk*dy)
-    dudy(:,n)   = ( u(:,n) - u(:,n-1) ) / (dy)
-
-end subroutine diffy_c
+end subroutine diffy

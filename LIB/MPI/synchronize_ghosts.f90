@@ -20,5 +20,5 @@ subroutine sync_ghosts(  params, lgt_block, hvy_block, hvy_neighbor, hvy_active,
 
     call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-    call toc( params, "WRAPPER: sync ghosts", MPI_wtime()-t0 )
+    call toc( "WRAPPER: sync ghosts", MPI_wtime()-t0 )
 end subroutine sync_ghosts

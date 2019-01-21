@@ -309,7 +309,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             if (lgt_n > 1) then
                 call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
             end if
-            call toc( params, "balance_load (SFC+sort)", MPI_wtime()-t1 )
+            call toc( "balance_load (SFC+sort)", MPI_wtime()-t1 )
 
             !---------------------------------------------------------------------------------
             ! 2nd: plan communication (fill list of blocks to transfer)
@@ -377,7 +377,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             !---------------------------------------------------------------------------------
             call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, lgt_active, &
                  lgt_n, lgt_sortednumlist, hvy_tmp )
-            call toc( params, "balance_load (comm)", MPI_wtime()-t1 )
+            call toc( "balance_load (comm)", MPI_wtime()-t1 )
 
         case default
             call abort(2009182147, "[balance_load.f90] ERROR: block distribution scheme is unknown")
@@ -385,5 +385,5 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     end select
 
     ! timing
-    call toc( params, "balance_load (TOTAL)", MPI_wtime()-t0 )
+    call toc( "balance_load (TOTAL)", MPI_wtime()-t0 )
 end subroutine balance_load

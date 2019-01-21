@@ -46,7 +46,8 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_activ
     integer(kind=ik)                    :: k, dF, neqn, lgt_id
     ! grid parameter, error variable
     integer(kind=ik)                    :: Bs, g
-
+    !  surface normal
+    integer(kind=2)                    :: surface(3)=0
 
     ! grid parameter
     Bs    = params%Bs
@@ -59,8 +60,13 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_activ
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
+      if ( .not. All(params%periodic_BC) ) then
+        ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+        call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
+      endif
+
       call filter_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
-          hvy_tmp(:,:,:,:,hvy_active(k)))
+          hvy_tmp(:,:,:,:,hvy_active(k)),surface)
     enddo
 
 end subroutine filter_wrapper

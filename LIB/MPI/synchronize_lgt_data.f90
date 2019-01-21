@@ -98,7 +98,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
         proc_lgt_start(k) = sum(proc_lgt_num(1:k-1))! + 1
     enddo
 
-    call toc( params, "synchronize_lgt_data (prep)", MPI_wtime()-t1 )
+    call toc( "synchronize_lgt_data (prep)", MPI_wtime()-t1 )
 
     ! ==========================================================================
     ! The data in lgt_block:
@@ -159,7 +159,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
             my_lgt_block_recv_buffer(1:buffer_size, k) = -1
         enddo
     endif
-    call toc( params, "synchronize_lgt_data (MPI)", MPI_wtime()-t1 )
+    call toc( "synchronize_lgt_data (MPI)", MPI_wtime()-t1 )
 
     ! we need to delete the old lgt_block array to avoid any rotting corpses somewhere.
     ! it is a little tricky to see why this is the case, but we found it to be necessary.
@@ -186,7 +186,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
             end if
         end if
     end do
-    call toc( params, "synchronize_lgt_data (post)", MPI_wtime()-t1 )
+    call toc( "synchronize_lgt_data (post)", MPI_wtime()-t1 )
 
-    call toc( params, "synchronize_lgt_data (TOTAL)", MPI_wtime()-t0 )
+    call toc( "synchronize_lgt_data (TOTAL)", MPI_wtime()-t0 )
 end subroutine

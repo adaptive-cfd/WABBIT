@@ -60,12 +60,12 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
 
     ! reset refinement status to "stay", unless its status is +11. This special
     ! status indicates that the block is on Jmax and has not been interpolated.
-    ! NOTE: resetting the refinement status is in fact not necessary.
-    do k = 1, lgt_n
-        if (lgt_block( lgt_active(k), Jmax+idx_refine_sts ) /= 11) then
-            lgt_block( lgt_active(k), Jmax+idx_refine_sts ) = 0
-        endif
-    enddo
+    ! resetting the refinement status is in fact not necessary.
+    !do k = 1, lgt_n
+    !    if (lgt_block( lgt_active(k), Jmax+idx_refine_sts ) /= 11) then
+    !        lgt_block( lgt_active(k), Jmax+idx_refine_sts ) = 0
+    !    endif
+    !enddo
 
 
     !> (a) loop over the blocks and set their refinement status.

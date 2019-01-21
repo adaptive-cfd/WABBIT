@@ -49,7 +49,7 @@ subroutine mask_post(params)
     ! have the pysics module read their own parameters
     call init_physics_modules( params, fname_ini )
     ! initalize debugging ( this is mainly time measurements )
-    call allocate_init_debugging( params )
+    call allocate_init_timing( params )
 
 
     ! get some parameters from one of the files (they should be the same in all of them)

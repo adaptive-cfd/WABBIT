@@ -498,7 +498,7 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3) !< spacing and origin of a block
   !-----------------------------------------------------------------------
 
-  integer(kind=ik) :: ix,iy,iz,i,dF,d !loop variables
+  integer(kind=ik) :: ix,iy,iz,dF,i,d !loop variables
   real(kind=rk)    :: r_th, r, c_stencil(4)
   real(kind=rk)    :: block_old(size(work_array,1), size(work_array,2), size(work_array,3), N_dF)
   integer(kind=ik),parameter :: stencil_size=3, SHIFT(7)=(/-3, -2, -1, 0, 1, 2, 3/),DIM=2
@@ -521,11 +521,16 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   detector_method = filter%detector_method ! "p", "divU"
   sigma_method    = filter%sigma_switch ! "abs", "tanh"
 
-
   c_stencil = (/ -c2, -c1, c1, c2 /);
-  block_old = work_array(:,:,:,1:N_dF)
-  call convert2format( block_old    ,'conservative',&
-  work_array(:,:,:,1:N_dF)  ,'pure_variables')
+
+  ! copy the non filtert data work_array to block_old
+  do dF=1,N_dF
+      do iy = 1, Bs+2*g, 1
+         do ix = 1, Bs+2*g, 1
+              block_old(ix,iy,1,df) = work_array(ix,iy,1,dF)
+          end do
+      end do
+  end do
   call convert_statevector(u,'pure_variables')
 
   gamma_=params_ns%gamma_
@@ -567,14 +572,13 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
           ! compute the filtering strength
           sigma(i,d) = 1.0_rk - dtanh( r_th/r/0.7_rk )
         enddo
-        ! save the filtering strength
+
         i=4 ! SHIFT(4)=0 (no shift)
-        work_array(ix,iy,iz,N_dF+d)=sigma(i,d)
+        work_array(ix,iy,iz,N_dF+d)=sigma(i,d) ! save the filtering strength to save it to file
       enddo ! loop over dimensions
 
       do dF= 1, N_dF
-        work_array(ix,iy,iz,dF) = block_old(ix,iy,iz,dF)
-        work_array(ix,iy,iz,dF) = work_array(ix,iy,iz ,dF) &
+        work_array(ix,iy,iz,dF) = block_old(ix,iy,iz,dF) &
         !filtering in x
         - ( 0.5_rk * (sigma(i+1,1) + sigma(i,1)) * sum( c_stencil * block_old(ix-1:ix+2,iy,iz,dF) ) &
         -   0.5_rk * (sigma(i-1,1) + sigma(i,1)) * sum( c_stencil * block_old(ix-2:ix+1,iy,iz,dF) ) ) &

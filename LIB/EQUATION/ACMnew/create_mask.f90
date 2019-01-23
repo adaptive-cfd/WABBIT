@@ -47,8 +47,8 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
             ! the grid_qty already contains the body mask + fixed obstacles. Note that the insect
             ! module needs to add the wings to this existing data, not the other way around (i.e. not
             ! adding the body afterwards)
-            mask = grid_qty(:,:,:,1)
-            mask_color = int( grid_qty(:,:,:,5), kind=2 )
+            mask = grid_qty(:,:,:,IDX_MASK)
+            mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
 
             ! add the wings to the existing mask. note: the "old" wings from the previous
             ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)

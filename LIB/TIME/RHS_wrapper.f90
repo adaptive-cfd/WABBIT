@@ -27,7 +27,7 @@
 !
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_grid, lgt_block, hvy_active, hvy_n, first_substep)
+subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, hvy_active, hvy_n, first_substep)
 
 !----------------------------------------------------------------------------------------------
 ! modules
@@ -45,8 +45,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_grid, lgt_block, hv
     real(kind=rk), intent(inout)        :: hvy_rhs(:, :, :, :, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_state(:, :, :, :, :)
-    !> hvy_grid are qtys that depend on grid and not explicitly on time
-    real(kind=rk), intent(inout)        :: hvy_grid(:, :, :, :, :)
+    !> hvy_gridQ are qtys that depend on grid and not explicitly on time
+    real(kind=rk), intent(inout)        :: hvy_gridQ(:, :, :, :, :)
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> list of active blocks (heavy data)
@@ -91,7 +91,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_grid, lgt_block, hv
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
     call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:,hvy_active(1)), g, x0, dx, &
-        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_grid(:,:,:,:,hvy_active(1)), "init_stage", &
+        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_gridQ(:,:,:,:,hvy_active(1)), "init_stage", &
         first_substep=first_substep2 )
 
     !-------------------------------------------------------------------------
@@ -109,7 +109,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_grid, lgt_block, hv
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
       call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
-          hvy_rhs(:,:,:,:,hvy_active(k)), hvy_grid(:,:,:,:,hvy_active(k)), &
+          hvy_rhs(:,:,:,:,hvy_active(k)), hvy_gridQ(:,:,:,:,hvy_active(k)), &
           "integral_stage", first_substep=first_substep2 )
     enddo
 
@@ -119,7 +119,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_grid, lgt_block, hv
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
     call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, &
-        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_grid(:,:,:,:,hvy_active(1)), &
+        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_gridQ(:,:,:,:,hvy_active(1)), &
         "post_stage", first_substep=first_substep2 )
 
 
@@ -143,7 +143,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_grid, lgt_block, hv
       ! endif
 
       call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
-           x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), hvy_grid(:,:,:,:, hvy_active(k)), "local_stage", &
+           x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), hvy_gridQ(:,:,:,:, hvy_active(k)), "local_stage", &
            boundary_flag=surface, first_substep=first_substep2 )
     enddo
 

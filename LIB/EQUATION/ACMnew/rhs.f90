@@ -417,7 +417,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
             do ix = g+1, Bs+g
                 ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                 ! which is different from the penalization term, which acts only on ux,uy and not p
-                spo = grid_qty(ix,iy,6) * eps_inv
+                spo = grid_qty(ix,iy,IDX_SPONGE) * eps_inv
 
                 rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
                 rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
@@ -675,7 +675,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
                     ! NOTE: sponge mask set in grid_qty
-                    spo = grid_qty(ix,iy,iz,6) * eps_inv
+                    spo = grid_qty(ix,iy,iz,IDX_SPONGE) * eps_inv
 
                     rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * spo
                     rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * spo

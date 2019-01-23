@@ -88,11 +88,9 @@ module module_acm
   ! all parameters for insects go here:
   type(diptera), save :: insect
 
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
+  ! two things can be stored in the grid_qtys: the sponge and the mask.
+  ! we therefore need to know where to store what (fixed indices do not work)
+  integer(kind=ik) :: IDX_MASK=-1, IDX_USX=-1, IDX_USY=-1, IDX_USZ=-1 , IDX_COLOR=-1, IDX_SPONGE=-1
 
 contains
 
@@ -109,16 +107,18 @@ contains
   ! main level wrapper routine to read parameters in the physics module. It reads
   ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   ! the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_ACM( filename )
+  subroutine READ_PARAMETERS_ACM( filename, n_gridQ )
     implicit none
 
     character(len=*), intent(in) :: filename
     integer(kind=ik) :: mpicode, nx_max
     real(kind=rk) :: dx_min, dt_min
+    integer(kind=ik), intent(out) :: n_gridQ
 
     ! inifile structure
     type(inifile) :: FILE
 
+    n_gridQ = 0
 
     ! we still need to know about mpirank and mpisize, occasionally
     call MPI_COMM_SIZE (WABBIT_COMM, params_acm%mpisize, mpicode)
@@ -196,6 +196,23 @@ contains
     nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
     dt_min = params_acm%CFL*dx_min/params_acm%c_0
 
+    ! two things can be stored in the grid_qtys: the sponge and the mask.
+    ! we therefore need to know where to store what (fixed indices do not work)
+    if (params_acm%penalization .and. params_acm%geometry=="Insect") then
+        n_gridQ = n_gridQ + 5
+        IDX_MASK  = n_gridQ - 4
+        IDX_USX   = n_gridQ - 3
+        IDX_USY   = n_gridQ - 2
+        IDX_USZ   = n_gridQ - 1
+        IDX_COLOR = n_gridQ
+    endif
+
+    if (params_acm%use_sponge) then
+        n_gridQ = n_gridQ + 1
+        IDX_SPONGE = n_gridQ
+    endif
+
+
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
       write(*,*) "Some information:"
@@ -203,6 +220,7 @@ contains
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+      write(*,'("n_gridQ=",i1)') n_gridQ
       write(*,'(80("<"))')
     endif
 

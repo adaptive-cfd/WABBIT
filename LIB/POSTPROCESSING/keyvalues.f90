@@ -64,6 +64,7 @@ subroutine keyvalues(fname, params)
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
+    params%dim = dim    
     if (dim==3) then
         params%threeD_case = .true.
     else

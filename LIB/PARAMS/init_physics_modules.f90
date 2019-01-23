@@ -23,7 +23,7 @@
 !
 !**********************************************************************************************
 
-subroutine init_physics_modules( params, filename )
+subroutine init_physics_modules( params, filename, n_gridQ)
   ! of course, we have to load all available physics modules here.
   use module_physics_metamodule
   ! NOTE: this is *NOT* a part of module_params.f90 in order to avoid circulars in the makefile
@@ -33,6 +33,8 @@ subroutine init_physics_modules( params, filename )
   implicit none
 
   type (type_params), intent(in) :: params
+  ! number of grid-dependent (and not time-dependend qtys) is decided by the physics modules
+  integer(kind=ik), intent(out) :: n_gridQ
   character(len=*), intent(in) :: filename
 
   if (params%rank==0) then
@@ -42,6 +44,6 @@ subroutine init_physics_modules( params, filename )
   endif
 
   ! call the initialization routines for the physics module that is in use
-  call READ_PARAMETERS_meta( params%physics_type, filename )
+  call READ_PARAMETERS_meta( params%physics_type, filename, n_gridQ )
 
 end subroutine

@@ -319,7 +319,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
     ! and thus cycle from 1:1
     data_bounds(:,:) = 1
 
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         !---3D------3D------3D------3D------3D------3D------3D------3D---
         select case(neighborhood)
             ! '__1/___'

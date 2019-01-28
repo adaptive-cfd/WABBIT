@@ -110,7 +110,6 @@ module module_params
         real(kind=rk)     :: domain_size(3)=0.0_rk
 
         ! use third dimension
-        logical           :: threeD_case=.false.
         integer(kind=ik)  :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------

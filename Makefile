@@ -233,7 +233,7 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o \
-	set_initial_grid.f90 new_block_heavy.f90 \
+	set_initial_grid.f90 \
 	set_inicond_blocks.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

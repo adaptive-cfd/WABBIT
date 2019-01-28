@@ -54,11 +54,6 @@ subroutine mask_post(params)
 
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(fname_grid, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
-    if (params%dim==3) then
-        params%threeD_case = .true.
-    else
-        params%threeD_case = .false.
-    end if
 
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
     !> \todo change that for 3d case

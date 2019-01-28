@@ -49,8 +49,4 @@ contains
     include "set_initial_grid.f90"
     include "set_inicond_blocks.f90"
     include "get_inicond_from_file.f90"
-
-    ! subroutine to write new heavy block data
-    include "new_block_heavy.f90"
-
 end module module_initialization

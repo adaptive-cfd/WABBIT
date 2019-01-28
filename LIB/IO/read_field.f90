@@ -65,7 +65,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
     call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
 
         ! tell the hdf5 wrapper what part of the global [Bs x Bs x Bs x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
@@ -91,7 +91,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     end if
 
     ! actual reading of file
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         ! 3D data case
         call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, &
             hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,1:hvy_n))
@@ -105,7 +105,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     call close_file_hdf5(file_id)
     ! check if field contains NaNs
     do k=1,hvy_n
-        if ( params%threeD_case ) then
+        if ( params%dim == 3 ) then
             if (block_contains_NaN(hvy_block(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,dF,k))) &
                 call abort(0200, "ERROR: Saved field "//get_dsetname(fname)//" contains NaNs!! I don't want to read from this file!")
         else

@@ -47,7 +47,7 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     logical :: error = .false., error2 = .false.
     integer(kind=ik ) :: mpierror
 
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         ! 3D:
         call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
     else

@@ -158,10 +158,9 @@ subroutine init_ghost_nodes( params )
         ! max neighbor number: 2D = 12, 3D = 56
         ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
         ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
-        if ( params%threeD_case ) then
+        dim = params%dim
+        if ( params%dim == 3 ) then
             !---3d---3d---
-            ! space dimensions: used in the static arrays as index
-            dim = 3
             ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
             ! at most, we can have 56 neighbors ACTIVE per block
             buffer_N_int = number_blocks * 56 * 5
@@ -171,8 +170,6 @@ subroutine init_ghost_nodes( params )
             allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
         else
             !---2d---2d---
-            ! space dimensions: used in the static arrays as index
-            dim = 2
             ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
             ! at most, we can have 12 neighbors ACTIVE per block
             buffer_N_int = number_blocks * 12 * 5

@@ -198,11 +198,7 @@ end subroutine ini_file_to_params
 
 
     call read_param_mpi(FILE, 'Domain', 'dim', params%dim, 2 )
-    if ( params%dim==2 ) then
-          params%threeD_case = .false.
-    elseif(params%dim==3) then
-          params%threeD_case = .true.
-    else
+    if ( .not.(params%dim==2 .or. params%dim==3) ) then
          call abort(234534,"Hawking: ERROR! The idea of 10 dimensions might sound exciting, &
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")

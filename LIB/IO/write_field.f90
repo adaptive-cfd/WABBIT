@@ -106,8 +106,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! grid parameter
     Bs   = params%Bs
     g    = params%n_ghosts
-    dim  = 2
-    if (params%threeD_case) dim = 3
+    dim  = params%dim
 
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
@@ -145,7 +144,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! fill blocks buffer (we cannot use the bvy_block array as it is not contiguous, i.e.
     ! it may contain holes)
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
 
         ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
         ! array we hold, so that all CPU can write to the same file simultaneously
@@ -180,7 +179,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             call get_block_spacing_origin( params, lgt_id , lgt_block, xx0, ddx )
 
 
-            if ( params%threeD_case ) then
+            if ( params%dim == 3 ) then
                 ! 3D
                 myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
 
@@ -222,7 +221,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     call open_file_hdf5( trim(adjustl(fname)), file_id, .true.)
 
     ! write heavy block data to disk
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         ! 3D data case
         call write_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
         call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2), params%domain_size(3)/))

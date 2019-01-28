@@ -40,7 +40,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
     character(len=*), intent(in)        :: indicator
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, max_blocks, d, ierr
+    integer(kind=ik) :: k, Jmax, max_blocks, ierr
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r
 
@@ -48,12 +48,6 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
 ! variables initialization
 
         Jmax = params%max_treelevel
-        ! set data dimension
-        if ( params%threeD_case ) then
-            d = 3
-        else
-            d = 2
-        endif
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -95,7 +89,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator
           ! at most for Nmax-lgt_n blocks)
           max_blocks = (size(lgt_block,1) - lgt_n ) ! / 4 ! 4: safety
           ! each block flagged for refinement creates (2**d-1) new blocks
-          max_blocks = ( max_blocks / (2**d-1) )
+          max_blocks = ( max_blocks / (2**params%dim-1) )
           ! safety
           max_blocks = max_blocks / 6
 

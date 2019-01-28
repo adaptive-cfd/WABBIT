@@ -74,7 +74,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         !! this should allow to consider only the rotational part, not the divergent one.
 
         thresholding_component = .false.
-        if (params%threeD_case) then
+        if (params%dim == 3) then
             thresholding_component(1:3) = .true.
         else
             thresholding_component(1) = .true.

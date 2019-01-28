@@ -85,7 +85,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! set MPI parameter
     rank = params%rank
 
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         ! 3D:
         neighbor_num = 74
         if (.not.allocated(sisters)) allocate( sisters(8) )

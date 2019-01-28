@@ -64,9 +64,9 @@ subroutine flusi_to_wabbit(params)
         ! read attributes such as number of discretisation points, time, domain size
         call get_attributes_flusi(file_in, nxyz, time, domain)
         if (nxyz(1)/=1) then
-            params%threeD_case = .true.
+            params%dim = 3
         else
-            params%threeD_case = .false.
+            params%dim = 2
         end if
 
         level_tmp = log(dble(nxyz(2))/dble(Bs-1)) / log(2.0_rk)
@@ -85,7 +85,7 @@ subroutine flusi_to_wabbit(params)
         params%Bs = Bs
         params%n_ghosts = 1_ik
         params%order_predictor = 'multiresolution_4th'
-        if (params%threeD_case) then
+        if (params%dim == 3) then
             lgt_n = 8_ik**params%max_treelevel
             params%domain_size(3) = domain(1)
         else
@@ -112,7 +112,7 @@ subroutine flusi_to_wabbit(params)
             call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
             start_x = nint(x0(1)/dx(1))
             start_y = nint(x0(2)/dx(2))
-            if (params%threeD_case) then
+            if (params%dim == 3) then
                 start_z = nint(x0(3)/dx(3))
             else
                 start_z = 0_ik

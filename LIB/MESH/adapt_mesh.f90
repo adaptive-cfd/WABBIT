@@ -70,7 +70,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     lgt_n_old = 0
     iteration = 0
 
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         max_neighbors = 56
     else
         max_neighbors = 12
@@ -116,7 +116,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         t0 = MPI_Wtime()
         if (present(hvy_gridQ) .and. iteration==0) then
             ! note: the grid changes here, so we can use the hvy_grid (which contains masks that do not
-            ! explicitly depend on time) only once 
+            ! explicitly depend on time) only once
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
             hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_gridQ)
         else

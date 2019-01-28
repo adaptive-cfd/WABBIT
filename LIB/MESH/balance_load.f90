@@ -275,7 +275,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     !-----------------------------------------------------------
                     ! Z - curve
                     !-----------------------------------------------------------
-                    if (params%threeD_case) then
+                    if (params%dim == 3) then
                         call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
                     else
                         call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
@@ -285,7 +285,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     !-----------------------------------------------------------
                     ! Hilbert curve
                     !-----------------------------------------------------------
-                    if (params%threeD_case) then
+                    if (params%dim == 3) then
                         ! transfer treecode to hilbertcode
                         call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
                         ! calculate sfc position from hilbertcode

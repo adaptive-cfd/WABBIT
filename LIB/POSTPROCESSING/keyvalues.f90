@@ -64,12 +64,7 @@ subroutine keyvalues(fname, params)
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
-    params%dim = dim    
-    if (dim==3) then
-        params%threeD_case = .true.
-    else
-        params%threeD_case = .false.
-    end if
+    params%dim = dim
     params%Bs = Bs
     params%max_treelevel = tc_length
     params%n_eqn = 1
@@ -97,7 +92,7 @@ subroutine keyvalues(fname, params)
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
     Bs = params%Bs
-    if (params%threeD_case) then
+    if (params%dim == 3) then
         nz = Bs
     else
         nz = 1

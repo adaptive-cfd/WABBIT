@@ -262,6 +262,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+    call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
     call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
 

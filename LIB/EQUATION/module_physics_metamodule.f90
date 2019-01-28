@@ -27,10 +27,57 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
               INICOND_meta, FIELD_NAMES_meta,&
-              STATISTICS_meta, FILTER_meta, UPDATE_GRID_QTYS_meta
+              STATISTICS_meta, FILTER_meta, UPDATE_GRID_QTYS_meta, CREATE_MASK_meta
     !**********************************************************************************************
 
 contains
+
+! this is a public routine to create the mask function for the penalization term
+! not all physics modules use it
+subroutine CREATE_MASK_meta( physics, time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+    implicit none
+    character(len=*), intent(in) :: physics
+    ! grid
+    integer(kind=ik), intent(in) :: Bs, g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(inout) :: mask
+    integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
+    real(kind=rk), dimension(:,:,:,:), optional, intent(in) :: grid_qty
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+
+    select case ( physics )
+    case ('ACM-new')
+        if (size(mask,3)==1) then
+            call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+        else
+            if (present(grid_qty)) then
+                call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+            else
+                call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us)
+            endif
+        endif
+
+    case ('ConvDiff-new')
+        ! not implemented yet (this module does not use penalization)
+        mask = 0.00_rk
+        mask_color = 0
+        us = 0.00_rk
+
+    case ('navier_stokes')
+        ! not implemented yet
+        mask = 0.00_rk
+        mask_color = 0
+        us = 0.00_rk
+
+    case default
+        call abort(1212,'unknown physics...say whaaat?')
+
+    end select
+
+end subroutine
+
 
  !-----------------------------------------------------------------------------
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
@@ -126,7 +173,7 @@ contains
  ! NOTE that as we have way more work arrays than actual state variables (typically
  ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
  !-----------------------------------------------------------------------------
- subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work )
+ subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, grid_qty )
    implicit none
    character(len=*), intent(in) :: physics
 
@@ -148,10 +195,11 @@ contains
 
    ! output in work array.
    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+   real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
 
    select case(physics)
    case ('ACM-new')
-     call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
+     call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
 
    case ('ConvDiff-new')
      call PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )

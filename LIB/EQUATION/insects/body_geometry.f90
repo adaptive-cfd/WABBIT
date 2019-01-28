@@ -1,53 +1,119 @@
-subroutine draw_body( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
     implicit none
 
     type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(in)    :: xx0(1:3), ddx(1:3)
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
+    real(kind=rk)                 :: M_body(1:3,1:3)
+    integer(kind=2)               :: color_body
+    integer                       :: ix, iy, iz
+    real(kind=rk), dimension(1:3) :: x_glob, x_body, v_tmp
+    logical, intent(in) :: delete
 
+    ! 28/01/2019: Thomas. Discovered that this was done block based, i.e. the smoothing layer
+    ! had different thickness, if some blocks happened to be at different levels (and still carry
+    ! a part of the smoothing layer.) I don't know if that made sense, because the layer shrinks/expands then
+    ! and because it might be discontinous. Both options are included now, default is "as before"
+    ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
+    ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
+    ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
+    if (Insect%smoothing_thickness=="local" .or. .not. grid_time_dependent) then
+        Insect%smooth = 1.0d0*maxval(ddx)
+        Insect%safety = 3.5d0*Insect%smooth
+    endif
+
+    color_body = Insect%color_body
+    M_body = Insect%M_body
+
+    if (delete) then
+        where (mask_color==Insect%color_body)
+            mask = 0.00_rk
+            us(:,:,:,1) = 0.00_rk
+            us(:,:,:,2) = 0.00_rk
+            us(:,:,:,3) = 0.00_rk
+            mask_color = 0
+        end where
+    endif
+
+    !---------------------------------------------------------------------------
+    ! stage I:
+    !---------------------------------------------------------------------------
+    ! create the body mask, not the solid velocity field.
     select case (Insect%BodyType)
     case ("nobody")
         return
     case ("suzuki_thin_rod")
-        call draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
     case ("jerry","Jerry")
-        call draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     case ("hawkmoth","Hawkmoth")
-        call draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
     case ("particle")
-        call draw_body_particle( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
     case ("platicle")
-        call draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     case ("coin")
-        call draw_body_coin( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     case ("sphere","SPHERE","Sphere")
-        call draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect)
     case ("drosophila_maeda","drosophila_slim")
-        call draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     case ("bumblebee")
-        call draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     case ("mosquito_iams")
-        call draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     case ("pyramid")
-        call draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect)
     case ("cone")
-        call draw_body_cone( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
     case ("birch_seed")
-        call draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+        call draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect)
     case default
-        call abort(10623, "Insect::draw_body::Insect%BodyType unknown..."//trim(adjustl(Insect%BodyType)))
+        call abort(10623, "Insect::draw_insect_body::Insect%BodyType unknown..."//trim(adjustl(Insect%BodyType)))
     end select
+
+    !---------------------------------------------------------------------------
+    ! stage II:
+    !---------------------------------------------------------------------------
+    ! if the body does not move, we can skip the creation of us
+    if (Insect%body_moves == "no") return
+
+    ! add the solid velocity field to the body mask (i.e. create us)
+    do iz = 0, size(mask,3)-1
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+        do iy = 0, size(mask,2)-1
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+            do ix = 0, size(mask,1)-1
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+
+                ! skip all parts that do not belong to the body (ie they have a different color)
+                if ( mask_color(ix,iy,iz) == Insect%color_body .and. mask(ix,iy,iz) > 0.d0 ) then
+
+                    if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                    x_body = matmul(Insect%M_body, x_glob)
+
+                    ! add solid body rotation to the translational velocity field. Note
+                    ! that rot_body_b and x_body are in the body reference frame
+                    v_tmp(1) = v_tmp(1) + Insect%rot_body_b(2)*x_body(3)-Insect%rot_body_b(3)*x_body(2)
+                    v_tmp(2) = v_tmp(2) + Insect%rot_body_b(3)*x_body(1)-Insect%rot_body_b(1)*x_body(3)
+                    v_tmp(3) = v_tmp(3) + Insect%rot_body_b(1)*x_body(2)-Insect%rot_body_b(2)*x_body(1)
+
+                    ! the body motion is transformed to the global system, translation is added
+                    us(ix,iy,iz,1:3) = matmul( Insect%M_body_inv, v_tmp ) + Insect%vc_body_g
+                endif
+            enddo
+        enddo
+    enddo
+
 end subroutine
 
 
 !-------------------------------------------------------------------------------
 
 ! Bumblebee body, BB1 in Dudley & Ellington JEB 1990
-subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -55,8 +121,6 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     integer :: ix,iy,iz,j
     real(kind=rk) :: x,y,z,s,s1,a_body,R,R0,R_tmp,x1
@@ -66,6 +130,11 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect, color_bo
     real(kind=rk) :: xl1(5),yl1(5),zl1(5),rl1(4),xl2(5),yl2(5),zl2(5),rl2(4),&
     xl3(5),yl3(5),zl3(5),rl3(4),xf(2),yf(2),zf(2),rf,xan(2),yan(2),zan(2),ran,&
     xmin_bbox,xmax_bbox,ymin_bbox,ymax_bbox,zmin_bbox,zmax_bbox
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     !-----------------------------------------------------------------------------
     ! Body
@@ -342,7 +411,7 @@ end subroutine draw_body_bumblebee
 !------------------------------------------------------------------------------
 
 ! Body adapted from Maeda & Liu. It assumes Insect%x_head=0.0
-subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -350,14 +419,17 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect, c
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     integer :: ix,iy,iz
     real(kind=rk) :: x,y,z,s,s1, a_body, R,R0,R_tmp,x1, a_body0
     real(kind=rk) :: x_glob(1:3),x_body(1:3),x_head(1:3)
     real(kind=rk) :: rbc,thbc1,thbc2,x0bc,z0bc,xcs,zcs
     real(kind=rk) :: xx_head,zz_head,dx_head,dz_head,a_head
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
 
     !-----------------------------------------------------------------------------
@@ -498,7 +570,7 @@ end subroutine draw_body_drosophila_maeda
 
 
 !-------------------------------------------------------------------------------
-subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -506,12 +578,15 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect, color_body, 
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a_body
     real(kind=rk) :: x_body(1:3), x_glob(1:3), x_head(1:3), x_eye(1:3)
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
     integer :: ix,iy,iz
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     ! the following are coordinates of specific points on the insect's body, for
     ! example the position of the head, its size etc. In older versions, these
@@ -583,7 +658,7 @@ end subroutine draw_body_jerry
 
 
 ! a body that is just a sphere of unit diameter. used for particles.
-subroutine draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -591,12 +666,15 @@ subroutine draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect, color_body,
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: x,R0,R,R_tmp,x_tmp,a_body
     real(kind=rk) :: corner
     real(kind=rk) :: x_body(1:3), x_glob(1:3), x_head(1:3), x_eye(1:3)
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     x_head = Insect%xc_body_g
     call drawsphere( x_head, 0.50d0, xx0, ddx, mask, mask_color, us, Insect, color_body )
@@ -672,7 +750,7 @@ end subroutine
 
 
 !-------------------------------------------------------------------------------
-subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -680,12 +758,15 @@ subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect, color_bod
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a_body, projected_length
     real(kind=rk) :: x_body(1:3), x_glob(1:3), x_part(1:3), n_part(1:3)
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     ! NOTE HACK
     ! this routine is deprecated, its functionality is in the STL and pointcloud ideas.
@@ -867,7 +948,7 @@ end subroutine draw_body_particle
 ! size
 ! Insect%L_span x Insect%L_body x Insect%WingThickness
 !-------------------------------------------------------------------------------
-subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -875,12 +956,15 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect, color_bod
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a_body, projected_length
     real(kind=rk) :: x_body(1:3), x(1:3), xc(1:3), n_part(1:3)
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     do iz = 0, size(mask,3)-1
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
@@ -921,7 +1005,7 @@ end subroutine draw_body_platicle
 ! flapping motion in free flight. Therefore, the insect module contains nowadays
 ! also body shapes that are not related to insects. This one is a flat COIN (D=1)
 !-------------------------------------------------------------------------------
-subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -929,12 +1013,15 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect, color_body, M
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a_body, projected_length
     real(kind=rk) :: x_body(1:3), x(1:3), xc(1:3), n_part(1:3)
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     do iz = 0, size(mask,3)-1
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
@@ -971,7 +1058,7 @@ end subroutine draw_body_coin
 !-------------------------------------------------------------------------------
 ! Thin rod-like body used in Suzuki et al. JFM 2015 to model a butterfly
 !-------------------------------------------------------------------------------
-subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -979,12 +1066,15 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect, color_b
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a,RR0
     real(kind=rk) :: x_body(1:3), x_glob(1:3), x_head(1:3), x_eye(1:3)
     integer :: ix,iy,iz
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     R0 = ( 0.5d0*Insect%WingThickness + Insect%Safety )**2
     RR0 = 0.5d0*Insect%WingThickness
@@ -1018,7 +1108,7 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect, color_b
 end subroutine draw_suzuki_thin_rod
 
 !-------------------------------------------------------------------------------
-subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -1026,13 +1116,17 @@ subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect, color_bod
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in) :: M_body(1:3,1:3)
+
 
     real(kind=rk) :: R0,R,a_body
     real(kind=rk) :: x_body(1:3), x_glob(1:3), x_head(1:3), x_eye(1:3), x_eye_r(1:3), x_eye_l(1:3)
     real(kind=rk), dimension(1:3) :: x1,x2
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
     integer :: ix,iy,iz
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     Insect%R_head = 0.125d0
     Insect%R_eye = 0.0625d0
@@ -1114,7 +1208,7 @@ end subroutine draw_body_hawkmoth
 ! The mosquito is based on the simplified model presented in
 ! [1] Iams "Flight stability of mosquitos: A reduced model" SIAM J. Appl. Math. 74(5) 1535--1550 (2014)
 !-------------------------------------------------------------------------------
-subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -1122,14 +1216,17 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect, colo
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a_body, a,b,c, alpha, Ralpha(1:3,1:3)
     real(kind=rk) :: x_body(1:3), x_glob(1:3), x_head(1:3), x_eye(1:3), x_eye_r(1:3), x_eye_l(1:3)
     real(kind=rk) :: x0_head(1:3), x0_abdomen(1:3), x0_thorax(1:3)
     real(kind=rk), dimension(1:3) :: x1,x2
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
     integer :: ix,iy,iz
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     ! The mosquito consists of three parts: head, thorax and abdomen (sphere, ellipsoid, ellipsoid)
     ! positions are measured from fig. 1 in [1], we computed also the center of gravity
@@ -1247,7 +1344,7 @@ end subroutine draw_body_mosquito_iams
 ! The SIDELENGTH is INsect%b_body
 ! This is the conical version (so a pyramid with circular base area)
 !-------------------------------------------------------------------------------
-subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -1255,13 +1352,16 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect, color_body, M
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a,H, alpha, thick
     real(kind=rk) :: x_body(1:3), x_glob(1:3)
     integer :: ix,iy,iz
     logical, save :: informed = .false.
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     ! a is the sidelength of the pyramid
     a = Insect%b_body
@@ -1316,7 +1416,7 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect, color_body, M
 end subroutine draw_body_cone
 
 
-subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -1324,13 +1424,16 @@ subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect, color_body, 
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a,H, alpha, thick, a_body
     real(kind=rk) :: x_body(1:3), x_glob(1:3), Id(1:3,1:3)
     integer :: ix,iy,iz
     logical, save :: informed = .false.
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     ! if (root ) then
     !    if (informed .eqv. .false. ) then
@@ -1390,7 +1493,7 @@ end subroutine draw_birch_seed
 ! The HEIGHT is Insect%L_body
 ! The SIDELENGTH is INsect%b_body
 !-------------------------------------------------------------------------------
-subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect, color_body, M_body)
+subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
     type(diptera),intent(inout) :: Insect
@@ -1398,13 +1501,16 @@ subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect, color_body
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    integer(kind=2),intent(in) :: color_body
-    real(kind=rk),intent(in)::M_body(1:3,1:3)
 
     real(kind=rk) :: R0,R,a,H,b, alpha, thick, di(1:4)
     real(kind=rk) :: x_body(1:3), x_glob(1:3)
     integer :: ix,iy,iz
     logical, save :: informed = .false.
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
 
     ! a is the sidelength of the pyramid
     a = Insect%b_body

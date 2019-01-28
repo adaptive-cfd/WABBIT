@@ -226,7 +226,8 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
+        hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
 
     end if
 
@@ -296,7 +297,8 @@ program main
             call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
 
             if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
+                hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -417,7 +419,7 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_gridQ )
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
@@ -433,7 +435,7 @@ program main
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
             call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-            lgt_n, hvy_n, hvy_tmp, hvy_active )
+            lgt_n, hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
 
             output_time = time
             params%next_write_time = params%next_write_time + params%write_time
@@ -508,7 +510,8 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, &
+        hvy_tmp, hvy_active, hvy_gridQ )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements

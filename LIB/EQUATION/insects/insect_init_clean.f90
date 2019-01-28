@@ -1,4 +1,5 @@
-subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box_domain, viscosity, dx_reference)
+subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box_domain, &
+    viscosity, dx_reference)
   implicit none
   real(kind=rk), intent(in) :: time
   character(len=*), intent(in) :: fname_ini
@@ -159,6 +160,17 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   call read_param_mpi(PARAMS,"Insects","Jxy",Insect%Jxy,0.d0)
 
   call read_param_mpi(PARAMS,"Insects","startup_conditioner",Insect%startup_conditioner,"no")
+
+  ! 28/01/2019: Thomas. Discovered that this was done block based, i.e. the smoothing layer
+  ! had different thickness, if some blocks happened to be at different levels (and still carry
+  ! a part of the smoothing layer.) I don't know if that made sense, because the layer shrinks/expands then
+  ! and because it might be discontinous. Both options are included now, default is "as before"
+  ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
+  ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
+  ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
+  call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
+  Insect%smooth = 1.0d0*dx_reference
+  Insect%safety = 3.5d0*Insect%smooth
 
   ! position vector of the head
   call read_param_mpi(PARAMS,"Insects","x_head",&

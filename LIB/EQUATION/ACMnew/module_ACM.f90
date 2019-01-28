@@ -40,7 +40,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM, create_mask_2D, create_mask_3D
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -221,6 +221,8 @@ contains
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
       write(*,'("n_gridQ=",i1)') n_gridQ
+      write(*,'("IDX_MASK=",i1," IDX_COLOR=",i1," IDX_USX=",i1," IDX_USY=",i1," IDX_USZ=",i1)')  &
+      IDX_MASK, IDX_COLOR, IDX_USX, IDX_USY, IDX_USZ
       write(*,'(80("<"))')
     endif
 

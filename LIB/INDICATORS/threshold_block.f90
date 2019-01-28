@@ -39,18 +39,18 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    !> it can be useful not to consider all components for threhsolding here.
+    !> it can be useful not to consider all components for thresholding here.
     !! e.g. to work only on the pressure or vorticity.
     logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(inout)        :: norm(1:params%n_eqn)
+    real(kind=rk), intent(inout)        :: norm( size(block_data,4) )
 
     ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
     ! detail
-    real(kind=rk)                       :: detail(1:params%n_eqn)
+    real(kind=rk)                       :: detail( size(block_data,4) )
     ! grid parameter
     integer(kind=ik)                    :: Bs, g
 
@@ -68,10 +68,10 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
 
 
     ! reset detail
-    detail = 0.0_rk
+    detail = -1.0_rk
 
     ! loop over all datafields
-    do dF = 1, params%n_eqn
+    do dF = 1, size(block_data,4)
         ! is this component of the block used for thresholding or not?
         if (thresholding_component(dF)) then
             if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
@@ -134,6 +134,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     if ( maxval(detail) < params%eps) then
         ! coarsen block, -1
         refinement_status = -1
+    else
+        refinement_status = 0
     end if
 
     ! timings

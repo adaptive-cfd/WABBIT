@@ -1,3 +1,101 @@
+subroutine draw_insect_wings(xx0, ddx, mask, mask_color, us, Insect, delete)
+  implicit none
+
+  type(diptera),intent(inout) :: Insect
+  real(kind=rk),intent(in)    :: xx0(1:3), ddx(1:3)
+  real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+  real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+  integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+  logical, intent(in) :: delete
+
+  integer :: ix, iy, iz
+  real(kind=rk), dimension(1:3) :: x_glob, x_body, v_tmp
+  integer(kind=2) :: c
+
+  if (delete) then
+      where (mask_color==Insect%color_r .and. mask_color==Insect%color_l)
+          mask = 0.00_rk
+          us(:,:,:,1) = 0.00_rk
+          us(:,:,:,2) = 0.00_rk
+          us(:,:,:,3) = 0.00_rk
+          mask_color = 0
+      end where
+  endif
+
+  ! 28/01/2019: Thomas. Discovered that this was done block based, i.e. the smoothing layer
+  ! had different thickness, if some blocks happened to be at different levels (and still carry
+  ! a part of the smoothing layer.) I don't know if that made sense, because the layer shrinks/expands then
+  ! and because it might be discontinous. Both options are included now, default is "as before"
+  ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
+  ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
+  ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
+  if (Insect%smoothing_thickness=="local" .or. .not. grid_time_dependent) then
+      Insect%smooth = 1.0d0*maxval(ddx)
+      Insect%safety = 3.5d0*Insect%smooth
+  endif
+
+  !-----------------------------------------------------------------------------
+  ! Stage I: mask + us field in wing system
+  !-----------------------------------------------------------------------------
+  if (Insect%RightWing == "yes") then
+      call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, &
+      Insect%M_body, Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
+  endif
+
+  if (Insect%LeftWing == "yes") then
+      call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, &
+      Insect%M_body, Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+  endif
+
+  !-----------------------------------------------------------------------------
+  ! stage II: add body motion to wing and bring us to global system
+  !-----------------------------------------------------------------------------
+  ! Add solid body rotation (i.e. the velocity field that originates
+  ! from the body rotation and translation). Until now, the wing velocities
+  ! were the only ones set plus they are in the body reference frame
+  do iz = 0, size(mask,3)-1
+      x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+      do iy = 0, size(mask,2)-1
+          x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+          do ix = 0, size(mask,1)-1
+              x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+
+              c = mask_color(ix,iy,iz)
+              ! skip all parts that do not belong to the wings (ie they have a different color)
+              if (c==Insect%color_l .or. c==Insect%color_r) then
+
+                  if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                  x_body = matmul(Insect%M_body, x_glob)
+
+                  ! add solid body rotation in the body-reference frame, if color
+                  ! indicates that this part of the mask belongs to the wings
+                  if (mask(ix,iy,iz) > 0.d0) then
+
+                      ! translational part. we compute the rotational part in the body
+                      ! reference frame, therefore, we must transform the body translation
+                      ! velocity Insect%vc (which is in global coordinates) to the body frame
+                      v_tmp = matmul(Insect%M_body, Insect%vc_body_g)
+
+                      ! add solid body rotation to the translational velocity field. Note
+                      ! that rot_body_b and x_body are in the body reference frame
+                      v_tmp(1) = v_tmp(1) + Insect%rot_body_b(2)*x_body(3)-Insect%rot_body_b(3)*x_body(2)
+                      v_tmp(2) = v_tmp(2) + Insect%rot_body_b(3)*x_body(1)-Insect%rot_body_b(1)*x_body(3)
+                      v_tmp(3) = v_tmp(3) + Insect%rot_body_b(1)*x_body(2)-Insect%rot_body_b(2)*x_body(1)
+
+                      ! the body motion is added to the wing motion, which is already in us
+                      ! and they are also in the body refrence frame. However, us has to be
+                      ! in the global reference frame, so M_body_inverse is applied
+                      us(ix,iy,iz,1:3) = matmul( Insect%M_body_inv, us(ix,iy,iz,1:3)+v_tmp )
+                  endif
+              endif
+          enddo
+      enddo
+  enddo
+
+end subroutine
+
+
+
 ! Wing wrapper for different wing shapes
 subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,&
     M_wing, x_pivot_b, rot_rel_wing_w)
@@ -9,7 +107,8 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
   real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
   integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
   integer(kind=2),intent(in) :: color_wing
-  real(kind=rk),intent(in)::M_body(1:3,1:3),M_wing(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
+  real(kind=rk), intent(in)::M_body(1:3,1:3),M_wing(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
+
 
   select case(Insect%WingShape)
   case ("pointcloud")

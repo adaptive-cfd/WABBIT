@@ -42,16 +42,19 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:), div(:,:,:)
+    integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     ! compute the size of blocks
     Bs = size(u,1) - 2*g
 
     if (params_acm%dim==3) then
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
         if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
         if (.not. allocated(div)) allocate(div(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
         if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
         dV = dx(1)*dx(2)*dx(3)
     else
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
         if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
         if (.not. allocated(div)) allocate(div(1:Bs+2*g, 1:Bs+2*g, 1))
         if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
@@ -93,7 +96,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
 
         !-------------------------------------------------------------------------
         ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
-        ! we compute the error w.r.t. this solution heres
+        ! we compute the error w.r.t. this solution here
         if (params_acm%forcing_type(1) .eq. "taylor_green") then
             do iy = g+1,Bs+g
                 do ix = g+1, Bs+g
@@ -166,7 +169,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             enddo
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            call create_mask_3D( time, x0, dx, Bs, g, mask, us )
+            call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us )
             eps_inv = 1.0_rk / params_acm%C_eta
 
             ! compute divergence on this block

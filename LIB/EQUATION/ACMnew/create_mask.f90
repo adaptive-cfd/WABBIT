@@ -3,19 +3,24 @@
 !   - grid_qty is given: we possibly use a part of grid_qty as time-independent mask function
 !   - grid_qty is not given: all masks are created, incl non-moving parts
 !-------------------------------------------------------------------------------
-subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
+subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
     implicit none
 
     ! grid
     integer(kind=ik), intent(in) :: Bs, g
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(inout) :: mask
+    integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
     real(kind=rk), dimension(:,:,:,:), optional, intent(in) :: grid_qty
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+    !> mask term for every grid point in this block
+    integer(kind=2), allocatable, save :: mask_color2(:,:,:)
+    !> velocity of the solid
+    real(kind=rk), allocatable, save :: us2(:,:,:,:), mask2(:,:,:)
 
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
+
 
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
@@ -31,33 +36,40 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
     endif
 
 
-    mask = 0.0_rk
-    us = 0.0_rk
-
 
     select case (params_acm%geometry)
     case ('Insect')
         !-----------------------------------------------------------------------
         ! INSECT MODULE
         !-----------------------------------------------------------------------
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g,1:Bs+2*g,1:Bs+2*g))
-
         ! case I: the body is fixed and alread created on "grid_qty"
         if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
             ! the grid_qty already contains the body mask + fixed obstacles. Note that the insect
             ! module needs to add the wings to this existing data, not the other way around (i.e. not
             ! adding the body afterwards)
             mask = grid_qty(:,:,:,IDX_MASK)
+            us = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
             mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
 
             ! add the wings to the existing mask. note: the "old" wings from the previous
             ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)
             ! Hence, here, you do not have to delete again.
-            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
-                mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3), &
-                with_body = .false., with_wings = .true., delete_before_drawing = .false. )
+            call draw_insect_wings( x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
+                mask_color, us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3), Insect, delete=.false.)
 
-        ! case II: the body moves OR the grid qty is not available: create everything
+! if (.not. allocated(mask2)) allocate(mask2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
+! if (.not. allocated(mask_color2)) allocate(mask_color2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
+! if (.not. allocated(us2)) allocate(us2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g, 1:params_acm%dim))
+!
+! call Draw_Insect( time, Insect, x0, dx, mask2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
+! mask_color2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3) )
+!
+! if (maxval(abs(mask2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g)-mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g)))>0.0) then
+!     write(*,*) x0
+!     call abort(7742,"rick me")
+! endif
+
+        ! case II: the body moves OR the grid qty is not available: delete & create everything
         else
             ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
             ! know that the first g points are in fact ghost nodes...
@@ -78,6 +90,7 @@ end subroutine create_mask_3D
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
+
 
 subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     implicit none
@@ -118,6 +131,7 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     end select
 
 end subroutine create_mask_2D
+
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------

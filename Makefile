@@ -256,7 +256,7 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o \
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o $(OBJDIR)/module_physics_metamodule.o \
 	$(OBJDIR)/module_boundary_conditions.o $(OBJDIR)/module_helpers.o update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \

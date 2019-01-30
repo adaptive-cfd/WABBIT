@@ -25,7 +25,7 @@
 !
 ! ********************************************************************************************
 
-subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
+subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_nr_optional)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,6 +43,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     integer(kind=ik), intent(inout)   :: hvy_n, lgt_n
     !> light data array
     integer(kind=ik), intent(inout)   :: lgt_block(:,:)
+    !> index of the tree you want to save the field in
+    integer(kind=ik), optional, intent(in)   :: tree_nr_optional
 
     ! treecode array
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
@@ -59,10 +61,14 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     integer(kind=ik)      :: ierr
     integer(kind=ik)      :: treecode_size
     integer(hsize_t)      :: dims_treecode(2)
-
+    integer(kind=ik)      :: tree_nr
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
+    if (present(tree_nr_optional)) then
+        tree_nr=tree_nr_optional
+    else
+        tree_nr=1
+    endif
     ! set MPI parameters
     rank         = params%rank
     number_procs = params%number_procs
@@ -90,7 +96,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
             write(*,'(A)') "ERROR: READ_MESH is called with NON_EMPTY DATA!!!!!"
         end if
     end if
-
     ! Nblocks per CPU
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note
     ! zero indexing as required by MPI
@@ -100,7 +105,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
     if (mod(lgt_n, number_procs) > 0) then
         blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = &
-            blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
+        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
     end if
     ! some error control -> did we loose blocks? should never happen.
     if ( sum(blocks_per_rank_list) /= lgt_n) then
@@ -145,6 +150,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         lgt_block(lgt_id, params%max_treelevel+idx_mesh_lvl) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
         lgt_block(lgt_id, params%max_treelevel+idx_refine_sts) = 0
+        ! set number of the tree
+        lgt_block(lgt_id, params%max_treelevel+idx_tree_nr) = tree_nr
     end do
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.

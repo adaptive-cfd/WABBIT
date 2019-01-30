@@ -18,7 +18,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_debug.
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
-	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90
+	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 module_forest.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -27,7 +27,7 @@ VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQ
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
-VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS
+VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS:LIB/FOREST
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -124,10 +124,16 @@ FFLAGS += $(PPFLAG) $(PRAGMAS)
 
 
 # Both programs are compiled by default.
-all: directories wabbit wabbit-post #doc
+all: directories wabbit wabbit-post sPOD#doc
 
 # Compile main programs, with dependencies.
-wabbit: main.f90 $(MOBJS) $(OBJS)
+wabbit: wabbit.f90 $(MOBJS) $(OBJS)
+	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
+
+wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
+	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
+
+sPOD: sPOD.f90 $(MOBJS) $(OBJS)
 	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compile modules (module dependency must be specified by hand in
@@ -288,9 +294,6 @@ $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/modul
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
-wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
-		$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post

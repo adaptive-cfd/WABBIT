@@ -35,7 +35,6 @@ subroutine compute_vorticity_post(params)
     character(len=80)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
-    real(kind=rk), dimension(3)        :: domain
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -57,7 +56,7 @@ subroutine compute_vorticity_post(params)
     call check_file_exists(trim(file_uy))
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
+    call read_attributes(file_ux, lgt_n, time, iteration, params%domain_size, Bs, tc_length, params%dim)
     if (params%dim==3) then
         params%threeD_case = .true.
     else
@@ -91,9 +90,6 @@ subroutine compute_vorticity_post(params)
 
     params%max_treelevel = tc_length
     params%n_eqn = params%dim
-    params%domain_size(1) = domain(1)
-    params%domain_size(2) = domain(2)
-    params%domain_size(3) = domain(3)
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
     ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)

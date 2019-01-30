@@ -21,7 +21,7 @@
 !> \image html rhs.svg width=600
 !> \image html rhs.eps
 
-program main
+program wabbit
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -538,4 +538,4 @@ program main
     ! end mpi
     call MPI_Finalize(ierr)
 
-end program main
+end program wabbit

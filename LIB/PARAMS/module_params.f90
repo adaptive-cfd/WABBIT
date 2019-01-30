@@ -68,7 +68,8 @@ module module_params
         integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree
         integer(kind=ik)                             :: max_treelevel=0
-
+        ! maximal numbers of trees in the forest
+        integer(kind=ik)                             :: max_forest_size=1
         ! order of refinement predictor
         character(len=80)                            :: order_predictor=""
         ! order of spatial discretization
@@ -111,13 +112,11 @@ module module_params
         ! use third dimension
         logical           :: threeD_case=.false.
         integer(kind=ik)  :: dim=2 ! can be 2 or 3
-
-        ! -------------------------------------------------------------------------------------
+        ! ------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
         real(kind=rk)    :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
-
         ! -------------------------------------------------------------------------------------
         ! MPI
         ! -------------------------------------------------------------------------------------
@@ -141,21 +140,15 @@ module module_params
         logical                          :: bridgeCommonMPI
         !! - Consideration of the fluid side as master in case of several myWorld_comms
         logical                          :: bridgeFluidMaster
-
-
-
         ! -------------------------------------------------------------------------------------
         ! saving
         ! -------------------------------------------------------------------------------------
         integer(kind=ik) :: N_fields_saved=0
         character(len=80), allocatable, dimension(:) :: field_names
-
-
         ! -------------------------------------------------------------------------------------
         ! unit test
         ! -------------------------------------------------------------------------------------
         logical :: test_treecode=.false., test_ghost_nodes_synch=.false., check_redundant_nodes=.false.
-
         ! -------------------------------------------------------------------------------------
         ! filter
         ! -------------------------------------------------------------------------------------
@@ -165,7 +158,6 @@ module module_params
         integer(kind=ik)                            :: filter_freq=-1
         ! save filter strength sigma
         logical                                     :: save_filter_strength
-
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions
         ! -------------------------------------------------------------------------------------

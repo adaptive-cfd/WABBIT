@@ -83,18 +83,16 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     elseif (params%time_step_method == "Krylov") then
         nrhs_slots = params%M_krylov +3
-
+    elseif (params%time_step_method == "no") then
+        nrhs_slots = 0 ! no time stepping
     else
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
-
     endif
 
     nwork = max( 2*Neqn, params%N_fields_saved)
 
     !---------------------------------------------------------------------------------------------
     ! main body
-
-
     if (rank == 0) then
         write(*,'(80("_"))')
         write(*,'(A)') "INIT: Beginning memory allocation and initialization."
@@ -103,9 +101,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
-
     ! allocate memory
-    if ( params%threeD_case ) then
+    if ( params%dim==3 ) then
         ! 3D:
         if (rank==0) write(*,'("INIT: Allocating a 3D case.")')
 

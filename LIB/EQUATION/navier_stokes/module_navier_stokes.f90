@@ -29,14 +29,13 @@ module module_navier_stokes
   use module_operators
 
 #ifdef SBLAS
-  use module_sparse_operators, only: initialice_derivatives
+  use module_sparse_operators
 #endif
   implicit none
 
   ! I usually find it helpful to use the private keyword by itself initially, which specifies
   ! that everything within the module is private unless explicitly marked public.
   PRIVATE
-
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
@@ -57,7 +56,6 @@ contains
   include "filter_block.f90"
   include "inicond_NStokes.f90"
   include "save_data_ns.f90"
-
 #ifdef SBLAS
   include "RHS_2D_cylinder.f90"
   include "RHS_2D_navier_stokes_bc.f90"
@@ -468,7 +466,6 @@ contains
         select case(params_ns%bound%name(2))
         case("symmetryAxis-wall")
           ! slip wall condition: keep velocity
-          !rhs(:, g+1, UxF) = 0
           phi(:, g+1, UyF) = 0
 
         case default
@@ -680,7 +677,7 @@ contains
       !
       ! called for each block.
 
-      if (maxval(abs(u))>1.0e5) then
+      if (maxval(abs(u))>1.0e10) then
         call abort(6661,"ns fail: very very large values in state vector.")
       endif
       ! compute mean density and pressure
@@ -851,7 +848,7 @@ contains
   ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
   ! Ghost nodes are assumed to be sync'ed.
   !-----------------------------------------------------------------------------
-  subroutine filter_NStokes( time, u, g, x0, dx, work_array )
+  subroutine filter_NStokes( time, u, g, x0, dx, work_array, boundary_flag )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -871,7 +868,15 @@ contains
 
     ! output. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
-
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=2), optional, intent(in):: boundary_flag(3)
 
     ! local variables
     integer(kind=ik), dimension(3) :: Bs
@@ -882,9 +887,11 @@ contains
     Bs(3) = size(u,3) - 2*g
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
-
     ! copy filtered state vector back to input state vector
     u = work_array(:,:,:,1:params_ns%n_eqn)
+
+    ! ensure that boundary conditions are ok after filtering
+    call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
 
   end subroutine filter_NStokes
 

@@ -356,13 +356,10 @@ end subroutine ini_file_to_params
     ! read number_ghost_nodes
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     ! read number_blocks
-    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
 
     ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
-    ! set number of fields in heavy work data
-    ! every datafield has 5 additional fields: old, k1, k2, k3, k4
-    params%number_fields = params%n_eqn*5
     ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )

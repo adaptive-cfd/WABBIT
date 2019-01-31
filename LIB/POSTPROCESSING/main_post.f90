@@ -80,7 +80,7 @@ program main_post
     case("--sparse-to-dense")
         call sparse_to_dense(params)
 
-    case("--vorticity", "--divergence")
+    case("--vorticity", "--divergence", "--vor-abs")
         call compute_vorticity_post(params)
 
     case("--keyvalues")

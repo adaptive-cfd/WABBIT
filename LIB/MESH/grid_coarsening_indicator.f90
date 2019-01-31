@@ -108,7 +108,11 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! the vector of normalization factors for each qty that adaptivity will bebased on (state vector
     !! or vorticity). We currently use the L_infty norm. I have made bad experience with L_2 norm
     !! (to be checked...)
+
+    !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
+    !! is an absolute value.
     norm = 1.0_rk
+
     if (params%eps_normalized .and. params%physics_type=="ACM-new") then
         norm = 0.0_rk
         if (params%coarsening_indicator=="threshold-vorticity") then
@@ -135,14 +139,16 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         ! note that a check norm>1.0e-10 is in threshold-block
         tmp = norm
         call MPI_ALLREDUCE(tmp, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+
+        ! during dev is it useful to know what the normalization is, if that is active
+        if (params%rank == 0) then
+            open(14,file='eps_norm.t',status='unknown',position='append')
+            write (14,'(10(g15.8,1x))') time, norm, params%eps
+            close(14)
+        endif
+
     endif
 
-    ! during dev is it useful to know what the normalization is, if that is active
-    if (params%rank == 0 .and. params%eps_normalized .and. params%physics_type=="ACM-new") then
-        open(14,file='eps_norm.t',status='unknown',position='append')
-        write (14,'(10(g15.8,1x))') time, norm, params%eps
-        close(14)
-    endif
 
     !---------------------------------------------------------------------------
     !> evaluate coarsing criterion on all blocks
@@ -164,7 +170,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     enddo
 
     !---------------------------------------------------------------------------
-    !
+    !> force blocks on maximum refinement level to coarsen, if parameter is set
     !---------------------------------------------------------------------------
     if (params%force_maxlevel_dealiasing) then
         do k = 1, lgt_n

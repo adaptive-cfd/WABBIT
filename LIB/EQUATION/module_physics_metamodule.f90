@@ -36,14 +36,19 @@ contains
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
  !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
  !> the parameter struct for wabbit is not available.
- subroutine READ_PARAMETERS_meta( physics, filename )
+ subroutine READ_PARAMETERS_meta( physics, filename, n_gridQ )
    implicit none
    character(len=*), intent(in) :: physics
+   ! number of grid-dependent (and not time-dependend qtys) is decided by the physics modules
+   integer(kind=ik), intent(out) :: n_gridQ
    character(len=*), intent(in) :: filename
+
+   ! default is none (for navier-stokes and convection-diffusion)
+   n_gridQ = 0
 
    select case ( physics )
    case ('ACM-new')
-     call READ_PARAMETERS_ACM( filename )
+     call READ_PARAMETERS_ACM( filename, n_gridQ )
 
    case ('ConvDiff-new')
      call READ_PARAMETERS_convdiff( filename )
@@ -434,7 +439,7 @@ end subroutine FIELD_NAMES_meta
  ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
  ! Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
- subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array)
+ subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array, boundary_flag)
    implicit none
    !> physics type
    character(len=*), intent(in) :: physics
@@ -455,6 +460,15 @@ end subroutine FIELD_NAMES_meta
    ! the work array is an additional array which can be used to store temporal
    ! values of the statevector field
    real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
+   ! when implementing boundary conditions, it is necessary to now if the local field (block)
+   ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+   ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+   ! boundary_flag(i) can be either 0, 1, -1,
+   !  0: no boundary in the direction +/-e_i
+   !  1: boundary in the direction +e_i
+   ! -1: boundary in the direction - e_i
+   ! currently only acessible in the local stage
+   integer(kind=2), optional, intent(in):: boundary_flag(3)
 
    select case(physics)
    case ("ACM-new")
@@ -464,7 +478,7 @@ end subroutine FIELD_NAMES_meta
      call abort(1009181817, "filter not implemented for convection-diffusion.")
 
    case ("navier_stokes")
-     call filter_NStokes( time, u, g, x0, dx, work_array)
+     call filter_NStokes( time, u, g, x0, dx, work_array, boundary_flag)
 
    case default
      call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown "//trim(adjustl(physics)))

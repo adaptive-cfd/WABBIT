@@ -57,41 +57,45 @@ program main
     integer(kind=ik)                    :: rank
     ! number of processes
     integer(kind=ik)                    :: number_procs
-
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1, t2
-
     ! user defined parameter structure
     type (type_params)                  :: params
 
-    ! light data array  -> line number = ( 1 + proc_rank ) * heavy_data_line_number
-    !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
-    !                   -> column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
-    !                   -> column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    ! light data array (the grid metadata, block treecodes etc)
+    ! line number = ( 1 + proc_rank ) * heavy_data_line_number
+    ! column(1:max_treelevel): block treecode, treecode -1 => block is inactive
+    ! column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
+    ! column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: lgt_block(:, :)
 
-    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: components ( 1:number_equations)
-    ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
+    ! heavy data array (the actual state vector). Is synchronized.
+    ! dim 1-3: x,y,z coord ( 1:Bs+2*g )
+    ! dim 4: components ( 1:number_equations)
+    ! dim 5: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
+    ! grid-depenendent (and not explicitly time dependent) quantities: no synchronization
+    ! of these qtys is performed
+    real(kind=rk), allocatable          :: hvy_gridQ(:, :, :, :, :)
+    !!!!!! => renaming: hvy_block -> hvy_state
 
-    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: components ( 1:number_equations)
-    !                   -> dim 5: RHS slot (k1,k2 etc for RK4)
-    ! heavy work array  -> dim 6: block id  ( 1:number_blocks )
+    ! hvy work array: the slots for RHS evaluation (e.g. 5 for a RK4)
+    ! no synchronization performed
+    ! dim 1-3: x,y,z coord ( 1:Bs+2*g )
+    ! dim 4: components ( 1:number_equations)
+    ! dim 5: RHS slot (k1,k2 etc for RK4)
+    ! dim 6: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :, :)
+    !!!!!! => renaming: hvy_work -> hvy_rhs
 
-    !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
-    !                   -> dim 4: components ( 1:number_equations)
-    ! heavy data array  -> dim 5: block id  ( 1:number_blocks )
+    ! work array (e.g. for saving fields, state vector conversions etc)
+    ! no synchronization performed
+    ! dim 1-3: x,y,z coord ( 1:Bs+2*g )
+    ! dim 4: components ( 1:number_equations)
+    ! dim 5: block id  ( 1:number_blocks )
     ! This array can be used for work data.
     real(kind=rk), allocatable          :: hvy_tmp(:, :, :, :, :)
+    !!!!!! => renaming: hvy_tmp -> hvy_work
 
     ! neighbor array (heavy data) -> number_lines   = number_blocks (correspond to heavy data id)
     !                             -> number_columns = 16 (...different neighbor relations:
@@ -105,40 +109,28 @@ program main
     ! a treecode is an array and this is handy. for finding a block however, this is not true,
     ! here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
     integer(kind=tsize), allocatable    :: lgt_sortednumlist(:,:)
-
     ! list of active blocks (light data)
     integer(kind=ik), allocatable       :: lgt_active(:)
     ! number of active blocks (light data)
     integer(kind=ik)                    :: lgt_n
-
     ! list of active blocks (heavy data)
     integer(kind=ik), allocatable       :: hvy_active(:)
     ! number of active blocks (heavy data)
     integer(kind=ik)                    :: hvy_n
-
     integer(kind=ik), allocatable       :: blocks_per_rank(:)
-
     ! time loop variables
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
-
     ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
-
     ! loop variable
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it
-
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
     ! flag of write_individual_timings to pass value from params to module_timing
     logical                             :: write_indiv_timings=.false.
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! init time loop
     time          = 0.0_rk
@@ -188,11 +180,12 @@ program main
     call initialize_communicator(params)
     ! read flag write_individual_timings from params, to be used in module_timings
     call setup_indiv_timings( write_indiv_timings = params%write_individual_timings )
-    ! have the pysics module read their own parameters
-    call init_physics_modules( params, filename )
+    ! have the pysics module read their own parameters. They also decide how many grid-qtys
+    ! they want
+    call init_physics_modules( params, filename, params%n_gridQ )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ)
     ! reset the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
@@ -351,8 +344,9 @@ program main
         ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
         ! if they require such qantities. In many cases, the grid_qtys are probably not used.
         ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
+        ! so it is available only during the
         t4 = MPI_wtime()
-        call update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n )
+        call update_grid_qyts( time, params, lgt_block, hvy_gridQ, hvy_active, hvy_n )
         call toc( "TOPLEVEL: update_grid_qyts", MPI_wtime()-t4)
 
 
@@ -369,7 +363,7 @@ program main
             ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, &
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gridQ, hvy_neighbor, &
             hvy_active, lgt_active, lgt_n, hvy_n )
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1

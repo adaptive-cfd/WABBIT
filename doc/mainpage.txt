@@ -77,8 +77,9 @@
 !!                 $  domain_size=6 3;
 !!                 $
 !!                 $  [Blocks]
-!!                 $  ; size of each block, should be odd (17, 33, 65 etc)
-!!                 $  number_block_nodes=17;129;17;33;
+!!                 $  ; size of each block, should be odd (17, 33, 65, 129 etc)
+!!                 $  ; give either one value (for same Bs in x,y,z) or as many (different) values as dim
+!!                 $  number_block_nodes=17;
 !!                 $  ; ghost nodes for each block
 !!                 $  number_ghost_nodes=4;
 !!                 $  ; number of equations / components of state vector. Note you have to properly

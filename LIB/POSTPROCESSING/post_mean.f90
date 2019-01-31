@@ -29,7 +29,8 @@ subroutine post_mean(params)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, Bs, nz, iteration, lgt_n, hvy_n, dim
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim
+    integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk)                           :: time
@@ -93,7 +94,7 @@ subroutine post_mean(params)
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
     if (params%threeD_case) then
-        nz = Bs
+        nz = Bs(3)
     else
         nz = 1
     end if
@@ -106,9 +107,9 @@ subroutine post_mean(params)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (params%threeD_case) then
-            meanl = meanl + sum( hvy_block(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
         else
-            meanl = meanl + sum( hvy_block(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
         endif
     end do
 

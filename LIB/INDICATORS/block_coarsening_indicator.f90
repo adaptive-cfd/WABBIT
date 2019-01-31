@@ -49,7 +49,8 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     real(kind=rk), intent(inout)        :: norm(1:params%n_eqn)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, Bs, g
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g
+    integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r
     logical :: thresholding_component(1:params%n_eqn)

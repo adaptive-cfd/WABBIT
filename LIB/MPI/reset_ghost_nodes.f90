@@ -41,7 +41,8 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! grid parameter
-    integer(kind=ik)                    :: g, Bs
+    integer(kind=ik)                    :: g
+    integer(kind=ik), dimension(3)     :: Bs
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -59,13 +60,13 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
 
     !-- x-direction
     hvy_block(1:g, :, :, :, : )           = 9.0e9_rk
-    hvy_block(Bs+g+1:Bs+2*g, :, :, :, : ) = 9.0e9_rk
+    hvy_block(Bs(1)+g+1:Bs(1)+2*g, :, :, :, : ) = 9.0e9_rk
     !-- y-direction
     hvy_block(:, 1:g, :, :, : )           = 9.0e9_rk
-    hvy_block(:, Bs+g+1:Bs+2*g, :, :, : ) = 9.0e9_rk
+    hvy_block(:, Bs(2)+g+1:Bs(2)+2*g, :, :, : ) = 9.0e9_rk
     !-- z-direction
     if ( params%threeD_case ) then
       hvy_block(:, :, 1:g, :, : )           = 9.0e9_rk
-      hvy_block(:, :, Bs+g+1:Bs+2*g, :, : ) = 9.0e9_rk
+      hvy_block(:, :, Bs(3)+g+1:Bs(3)+2*g, :, : ) = 9.0e9_rk
     end if
 end subroutine reset_ghost_nodes

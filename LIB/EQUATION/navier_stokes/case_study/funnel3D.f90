@@ -5,7 +5,8 @@ subroutine  funnel_penalization3D(Bs, g, x0, dx, phi, mask, phi_ref)
   use module_helpers
   implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in)  :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
     real(kind=rk), intent(in)     :: phi(:,:,:,:)     !< state vector
     real(kind=rk), intent(inout)  :: phi_ref(:,:,:,:) !< reference values of penalized volume
@@ -13,7 +14,7 @@ subroutine  funnel_penalization3D(Bs, g, x0, dx, phi, mask, phi_ref)
     integer(kind=2), allocatable,save:: mask_color(:,:,:)!< identifyers of mask parts (plates etc)
     logical                       :: mesh_was_adapted=.true.
     ! -----------------------------------------------------------------
-    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g,  1:Bs+2*g))
+    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g,  1:Bs(3)+2*g))
     !!> todo implement function check_if_mesh_adapted (true/false) in adapt mesh
     if ( mesh_was_adapted .eqv. .true. ) then
       ! dont switch the order of draw_funnel3D and draw_sponge3D,
@@ -32,7 +33,8 @@ end subroutine  funnel_penalization3D
 subroutine draw_funnel3D(x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g                             !< grid parameter
+    integer(kind=ik), intent(in)  :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)     :: x0(3), dx(3)                      !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)  :: mask(:,:,:,:)                     !< mask function
     integer(kind=2), intent(inout):: mask_color(:,:,:)                 !< identifyers of mask parts (plates etc)
@@ -44,16 +46,16 @@ subroutine draw_funnel3D(x0, dx, Bs, g, mask, mask_color)
     ! loop variables
     integer(kind=ik)                                 :: ix, iy, iz, n
 
-    if (size(mask,1) /= Bs+2*g) call abort(77559,"wrong array size of mask function")
+    if (size(mask,1) /= Bs(1)+2*g) call abort(77559,"wrong array size of mask function")
 
     h  = 1.5_rk*maxval(dx(1:params_ns%dim))
 
-    do iz=g+1, Bs+g
+    do iz=g+1, Bs(3)+g
       z = dble(iz - (g+1)) * dx(3) + x0(3)
-      do iy=g+1, Bs+g
+      do iy=g+1, Bs(2)+g
          y = dble(iy-(g+1)) * dx(2) + x0(2)
          r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-         do ix=g+1, Bs+g
+         do ix=g+1, Bs(1)+g
               x = dble(ix-(g+1)) * dx(1) + x0(1)
 
               ! reset the mask function here
@@ -85,7 +87,8 @@ end subroutine draw_funnel3D
 subroutine draw_sponge3D(x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g             !< grid parameter
+    integer(kind=ik), intent(in)  :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)     :: x0(3), dx(3)      !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)  :: mask(:,:,:,:)     !< mask function
     integer(kind=2), intent(inout):: mask_color(:,:,:) !< identifyers of mask parts (plates etc)
@@ -99,12 +102,12 @@ subroutine draw_sponge3D(x0, dx, Bs, g, mask, mask_color)
 
     h  = 1.5_rk*maxval(dx(1:params_ns%dim))
 
-  do iz=g+1, Bs+g
+  do iz=g+1, Bs(3)+g
     z = dble(iz - (g+1)) * dx(3) + x0(3)
-    do iy=g+1, Bs+g
+    do iy=g+1, Bs(2)+g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-       do ix=g+1, Bs+g
+       do ix=g+1, Bs(1)+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             ! Outlet flow: PUMPS
             ! ------------------
@@ -154,7 +157,8 @@ end subroutine draw_sponge3D
 subroutine compute_penal3D(mask_color, mask, phi, x0, dx, Bs, g ,phi_ref)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in)  :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
     integer(kind=2), intent(inout):: mask_color(:,:,:)!< identifyers of mask parts (plates etc)
     real(kind=rk), intent(in)     :: phi(:,:,:,:)     !< state vector
@@ -204,12 +208,12 @@ subroutine compute_penal3D(mask_color, mask, phi, x0, dx, Bs, g ,phi_ref)
 
 
 
-  do iz=g+1, Bs+g
+  do iz=g+1, Bs(3)+g
     z = dble(iz - (g+1)) * dx(3) + x0(3)
-    do iy=g+1, Bs+g
+    do iy=g+1, Bs(2)+g
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-       do ix=g+1, Bs+g
+       do ix=g+1, Bs(1)+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
 
             !reset ref values
@@ -295,7 +299,8 @@ end subroutine compute_penal3D
   subroutine integrate_over_pump_area3D(u,g,Bs,x0,dx,integral,volume)
       implicit none
       ! -----------------------------------------------------------------
-      integer(kind=ik), intent(in)         :: Bs, g         !< grid parameter (g ghostnotes,Bs Bulk)
+      integer(kind=ik), intent(in)  :: g          !< grid parameter
+      integer(kind=ik), dimension(3), intent(in) :: Bs
       real(kind=rk), intent(in)            :: u(:,:,:,:)    !< vector of state in pure format
       real(kind=rk), intent(in)            :: x0(3), dx(3)  !< spacing and origin of block
       real(kind=rk),intent(out)            :: integral(params_ns%n_eqn)  !< mean statevector
@@ -312,15 +317,15 @@ end subroutine compute_penal3D
       width =funnel%wall_thickness
       tmp   =  0.0_rk
       r0    =(R_domain-2*funnel%wall_thickness)
-      do iz=g+1, Bs+g
+      do iz=g+1, Bs(3)+g
        ! relative coordinates z=z-Lz/2
        z = dble(iz-(g+1)) * dx(3) + x0(3) - R_domain
-       do iy=g+1, Bs+g
+       do iy=g+1, Bs(2)+g
          ! relative coordinates y=y-Ly/2
          y = dble(iy-(g+1)) * dx(2) + x0(2)-R_domain
          ! radius
          r = dsqrt(y**2+z**2)
-         do ix=g+1, Bs+g
+         do ix=g+1, Bs(1)+g
               !this is the absolut coordinate
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &

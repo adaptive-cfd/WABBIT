@@ -32,7 +32,8 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
 
     implicit none
     !> grid parameter
-    integer(kind=ik), intent(in)                            :: g, Bs
+    integer(kind=ik), intent(in)                            :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> rhs parameter
     real(kind=rk), dimension(3), intent(in)                 :: x0,delta_x
     !> datafields
@@ -69,17 +70,17 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     logical                                                 :: dissipation
 
     ! variables
-    real(kind=rk)                                           :: rho(Bs+2*g, Bs+2*g, Bs+2*g), u(Bs+2*g, Bs+2*g, Bs+2*g), v(Bs+2*g, Bs+2*g, Bs+2*g), w(Bs+2*g, Bs+2*g, Bs+2*g), &
-                                                               p(Bs+2*g, Bs+2*g, Bs+2*g), T(Bs+2*g, Bs+2*g, Bs+2*g), &
-                                                               tau11(Bs+2*g, Bs+2*g, Bs+2*g), tau22(Bs+2*g, Bs+2*g, Bs+2*g), tau33(Bs+2*g, Bs+2*g, Bs+2*g), &
-                                                               tau12(Bs+2*g, Bs+2*g, Bs+2*g), tau13(Bs+2*g, Bs+2*g, Bs+2*g), tau23(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk)                                           :: rho(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), v(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), w(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
+                                                               p(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), T(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
+                                                               tau11(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau22(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau33(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
+                                                               tau12(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau13(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau23(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     ! dummy field
-    real(kind=rk)                                           :: dummy(Bs+2*g, Bs+2*g, Bs+2*g), dummy2(Bs+2*g, Bs+2*g, Bs+2*g), dummy3(Bs+2*g, Bs+2*g, Bs+2*g), &
-                                                               dummy4(Bs+2*g, Bs+2*g, Bs+2*g), dummy5(Bs+2*g, Bs+2*g, Bs+2*g), dummy6(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk)                                           :: dummy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy2(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy3(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
+                                                               dummy4(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy5(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy6(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     ! inverse sqrt(rho) field
-    real(kind=rk)                                           :: phi1_inv(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk)                                           :: phi1_inv(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     ! loop variables
     integer(kind=ik)                                        :: i, j, k,n_eqn
@@ -103,9 +104,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     dissipation = params_ns%dissipation
 
     ! variables
-    do k = 1, Bs+2*g
-       do j = 1, Bs+2*g
-            do i = 1, Bs+2*g
+    do k = 1, Bs(3)+2*g
+       do j = 1, Bs(2)+2*g
+            do i = 1, Bs(1)+2*g
                 rho(i,j,k)       = phi(i,j,k,1) * phi(i,j,k,1)
                 phi1_inv(i,j,k)  = 1.0_rk / phi(i,j,k,1)
                 u(i,j,k)         = phi(i,j,k,2) * phi1_inv(i,j,k)
@@ -118,9 +119,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
 
     ! Compute mu and T
     if (dissipation) then
-        do k = 1, Bs+2*g
-            do j = 1, Bs+2*g
-                do i = 1, Bs+2*g
+        do k = 1, Bs(3)+2*g
+            do j = 1, Bs(2)+2*g
+                do i = 1, Bs(1)+2*g
                     T(i,j,k) = p(i,j,k) * phi1_inv(i,j,k) * phi1_inv(i,j,k) * Rs
                 end do
             end do
@@ -144,9 +145,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxyz_c_3D_opt( Bs, g, dx, dy, dz, u, dummy, dummy2, dummy3)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,2) = - 0.5_rk * rho(i,j,k) * ( u(i,j,k) * dummy(i,j,k) + v(i,j,k) * dummy2(i,j,k) + w(i,j,k) * dummy3(i,j,k))
             end do
         end do
@@ -167,9 +168,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxyz_c_3D_opt( Bs, g, dx, dy, dz, v, dummy, dummy2, dummy3)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,3) = - 0.5_rk * rho(i,j,k) * ( u(i,j,k) * dummy(i,j,k) + v(i,j,k) * dummy2(i,j,k) + w(i,j,k) * dummy3(i,j,k))
             end do
         end do
@@ -190,9 +191,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxyz_c_3D_opt( Bs, g, dx, dy, dz, w, dummy, dummy2, dummy3)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,4) = - 0.5_rk * rho(i,j,k) * ( u(i,j,k) * dummy(i,j,k) + v(i,j,k) * dummy2(i,j,k) + w(i,j,k) * dummy3(i,j,k))
             end do
         end do
@@ -213,9 +214,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxyz_c_3D_opt( Bs, g, dx, dy, dz, p, dummy, dummy2, dummy3)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,2) = rhs(i,j,k,2) - dummy(i,j,k)
                 rhs(i,j,k,3) = rhs(i,j,k,3) - dummy2(i,j,k)
                 rhs(i,j,k,4) = rhs(i,j,k,4) - dummy3(i,j,k)
@@ -232,9 +233,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffx_c_3D_opt( Bs, g, dx, tau11, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,2) = rhs(i,j,k,2) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * u(i,j,k) * dummy(i,j,k)
                 end do
@@ -245,9 +246,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffx_c_3D_opt( Bs, g, dx, tau12, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,3) = rhs(i,j,k,3) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * v(i,j,k) * dummy(i,j,k)
                 end do
@@ -258,9 +259,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffy_c_3D_opt( Bs, g, dy, tau12, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,2) = rhs(i,j,k,2) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * u(i,j,k) * dummy(i,j,k)
                 end do
@@ -271,9 +272,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffx_c_3D_opt( Bs, g, dx, tau13, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,4) = rhs(i,j,k,4) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * w(i,j,k) * dummy(i,j,k)
                 end do
@@ -284,9 +285,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffz_c_3D_opt( Bs, g, dz, tau13, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,2) = rhs(i,j,k,2) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * u(i,j,k) * dummy(i,j,k)
                 end do
@@ -297,9 +298,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffy_c_3D_opt( Bs, g, dy, tau22, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,3) = rhs(i,j,k,3) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * v(i,j,k) * dummy(i,j,k)
                 end do
@@ -310,9 +311,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffy_c_3D_opt( Bs, g, dy, tau23, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,4) = rhs(i,j,k,4) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * w(i,j,k) * dummy(i,j,k)
                 end do
@@ -323,9 +324,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffz_c_3D_opt( Bs, g, dz, tau23, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,3) = rhs(i,j,k,3) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * v(i,j,k) * dummy(i,j,k)
                 end do
@@ -336,9 +337,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffz_c_3D_opt( Bs, g, dz, tau33, dummy)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,4) = rhs(i,j,k,4) + dummy(i,j,k)
                     rhs(i,j,k,5) = rhs(i,j,k,5) - ( gamma_ - 1.0_rk ) * w(i,j,k) * dummy(i,j,k)
                 end do
@@ -349,9 +350,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         ! Heat Flux
         call diffxyz_c_3D_opt( Bs, g, dx, dy, dz, T, dummy, dummy2, dummy3)
 
-        do k = g-1, Bs+g+2
-            do j = g-1, Bs+g+2
-                do i = g-1, Bs+g+2
+        do k = g-1, Bs(3)+g+2
+            do j = g-1, Bs(2)+g+2
+                do i = g-1, Bs(1)+g+2
                     dummy4(i,j,k) = u(i,j,k)*tau11(i,j,k) + v(i,j,k)*tau12(i,j,k) + w(i,j,k)*tau13(i,j,k) + lambda * dummy(i,j,k)
                     dummy5(i,j,k) = u(i,j,k)*tau12(i,j,k) + v(i,j,k)*tau22(i,j,k) + w(i,j,k)*tau23(i,j,k) + lambda * dummy2(i,j,k)
                     dummy6(i,j,k) = u(i,j,k)*tau13(i,j,k) + v(i,j,k)*tau23(i,j,k) + w(i,j,k)*tau33(i,j,k) + lambda * dummy3(i,j,k)
@@ -362,9 +363,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         call diffy_c_3D_opt( Bs, g, dy, dummy5, dummy2)
         call diffz_c_3D_opt( Bs, g, dz, dummy6, dummy3)
 
-        do k = g+1, Bs+g
-            do j = g+1, Bs+g
-                do i = g+1, Bs+g
+        do k = g+1, Bs(3)+g
+            do j = g+1, Bs(2)+g
+                do i = g+1, Bs(1)+g
                     rhs(i,j,k,5) = rhs(i,j,k,5) + ( gamma_ - 1.0_rk ) * ( dummy(i,j,k) + dummy2(i,j,k) + dummy3(i,j,k) )
                 end do
             end do
@@ -375,9 +376,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     ! EQUATIONS
     ! --------------------------------------------------------------------------------------------------------------
     ! RHS of equation of mass: J*srho*2 * srho_t = -div(rho*U_tilde)
-    do k = g-1, Bs+g+2
-        do j = g-1, Bs+g+2
-            do i = g-1, Bs+g+2
+    do k = g-1, Bs(3)+g+2
+        do j = g-1, Bs(2)+g+2
+            do i = g-1, Bs(1)+g+2
                 dummy(i,j,k)  = rho(i,j,k)*u(i,j,k)
                 dummy2(i,j,k) = rho(i,j,k)*v(i,j,k)
                 dummy3(i,j,k) = rho(i,j,k)*w(i,j,k)
@@ -388,18 +389,18 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     call diffy_c_3D_opt( Bs, g, dy, dummy2, dummy5)
     call diffz_c_3D_opt( Bs, g, dz, dummy3, dummy6)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,1) = (-dummy4(i,j,k) - dummy5(i,j,k) - dummy6(i,j,k)) * 0.5_rk * phi1_inv(i,j,k)
             end do
         end do
     end do
 
     ! RHS of  momentum equation for u: sru_t = -1/2 * div(rho U_tilde u ) - 1/2 * (rho*U_tilde)*Du - Dp
-    do k = g-1, Bs+g+2
-        do j = g-1, Bs+g+2
-            do i = g-1, Bs+g+2
+    do k = g-1, Bs(3)+g+2
+        do j = g-1, Bs(2)+g+2
+            do i = g-1, Bs(1)+g+2
                 dummy(i,j,k)  = u(i,j,k)*rho(i,j,k)*u(i,j,k)
                 dummy2(i,j,k) = v(i,j,k)*rho(i,j,k)*u(i,j,k)
                 dummy3(i,j,k) = w(i,j,k)*rho(i,j,k)*u(i,j,k)
@@ -410,18 +411,18 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     call diffy_c_3D_opt( Bs, g, dy, dummy2, dummy5)
     call diffz_c_3D_opt( Bs, g, dz, dummy3, dummy6)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,2) = ( rhs(i,j,k,2) - 0.5_rk * ( dummy4(i,j,k) + dummy5(i,j,k) + dummy6(i,j,k) ) ) * phi1_inv(i,j,k)
             end do
         end do
     end do
 
     ! RHS of  momentum equation for v
-    do k = g-1, Bs+g+2
-        do j = g-1, Bs+g+2
-            do i = g-1, Bs+g+2
+    do k = g-1, Bs(3)+g+2
+        do j = g-1, Bs(2)+g+2
+            do i = g-1, Bs(1)+g+2
                 dummy(i,j,k)  = u(i,j,k)*rho(i,j,k)*v(i,j,k)
                 dummy2(i,j,k) = v(i,j,k)*rho(i,j,k)*v(i,j,k)
                 dummy3(i,j,k) = w(i,j,k)*rho(i,j,k)*v(i,j,k)
@@ -432,18 +433,18 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     call diffy_c_3D_opt( Bs, g, dy, dummy2, dummy5)
     call diffz_c_3D_opt( Bs, g, dz, dummy3, dummy6)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,3) = ( rhs(i,j,k,3) - 0.5_rk * ( dummy4(i,j,k) + dummy5(i,j,k) + dummy6(i,j,k)) ) * phi1_inv(i,j,k)
             end do
         end do
     end do
 
     ! RHS of  momentum equation for w
-    do k = g-1, Bs+g+2
-        do j = g-1, Bs+g+2
-            do i = g-1, Bs+g+2
+    do k = g-1, Bs(3)+g+2
+        do j = g-1, Bs(2)+g+2
+            do i = g-1, Bs(1)+g+2
                 dummy(i,j,k)  = u(i,j,k)*rho(i,j,k)*w(i,j,k)
                 dummy2(i,j,k) = v(i,j,k)*rho(i,j,k)*w(i,j,k)
                 dummy3(i,j,k) = w(i,j,k)*rho(i,j,k)*w(i,j,k)
@@ -454,18 +455,18 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     call diffy_c_3D_opt( Bs, g, dy, dummy2, dummy5)
     call diffz_c_3D_opt( Bs, g, dz, dummy3, dummy6)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,4) = ( rhs(i,j,k,4) - 0.5_rk * ( dummy4(i,j,k) + dummy5(i,j,k) + dummy6(i,j,k)) ) * phi1_inv(i,j,k)
             end do
         end do
     end do
 
     ! RHS of energy equation:  p_t = -gamma*div(U_tilde p) + gamm1 *U x grad(p)
-    do k = g-1, Bs+g+2
-        do j = g-1, Bs+g+2
-            do i = g-1, Bs+g+2
+    do k = g-1, Bs(3)+g+2
+        do j = g-1, Bs(2)+g+2
+            do i = g-1, Bs(1)+g+2
                 dummy(i,j,k)  = u(i,j,k)*p(i,j,k)
                 dummy2(i,j,k) = v(i,j,k)*p(i,j,k)
                 dummy3(i,j,k) = w(i,j,k)*p(i,j,k)
@@ -476,9 +477,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     call diffy_c_3D_opt( Bs, g, dy, dummy2, dummy5)
     call diffz_c_3D_opt( Bs, g, dz, dummy3, dummy6)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 rhs(i,j,k,5) = rhs(i,j,k,5) - gamma_ * ( dummy4(i,j,k) + dummy5(i,j,k) + dummy6(i,j,k) )
             end do
         end do
@@ -489,9 +490,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         if (.not. allocated_penal_fields) then
           allocated_penal_fields=.true.
           n_eqn=params_ns%n_eqn
-          allocate( mask(Bs+2*g,Bs+2*g,Bs+2*g,n_eqn), &
-                    phi_prime(Bs+2*g,Bs+2*g,Bs+2*g,n_eqn),&
-                    phi_ref(Bs+2*g,Bs+2*g,Bs+2*g,n_eqn))
+          allocate( mask(Bs(1)+2*g,Bs(2)+2*g,Bs(3)+2*g,n_eqn), &
+                    phi_prime(Bs(1)+2*g,Bs(2)+2*g,Bs(3)+2*g,n_eqn),&
+                    phi_ref(Bs(1)+2*g,Bs(2)+2*g,Bs(3)+2*g,n_eqn))
         endif
         phi_prime(:,:,:,rhoF)= rho
         phi_prime(:,:,:,UxF )= u
@@ -500,9 +501,9 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
         phi_prime(:,:,:,pF  )= p
 
         call compute_mask_and_ref3D(params_ns, Bs, g, x0, delta_x, phi_prime, mask, phi_ref)
-        do k = 1, Bs+2*g
-          do j = 1, Bs+2*g
-            do i = 1, Bs+2*g
+        do k = 1, Bs(3)+2*g
+          do j = 1, Bs(2)+2*g
+            do i = 1, Bs(1)+2*g
               ! density
               rhs(i,j,k,rhoF)=rhs(i,j,k,rhoF) -0.5_rk*phi1_inv(i,j,k)*mask(i,j,k,rhoF)*(phi_prime(i,j,k,rhoF)-  Phi_ref(i,j,k,rhoF) )
               ! x-velocity
@@ -528,10 +529,11 @@ end subroutine RHS_3D_navier_stokes
 
 subroutine  diffxyz_c_3D_opt( Bs, g, dx, dy, dz, u, dudx, dudy, dudz)
 
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dx, dy, dz
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g, Bs+2*g), dudy(Bs+2*g, Bs+2*g, Bs+2*g), dudz(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudx(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dudy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dudz(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, j, k
     real(kind=rk)                   :: dx_inv, dy_inv, dz_inv
@@ -546,9 +548,9 @@ subroutine  diffxyz_c_3D_opt( Bs, g, dx, dy, dz, u, dudx, dudy, dudz)
     dy_inv = 1.0_rk/(12.0_rk*dy)
     dz_inv = 1.0_rk/(12.0_rk*dz)
 
-    do k = g-1, Bs+g+2
-        do j = g-1, Bs+g+2
-            do i = g-1, Bs+g+2
+    do k = g-1, Bs(3)+g+2
+        do j = g-1, Bs(2)+g+2
+            do i = g-1, Bs(1)+g+2
                 dudx(i,j,k) = ( u(i-2,j,k) - 8.0_rk*u(i-1,j,k) + 8.0_rk*u(i+1,j,k) - u(i+2,j,k) ) * dx_inv
                 dudy(i,j,k) = ( u(i,j-2,k) - 8.0_rk*u(i,j-1,k) + 8.0_rk*u(i,j+1,k) - u(i,j+2,k) ) * dy_inv
                 dudz(i,j,k) = ( u(i,j,k-2) - 8.0_rk*u(i,j,k-1) + 8.0_rk*u(i,j,k+1) - u(i,j,k+2) ) * dz_inv
@@ -560,10 +562,11 @@ end subroutine diffxyz_c_3D_opt
 
 subroutine  diffx_c_3D_opt( Bs, g, dx, u, dudx)
 
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudx(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, j, k
     real(kind=rk)                   :: dx_inv
@@ -576,9 +579,9 @@ subroutine  diffx_c_3D_opt( Bs, g, dx, u, dudx)
 
     dx_inv = 1.0_rk/(12.0_rk*dx)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 dudx(i,j,k) = ( u(i-2,j,k) - 8.0_rk*u(i-1,j,k) + 8.0_rk*u(i+1,j,k) - u(i+2,j,k) ) * dx_inv
             end do
         end do
@@ -588,10 +591,11 @@ end subroutine diffx_c_3D_opt
 
 subroutine  diffy_c_3D_opt( Bs, g, dy, u, dudy)
 
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudy(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, j, k
     real(kind=rk)                   :: dy_inv
@@ -604,9 +608,9 @@ subroutine  diffy_c_3D_opt( Bs, g, dy, u, dudy)
 
     dy_inv = 1.0_rk/(12.0_rk*dy)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 dudy(i,j,k) = ( u(i,j-2,k) - 8.0_rk*u(i,j-1,k) + 8.0_rk*u(i,j+1,k) - u(i,j+2,k) ) * dy_inv
             end do
         end do
@@ -616,10 +620,11 @@ end subroutine diffy_c_3D_opt
 
 subroutine  diffz_c_3D_opt( Bs, g, dz, u, dudz)
 
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dz
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudz(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudz(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, j, k
     real(kind=rk)                   :: dz_inv
@@ -632,9 +637,9 @@ subroutine  diffz_c_3D_opt( Bs, g, dz, u, dudz)
 
     dz_inv = 1.0_rk/(12.0_rk*dz)
 
-    do k = g+1, Bs+g
-        do j = g+1, Bs+g
-            do i = g+1, Bs+g
+    do k = g+1, Bs(3)+g
+        do j = g+1, Bs(2)+g
+            do i = g+1, Bs(1)+g
                 dudz(i,j,k) = ( u(i,j,k-2) - 8.0_rk*u(i,j,k-1) + 8.0_rk*u(i,j,k+1) - u(i,j,k+2) ) * dz_inv
             end do
         end do
@@ -650,12 +655,13 @@ end subroutine diffz_c_3D_opt
 
 subroutine grad_zentral_3D(Bs, g, dx, dy, dz, q, qx, qy, qz)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dx, dy, dz
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qx(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qy(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qz(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: q(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: qx(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: qy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: qz(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     !! XXX !!
     call diffx_c_3D( Bs, g, dx, q, qx)
@@ -672,13 +678,14 @@ end subroutine grad_zentral_3D
 
 subroutine diff1x_zentral_3D(Bs, g, dx, q, qx)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qx(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: q(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: qx(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     !! XXX !!
-    call diffx_c_3D( Bs, g, dx, q, qx)
+    call diffx_c_3D( Bs(1), g, dx, q, qx)
 
 end subroutine diff1x_zentral_3D
 
@@ -686,10 +693,11 @@ end subroutine diff1x_zentral_3D
 
 subroutine diff1y_zentral_3D(Bs, g, dy, q, qy)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qy(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: q(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: qy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     !! YYY !!
     call diffy_c_3D( Bs, g, dy, q, qy)
@@ -700,10 +708,11 @@ end subroutine diff1y_zentral_3D
 
 subroutine diff1z_zentral_3D(Bs, g, dz, q, qz)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dz
-    real(kind=rk), intent(in)       :: q(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: qz(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: q(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: qz(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     !! ZZZ !!
     call diffz_c_3D( Bs, g, dz, q, qz)
@@ -714,10 +723,11 @@ end subroutine diff1z_zentral_3D
 
 subroutine  diffx_c_3D( Bs, g, dx, u, dudx)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dx
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudx(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudx(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, n
 
@@ -739,10 +749,11 @@ end subroutine diffx_c_3D
 
 subroutine  diffy_c_3D( Bs, g, dy, u, dudy)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dy
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudy(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, n
 
@@ -764,10 +775,11 @@ end subroutine diffy_c_3D
 
 subroutine  diffz_c_3D( Bs, g, dz, u, dudz)
     use module_params
-    integer(kind=ik), intent(in)    :: g, Bs
+    integer(kind=ik), intent(in)    :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)       :: dz
-    real(kind=rk), intent(in)       :: u(Bs+2*g, Bs+2*g, Bs+2*g)
-    real(kind=rk), intent(out)      :: dudz(Bs+2*g, Bs+2*g, Bs+2*g)
+    real(kind=rk), intent(in)       :: u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
+    real(kind=rk), intent(out)      :: dudz(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
 
     integer                         :: i, n
 

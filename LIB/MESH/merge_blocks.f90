@@ -38,7 +38,8 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   ! list of block ids, proc ranks
   integer(kind=ik) :: heavy_ids(8)
 
-  integer(kind=ik) :: i, i1, i2, im, Bs, g, level, lgt_merge_id, maxtL, hvy_merge_id
+  integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, maxtL, hvy_merge_id
+  integer(kind=ik), dimension(3) ::  bound1, bound2, boundm, Bs
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -105,39 +106,41 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
       ! get heavy id of merge block
       call lgt_id_to_hvy_id( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
 
-      i1 = g+1
-      i2 = Bs+g
-      im = (Bs-1)/2 + 1 + g
+      do i = 1,3
+        bound1(i) = g+1
+        bound2(i) = Bs(i)+g
+        boundm(i) = (Bs(i)-1)/2 + 1 + g
+      enddo
 
       if (N_merge == 4) then
         ! ************ 2D case ***********************
         ! sister 0
-        hvy_block(i1:im, i1:im, :, :, hvy_merge_id) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, :,:, heavy_ids(1) )
+        hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(1) )
         ! sister 1
-        hvy_block(i1:im, im:i2, :, :, hvy_merge_id) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, :,:, heavy_ids(2) )
+        hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(2) )
         ! sister 2
-        hvy_block(im:i2, i1:im, :, :, hvy_merge_id) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, :,:, heavy_ids(3) )
+        hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(3) )
         ! sister 3
-        hvy_block(im:i2, im:i2, :, :, hvy_merge_id) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, :,:, heavy_ids(4) )
+        hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(4) )
 
       elseif (N_merge == 8) then
         ! ************ 3D case ***********************
         ! sister 0
-        hvy_block(i1:im, i1:im, i1:im, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(1) )
+        hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
         ! sister 1
-        hvy_block(i1:im, im:i2, i1:im, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(2) )
+        hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
         ! sister 2
-        hvy_block(im:i2, i1:im, i1:im, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(3) )
+        hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
         ! sister 3
-        hvy_block(im:i2, im:i2, i1:im, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(4) )
+        hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
         ! sister 4
-        hvy_block(i1:im, i1:im, im:i2, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(5) )
+        hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(5) )
         ! sister 5
-        hvy_block(i1:im, im:i2, im:i2, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(6) )
+        hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(6) )
         ! sister 6
-        hvy_block(im:i2, i1:im, im:i2, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(7) )
+        hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(7) )
         ! sister 7
-        hvy_block(im:i2, im:i2, im:i2, :, hvy_merge_id ) = hvy_block( g+1:Bs+g:2, g+1:Bs+g:2, g+1:Bs+g:2, :, heavy_ids(8) )
+        hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(8) )
 
       endif
 

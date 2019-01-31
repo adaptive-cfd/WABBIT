@@ -81,7 +81,7 @@ module module_params
         character(len=80), dimension(:), allocatable  :: input_files
 
         ! grid parameter
-        integer(kind=ik)                             :: Bs=0        ! number of block nodes
+        integer(kind=ik), dimension(3)               :: Bs=(/ 0, 0, 0 /)      ! number of block nodes
         integer(kind=ik)                             :: n_ghosts=0 ! number of ghost nodes
 
         ! switch for mesh adaption
@@ -182,7 +182,5 @@ contains
     ! this file reads the ini file and distributes all the parameters to the
     ! various structs holding them
     include "ini_file_to_params.f90"
-
-
 
 end module module_params

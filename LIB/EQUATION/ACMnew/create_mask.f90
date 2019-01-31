@@ -7,7 +7,8 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in) :: Bs, g
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(inout) :: mask
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
@@ -22,7 +23,7 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
     if ( params_acm%penalization .eqv. .false.) return
 
 
-    if (size(mask,1) /= Bs+2*g .or. size(mask,2) /= Bs+2*g .or. size(mask,3) /= Bs+2*g ) then
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
@@ -40,7 +41,7 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
         !-----------------------------------------------------------------------
         ! INSECT MODULE
         !-----------------------------------------------------------------------
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g,1:Bs+2*g,1:Bs+2*g))
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g,1:Bs(2)+2*g,1:Bs(3)+2*g))
 
         ! case I: the body is fixed and alread created on "grid_qty"
         if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
@@ -53,16 +54,17 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
             ! add the wings to the existing mask. note: the "old" wings from the previous
             ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)
             ! Hence, here, you do not have to delete again.
-            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
-                mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3), &
+            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), &
+                mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), us(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1:3), &
                 with_body = .false., with_wings = .true., delete_before_drawing = .false. )
 
         ! case II: the body moves OR the grid qty is not available: create everything
         else
+          
             ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
             ! know that the first g points are in fact ghost nodes...
-            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
-                mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3) )
+            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), &
+                mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), us(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1:3) )
         endif
 
     case ('none')
@@ -83,7 +85,8 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in) :: Bs, g
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(inout) :: mask
     real(kind=rk), dimension(:,:,:), intent(inout) :: us
@@ -91,7 +94,9 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     real(kind=rk), intent(in) :: x0(1:2), dx(1:2), time
 
     ! some cheap checks
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
     if (size(us,3) /= 2) call abort(777209,"wrong array size, there's pirates, captain!")
 
     mask = 0.0_rk
@@ -130,7 +135,8 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(out)     :: mask
     !> spacing and origin of block
@@ -143,7 +149,9 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
 
     ! reset mask array
     mask = 0.0_rk
@@ -155,9 +163,9 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
-    do iy=1, Bs+2*g
+    do iy=1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-        do ix=1, Bs+2*g
+        do ix=1, Bs(1)+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
             ! distance from center of cylinder
             r = dsqrt(x*x + y*y)
@@ -187,7 +195,8 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)                   :: Bs, g
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(out)     :: mask
     !> spacing and origin of block
@@ -201,7 +210,9 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
 
     ! reset mask array
     mask = 0.0_rk
@@ -224,10 +235,10 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
-    do iy=1, Bs+2*g
+    do iy=1, Bs(2)+2*g
         y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
         y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
-        do ix=1, Bs+2*g
+        do ix=1, Bs(1)+2*g
             x1 = dble(ix-(g+1)) * dx(1) + x0(1) - cx1
             x2 = dble(ix-(g+1)) * dx(1) + x0(1) - cx2
             ! distance from center of cylinder 1

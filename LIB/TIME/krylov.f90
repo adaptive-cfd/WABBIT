@@ -509,7 +509,8 @@ subroutine wabbit_norm(params, hvy_block, hvy_active, hvy_n, norm)
     !> this is the output of the function:
     real(kind=rk), intent(out)          :: norm
 
-    integer :: k, mpierr, ix, iy, iz, Bs, g
+    integer :: k, mpierr, ix, iy, iz, g
+    integer, dimension(3) :: Bs
 
     norm = 0.0_rk
 
@@ -520,9 +521,9 @@ subroutine wabbit_norm(params, hvy_block, hvy_active, hvy_n, norm)
     if (params%dim == 3) then
         ! 3D
         do k = 1, hvy_n
-            do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
-            do iy = g+1, Bs+g-1
-            do ix = g+1, Bs+g-1
+            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+            do iy = g+1, Bs(2)+g-1
+            do ix = g+1, Bs(1)+g-1
                 norm = norm + sum( hvy_block(ix,iy,iz,:,hvy_active(k))**2 )
             enddo
             enddo
@@ -531,8 +532,8 @@ subroutine wabbit_norm(params, hvy_block, hvy_active, hvy_n, norm)
     else
         ! 2D
         do k = 1, hvy_n
-            do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
-            do ix = g+1, Bs+g-1
+            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
+            do ix = g+1, Bs(1)+g-1
                 norm = norm + sum( hvy_block(ix,iy,1,:,hvy_active(k))**2 )
             enddo
             enddo
@@ -558,7 +559,8 @@ subroutine scalarproduct(params, hvy_block1, hvy_block2, hvy_active, hvy_n, resu
     !> this is the output of the function:
     real(kind=rk), intent(out)          :: result
 
-    integer :: k, mpierr, ix, iy, iz, Bs, g, ieqn
+    integer :: k, mpierr, ix, iy, iz, g, ieqn
+    integer, dimension(3) :: Bs
 
     result = 0.0_rk
 
@@ -569,9 +571,9 @@ subroutine scalarproduct(params, hvy_block1, hvy_block2, hvy_active, hvy_n, resu
     if (params%dim == 3) then
         ! 3D
         do k = 1, hvy_n
-            do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
-            do iy = g+1, Bs+g-1
-            do ix = g+1, Bs+g-1
+            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+            do iy = g+1, Bs(2)+g-1
+            do ix = g+1, Bs(1)+g-1
             do ieqn = 1, params%n_eqn
                 result = result + hvy_block1(ix,iy,iz,ieqn,hvy_active(k)) * hvy_block2(ix,iy,iz,ieqn,hvy_active(k))
             enddo
@@ -582,8 +584,8 @@ subroutine scalarproduct(params, hvy_block1, hvy_block2, hvy_active, hvy_n, resu
     else
         ! 2D
         do k = 1, hvy_n
-            do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
-            do ix = g+1, Bs+g-1
+            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
+            do ix = g+1, Bs(1)+g-1
             do ieqn = 1, params%n_eqn
                 result = result + hvy_block1(ix,iy,1,ieqn,hvy_active(k)) * hvy_block2(ix,iy,1,ieqn,hvy_active(k))
             enddo

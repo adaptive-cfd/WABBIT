@@ -67,7 +67,8 @@ end subroutine read_case_parameters
   function set_inicond_case(params,x0, dx, Bs, g, phi) result(set_inicond)
       implicit none
       ! -----------------------------------------------------------------
-      integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+      integer(kind=ik), intent(in)  :: g          !< grid parameter
+      integer(kind=ik), dimension(3), intent(in) :: Bs
       real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
       real(kind=rk), intent(inout)  :: phi(:,:,:,:)    !< Statevector for t=0
       type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure
@@ -96,7 +97,8 @@ end subroutine read_case_parameters
  subroutine compute_mask_and_ref2D(params, Bs, g, x0, dx, phi, mask, phi_ref)
      implicit none
      !-------------------------------------------------------
-     integer(kind=ik), intent(in)    :: g, Bs          !< grid parameter
+     integer(kind=ik), intent(in)  :: g          !< grid parameter
+     integer(kind=ik), dimension(3), intent(in) :: Bs
      real(kind=rk), intent(in)       :: phi(:,:,:)     !< primary state variables
      real(kind=rk), intent(inout)    :: mask(:,:,:)    !< rhs
      real(kind=rk), intent(inout)    :: phi_ref(:,:,:) !< reference state variables
@@ -129,7 +131,8 @@ end subroutine read_case_parameters
  subroutine compute_mask_and_ref3D(params, Bs, g, x0, dx, phi, mask, phi_ref)
      implicit none
      !-------------------------------------------------------
-     integer(kind=ik), intent(in)    :: g, Bs          !< grid parameter
+     integer(kind=ik), intent(in)  :: g          !< grid parameter
+     integer(kind=ik), dimension(3), intent(in) :: Bs
      real(kind=rk), intent(in)       :: phi(:,:,:,:)     !< primary state variables
      real(kind=rk), intent(inout)    :: mask(:,:,:,:)    !< rhs
      real(kind=rk), intent(inout)    :: phi_ref(:,:,:,:) !< reference state variables
@@ -163,7 +166,8 @@ end subroutine read_case_parameters
   subroutine get_mask(params,x0, dx, Bs, g, mask, mask_is_colored)
       implicit none
       ! -----------------------------------------------------------------
-      integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+      integer(kind=ik), intent(in)  :: g          !< grid parameter
+      integer(kind=ik), dimension(3), intent(in) :: Bs
       real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
       real(kind=rk), intent(inout), allocatable  :: mask(:,:,:)    !< mask function
       type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure

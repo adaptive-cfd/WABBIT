@@ -51,11 +51,12 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
 !
     implicit none
     !> grid parameter
-    integer(kind=ik), intent(in)                            :: g, Bs
+    integer(kind=ik), intent(in)                            :: g
+    integer(kind=ik), dimension(3), intent(in)              :: Bs
     !> origin and spacing of the block
-    real(kind=rk), dimension(2), intent(in)                  :: x0, delta_x
+    real(kind=rk), dimension(2), intent(in)                 :: x0, delta_x
     !> datafields
-    real(kind=rk), intent(in)                            :: phi(:, :, :)
+    real(kind=rk), intent(in)                               :: phi(:, :, :)
     !> rhs array
     real(kind=rk), intent(inout)                            :: rhs(:, :, :)
 
@@ -75,10 +76,10 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
     logical                                                 :: dissipation
 
     ! variables
-    real(kind=rk)                                           :: rho(Bs+2*g, Bs+2*g), u(Bs+2*g, Bs+2*g), v(Bs+2*g, Bs+2*g),vRho(Bs+2*g, Bs+2*g), p(Bs+2*g, Bs+2*g), &
-                                                               uRho(Bs+2*g, Bs+2*g),uRhou(Bs+2*g, Bs+2*g),uRhov(Bs+2*g, Bs+2*g),vRhov(Bs+2*g, Bs+2*g), &
-                                                               T(Bs+2*g, Bs+2*g),tau(1:3, 1:3),&
-                                                               mask(Bs+2*g, Bs+2*g), sponge(Bs+2*g, Bs+2*g),up(Bs+2*g, Bs+2*g), vp(Bs+2*g, Bs+2*g)
+    real(kind=rk)                                           :: rho(Bs(1)+2*g, Bs(2)+2*g), u(Bs(1)+2*g, Bs(2)+2*g), v(Bs(1)+2*g, Bs(2)+2*g),vRho(Bs(1)+2*g, Bs(2)+2*g), p(Bs(1)+2*g, Bs(2)+2*g), &
+                                                               uRho(Bs(1)+2*g, Bs(2)+2*g),uRhou(Bs+2*g, Bs+2*g),uRhov(Bs+2*g, Bs+2*g),vRhov(Bs(1)+2*g, Bs(2)+2*g), &
+                                                               T(Bs(1)+2*g, Bs(2)+2*g),tau(1:3, 1:3),&
+                                                               mask(Bs(1)+2*g, Bs(2)+2*g), sponge(Bs(1)+2*g, Bs(2)+2*g),up(Bs(1)+2*g, Bs(2)+2*g), vp(Bs(1)+2*g, Bs(2)+2*g)
     ! derivatives
     real(kind=rk)                                           :: u_x, u_xx, u_xy, u_y, u_yy, v_x, v_xx, v_xy, v_y, v_yy, p_x, p_y, T_xx, T_yy, &
                                                                div_U, uRho_x, uRhou_x, vRhov_y, vRhou_y, vRho_y,uRhov_x, vp_y, up_x
@@ -150,8 +151,8 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
 ! main body
 
        !-----------------------------------------------------------------------
-        do ix = g+1, Bs+g
-            do iy = g+1, Bs+g
+        do ix = g+1, Bs(2)+g
+            do iy = g+1, Bs(1)+g
 
                 ! Derivatives
                 !------------
@@ -272,7 +273,7 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                    rhs(ix,iy,3)=rhs(ix,iy,3) - sqrt_rho_inv *mask(ix,iy) * ( vRho(ix,iy) - 0.0_rk )
                    ! p component (preasure/energy)
                    rhs(ix,iy,4)=rhs(ix,iy,4) -               mask(ix,iy) * ( p(ix,iy)    - rho(ix,iy)*Rs*T0_ )
-                   
+
                endif
 
 
@@ -349,7 +350,8 @@ subroutine get_sponge(sponge, x0, dx, Bs, g)
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in)                              :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> sponge term for every grid point of this block
     real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge
     !> spacing and origin of block
@@ -369,8 +371,8 @@ subroutine get_sponge(sponge, x0, dx, Bs, g)
 ! main body
     ddx = 0.1_rk*params_ns%domain_size(1)
 
-    do iy=1, Bs+2*g
-       do ix=1, Bs+2*g
+    do iy=1, Bs(2)+2*g
+       do ix=1, Bs(1)+2*g
            x = dble(ix-(g+1)) * dx(1) + x0(1)
            if ((params_ns%domain_size(1)-x) <= ddx) then
                sponge(ix,iy) = (x-(params_ns%domain_size(1)-ddx))**2

@@ -10,13 +10,13 @@
 !> \brief write heavy block data in first datafield, reset all other datafields
 !
 !>
-!! input:    
+!! input:
 !!           - params
 !!           - heavy data id
 !!           - data for second datafield
 !!           - coordinate vectors (store in first datafield)
 !!
-!! output:   
+!! output:
 !!           - heavy block data array
 !!
 !! = log ======================================================================================
@@ -46,7 +46,8 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi)
     real(kind=rk), intent(in)           :: phi(:, :, :)
 
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: g
+    integer(kind=ik), dimension(3)     :: Bs
     ! number of datafields
     integer(kind=ik)                    :: dF
 
@@ -67,12 +68,12 @@ subroutine new_block_heavy( params, hvy_block, heavy_id, phi)
     if ( params%threeD_case ) then
         ! 3D:
         ! save data in first datafield
-        hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, 1, heavy_id )      = phi(:, :, :)
+        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, heavy_id )      = phi(:, :, :)
 
     else
         ! 2D:
         ! save data in first datafield
-        hvy_block( g+1:Bs+g, g+1:Bs+g, 1, 1, heavy_id )             = phi(:, :, 1)
+        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, heavy_id )             = phi(:, :, 1)
 
     end if
 

@@ -7,7 +7,7 @@
 !> \brief reads a field from a .h5 file saved in flusi format
 !
 ! = log ======================================================================
-!> \date  9/3/2018 - create hashcode: commit 
+!> \date  9/3/2018 - create hashcode: commit
 !> \date 20/7/2018 - add read_field_flusi_MPI for parallel reading
 !-----------------------------------------------------------------------------
 subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params, Bs_f)
@@ -22,10 +22,11 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   type (type_params), intent(in)         :: params
   integer(kind=ik), intent(in)           :: hvy_active(:)
   integer(kind=ik), intent(in)           :: lgt_block(:, :)
-  integer(kind=ik), intent(in)           :: hvy_n, Bs_f
+  integer(kind=ik), intent(in)           :: hvy_n
+  integer(kind=ik), dimension(3), intent(in) :: Bs_f
 
   ! grid parameter
-  integer(kind=ik)                    :: Bs
+  integer(kind=ik), dimension(3)      :: Bs
   integer(kind=ik)                    :: k, lgt_id, start_x, start_y, start_z
   ! offset variables
   integer(kind=ik), dimension(3)      :: ubounds3D, lbounds3D
@@ -46,22 +47,22 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   end if
 
   if (params%threeD_case) then
-      allocate( blockbuffer(Bs_f+1,Bs_f+1,Bs_f+1))  
+      allocate( blockbuffer(Bs_f(1)+1,Bs_f(2)+1,Bs_f(3)+1))
       lbounds3D = (/0, 0, 0/)
-      ubounds3D = (/Bs_f, Bs_f, Bs_f/)-1
+      ubounds3D = (/Bs_f(1), Bs_f(2), Bs_f(3)/)-1
       call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds3D, ubounds3D, &
-          blockbuffer(1:Bs_f,1:Bs_f, 1:Bs_f))
+          blockbuffer(1:Bs_f(1),1:Bs_f(2), 1:Bs_f(3)))
   else
-      allocate( blockbuffer(1,Bs_f+1,Bs_f+1))
+      allocate( blockbuffer(1,Bs_f(1)+1,Bs_f(2)+1))
       lbounds2D = (/0, 0, 0/)
-      ubounds2D = (/1, Bs_f, Bs_f/)-1
+      ubounds2D = (/1, Bs_f(1), Bs_f(2)/)-1
       call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
-          blockbuffer(1,1:Bs_f,1:Bs_f))
+          blockbuffer(1,1:Bs_f(1),1:Bs_f(2)))
   end if
 
-  blockbuffer(:,Bs_f+1,:) = blockbuffer(:,1,:)
-  blockbuffer(:,:,Bs_f+1) = blockbuffer(:,:,1)
-  if (params%threeD_case) blockbuffer(Bs_f+1,:,:) = blockbuffer(1,:,:)
+  blockbuffer(:,Bs_f(2)+1,:) = blockbuffer(:,1,:)
+  blockbuffer(:,:,Bs_f(3)+1) = blockbuffer(:,:,1)
+  if (params%threeD_case) blockbuffer(Bs_f(1)+1,:,:) = blockbuffer(1,:,:)
   do k=1, hvy_n
       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -69,11 +70,11 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
       start_y = nint(x0(2)/dx(2)) + 1
       if (params%threeD_case) then
           start_z = nint(x0(3)/dx(3)) + 1
-          hvy_block(1:Bs, 1:Bs, 1:Bs, 1, hvy_active(k)) = blockbuffer(start_x:start_x+Bs-1,&
-              start_y:start_y+Bs-1,start_z:start_z+Bs-1)
-      else 
-          hvy_block(1:Bs, 1:Bs, 1, 1, hvy_active(k)) = blockbuffer(1,&
-              start_x:start_x+Bs-1,start_y:start_y+Bs-1)
+          hvy_block(1:Bs(1), 1:Bs(2), 1:Bs(3), 1, hvy_active(k)) = blockbuffer(start_x:start_x+Bs(1)-1,&
+              start_y:start_y+Bs(2)-1,start_z:start_z+Bs(3)-1)
+      else
+          hvy_block(1:Bs(1), 1:Bs(2), 1, 1, hvy_active(k)) = blockbuffer(1,&
+              start_x:start_x+Bs(1)-1,start_y:start_y+Bs(2)-1)
       end if
   end do
 
@@ -95,8 +96,10 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   type (type_params), intent(in)      :: params
   integer(kind=ik), intent(in)        :: hvy_active(:)
   integer(kind=ik), intent(in)        :: lgt_block(:, :)
-  integer(kind=ik), intent(in)        :: hvy_n, Bs_f
-  integer(kind=ik)                    :: Bs, g
+  integer(kind=ik), intent(in)        :: hvy_n
+  integer(kind=ik), dimension(3), intent(in) :: Bs_f
+  integer(kind=ik)                    :: g
+  integer(kind=ik), dimension(3)      :: Bs
   integer(kind=ik)                    :: k, lgt_id, start_x, start_y, start_z
   ! offset variables
   integer(kind=ik), dimension(3)      :: ubounds, lbounds, num_Bs
@@ -110,7 +113,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   g  = params%n_ghosts
   ! this is necessary in 2D because flusi data is organised as field(1,1:Bs_f,1:Bs_f)
   ! whereas in wabbit the field has only one component in z direction
-  if (.not. params%threeD_case) allocate(blockbuffer(1,0:Bs-1,0:Bs-1))
+  if (.not. params%threeD_case) allocate(blockbuffer(1,0:Bs(1)-1,0:Bs(2)-1))
 !----------------------------------------------------------------------------
   call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
     ! print a message
@@ -129,18 +132,18 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
       if (params%threeD_case) then
           start_z = nint(x0(3)/dx(3))
           lbounds = (/start_x,start_y,start_z/)
-          ubounds = (/end_bound(start_x,Bs,Bs_f), end_bound(start_y,Bs,Bs_f),&
-              end_bound(start_z,Bs,Bs_f)/)
+          ubounds = (/end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2)),&
+              end_bound(start_z,Bs(3),Bs_f(1))/)
           num_Bs = ubounds-lbounds+1
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
           hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k)))
       else
           lbounds = (/0, start_x, start_y/)
-          ubounds = (/0, end_bound(start_x,Bs,Bs_f), end_bound(start_y,Bs,Bs_f)/)
+          ubounds = (/0, end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2))/)
           num_Bs = ubounds-lbounds+1
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
           blockbuffer(1,0:num_Bs(2)-1,0:num_Bs(3)-1))
-          hvy_block(g+1:g+num_Bs(2),g+1:g+num_Bs(3), 1, 1, hvy_active(k)) = blockbuffer(1,0:num_Bs(2)-1,0:num_Bs(3)-1)
+          hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k)) = blockbuffer(1,0:num_Bs(2)-1,0:num_Bs(3)-1)
       end if
   end do
 
@@ -189,7 +192,7 @@ integer(kind=ik) function end_bound(start, Bs, Bs_f)
   implicit none
   integer(kind=ik), intent(in) :: start, Bs, Bs_f
 
-  ! if I'm the last block in x, y and/or z direction, I get to read only Bs-1 points, 
+  ! if I'm the last block in x, y and/or z direction, I get to read only Bs-1 points,
   ! otherwise all Bs points
   if (start==Bs_f-Bs+1) then
       end_bound = start + Bs - 2
@@ -197,4 +200,3 @@ integer(kind=ik) function end_bound(start, Bs, Bs_f)
       end_bound = start + Bs - 1
   end if
 end function end_bound
-

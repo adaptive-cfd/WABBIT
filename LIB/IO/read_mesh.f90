@@ -51,7 +51,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! process rank, number of procs
     integer(kind=ik)      :: rank, number_procs
     ! grid parameter
-    integer(kind=ik)      :: Bs, g
+    integer(kind=ik)      :: g
+    integer(kind=ik), dimension(3)    :: Bs
     ! offset variables
     integer(kind=ik)      :: ubounds(2), lbounds(2)
     integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)

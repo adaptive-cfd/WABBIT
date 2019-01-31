@@ -56,8 +56,9 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                    :: Bs, g, Neqn, number_blocks,&
-                                                      rank, number_procs,number_trees
+    integer(kind=ik)                                    :: g, Neqn, number_blocks,&
+                                                      rank, number_procs,number_trees, dim
+    integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
     integer             :: status, nrhs_slots, nwork
@@ -74,6 +75,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     g               = params%n_ghosts
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
+    dim             = params%dim
 
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
@@ -100,17 +102,17 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'(A)') "INIT: Beginning memory allocation and initialization."
         write(*,'("INIT: mpisize=",i6)') params%number_procs
         write(*,'("INIT: nwork=",i6)') nwork
-        write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
+        write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs(1),Bs(2),Bs(3), number_blocks, number_blocks*number_procs
     endif
 
 
     ! allocate memory
-    if ( params%threeD_case ) then
+    if ( dim==3 ) then
         ! 3D:
         if (rank==0) write(*,'("INIT: Allocating a 3D case.")')
 
         !---------------------------------------------------------------------------
-        allocate( hvy_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks ) )
+        allocate( hvy_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, Neqn, number_blocks ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
@@ -119,7 +121,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if (present(hvy_work)) then
-            allocate( hvy_work( Bs+2*g, Bs+2*g, Bs+2*g, Neqn, number_blocks, nrhs_slots ) )
+            allocate( hvy_work( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, Neqn, number_blocks, nrhs_slots ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
@@ -127,7 +129,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         end if
 
         if ( present(hvy_tmp) ) then
-        allocate( hvy_tmp( Bs+2*g, Bs+2*g, Bs+2*g, nwork, number_blocks )  )
+        allocate( hvy_tmp( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nwork, number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
@@ -148,7 +150,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (rank==0) write(*,'("INIT: Allocating a 2D case.")')
 
         !---------------------------------------------------------------------------
-        allocate( hvy_block( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks ) )
+        allocate( hvy_block( Bs(1)+2*g, Bs(2)+2*g, 1, Neqn, number_blocks ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
@@ -157,7 +159,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         !---------------------------------------------------------------------------
         ! work data (Runge-Kutta substeps and old time level)
         if ( present(hvy_work) ) then
-            allocate( hvy_work( Bs+2*g, Bs+2*g, 1, Neqn, number_blocks, nrhs_slots ) )
+            allocate( hvy_work( Bs(1)+2*g, Bs(2)+2*g, 1, Neqn, number_blocks, nrhs_slots ) )
             if (rank==0) then
                 write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",6(i9,1x))') &
                 "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
@@ -165,7 +167,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         end if
 
         if ( present(hvy_tmp) ) then
-        allocate( hvy_tmp( Bs+2*g, Bs+2*g, 1, nwork, number_blocks )  )
+        allocate( hvy_tmp( Bs(1)+2*g, Bs(2)+2*g, 1, nwork, number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)

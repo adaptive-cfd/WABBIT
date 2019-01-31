@@ -57,7 +57,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, Bs, g, mpierr
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr
+    integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), tmp(1:params%n_eqn)
     real(kind=rk) :: norm(1:params%n_eqn)

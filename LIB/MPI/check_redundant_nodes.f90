@@ -34,7 +34,8 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! data buffer size
     integer(kind=ik)                    :: buffer_size, buffer_position
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g, i0, ii0, ii1
+    integer(kind=ik)                    :: g, i0, ii0, ii1
+    integer(kind=ik), dimension(3)      :: Bs
     ! number of datafields
     integer(kind=ik)                    :: NdF
     logical                             :: test2
@@ -204,7 +205,8 @@ subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_s
     integer(kind=tsize)::tc
 
     ! loop variable
-    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven, bs, g
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven, g
+    integer(kind=ik), dimension(3)                  :: Bs
 
     ! error threshold
     real(kind=rk)                                   :: eps

@@ -311,7 +311,8 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g, alpha)
     implicit none
     !--------------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)                   :: Bs, g
+    integer(kind=ik), intent(in)  :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> sponge term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(out)     :: sponge
     !> spacing and origin of block
@@ -334,12 +335,12 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g, alpha)
       alpha_ = 1
     end if
 
-    do iy = 1, Bs+2*g
+    do iy = 1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2)
         ! distance to y-border of domain
         tmp(2) = min(y,-(y-params_ns%domain_size(2)))
 
-        do ix = 1, Bs+2*g
+        do ix = 1, Bs(1)+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             ! distance to x-border of domain
             tmp(1) = min(x,-(x-params_ns%domain_size(1)))
@@ -367,7 +368,8 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g, alpha)
     implicit none
     !--------------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)  :: Bs, g
+    integer(kind=ik), intent(in)  :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> sponge term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(out)     :: sponge
     !> spacing and origin of block
@@ -388,17 +390,17 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g, alpha)
     end if
 
 
-    do iz = 1, Bs+2*g
+    do iz = 1, Bs(3)+2*g
         z = dble(iz-(g+1)) * dx(3) + x0(3)
         ! distance to z-border of domain
         tmp(3) = min(z,-(z-params_ns%domain_size(3)))
 
-        do iy = 1, Bs+2*g
+        do iy = 1, Bs(2)+2*g
             y = dble(iy-(g+1)) * dx(2) + x0(2)
             ! distance to y-border of domain
             tmp(2) = min(y,-(y-params_ns%domain_size(2)))
 
-            do ix = 1, Bs+2*g
+            do ix = 1, Bs(1)+2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 ! distance to x-border of domain
                 tmp(1) = min(x,-(x-params_ns%domain_size(1)))
@@ -428,7 +430,8 @@ subroutine wall_2D(mask, x0, dx, Bs, g, alpha)
     implicit none
     !--------------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)                   :: Bs, g
+    integer(kind=ik), intent(in)  :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask at the boundary of the domain
     real(kind=rk), dimension(:,:), intent(out)     :: mask
     !> spacing and origin of block
@@ -452,12 +455,12 @@ subroutine wall_2D(mask, x0, dx, Bs, g, alpha)
 
     h = 1.5_rk*dx(alpha_)
 
-    do iy = 1, Bs+2*g
+    do iy = 1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2)
         ! distance to y-border of domain
         tmp(2) = min(y,-(y-params_ns%domain_size(2)))
 
-        do ix = 1, Bs+2*g
+        do ix = 1, Bs(1)+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             ! distance to x-border of domain
             tmp(1) = min(x,-(x-params_ns%domain_size(1)))
@@ -486,7 +489,8 @@ subroutine wall_3D(mask, x0, dx, Bs, g, alpha)
     implicit none
     !--------------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)  :: Bs, g
+    integer(kind=ik), intent(in)  :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask that is created on domain boundaries
     real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
@@ -508,17 +512,17 @@ subroutine wall_3D(mask, x0, dx, Bs, g, alpha)
 
     h = 1.5_rk*dx(alpha_)
 
-    do iz = 1, Bs+2*g
+    do iz = 1, Bs(3)+2*g
         z = dble(iz-(g+1)) * dx(3) + x0(3)
         ! distance to z-border of domain
         tmp(3) = min(z,-(z-params_ns%domain_size(3)))
 
-        do iy = 1, Bs+2*g
+        do iy = 1, Bs(2)+2*g
             y = dble(iy-(g+1)) * dx(2) + x0(2)
             ! distance to y-border of domain
             tmp(2) = min(y,-(y-params_ns%domain_size(2)))
 
-            do ix = 1, Bs+2*g
+            do ix = 1, Bs(1)+2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 ! distance to x-border of domain
                 tmp(1) = min(x,-(x-params_ns%domain_size(1)))
@@ -537,7 +541,8 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
 
     implicit none
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in)  :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(out)              :: mask
     !> spacing and origin of block
@@ -550,7 +555,7 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(745109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g) call abort(745109,"wrong array size, there's pirates, captain!")
 
     ! reset mask array
     mask  = 0.0_rk
@@ -563,9 +568,9 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
-    do ix=1, Bs+2*g
+    do ix=1, Bs(1)+2*g
         x = dble(ix-(g+1)) * dx(1) + x0(1)
-        do iy=1, Bs+2*g
+        do iy=1, Bs(2)+2*g
            y = dble(iy-(g+1)) * dx(2) + x0(2)
            r = abs(y-Domain_Size(2)*0.5_rk)
 

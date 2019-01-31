@@ -13,7 +13,8 @@ subroutine mask_post(params)
     type (type_params), intent(inout)  :: params
     character(len=80)      :: fname_ini, fname_mask, fname_grid
     real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, Bs, tc_length, g
+    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
+    integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
@@ -85,7 +86,7 @@ subroutine mask_post(params)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-    if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+    if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
 
     ! calculate vorticity from velocities
     do k = 1, hvy_n

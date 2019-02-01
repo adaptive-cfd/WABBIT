@@ -297,13 +297,16 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 
 clean:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
-.PHONY: doc test
+.PHONY: doc test ctags
 doc:
 	doxygen doc/doc_configuration
 	firefox doc/output/html/index.html &
 test:
 	./TESTING/runtests.sh
 
+ctags: 
+	ctags -R --fortran-kinds=+i -f LIB/wabbit_tags *
+	sed -i -e 's/\.\.\///' LIB/wabbit_tags
 # If the object directory doesn't exist, create it.
 .PHONY: directories
 

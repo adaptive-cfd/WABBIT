@@ -22,7 +22,7 @@ program sPOD
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
     !                   -> column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
     !                   -> column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
-    integer(kind=ik), allocatable       :: lgt_block(:, :)
+    integer(kind=ik), allocatable       :: lgt_block(:, :, :)
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
@@ -55,7 +55,7 @@ program sPOD
     ! here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
     integer(kind=tsize), allocatable    :: lgt_sortednumlist(:,:)
     ! list of active blocks (light data)
-    integer(kind=ik), allocatable       :: lgt_active(:)
+    integer(kind=ik), allocatable       :: lgt_active(:,:)
     ! number of active blocks (light data)
     integer(kind=ik)                    :: lgt_n
     ! list of active blocks (heavy data)
@@ -109,83 +109,23 @@ program sPOD
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
 
-
     allocate(params%input_files(1))
-    call get_command_argument( 2, params%input_files(1) )
+    params%input_files = "rho_000000000000.h5"
+    !call get_command_argument( 2, params%input_files(1) )
 
-    tree_id=
+    tree_id=1
+    call read_field2tree(params, params%input_files, size(params%input_files), &
+                        lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
     call read_field2tree(params, params%input_files, size(params%input_files), tree_id, &
-                        lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+                        lgt_block, lgt_active(:,tree_id), lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-
     keep_running = .true.
     iteration     = 0
 
 ! #################################################################################
-! #################################################################################
 !                   MAIN LOOP
 ! #################################################################################
-! #################################################################################
     call abort(23456,"stop here")
-    do while (keep_running)
-        t2 = MPI_wtime()
-        !***********************************************************************
-        ! MPI bridge (used e.g. for particle-fluid coupling)
-        !***********************************************************************
-        if (params%bridge_exists) then
-            call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active, &
-                                    lgt_active, lgt_n, hvy_n,params)
-        endif
-        !*******************************************************************
-        ! perform action
-        !*******************************************************************
-        t4 = MPI_wtime()
-        !call perform_operation( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, &
-        !hvy_active, lgt_active, lgt_n, hvy_n )
-        call toc( params, "TOPLEVEL: perform_operation", MPI_wtime()-t4)
-        iteration = iteration + 1
-        !***********************************************************************
-        ! Write fields to HDF5 file
-        !***********************************************************************
-        if (it_is_time_to_save_data) then
-            ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-
-            ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
-            ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
-            ! slots. the state vector (hvy_block) is copied if desired.
-            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-            lgt_n, hvy_n, hvy_tmp, hvy_active )
-
-            params%next_write_time = params%next_write_time + params%write_time
-        endif
-        !***********************************************************************
-        ! walltime limiter
-        !***********************************************************************
-        ! maximum walltime allowed for simulations (in hours). The run will be stopped if this duration
-        ! is exceeded. This is useful on real clusters, where the walltime of a job is limited, and the
-        ! system kills the job regardless of whether we're done or not. If WABBIT itself ends execution,
-        ! a backup is written and you can resume the simulation right where it stopped
-        if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
-            if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
-            keep_running = .false.
-        endif
-        !***********************************************************************
-        ! runtime control
-        !***********************************************************************
-        ! it happens quite often that one wants to end a simulation prematurely, but
-        ! one also wants to be able to resume it. the usual "kill" on clusters will terminate
-        ! wabbit immediately and not write a backup. Hence, it is possible to terminate
-        ! wabbit by writing "save_stop" to "runtime_control"
-        if ( runtime_control_stop() ) then
-            if (rank==0) write(*,*) "WE RECVED THE STOP COMMAND: WRITE BACKUP; THEN BYEBYE"
-            keep_running = .false.
-        endif
-    end do
-! #################################################################################
-! #################################################################################
-! #################################################################################
 ! #################################################################################
     if (rank==0) write(*,*) "Completed all tasks! Ending Program"
     ! MPI Barrier before program ends
@@ -195,8 +135,8 @@ program sPOD
     ! and print it to stdout
     call summarize_profiling( params, WABBIT_COMM )
 
-    call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp )
+    !call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+        !hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp )
 
     ! computing time output on screen
     call cpu_time(t1)

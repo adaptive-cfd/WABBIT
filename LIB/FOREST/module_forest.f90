@@ -68,10 +68,10 @@ contains
       character(len=*), intent(in)      :: fnames(N_files)  !< file names
       integer(kind=ik), intent(inout)   :: hvy_n, lgt_n     !< number of heavy and light active blocks
       integer(kind=ik), intent(in)      :: tree_id     !< number of the tree
-      integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_block(:, :)  !< light data array
+      integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_block(:,:,:)  !< light data array
       real(kind=rk), ALLOCATABLE, intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       integer(kind=ik), ALLOCATABLE, intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-      integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_active(:), hvy_active(:) !< active lists
+      integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_active(:,:), hvy_active(:) !< active lists
       integer(kind=tsize), ALLOCATABLE, intent(inout):: lgt_sortednumlist(:,:)
       real(kind=rk), ALLOCATABLE, intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
       !-------------------------------- ---------------------------------

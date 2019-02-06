@@ -42,17 +42,12 @@ endif
 #=======================================================================
 #List all source files
 #=======================================================================
-
+# Modules exluded from python library
+excludes_mod = module_insects_integration_flusi_wabbit.f90 \
+	   module_sparse_operators.f90
+excludes = $(addprefix f90wrap_,$(excludes_mod))
 # Files that create modules:
-LIBSRC_FILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90
-	#module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
-	#module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
-	#module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
-	#module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
-	#module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 \
-	#module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
-	#module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 
-
+LIBSRC_FILES = $(MFILES)
 LIBSRC_OBJECTS := $(LIBSRC_FILES:%.f90=$(OBJDIR)/%.o)
 
 
@@ -74,7 +69,7 @@ python-clean:
 	rm -rf OBJ/*.o
 	rm -rf  $(wrap_dir)/f90wrap_*.o $(wrap_dir)/f90wrap_*.f90
 	rm -rf *wabbit*.so src.linux*
-	rm  libsrc.a wabbit.py 
+	rm  libwabbit.a wabbit.py 
 	
 .F90.o:
 	${F90} ${F90FLAGS} ${SOFLAGS} -fPIC -c $< -o $@
@@ -85,7 +80,7 @@ python-clean:
 .F90.fpp:
 	${FPP} ${SOFLAGS} $<  -o 
 
-libsrc.a: ${LIBSRC_OBJECTS}
+libwabbit.a: ${LIBSRC_OBJECTS} ${MOBJS} $(OBJS)
 	${LIBTOOL} $@ $?
 
 #=======================================================================
@@ -93,16 +88,23 @@ libsrc.a: ${LIBSRC_OBJECTS}
 #=======================================================================
 python: ${LIBSRC_FILES}
 	@echo -e "\n\n \e[1m creating library\e[0m \n\n"
-	make libsrc.a
+	make libwabbit.a
 	mkdir -p $(wrap_dir)
 	mkdir -p $(moddir)
 	@echo -e "\n \n \e[1m create f90wrapper\e[0m \n\n"
-	f90wrap -m wabbit $^ -k $(kmap_file) -c -v
+	f90wrap -m libwabbit $^ -k $(kmap_file) -c -v
+	rm $(excludes)
 	mv f90wrap_*.f90 $(wrap_dir)
 	@echo -e "\n\n \e[1m compiling f90 wrapper \e[0m \n\n"
-	f2py -c --f90exec=$(F90) -I$(moddir) \
+	f2py-f90wrap -c --f90exec=$(F90) -I$(moddir) $(wrap_dir)/f90wrap*.f90 \
 	$(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 \
 	-lz -ldl -lm -lblas -llapack -I$(HDF_INC) $(SB_LIB) $(SB_INCL) --build-dir . \
-	-m _wabbit -L. -lsrc $(wrap_dir)/f90wrap*.f90 
+	-m _libwabbit -L. -lwabbit 
 ########################################################################
-########################################################################
+# Remarks:
+# 1. Libraries must be listed after the objects that use them
+# (more precisely, a library will be used only if it contains a 
+# symbol that satisfies an undefined reference known at the time
+# it is encountered)
+# Therefore make sure that -L. -lsrc comes after f90wrap*.f90.
+##################################################################

@@ -45,7 +45,7 @@ module module_acm
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
-  type :: type_params
+  type :: type_params_acm
     real(kind=rk) :: CFL, T_end, CFL_eta
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
@@ -79,11 +79,11 @@ module module_acm
     integer(kind=ik) :: mpirank, mpisize
     !
     integer(kind=ik) :: Jmax, Bs
-  end type type_params
+  end type type_params_acm
 
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  type(type_params), save :: params_acm
+  type(type_params_acm), save :: params_acm
 
   ! all parameters for insects go here:
   type(diptera), save :: insect

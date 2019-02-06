@@ -26,6 +26,7 @@ module module_acm
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
   use module_helpers, only : startup_conditioner, smoothstep
+  use module_params, only: merge_blancs, count_entries
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -78,9 +79,9 @@ module module_acm
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
-    integer(kind=ik) :: Jmax, Bs
+    integer(kind=ik) :: Jmax
+    integer(kind=ik), dimension(3) :: Bs
   end type type_params_acm
-
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params_acm), save :: params_acm
@@ -88,11 +89,9 @@ module module_acm
   ! all parameters for insects go here:
   type(diptera), save :: insect
 
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
+  ! two things can be stored in the grid_qtys: the sponge and the mask.
+  ! we therefore need to know where to store what (fixed indices do not work)
+  integer(kind=ik) :: IDX_MASK=-1, IDX_USX=-1, IDX_USY=-1, IDX_USZ=-1 , IDX_COLOR=-1, IDX_SPONGE=-1
 
 contains
 
@@ -109,16 +108,21 @@ contains
   ! main level wrapper routine to read parameters in the physics module. It reads
   ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   ! the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_ACM( filename )
+  subroutine READ_PARAMETERS_ACM( filename, n_gridQ )
     implicit none
 
     character(len=*), intent(in) :: filename
-    integer(kind=ik) :: mpicode, nx_max
+    integer(kind=ik) :: mpicode, nx_max, n_entries
     real(kind=rk) :: dx_min, dt_min
+    character(len=80) :: Bs_str, Bs_conc
+    character(:), allocatable :: Bs_short
+    real(kind=rk), dimension(3) :: Bs_real
+    integer(kind=ik), intent(out) :: n_gridQ
 
     ! inifile structure
     type(inifile) :: FILE
 
+    n_gridQ = 0
 
     ! we still need to know about mpirank and mpisize, occasionally
     call MPI_COMM_SIZE (WABBIT_COMM, params_acm%mpisize, mpicode)
@@ -185,16 +189,61 @@ contains
     call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
-
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_acm%Bs, 1   )
+
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
+    call merge_blancs(Bs_str)
+    Bs_short=trim(Bs_str)
+    call count_entries(Bs_short, " ", n_entries)
+    if (Bs_str .eq. "empty") then
+      Bs_conc="17 17 17"
+    elseif (n_entries==1) then
+      if (params_acm%dim==3) then
+        Bs_conc=Bs_short // " " // Bs_short // " " // Bs_short
+      elseif (params_acm%dim==2) then
+        Bs_conc=Bs_short//" "//Bs_short//" 1"
+      endif
+    elseif (n_entries==2) then
+      if (params_acm%dim==3) then
+        call abort(231191739,"ERROR: You only gave two values for Bs, but want three to be read...")
+      elseif (params_acm%dim==2) then
+        Bs_conc=Bs_short//" 1"
+      endif
+    elseif (n_entries==3) then
+      if (params_acm%dim==2) then
+        call abort(231191740,"ERROR: You gave three values for Bs, but only want two to be read...")
+      elseif (params_acm%dim==3) then
+        Bs_conc=trim(adjustl(Bs_str))
+      endif
+    elseif (n_entries .gt. 3) then
+      call abort(231191754,"ERROR: You gave too many arguments for Bs...")
+    endif
+    read(Bs_conc, *) Bs_real
+    params_acm%Bs = int(Bs_real)
 
 
     call clean_ini_file_mpi( FILE )
 
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)
-    nx_max = (params_acm%Bs-1) * 2**(params_acm%Jmax)
+    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    nx_max = (params_acm%Bs(1)-1) * 2**(params_acm%Jmax)
     dt_min = params_acm%CFL*dx_min/params_acm%c_0
+
+    ! two things can be stored in the grid_qtys: the sponge and the mask.
+    ! we therefore need to know where to store what (fixed indices do not work)
+    if (params_acm%penalization .and. params_acm%geometry=="Insect") then
+        n_gridQ = n_gridQ + 5
+        IDX_MASK  = n_gridQ - 4
+        IDX_USX   = n_gridQ - 3
+        IDX_USY   = n_gridQ - 2
+        IDX_USZ   = n_gridQ - 1
+        IDX_COLOR = n_gridQ
+    endif
+
+    if (params_acm%use_sponge) then
+        n_gridQ = n_gridQ + 1
+        IDX_SPONGE = n_gridQ
+    endif
+
 
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
@@ -203,6 +252,7 @@ contains
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+      write(*,'("n_gridQ=",i1)') n_gridQ
       write(*,'(80("<"))')
     endif
 
@@ -231,7 +281,8 @@ contains
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: Bs, g
+    integer, intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
 
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
@@ -295,8 +346,8 @@ contains
         x=L+x
       endif
 
-      min_dx = 2.0_rk**(-params_acm%Jmax) * min(params_acm%domain_size(1),params_acm%domain_size(2))&
-                        / real(params_acm%Bs-1, kind=rk)
+      min_dx = 2.0_rk**(-params_acm%Jmax) * min(params_acm%domain_size(1)/real(params_acm%Bs(1)-1, kind=rk) &
+                                                  , params_acm%domain_size(2)/real(params_acm%Bs(2)-1, kind=rk))
       ! u(x=0) should be set equal to u(x=L)
       if ( abs(x-L)<min_dx*0.5_rk ) then
         x = 0.0_rk

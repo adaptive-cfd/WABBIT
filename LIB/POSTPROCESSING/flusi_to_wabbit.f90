@@ -34,12 +34,15 @@ subroutine flusi_to_wabbit(params)
     integer(kind=ik), allocatable     :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable     :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                  :: hvy_n, lgt_n,level, Bs, k
+    integer(kind=ik)                  :: hvy_n, lgt_n, k
+    integer(kind=ik)                  :: refinement_status
+    integer(kind=ik) , dimension(3)   :: Bs
     real(kind=rk), dimension(3)       :: x0, dx
     real(kind=rk), dimension(3)       :: domain
-    character(len=3)                  :: Bs_read
+    character(len=3)                  :: dummy
     integer(kind=ik), dimension(3)    :: nxyz
-    real(kind=rk)                     :: level_tmp
+    real(kind=rk), dimension(3)       :: level_tmp
+    integer(kind=ik), dimension(3)    :: level
     integer(kind=ik)                  :: status, start_x, start_y, start_z
 
 !-----------------------------------------------------------------------------------------------------
@@ -50,16 +53,23 @@ subroutine flusi_to_wabbit(params)
     if (file_in=='--help' .or. file_in=='--h') then
         if (params%rank==0) then
             write(*,*) "postprocessing subroutine to read a file from flusi and convert it to wabbit format. command line:"
-            write(*,*) "mpi_command -n number_of_processes ./wabbit-post --flusi-to-wabbit source.h5 target.h5 target_blocksize"
+            write(*,*) "mpi_command -n number_of_processes ./wabbit-post --flusi-to-wabbit source.h5 target.h5 target_blocksize "
         end if
     else
         if (params%rank==0) write(*,*) "ATTENTION: this routine works in parallel only with ghost nodes synchronization --generic-sequence (default)"
         ! get values from command line (filename and desired blocksize)
         call check_file_exists(trim(file_in))
         call get_command_argument(3, file_out)
-        call get_command_argument(4, Bs_read)
-        read(Bs_read,*) Bs
-        if (mod(Bs,2)==0) call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
+
+        ! /todo to be checked (l66-72)
+
+        call get_command_argument(4, dummy)
+        read(dummy,*) Bs(1)
+        call get_command_argument(5, dummy)
+        read(dummy,*) Bs(2)
+        call get_command_argument(6, dummy)
+        read(dummy,*) Bs(3)
+        if (mod(Bs(1),2)==0 .or. mod(Bs(2),2)==0 .or. mod(Bs(3),2)==0) call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
 
         ! read attributes such as number of discretisation points, time, domain size
         call get_attributes_flusi(file_in, nxyz, time, domain)
@@ -69,17 +79,22 @@ subroutine flusi_to_wabbit(params)
             params%threeD_case = .false.
         end if
 
-        level_tmp = log(dble(nxyz(2))/dble(Bs-1)) / log(2.0_rk)
-        level = int(level_tmp)
+        do k=1,3
+          level_tmp(k) = log(dble(nxyz(k))/dble(Bs(k)-1)) / log(2.0_rk)
+          level(k) = int(level_tmp(k))
+        enddo
 
         ! check the input
         if (nxyz(2)/=nxyz(3)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
         if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
-        if (mod(nxyz(2),(Bs-1))/=0 .or. abs(level-level_tmp)>1.e-14)&
+        if (mod(nxyz(1),(Bs(1)-1))/=0 .or. mod(nxyz(2),(Bs(2)-1))/=0 .or. mod(nxyz(3),(Bs(3)-1))/=0 &
+            .or. abs(level(1)-level_tmp(1))>1.e-14 .or. abs(level(2)-level_tmp(2))>1.e-14 .or. abs(level(3)-level_tmp(3))>1.e-14)&
             call abort(2948, "ERROR: I'm afraid your saved blocksize does not match for WABBIT")
+        if ((Bs(1)/nxyz(1))/=(Bs(2)/nxyz(2)) .or. (Bs(1)/nxyz(1))/=(Bs(3)/nxyz(3)) .or. (Bs(2)/nxyz(2))/=(Bs(3)/nxyz(3)))&
+            call abort(2411921, "ERROR: Blocksizes of flusi and WABBIT are not compatible")
 
         ! set important parameters
-        params%max_treelevel=level
+        params%max_treelevel=max(max(level(1),level(2)),max(level(2),level(3)))
         params%domain_size(1) = domain(2)
         params%domain_size(2) = domain(3)
         params%Bs = Bs
@@ -104,7 +119,7 @@ subroutine flusi_to_wabbit(params)
 
         ! read the field from flusi file and organize it in WABBITs blocks
         call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
-            hvy_active, params, nxyz(2))
+            hvy_active, params, nxyz)
 
         ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
         ! they will therefore send their redundant points to the last blocks in x,y and z-direction
@@ -117,7 +132,7 @@ subroutine flusi_to_wabbit(params)
             else
                 start_z = 0_ik
             end if
-            lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = status(start_x, start_y, start_z, nxyz(2), Bs)
+            lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
         end do
 
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
@@ -129,18 +144,19 @@ subroutine flusi_to_wabbit(params)
 
 end subroutine flusi_to_wabbit
 
-function status(start_x, start_y, start_z, Bs_f, Bs)
+function refinement_status(start_x, start_y, start_z, Bs_f, Bs)
   use module_precision
   implicit none
-  integer(kind=ik), intent(in) :: start_x, start_y, start_z, Bs_f, Bs
-  integer(kind=ik) :: status
+  integer(kind=ik), intent(in) :: start_x, start_y, start_z
+  integer(kind=ik), dimension(3), intent(in) :: Bs, Bs_f
+  integer(kind=ik) :: refinement_status
 
   ! if I'm the last block in x,y and/or z-direction,
-  ! set my refinement status to 0, otherwise to 11 (historic fine)
-  if (((start_x==Bs_f-Bs+1) .or. (start_y==Bs_f-Bs+1)) .or. (start_z==Bs_f-Bs+1)) then
-      status = 0_ik
+  ! set my refinement refinement_status to 0, otherwise to 11 (historic fine)
+  if (((start_x==Bs_f(1)-Bs(1)+1) .or. (start_y==Bs_f(2)-Bs(2)+1)) .or. (start_z==Bs_f(3)-Bs(3)+1)) then
+      refinement_status = 0_ik
   else
-      status = 11_ik
+      refinement_status = 11_ik
   end if
 
-end function status
+end function refinement_status

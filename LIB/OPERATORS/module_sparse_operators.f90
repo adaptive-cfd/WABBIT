@@ -64,7 +64,8 @@ contains
       implicit none
       !-----------------------------------------------
       CHARACTER(LEN=80),INTENT(IN),dimension(3) :: boundary_type
-      INTEGER(KIND=ik), INTENT(IN) :: Bs,g
+      INTEGER(KIND=ik), INTENT(IN) :: g
+      INTEGER(KIND=ik), DIMENSION(3), INTENT(IN) :: Bs
       !-----------------------------------------------
       INTEGER :: Q,ierr,i
       real(kind=rk), allocatable:: D_VAL(:),  EYE_VAL(:)
@@ -78,10 +79,13 @@ contains
       integer, allocatable      :: Dy_INDX(:), Dyminus_INDX(:), Dyplus_INDX(:)
       integer, allocatable      :: Dy_JNDX(:), Dyminus_JNDX(:), Dyplus_JNDX(:)
 
+      !> \Todo
+      if (Bs(1) .ne. Bs(2)) call abort(2401191523, "derivatives with module sparse operators only work for equal Bs in x and y direction (TODO!!!)")
+
       !--------------------------------
       ! DERIVATIVE in x direction
       !--------------------------------
-      Q=Bs+2*g
+      Q=Bs(1)+2*g
       allocate(EYE_VAL(Q),EYE_INDX(Q),EYE_JNDX(Q))
       EYE_VAL=1
 
@@ -164,7 +168,7 @@ contains
         !                |  0    0     0     3   -16    36   -48    25    0   0|
         !                |  0    0     8     0     0     0     0     0    0   0|
         !                \  0    0     8     0     0     0     0     0    0   0/
-        call D_openFourthOrdplus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+        call D_openFourthOrdplus(g,Bs(1),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
         call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
@@ -197,7 +201,7 @@ contains
         !                |  0    0     0     1    -8     0     8    -1  |
         !                |  0    0     0     0     1    -8     0     8  |
         !                \  0    0     0     0     0     1    -8     0  /
-        call D_openFourthOrdminus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+        call D_openFourthOrdminus(g,Bs(1),D_VAL,D_INDX,D_JNDX,D_SHAPE)
         !call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
         call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
@@ -227,7 +231,7 @@ contains
         !                |  0    0     0     3   -16    36   -48    25    0   0|
         !                |  0    0     8     0     0     0     0     0    0   0|
         !                \  0    0     8     0     0     0     0     0    0   0/
-        call D_openFourthOrdplus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+        call D_openFourthOrdplus(g,Bs(1),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
         call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
@@ -245,6 +249,10 @@ contains
       !--------------------------------
       ! DERIVATIVE in y direction
       !--------------------------------
+      Q=Bs(2)+2*g
+      allocate(EYE_VAL(Q),EYE_INDX(Q),EYE_JNDX(Q))
+      EYE_VAL=1
+
       select case (boundary_type(2))
       case ('periodic')
 
@@ -322,7 +330,7 @@ contains
         !                |  0    0     0     3   -16    36   -48    25    0   0|
         !                |  0    0     8     0     0     0     0     0    0   0|
         !                \  0    0     8     0     0     0     0     0    0   0/
-        call D_openFourthOrdplus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+        call D_openFourthOrdplus(g,Bs(2),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
         call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
@@ -355,7 +363,7 @@ contains
         !                |  0    0     0     1    -8     0     8    -1  |
         !                |  0    0     0     0     1    -8     0     8  |
         !                \  0    0     0     0     0     1    -8     0  /
-        call D_openFourthOrdminus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+        call D_openFourthOrdminus(g,Bs(2),D_VAL,D_INDX,D_JNDX,D_SHAPE)
         !call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
         call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
@@ -385,7 +393,7 @@ contains
         !                |  0    0     0     3   -16    36   -48    25    0   0|
         !                |  0    0     8     0     0     0     0     0    0   0|
         !                \  0    0     8     0     0     0     0     0    0   0/
-        call D_openFourthOrdplus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+        call D_openFourthOrdplus(g,Bs(2),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
         call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
@@ -517,7 +525,8 @@ contains
     !                \0   0    0     0     0     0     1    -8     0  /
     subroutine  D_openFourthOrdminus(g,Bs,D_VAL,D_INDX,D_JNDX,D_SHAPE)
 
-      integer(kind=ik), intent(in)    :: g,Bs
+      integer(kind=ik), intent(in)    :: g
+      integer(kind=ik), intent(in) :: Bs
       real(kind=rk), allocatable, intent(out):: D_VAL(:)
       integer, allocatable, intent(out)      :: D_INDX(:)
       integer, allocatable, intent(out)      :: D_JNDX(:)
@@ -612,7 +621,8 @@ contains
 
     subroutine  D_openFourthOrdplus(g,Bs,D_val,D_INDX,D_JNDX,D_SHAPE)
 
-      integer(kind=ik), intent(in)    :: g,Bs
+      integer(kind=ik), intent(in)    :: g
+      integer(kind=ik), intent(in) :: Bs
       real(kind=rk), allocatable, intent(out):: D_VAL(:)
       integer, allocatable, intent(out)      :: D_INDX(:)
       integer, allocatable, intent(out)      :: D_JNDX(:)
@@ -621,7 +631,8 @@ contains
       real(kind=rk), ALLOCATABLE:: val_tmp(:)
       integer, ALLOCATABLE      :: indx_tmp(:)
       integer, ALLOCATABLE      :: jndx_tmp(:)
-      integer :: nmax,k,i,j,N
+      integer :: nmax,k,i,j
+      integer, dimension(3) :: N
 
       N=Bs+2*g
 

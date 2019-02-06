@@ -34,27 +34,31 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: Bs, mpierr, ix, iy, iz
+    integer(kind=ik) :: mpierr, ix, iy, iz
+    integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:6), tmp_meanflow(1:3), tmp_force(1:3), tmp_residual(1:3), tmp_ekin, tmp_volume
     real(kind=rk) :: x, y, CFL, CFL_eta, CFL_nu
     real(kind=rk) :: eps_inv, dV, dx_min
+    real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), save :: umag
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:), div(:,:,:)
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     if (params_acm%dim==3) then
-        if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-        if (.not. allocated(div)) allocate(div(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-        if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+        if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+        if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+        if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
         dV = dx(1)*dx(2)*dx(3)
     else
-        if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
-        if (.not. allocated(div)) allocate(div(1:Bs+2*g, 1:Bs+2*g, 1))
-        if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
+        if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+        if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+        if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
         dV = dx(1)*dx(2)
     endif
 
@@ -95,8 +99,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
         ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
         ! we compute the error w.r.t. this solution heres
         if (params_acm%forcing_type(1) .eq. "taylor_green") then
-            do iy = g+1,Bs+g
-                do ix = g+1, Bs+g
+            do iy = g+1,Bs(2)+g
+                do ix = g+1, Bs(1)+g
                     x = x0(1) + dble(ix-g-1)*dx(1)
                     y = x0(2) + dble(iy-g-1)*dx(2)
                     tmp(1) = params_acm%u_mean_set(1) + dsin(x-params_acm%u_mean_set(1)*time)*&
@@ -133,8 +137,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
                 div = 0.00_rk
             end where
 
-            do iy = g+1, Bs+g-1 ! Note: loops skip redundant points
-            do ix = g+1, Bs+g-1
+            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
+            do ix = g+1, Bs(1)+g-1
                 ! compute mean flow for output in statistics
                 tmp_meanflow(1) = tmp_meanflow(1) + u(ix,iy,1,1)
                 tmp_meanflow(2) = tmp_meanflow(2) + u(ix,iy,1,2)
@@ -177,9 +181,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
                 div = 0.00_rk
             end where
 
-            do iz = g+1, Bs+g-1 ! Note: loops skip redundant points
-            do iy = g+1, Bs+g-1
-            do ix = g+1, Bs+g-1
+            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+            do iy = g+1, Bs(2)+g-1
+            do ix = g+1, Bs(1)+g-1
                 ! compute mean flow for output in statistics
                 tmp_meanflow(1) = tmp_meanflow(1) + u(ix,iy,iz,1)
                 tmp_meanflow(2) = tmp_meanflow(2) + u(ix,iy,iz,2)
@@ -227,7 +231,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
         call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim ==2) then
-            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs+g-1,g+1:Bs+g-1,1,1)**2)*dx(1)*dx(2)
+            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs(1)+g-1,g+1:Bs(2)+g-1,1,1)**2)*dx(1)*dx(2)
         else
             params_acm%enstrophy = 0.0_rk
             ! call abort(6661,"ACM 3D not implemented.")
@@ -293,7 +297,17 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
             close(14)
 
-            dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs-1, kind=rk)
+            if (params_acm%dim==3) then
+              dxyz(3) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(3) / real(params_acm%Bs(3)-1, kind=rk)
+              dxyz(2) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(2) / real(params_acm%Bs(2)-1, kind=rk)
+              dxyz(1) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+              dx_min = minval( (/dxyz(1),dxyz(2),dxyz(3)/))
+            else
+              dxyz(3) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(3) / 1
+              dxyz(2) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(2) / real(params_acm%Bs(2)-1, kind=rk)
+              dxyz(1) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+              dx_min = minval( (/dxyz(1),dxyz(2)/))
+            endif
             CFL   = dt * (sqrt(umag) + sqrt(params_acm%c_0**2 + umag)) / dx_min
             CFL_nu = dt * params_acm%nu / dx_min**2
             CFL_eta = dt / params_acm%C_eta

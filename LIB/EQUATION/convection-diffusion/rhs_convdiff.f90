@@ -63,11 +63,14 @@
     integer(kind=2), intent(in):: boundary_flag(3)
 
     ! local variables
-    integer(kind=ik) :: Bs, mpierr
+    integer(kind=ik) :: mpierr
+    integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3)
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     select case(stage)
     case ("init_stage")
@@ -134,7 +137,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     !> time
     real(kind=rk), intent(in)                      :: time
     !> grid parameter
-    integer(kind=ik), intent(in)                   :: g, Bs
+    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> origin and spacing of the block
     real(kind=rk), intent(in)                      :: x0(:), dx(:)
     !> datafields
@@ -150,8 +154,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     ! currently only acessible in the local stage
     integer(kind=2), intent(in):: boundary_flag(3)
 
-    ! real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:2)
-    real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3)
+    ! real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:2)
+    real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu
     real(kind=rk) :: u_dx, u_dy, u_dz
     real(kind=rk) :: u_dxdx, u_dydy, u_dzdz
@@ -168,7 +172,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     u0 = 0.0_rk
     rhs = 0.0_rk
 
-    if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,4)/=N) then
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,4)/=N) then
         call abort(66233,"wrong size. The door rings, I'll leave u to it.")
     endif
 
@@ -212,8 +216,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! please note the performance penalty associated with the if-clause so
                 ! do not put it inside the loop, even if it's tempting.
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iy = g+1, Bs+g
-                        do ix = g+1, Bs+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
                             u_dx = (phi(ix+1,iy,1,i)-phi(ix-1,iy,1,i))*dx_inv*0.5_rk
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
 
@@ -224,8 +228,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else !  no viscosity
-                    do iy = g+1, Bs+g
-                        do ix = g+1, Bs+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
                             u_dx = (phi(ix+1,iy,1,i)-phi(ix-1,iy,1,i))*dx_inv*0.5_rk
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy
@@ -237,8 +241,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! 2D, 4th order
                 !-----------------------------------------------------------------------
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iy = g+1, Bs+g
-                        do ix = g+1, Bs+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
                             ! gradient
                             u_dx = (a(-3)*phi(ix-3,iy,1,i) + a(-2)*phi(ix-2,iy,1,i) + a(-1)*phi(ix-1,iy,1,i) + a(0)*phi(ix,iy,1,i)&
                             +  a(+3)*phi(ix+3,iy,1,i) + a(+2)*phi(ix+2,iy,1,i) + a(+1)*phi(ix+1,iy,1,i))*dx_inv
@@ -254,8 +258,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else ! no viscosity
-                    do iy = g+1, Bs+g
-                        do ix = g+1, Bs+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
                             ! gradient
                             u_dx = (a(-3)*phi(ix-3,iy,1,i) + a(-2)*phi(ix-2,iy,1,i) + a(-1)*phi(ix-1,iy,1,i) + a(0)*phi(ix,iy,1,i)&
                             +  a(+3)*phi(ix+3,iy,1,i) + a(+2)*phi(ix+2,iy,1,i) + a(+1)*phi(ix+1,iy,1,i))*dx_inv
@@ -274,8 +278,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
 
             if (params_convdiff%velocity(i)=="cyclogenesis") then
-                do iy = g+1, Bs+g
-                    do ix = g+1, Bs+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i)
                         y = y / params_convdiff%blob_width(i)
                         ! sech(x) = 1.0 / cosh(x)
@@ -300,9 +304,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! 3D, 2nd order
                 !-----------------------------------------------------------------------
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iz = g+1, Bs+g
-                        do iy = g+1, Bs+g
-                            do ix = g+1, Bs+g
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
                                 u_dx = (phi(ix+1,iy,iz,i) - phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
                                 u_dy = (phi(ix,iy+1,iz,i) - phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
                                 u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
@@ -317,9 +321,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else ! no viscosity
-                    do iz = g+1, Bs+g
-                        do iy = g+1, Bs+g
-                            do ix = g+1, Bs+g
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
                                 u_dx = (phi(ix+1,iy,iz,i) - phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
                                 u_dy = (phi(ix,iy+1,iz,i) - phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
                                 u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
@@ -335,9 +339,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! 3D, 4th order
                 !-----------------------------------------------------------------------
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iz = g+1, Bs+g
-                        do iy = g+1, Bs+g
-                            do ix = g+1, Bs+g
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
                                 ! gradient
                                 u_dx = (a(-3)*phi(ix-3,iy,iz,i) + a(-2)*phi(ix-2,iy,iz,i) + a(-1)*phi(ix-1,iy,iz,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix+3,iy,iz,i) + a(+2)*phi(ix+2,iy,iz,i) + a(+1)*phi(ix+1,iy,iz,i))*dx_inv
@@ -359,9 +363,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else ! no viscosity
-                    do iz = g+1, Bs+g
-                        do iy = g+1, Bs+g
-                            do ix = g+1, Bs+g
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
                                 ! gradient
                                 u_dx = (a(-3)*phi(ix-3,iy,iz,i) + a(-2)*phi(ix-2,iy,iz,i) + a(-1)*phi(ix-1,iy,iz,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix+3,iy,iz,i) + a(+2)*phi(ix+2,iy,iz,i) + a(+1)*phi(ix+1,iy,iz,i))*dx_inv
@@ -392,7 +396,8 @@ end subroutine RHS_convdiff_new
 subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
     implicit none
     real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, Bs, i
+    integer(kind=ik), intent(in) :: g, i
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
     real(kind=rk), intent(inout) :: u0(:,:,:)
     ! note you cannot change these values without recomputing the coefficients
@@ -412,8 +417,8 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
 
     select case(params_convdiff%velocity(i))
     case ("cyclogenesis")
-        do iy = 1, Bs + 2*g
-            do ix = 1, Bs + 2*g
+        do iy = 1, Bs(2) + 2*g
+            do ix = 1, Bs(1) + 2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
                 ! radius
@@ -430,8 +435,8 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
 
     case ("swirl")
 
-        do iy = 1, Bs + 2*g
-            do ix = 1, Bs + 2*g
+        do iy = 1, Bs(2) + 2*g
+            do ix = 1, Bs(1) + 2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
 
@@ -454,7 +459,8 @@ end subroutine
 subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
     implicit none
     real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, Bs, i
+    integer(kind=ik), intent(in) :: g, i
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in) :: dx(1:3), x0(1:3)
     real(kind=rk), intent(inout) :: u0(:,:,:,1:)
 
@@ -463,11 +469,11 @@ subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
 
     select case(params_convdiff%velocity(i))
     case ("swirl-helix")
-        do iz = 1, Bs + 2*g
+        do iz = 1, Bs(3) + 2*g
             z = dble(iz-(g+1)) * dx(3) + x0(3)
-            do iy = 1, Bs + 2*g
+            do iy = 1, Bs(2) + 2*g
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
-                do ix = 1, Bs + 2*g
+                do ix = 1, Bs(1) + 2*g
                     x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                     u0(ix,iy,iz,1) = cos((pi*time)/T) * (sin(pi*x))**2 * sin(2*pi*y)
@@ -493,7 +499,8 @@ end subroutine
 subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
     implicit none
     real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, Bs,i
+    integer(kind=ik), intent(in) :: g, i
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
     !> datafields, and velocity field
     real(kind=rk), intent(inout) :: phi(:,:,:), u0(:,:,:)
@@ -507,7 +514,7 @@ subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
     integer(kind=2), intent(in):: boundary_flag(3)
 
     integer(kind=ik) :: ix,iy
-    real(kind=rk)   :: phi_boundary(4,Bs+2*g)
+    real(kind=rk)   :: phi_boundary(4,Bs(1)+2*g)
 
   !##################################################
   ! compute the boundary values
@@ -517,7 +524,7 @@ subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
     if ( params_convdiff%velocity(i) == "constant" ) then
       ! Boundary conditions for outflow extrapolation
       phi_boundary(1,:)=phi(g+1,:,i)
-      phi_boundary(2,:)=phi(Bs+g,:,i)
+      phi_boundary(2,:)=phi(Bs(1)+g,:,i)
       if (params_convdiff%u0x(i)>0) then
           phi_boundary(1,:)=params_convdiff%phi_boundary(i)
       else
@@ -525,7 +532,7 @@ subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
       endif
       ! Boundary conditions for outflow extrapolation
       phi_boundary(3,:)=phi(:,g+1,i)
-      phi_boundary(4,:)=phi(:,Bs+g,i)
+      phi_boundary(4,:)=phi(:,Bs(2)+g,i)
       if (params_convdiff%u0y(i)>0) then
           phi_boundary(3,:)=params_convdiff%phi_boundary(i)
       else
@@ -551,7 +558,7 @@ subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
       end do
     else ! (boundary_flag(1)==1)
       do ix = 1, g
-        phi(Bs+g+ix,:,i)= phi_boundary(2,:)
+        phi(Bs(1)+g+ix,:,i)= phi_boundary(2,:)
       end do
      endif
   endif
@@ -562,7 +569,7 @@ subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
         phi(:,iy,i)= phi_boundary(3,:)
       end do
     else ! (boundary_flag(2)==1)
-      do iy = Bs+g+1, Bs+2*g
+      do iy = Bs(2)+g+1, Bs(2)+2*g
         phi(:,iy,i)= phi_boundary(4,:)
       end do
     endif

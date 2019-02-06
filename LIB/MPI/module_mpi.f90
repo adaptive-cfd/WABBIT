@@ -126,7 +126,8 @@ subroutine init_ghost_nodes( params )
     !> user defined parameter structure
     type (type_params), intent(in) :: params
     ! local variables
-    integer(kind=ik) :: buffer_N_int, buffer_N, Bs, g, Neqn, number_blocks, rank
+    integer(kind=ik) :: buffer_N_int, buffer_N, g, Neqn, number_blocks, rank
+    integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idata_bounds_type, Ncpu
     integer(kind=ik) ::  j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
     integer(kind=ik) :: i, k, status(1:4)
@@ -147,10 +148,18 @@ subroutine init_ghost_nodes( params )
         if (rank==0) write(*,'("                     GHOST-INIT ")')
         if (rank==0) write(*,'("---------------------------------------------------------")')
 
-        if (g>=(Bs+1)/2) then
-            call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 which implies &
-            & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
-            & number_ghost_nodes or increase number_block_nodes.")
+        if ( params%threeD_case ) then
+            if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. g>=(Bs(3)+1)/2) then
+              call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
+              & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
+              & number_ghost_nodes or increase number_block_nodes.")
+            endif
+        else
+            if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2) then
+              call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
+              & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
+              & number_ghost_nodes or increase number_block_nodes.")
+            endif
         endif
 
         ! synchronize buffer length
@@ -168,7 +177,7 @@ subroutine init_ghost_nodes( params )
             ! how many possible neighbor relations are there?
             Nneighbor = 74
 
-            allocate( tmp_block( Bs+2*g, Bs+2*g, Bs+2*g, Neqn) )
+            allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, Neqn) )
         else
             !---2d---2d---
             ! space dimensions: used in the static arrays as index
@@ -179,12 +188,17 @@ subroutine init_ghost_nodes( params )
             ! how many possible neighbor relations are there?
             Nneighbor = 16
 
-            allocate( tmp_block( Bs+2*g, Bs+2*g, 1, Neqn) )
+            allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, 1, Neqn) )
         end if
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"
-        buffer_N = number_blocks * Neqn * ((Bs+2*g)**dim - Bs**dim)
+        if ( params%threeD_case ) then
+          buffer_N = number_blocks * Neqn * ((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)-(Bs(1)*Bs(2)*Bs(3)))
+        else
+          ! 2D case
+          buffer_N = number_blocks * Neqn * ((Bs(1)+2*g)*(Bs(2)+2*g)-(Bs(1)*Bs(2)))
+        end if
 
         !-----------------------------------------------------------------------
         ! allocate auxiliary memory
@@ -245,7 +259,12 @@ subroutine init_ghost_nodes( params )
         allocate( communication_counter(1:Ncpu, 1:Nstages) )
         allocate( int_pos(1:Ncpu, 1:Nstages) )
         allocate( real_pos(1:Ncpu, 1:Nstages) )
-        allocate( line_buffer( Neqn*(Bs+2*g)**(dim) ) )
+        if ( params%threeD_case ) then
+          allocate( line_buffer( Neqn*(Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) ) )
+        else
+          ! 2D case
+          allocate( line_buffer( Neqn*(Bs(1)+2*g)*(Bs(2)+2*g) ) )
+        end if
 
         allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
         allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
@@ -285,7 +304,9 @@ subroutine init_ghost_nodes( params )
         ! this output can be plotted using the python script
         if (params%rank==0) Then
             open(16,file='ghost_bounds.dat',status='replace')
-            write(16,'(i3)') Bs
+            write(16,'(i3)') Bs(1)
+            write(16,'(i3)') Bs(2)
+            write(16,'(i3)') Bs(3)
             write(16,'(i3)') g
             write(16,'(i3)') S
             write(16,'(i3)') A

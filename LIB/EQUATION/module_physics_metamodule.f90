@@ -36,14 +36,19 @@ contains
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
  !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
  !> the parameter struct for wabbit is not available.
- subroutine READ_PARAMETERS_meta( physics, filename )
+ subroutine READ_PARAMETERS_meta( physics, filename, n_gridQ )
    implicit none
    character(len=*), intent(in) :: physics
+   ! number of grid-dependent (and not time-dependend qtys) is decided by the physics modules
+   integer(kind=ik), intent(out) :: n_gridQ
    character(len=*), intent(in) :: filename
+
+   ! default is none (for navier-stokes and convection-diffusion)
+   n_gridQ = 0
 
    select case ( physics )
    case ('ACM-new')
-     call READ_PARAMETERS_ACM( filename )
+     call READ_PARAMETERS_ACM( filename, n_gridQ )
 
    case ('ConvDiff-new')
      call READ_PARAMETERS_convdiff( filename )
@@ -347,7 +352,8 @@ end subroutine FIELD_NAMES_meta
 
    ! as you are allowed to compute the RHS only in the interior of the field
    ! you also need to know where 'interior' starts: so we pass the number of ghost points
-   integer, intent(in) :: g, bs
+   integer, intent(in) :: g
+   integer, dimension(3), intent(in) :: Bs
 
    ! for each block, you'll need to know where it lies in physical space. The first
    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing

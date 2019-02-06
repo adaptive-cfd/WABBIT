@@ -194,7 +194,8 @@ end subroutine init_triangle
 subroutine geometry_penalization2D(Bs, g, x0, dx, rho, mask, phi_ref)
       implicit none
       ! -----------------------------------------------------------------
-      integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+      integer(kind=ik), intent(in) :: g
+      integer(kind=ik), dimension(3), intent(in) :: Bs!< grid parameter
       real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
       real(kind=rk), intent(in)     :: rho(:,:)       !< density of the current field
       real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
@@ -204,9 +205,9 @@ subroutine geometry_penalization2D(Bs, g, x0, dx, rho, mask, phi_ref)
       real(kind=rk),save,allocatable :: tmp_mask(:,:)    !< mask function
       integer(kind=ik):: ix, iy
 
-      if (size(phi_ref,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
-      if (size(mask,1) /= Bs+2*g) call abort(7109,"wrong array size, there's pirates, captain!")
-      if (.not. allocated(tmp_mask)) allocate(tmp_mask(Bs+2*g,Bs+2*g))
+      if (size(phi_ref,1) /= Bs(1)+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+      if (size(mask,1) /= Bs(1)+2*g) call abort(7109,"wrong array size, there's pirates, captain!")
+      if (.not. allocated(tmp_mask)) allocate(tmp_mask(Bs(1)+2*g,Bs(2)+2*g))
       ! reset mask array
       mask    = 0.0_rk
       phi_ref = 0.0_rk
@@ -241,8 +242,8 @@ subroutine geometry_penalization2D(Bs, g, x0, dx, rho, mask, phi_ref)
       call sponge_2D(tmp_mask, x0, dx, Bs, g)
 
 
-      do iy = g+1, Bs + g
-        do ix = g+1, Bs + g
+      do iy = g+1, Bs(2) + g
+        do ix = g+1, Bs(1) + g
           ! this if is necessary to not overwrite the privious values
           if ( tmp_mask(ix,iy)>0 ) then
             ! mask of the inlet and outlet sponge
@@ -265,8 +266,8 @@ subroutine geometry_penalization2D(Bs, g, x0, dx, rho, mask, phi_ref)
       ! add a free outlet wall as a sponge in north and south if necessary
       if ( FREE_OUTLET_WALL ) then
         call draw_free_outlet_wall(tmp_mask, x0, dx, Bs, g )
-        do iy = g+1, Bs + g
-          do ix = g+1, Bs + g
+        do iy = g+1, Bs(2) + g
+          do ix = g+1, Bs(1) + g
             if ( tmp_mask(ix,iy)>0 ) then
               ! mask of the wall
               mask(ix,iy,rhoF) = C_sp_inv*tmp_mask(ix,iy)
@@ -292,7 +293,8 @@ end subroutine geometry_penalization2D
 subroutine draw_geometry(x0, dx, Bs, g, mask)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs !< grid parameter
     real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
     real(kind=rk), intent(inout), allocatable  :: mask(:,:,:)    !< mask function
     ! -----------------------------------------------------------------
@@ -320,7 +322,8 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)                              :: Bs, g
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(out)     :: mask
     !> spacing and origin of block
@@ -331,7 +334,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     ! loop variables
     integer(kind=ik)                                          :: ix, iy
 
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     ! reset mask array
     mask = 0.0_rk
@@ -339,9 +342,9 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
-    do iy=1, Bs+2*g
+    do iy=1, Bs(2)+2*g
        y = dble(iy-(g+1)) * dx(2) + x0(2) - cyl%x_cntr(2)
-       do ix=1, Bs+2*g
+       do ix=1, Bs(1)+2*g
            x = dble(ix-(g+1)) * dx(1) + x0(1) - cyl%x_cntr(1)
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
@@ -360,7 +363,8 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
 
    implicit none
    ! grid
-   integer(kind=ik), intent(in)                              :: Bs, g
+   integer(kind=ik), intent(in) :: g
+   integer(kind=ik), dimension(3), intent(in) :: Bs
    !> mask term for every grid point of this block
    real(kind=rk), dimension(:,:), intent(out)              :: mask
    !> spacing and origin of block
@@ -375,7 +379,7 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-   if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+   if (size(mask,1) /= Bs(1)+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
    ! reset mask array
    mask  = 0.0_rk
@@ -391,7 +395,7 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
    ! parameter for smoothing function (width)
    h = 1.5_rk*max(dx(1), dx(2))
 
-   do ix=1, Bs+2*g
+   do ix=1, Bs(1)+2*g
        x = dble(ix-(g+1)) * dx(1) + x0(1)
        x = x-triangle%x_cntr(1)
        !YES a rhombus is made from two isosceles triangles
@@ -400,7 +404,7 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
          x = 2 * length - x
        end if
        height = tan_theta*x
-       do iy=1, Bs+2*g
+       do iy=1, Bs(2)+2*g
           y = dble(iy-(g+1)) * dx(2) + x0(2)
           y = abs(y-triangle%x_cntr(2))
 

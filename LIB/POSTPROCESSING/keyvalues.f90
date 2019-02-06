@@ -32,7 +32,8 @@ subroutine keyvalues(fname, params)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, Bs, nz, iteration, lgt_n, hvy_n, tc_length, dim
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, tc_length, dim
+    integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk)                           :: time
@@ -64,6 +65,7 @@ subroutine keyvalues(fname, params)
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
+    params%dim = dim    
     if (dim==3) then
         params%threeD_case = .true.
     else
@@ -76,6 +78,7 @@ subroutine keyvalues(fname, params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
+    params%dim = dim
     ! make sure there is enough memory allocated
     params%number_blocks = (dim**2) * (lgt_n/params%number_procs)
 
@@ -95,12 +98,7 @@ subroutine keyvalues(fname, params)
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
-    Bs = params%Bs
-    if (params%threeD_case) then
-        nz = Bs
-    else
-        nz = 1
-    end if
+    if (dim==2) Bs(3)=1
 
     allocate(tree(1:params%max_treelevel))
     allocate(sum_tree(1:params%max_treelevel))
@@ -137,12 +135,12 @@ subroutine keyvalues(fname, params)
     do k = 1,hvy_n
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-        do iz = 1, nz
-            do iy = 1, Bs
-                do ix = 1, Bs
-                    x = dble(ix-1)*dx(1)/dble(Bs) + x0(1)
-                    y = dble(iy-1)*dx(2)/dble(Bs) + x0(2)
-                    z = dble(iz-1)*dx(3)/dble(nz) + x0(3)
+        do iz = 1, Bs(3)
+            do iy = 1, Bs(2)
+                do ix = 1, Bs(1)
+                    x = dble(ix-1)*dx(1)/dble(Bs(1)) + x0(1)
+                    y = dble(iy-1)*dx(2)/dble(Bs(2)) + x0(2)
+                    z = dble(iz-1)*dx(3)/dble(Bs(3)) + x0(3)
 
                     ql = ql + hvy_block(ix,iy,iz,1,hvy_active(k))*(x+y+z)
                 end do

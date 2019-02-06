@@ -24,7 +24,8 @@ subroutine update_grid_qyts( time, params, lgt_block, hvy_tmp, hvy_active, hvy_n
     integer(kind=ik), intent(inout)        :: hvy_n
 
     ! grid parameter
-    integer(kind=ik) :: Bs, g, k, lgt_id
+    integer(kind=ik) :: g, k, lgt_id
+    integer(kind=ik), dimension(3) :: Bs
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0
 

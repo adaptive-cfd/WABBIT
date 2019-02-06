@@ -24,7 +24,8 @@ subroutine compute_vorticity_post(params)
     type (type_params), intent(inout)  :: params
     character(len=80)      :: file_ux, file_uy, file_uz, operator
     real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, Bs, tc_length
+    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length
+    integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)

@@ -20,7 +20,8 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
     real(kind=rk), dimension(:,:,:,:), intent(out) :: vorticity
     character(len=*), intent(in)                   :: discretization
     !> grid parameters
-    integer(kind=ik), intent(in)                   :: Bs, g
+    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), dimension(3), intent(in)     :: Bs
     !> derivatives
     real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
     !> inverse of dx, dy, dz
@@ -47,9 +48,9 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
     if (size(u,3)>2) then ! 3D case
         dz_inv = 1.0_rk / dx(3)
         if (discretization == "FD_2nd_central" ) then
-            do ix = g+1, Bs+g
-                do iy = g+1, Bs+g
-                    do iz = g+1, Bs+g
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
                         u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv*0.5_rk
                         u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv*0.5_rk
                         v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv*0.5_rk
@@ -64,9 +65,9 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
                  end do
             end do
         else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs+g
-                do iy = g+1, Bs+g
-                    do iz = g+1, Bs+g
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
                         u_dy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + &
                             a(-1)*u(ix,iy-1,iz) + a(0)*u(ix,iy,iz)&
                        +  a(+1)*u(ix,iy+1,iz) + a(+2)*u(ix,iy+2,iz) + &
@@ -109,16 +110,16 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
         end if
     else
         if (discretization == "FD_2nd_central" ) then
-            do ix = g+1, Bs+g
-                do iy = g+1, Bs+g
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
                     u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv*0.5_rk
                     v_dx = (v(ix+1,iy,1)-v(ix-1,iy,1))*dx_inv*0.5_rk
                     vorticity(ix,iy,1,1) = v_dx - u_dy
                  end do
             end do
         else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs+g
-                do iy = g+1, Bs+g
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
                     u_dy = (a(-3)*u(ix,iy-3,1) + a(-2)*u(ix,iy-2,1) + &
                         a(-1)*u(ix,iy-1,1) + a(0)*u(ix,iy,1)&
                   +  a(+1)*u(ix,iy+1,1) + a(+2)*u(ix,iy+2,1) + a(+3)*u(ix,iy+3,1))*dy_inv

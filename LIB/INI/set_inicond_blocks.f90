@@ -31,7 +31,8 @@ subroutine set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, h
     integer(kind=ik), intent(inout)      :: hvy_n
     ! loop variable
     integer(kind=ik)                     :: k
-    integer(kind=ik)                     :: Bs, g
+    integer(kind=ik)                     :: g
+    integer(kind=ik), dimension(3)       :: Bs
     integer(kind=ik)                     :: hvy_id, lgt_id
     ! origin and spacing of blocks
     real(kind=rk)                        :: x0(1:3), dx(1:3)

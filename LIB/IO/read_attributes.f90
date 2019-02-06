@@ -25,7 +25,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     !> iteration (to be read from file)
     integer(kind=ik), intent(out)                 :: iteration
     !> blocksize in the file (required to allocate light data, prior to reading)
-    integer(kind=ik), intent(out)                 :: bs
+    integer(kind=ik), dimension(3), intent(out)   :: Bs
     !> length of treecodes in the file (required to allocate light data, prior to reading)
     integer(kind=ik), intent(out)                 :: tc_length
     !> data dimensionality (2 or 3)
@@ -61,7 +61,9 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     if (datarank == 3) then
         ! 2D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs = int( size_field(1), kind=ik)
+        Bs(1) = int( size_field(1), kind=ik)
+        Bs(2) = int( size_field(2), kind=ik)
+        Bs(3) = 1
         Nb = int( size_field(3), kind=ik)
         domain(3) = 0.0_rk
         dim = 2
@@ -69,7 +71,9 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     elseif (datarank == 4) then
         ! 3D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs = int( size_field(1), kind=ik)
+        Bs(1) = int( size_field(1), kind=ik)
+        Bs(2) = int( size_field(2), kind=ik)
+        Bs(3) = int( size_field(3), kind=ik)
         Nb = int( size_field(4), kind=ik)
         dim = 3
 

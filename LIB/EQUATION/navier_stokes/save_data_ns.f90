@@ -31,12 +31,15 @@
     ! output in work array.
     real(kind=rk), allocatable,save :: tmp_u(:,:,:,:), vort(:,:,:,:), sigma(:,:,:,:), mask(:,:,:)
     ! local variables
-    integer(kind=ik)             ::  Bs, nvar, k
+    integer(kind=ik)             ::  nvar, k
+    integer(kind=ik), dimension(3) :: Bs
     ! variable name
     character(len=80)            :: name
 
 
-    Bs   = size(u,1)-2*g                 ! number of block sides
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g                 ! number of block sides
     nvar = params_ns%n_eqn  ! number of variables describing the state of the fluid
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)

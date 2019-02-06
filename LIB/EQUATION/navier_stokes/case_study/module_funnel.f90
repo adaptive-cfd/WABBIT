@@ -209,7 +209,8 @@ end subroutine read_params_funnel
 subroutine  draw_funnel(x_0, delta_x, Bs, g, mask, mask_is_colored)
   implicit none
   ! -----------------------------------------------------------------
-  integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+  integer(kind=ik), intent(in)  :: g        !< grid parameter
+  integer(kind=ik), dimension(3), intent(in) :: Bs
   real(kind=rk), intent(in)     :: x_0(3), delta_x(3) !< coordinates of block and block spacinf
   real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
   logical, optional, intent(in) :: mask_is_colored
@@ -218,20 +219,20 @@ subroutine  draw_funnel(x_0, delta_x, Bs, g, mask, mask_is_colored)
   real(kind=rk), allocatable    :: mask_tmp(:,:,:,:) !< mask function for the statevector
   real(kind=rk)                 :: r0, dr, dx, x0 !< cylindrical coordinates
   ! -----------------------------------------------------------------
-  if (size(mask,1) /= Bs+2*g) call abort(127109,"wrong array size!")
+  if (size(mask,1) /= Bs(1)+2*g) call abort(127109,"wrong array size!")
   ! if variable is present the default (false) is overwritten by the input
   if( present(mask_is_colored)) is_colored=mask_is_colored
   ! allocate and compute mask and colored mask
   if (params_ns%dim==3) then
-    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g,5))
+    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+    if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g,5))
     mask_tmp    = 0.0_rk
     mask_color  = 0
     call  draw_funnel3D(x_0, delta_x, Bs, g, mask_tmp, mask_color)
     call  draw_sponge3D(x_0,delta_x,Bs,g,mask_tmp,mask_color)
   else
-    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
-    if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs+2*g, 1:Bs+2*g, 1,4))
+    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+    if (.not. allocated(mask_tmp))        allocate(mask_tmp(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1,4))
     mask_tmp    = 0.0_rk
     mask_color  = 0
     call cartesian2cylinder(x_0(1:2), delta_x(1:2), dx, dr, x0, r0)
@@ -259,7 +260,8 @@ end subroutine draw_funnel
    subroutine set_inicond_funnel(x0, dx, Bs, g, u)
        implicit none
        ! -----------------------------------------------------------------
-       integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+       integer(kind=ik), intent(in)  :: g          !< grid parameter
+       integer(kind=ik), dimension(3), intent(in) :: Bs
        real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
        real(kind=rk), intent(inout)  :: u(:,:,:,:)    !< Statevector for t=0
        ! -----------------------------------------------------------------
@@ -299,7 +301,8 @@ end subroutine draw_funnel
   subroutine integrate_over_pump_area(u,g,Bs,x0,dx,integral,area)
       implicit none
       !---------------------------------------------------------------
-      integer(kind=ik), intent(in):: Bs, g            !< grid parameter (g ghostnotes,Bs Bulk)
+      integer(kind=ik), intent(in)  :: g          !< grid parameter
+      integer(kind=ik), dimension(3), intent(in) :: Bs
       real(kind=rk), intent(in)   :: u(:,:,:,:)       !< statevector in PURE VARIABLES \f$ (rho,u,v,w,p) \f$
       real(kind=rk),  intent(in)  :: x0(3), dx(3)     !< spacing and origin of block
       real(kind=rk),intent(out)   :: integral(5), area!< mean values

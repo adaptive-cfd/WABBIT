@@ -22,7 +22,8 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)                   :: Bs, g
+    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> sponge term for every grid point of this block
     real(kind=rk), dimension(:,:), intent(out)     :: sponge
     !> spacing and origin of block
@@ -35,10 +36,10 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
 
     if (params_acm%sponge_type == "rect") then
         ! rectangular sponge with 45deg edges
-        do iy = g+1, Bs+g
+        do iy = g+1, Bs(2)+g
             y = dble(iy-(g+1)) * dx(2) + x0(2)
 
-            do ix = g+1, Bs+g
+            do ix = g+1, Bs(1)+g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                 ! distance to borders of domain
@@ -60,9 +61,9 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
         p = params_acm%p_sponge
         offset = 0.5_rk * params_acm%domain_size(1)
 
-        do iy = g+1, Bs+g
+        do iy = g+1, Bs(2)+g
             y = dble(iy-(g+1)) * dx(2) + x0(2) - offset
-            do ix = g+1, Bs+g
+            do ix = g+1, Bs(1)+g
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - offset
 
                 ! distance to borders of domain
@@ -82,7 +83,8 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
     implicit none
 
     ! grid
-    integer(kind=ik), intent(in)  :: Bs, g
+    integer(kind=ik), intent(in)  :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> sponge term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(out)     :: sponge
     !> spacing and origin of block
@@ -96,11 +98,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
 
     if (params_acm%sponge_type == "rect") then
         ! rectangular sponge with 45deg edges
-        do iz = g+1, Bs+g
+        do iz = g+1, Bs(3)+g
             z = dble(iz-(g+1)) * dx(3) + x0(3)
-            do iy = g+1, Bs+g
+            do iy = g+1, Bs(2)+g
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
-                do ix = g+1, Bs+g
+                do ix = g+1, Bs(1)+g
                     x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                     ! distance to borders of domain
@@ -124,11 +126,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         p = params_acm%p_sponge
         offset = 0.5_rk * params_acm%domain_size(1)
 
-        do iz = g+1, Bs+g
+        do iz = g+1, Bs(3)+g
             z = dble(iz-(g+1)) * dx(3) + x0(3) - offset
-            do iy = g+1, Bs+g
+            do iy = g+1, Bs(2)+g
                 y = dble(iy-(g+1)) * dx(2) + x0(2) - offset
-                do ix = g+1, Bs+g
+                do ix = g+1, Bs(1)+g
                     x = dble(ix-(g+1)) * dx(1) + x0(1) - offset
 
                     ! distance to borders of domain

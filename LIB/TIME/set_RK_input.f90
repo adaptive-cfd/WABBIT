@@ -53,7 +53,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
     integer(kind=ik), intent(in)        :: hvy_n
 
     ! loop variables
-    integer(kind=ik)                    :: l, Neqn, k, Bs, g, z1, z2
+    integer(kind=ik)                    :: l, Neqn, k, g, z1, z2
+    integer(kind=ik), dimension(3)      :: Bs
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -69,14 +70,14 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
         z2 = 1
     else
         z1 = g+1
-        z2 = Bs+g
+        z2 = Bs(3)+g
     endif
 
     ! first: k_j = RHS(data_field(t) + ...
     ! loop over all active heavy data blocks
     do k = 1, hvy_n
         ! first slot in hvy_work is previous time step
-        hvy_block(g+1:Bs+g,g+1:Bs+g,z1:z2,:,hvy_active(k)) = hvy_work(g+1:Bs+g,g+1:Bs+g,z1:z2,:,hvy_active(k),1)
+        hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,z1:z2,:,hvy_active(k)) = hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g,z1:z2,:,hvy_active(k),1)
     end do
 
     do l = 2, j
@@ -86,8 +87,8 @@ subroutine set_RK_input(dt, params, rk_coeffs, j, hvy_block, hvy_work, hvy_activ
             do k = 1, hvy_n
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block(g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k)) = hvy_block(g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k)) &
-                + dt * rk_coeffs(l) * hvy_work(g+1:Bs+g, g+1:Bs+g, z1:z2, :, hvy_active(k), l)
+                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k)) = hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k)) &
+                + dt * rk_coeffs(l) * hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k), l)
 
             end do
         end if

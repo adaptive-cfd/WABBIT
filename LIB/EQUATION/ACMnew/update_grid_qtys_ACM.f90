@@ -29,9 +29,11 @@ subroutine update_grid_qtys_ACM( time, field, g, x0, dx, stage )
 
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
-    integer :: Bs
+    integer, dimension(3) :: Bs
     ! compute the size of blocks
-    Bs = size(field,1) - 2*g
+    Bs(1) = size(field,1) - 2*g
+    Bs(2) = size(field,2) - 2*g
+    Bs(3) = size(field,3) - 2*g
 
     select case(stage)
     case("init_stage")
@@ -50,26 +52,26 @@ subroutine update_grid_qtys_ACM( time, field, g, x0, dx, stage )
 
             if (size(field,4) < 4) call abort(12121802,"[update_grid_qtys_ACM.f90]::not enough work arrays")
 
-            if (.not. allocated(mask_color)) allocate(mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
+            if (.not. allocated(mask_color)) allocate(mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g))
 
             ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
             ! know that the first g points are in fact ghost nodes...
-            call Draw_Insect( time, Insect, x0, dx, field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1), &
-            mask_color, field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,2:4), with_body = .true., &
+            call Draw_Insect( time, Insect, x0, dx, field(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,IDX_MASK), &
+            mask_color, field(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,IDX_USX:IDX_USZ), with_body = .true., &
             with_wings = .false., delete_before_drawing = .true. )
 
             ! copy mask color array as well
             ! NOTE: I am not yet sure if I need this.
             ! NOTE: even us field is just zero, so maybe we shall not bother.
-            field(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,5) = dble( mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g) )
+            field(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,5) = dble( mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g) )
         endif
 
         ! are we using the sponge ?
         if ( params_acm%use_sponge ) then
             if ( params_acm%dim==3 ) then
-                call sponge_3D( field(:, :, :, 6), x0, dx, Bs, g )
+                call sponge_3D( field(:, :, :, IDX_SPONGE), x0, dx, Bs, g )
             else
-                call sponge_2D( field(:, :, 1, 6), x0, dx, Bs, g )
+                call sponge_2D( field(:, :, 1, IDX_SPONGE), x0, dx, Bs, g )
             endif
         endif
     case default

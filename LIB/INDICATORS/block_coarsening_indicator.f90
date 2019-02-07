@@ -17,8 +17,7 @@
 !! ------------------ \n
 !! +1 refine \n
 !! 0 do nothing \n
-!! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
-!! -2 block will coarsen and be merged with her sisters \n
+!! -1 block wants to coarsen \n
 !! ------------------ \n
 !! \n
 !! = log ======================================================================================
@@ -49,7 +48,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, Bs, g, refinement_status2
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, Bs, g, refinement_status_mask
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, nnorm(1)
     logical :: thresholding_component(1:size(block_data,4))
@@ -118,16 +117,20 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 
 
     ! mask thresholding on top of regular thresholding?
+    ! it can be useful to also use the mask function (if penalization is used) for grid adaptation.
+    ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
+    ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
+    ! not available, the option is useless but can cause errors.
     if (params%threshold_mask) then
         ! assuming block_work holds mask function
         nnorm = 1.0_rk
-        call threshold_block( params, block_work(:,:,:,1:1), (/.true./), refinement_status2, nnorm )
+        call threshold_block( params, block_work(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )
 
         ! refinement_status_state: -1 refinemet_status_mask: -1 ==>  -1
         ! refinement_status_state: 0  refinemet_status_mask: -1 ==>   0
         ! refinement_status_state: 0  refinemet_status_mask: 0  ==>   0
 
-        refinement_status = max(refinement_status, refinement_status2)
+        refinement_status = max(refinement_status, refinement_status_mask)
     endif
 
 end subroutine block_coarsening_indicator

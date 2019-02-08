@@ -160,6 +160,18 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> evaluate coarsing criterion on all blocks
     !---------------------------------------------------------------------------
+    if (params%threshold_mask) then
+        ! allocate work blocks (this is not the full grid and very little memory)
+        if (.not. allocated(mask_color)) allocate(mask_color(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3)))
+        if (.not. allocated(us)) allocate(us(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3), 1:params%dim))
+
+        ! if additional mask thresholding is used, we have to create the mask
+        ! function here. First: initializations of routines. (right now, this is only useful for insects)
+        call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
+        mask_color, us, "init_stage", hvy_gridQ(:,:,:,:,hvy_active(1)) )
+    endif
+
+
     ! loop over all my blocks
     do k = 1, hvy_n
         ! get lgt id of block
@@ -172,19 +184,13 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
         if (params%threshold_mask) then
             ! if additional mask thresholding is used, we have to create the mask
-            ! function here.
-
-            ! allocate work blocks (this is not the full grid and very little memory)
-            if (.not. allocated(mask_color)) allocate(mask_color(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3)))
-            if (.not. allocated(us)) allocate(us(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3), 1:params%dim))
-
-            ! create mask function (in hvy_tmp)
+            ! function here (in hvy_tmp)
             if (present(hvy_gridQ)) then
                 call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(k)), &
-                mask_color, us, hvy_gridQ(:,:,:,:,hvy_active(k)) )
+                mask_color, us, "main_stage", hvy_gridQ(:,:,:,:,hvy_active(k)) )
             else
                 call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(k)), &
-                mask_color, us )
+                mask_color, us, "main_stage" )
             endif
         endif
 

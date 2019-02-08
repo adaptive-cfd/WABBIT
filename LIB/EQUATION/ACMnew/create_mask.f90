@@ -3,7 +3,7 @@
 !   - grid_qty is given: we possibly use a part of grid_qty as time-independent mask function
 !   - grid_qty is not given: all masks are created, incl non-moving parts
 !-------------------------------------------------------------------------------
-subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, grid_qty )
     implicit none
 
     ! grid
@@ -12,13 +12,11 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
     real(kind=rk), dimension(:,:,:), intent(inout) :: mask
     integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
+    ! sometimes one has to do preparatory work for the mask function => staging idea.
+    character(len=*), optional, intent(in) :: stage
     real(kind=rk), dimension(:,:,:,:), optional, intent(in) :: grid_qty
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
-    !> mask term for every grid point in this block
-    integer(kind=2), allocatable, save :: mask_color2(:,:,:)
-    !> velocity of the solid
-    real(kind=rk), allocatable, save :: us2(:,:,:,:), mask2(:,:,:)
 
 
 
@@ -28,12 +26,22 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
 
 
     if (size(mask,1) /= Bs+2*g .or. size(mask,2) /= Bs+2*g .or. size(mask,3) /= Bs+2*g ) then
+        write(*,*) shape(mask)
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
     if (size(us,4) /= 3 ) then
+        write(*,*) shape(us)
         call abort(777108, "us: wrong array size, there's pirates, captain!")
     endif
+
+    if (present(stage)) then
+        if (stage == "init_stage") then
+            call Update_Insect(time, Insect)
+            return
+        endif
+    endif
+
 
 
 
@@ -56,18 +64,6 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
             ! Hence, here, you do not have to delete again.
             call draw_insect_wings( x0, dx, mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
                 mask_color, us(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3), Insect, delete=.false.)
-
-! if (.not. allocated(mask2)) allocate(mask2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
-! if (.not. allocated(mask_color2)) allocate(mask_color2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
-! if (.not. allocated(us2)) allocate(us2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g, 1:params_acm%dim))
-!
-! call Draw_Insect( time, Insect, x0, dx, mask2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), &
-! mask_color2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), us2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,1:3) )
-!
-! if (maxval(abs(mask2(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g)-mask(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g)))>0.0) then
-!     write(*,*) x0
-!     call abort(7742,"rick me")
-! endif
 
         ! case II: the body moves OR the grid qty is not available: delete & create everything
         else

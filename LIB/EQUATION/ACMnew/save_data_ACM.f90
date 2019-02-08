@@ -108,7 +108,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
             if (params_acm%dim==2) then
                 call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
             else
-                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
             endif
             work(:,:,:,k) = mask
 
@@ -116,7 +116,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
             if (params_acm%dim==2) then
                 call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
             else
-                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
             endif
             work(:,:,:,k) = us(:,:,:,1)
 
@@ -124,12 +124,12 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
             if (params_acm%dim==2) then
                 call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
             else
-                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
             endif
             work(:,:,:,k) = us(:,:,:,2)
 
         case('usz')
-            call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty )
+            call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
             work(:,:,:,k) = us(:,:,:,3)
 
         case('sponge')

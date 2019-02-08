@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage, first_substep )
+subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -44,11 +44,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage, first_substep )
     ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
     ! if they require such qantities. In many cases, the grid_qtys are probably not used.
     real(kind=rk), intent(in) :: grid_qty(1:,1:,1:,1:)
-
-
-    !> some operations might be done only in the first RK substep, hence we pass
-    !! this flag to check if this is the first call at the current time level.
-    logical, intent(in) :: first_substep
 
     ! local variables
     integer(kind=ik) :: Bs, mpierr
@@ -504,7 +499,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty)
+        call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty)
         mask = mask * eps_inv
     else
         ! note setting zero is required if params_acm%penalization = .false.

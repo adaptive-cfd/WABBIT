@@ -407,7 +407,7 @@ program main
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n, hvy_gridQ)
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
         enddo

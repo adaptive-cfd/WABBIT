@@ -91,8 +91,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
     call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:,hvy_active(1)), g, x0, dx, &
-        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_gridQ(:,:,:,:,hvy_active(1)), "init_stage", &
-        first_substep=first_substep2 )
+        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_gridQ(:,:,:,:,hvy_active(1)), "init_stage" )
 
     !-------------------------------------------------------------------------
     ! 2nd stage: integral_stage. (called for all blocks)
@@ -109,8 +108,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
       call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, x0, dx,&
-          hvy_rhs(:,:,:,:,hvy_active(k)), hvy_gridQ(:,:,:,:,hvy_active(k)), &
-          "integral_stage", first_substep=first_substep2 )
+          hvy_rhs(:,:,:,:,hvy_active(k)), hvy_gridQ(:,:,:,:,hvy_active(k)), "integral_stage" )
     enddo
 
 
@@ -119,8 +117,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
     call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(1)), g, x0, dx, &
-        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_gridQ(:,:,:,:,hvy_active(1)), &
-        "post_stage", first_substep=first_substep2 )
+        hvy_rhs(:,:,:,:,hvy_active(1)), hvy_gridQ(:,:,:,:,hvy_active(1)), "post_stage" )
 
 
     !-------------------------------------------------------------------------
@@ -138,13 +135,11 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
         ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
         call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
       endif
-      ! if (surface(1).ne. 0 .or. surface(2).ne.0) then
-      !   write(*,*) "surface normal",lgt_block(lgt_id,1:params%max_treelevel)
-      ! endif
+      
 
       call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
            x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), hvy_gridQ(:,:,:,:, hvy_active(k)), "local_stage", &
-           boundary_flag=surface, first_substep=first_substep2 )
+           boundary_flag=surface )
     enddo
 
 end subroutine RHS_wrapper

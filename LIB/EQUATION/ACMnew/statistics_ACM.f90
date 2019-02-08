@@ -4,7 +4,7 @@
 ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
 ! on individual blocks. This requires one to use the same staging concept as for the RHS.
 !-----------------------------------------------------------------------------
-subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
+subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -18,6 +18,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     ! work data, for mask, vorticity etc. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+    real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -32,6 +33,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     ! from a single block alone, the first stage does that. the second stage can then
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
+
 
     ! local variables
     integer(kind=ik) :: Bs, mpierr, ix, iy, iz
@@ -169,7 +171,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             enddo
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us )
+            call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
             eps_inv = 1.0_rk / params_acm%C_eta
 
             ! compute divergence on this block

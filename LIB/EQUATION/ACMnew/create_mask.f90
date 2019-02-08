@@ -24,6 +24,16 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
     ! happens, do nothing.
     if ( params_acm%penalization .eqv. .false.) return
 
+    ! the insects require us to determine their state vector before they can be drawn
+    ! as this is to do only once, not for all blocks, we have this stage here
+    if (present(stage)) then
+        if (stage == "init_stage") then
+            call Update_Insect(time, Insect)
+            ! that's all
+            return
+        endif
+    endif
+    
 
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
@@ -32,13 +42,6 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
     if (size(us,4) /= 3 ) then
         write(*,*) shape(us)
         call abort(777108, "us: wrong array size, there's pirates, captain!")
-    endif
-
-    if (present(stage)) then
-        if (stage == "init_stage") then
-            call Update_Insect(time, Insect)
-            return
-        endif
     endif
 
 

@@ -168,8 +168,13 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
         ! if additional mask thresholding is used, we have to create the mask
         ! function here. First: initializations of routines. (right now, this is only useful for insects)
-        call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
-        mask_color, us, "init_stage", hvy_gridQ(:,:,:,:,hvy_active(1)) )
+        if (present(hvy_gridQ)) then
+            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
+            mask_color, us, "init_stage", hvy_gridQ(:,:,:,:,hvy_active(1)) )
+        else
+            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
+            mask_color, us, "init_stage" )
+        endif
     endif
 
 

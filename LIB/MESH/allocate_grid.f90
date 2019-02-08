@@ -178,7 +178,8 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank == 0) then
         write(*,'("INIT: mpisize=",i6)') params%number_procs
         write(*,'("INIT: nwork=",i6)') nwork
-        write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs(1),Bs(2),Bs(3), number_blocks, number_blocks*number_procs
+        write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') &
+        Bs(1),Bs(2),Bs(3), params%number_blocks, params%number_blocks*params%number_procs
         write(*,'("INIT: Allocating a ",i1,"D case.")') params%dim
     endif
 

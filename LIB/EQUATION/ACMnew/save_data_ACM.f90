@@ -32,7 +32,8 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
     real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, Bs, k
+    integer(kind=ik)  :: neqn, nwork, k
+    integer(kind=ik), dimension(3) :: Bs
     character(len=80) :: name
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
@@ -42,22 +43,26 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
     ! number of available work array slots
     nwork = size(work,4)
 
-    Bs = size(u,1)-2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
-    if (params_acm%geometry == "Insect" .and. Insect%time /= time) then
+    if (params_acm%geometry == "Insect" .and. Insect%time /= time) then 
         call Update_Insect(time, Insect)
     endif
 
+    ! this routine saves the mask function, and most of the time the grid_qtys should already be available
+    ! but for security (and because this routine is called seldom) we update them here.
     call update_grid_qtys_ACM( time, grid_qty, g, x0, dx, "main_stage" )
 
     if (params_acm%dim==3) then
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-        if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-        if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+        if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+        if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
     else
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
-        if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
-        if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+        if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+        if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
     endif
 
 

@@ -5,7 +5,8 @@ subroutine  funnel_penalization2D(Bs, g, x_0, delta_x, phi, mask, phi_ref)
   use module_helpers
   implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in)  :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)     :: x_0(2), delta_x(2)   !< coordinates of block and block spacinf
     real(kind=rk), intent(in)     :: phi(:,:,:)     !< state vector
     real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
@@ -16,7 +17,7 @@ subroutine  funnel_penalization2D(Bs, g, x_0, delta_x, phi, mask, phi_ref)
     ! -----------------------------------------------------------------
     call cartesian2cylinder( x_0, delta_x, dx, dr, x0, r0 )
 
-    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs+2*g, 1:Bs+2*g))
+    if (.not. allocated(mask_color))  allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g))
     !!> todo implement function check_if_mesh_adapted (true/false) in adapt mesh
     if ( mesh_was_adapted .eqv. .true. ) then
       ! dont switch the order of draw_funnel3D and draw_sponge3D,
@@ -34,7 +35,8 @@ end subroutine  funnel_penalization2D
 subroutine draw_funnel2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)             :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in)             :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)                :: r0, x0, dr, dx !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)             :: mask(:,:,:)    !< mask function
     integer(kind=2), intent(inout), optional :: mask_color(:,:)!< identifyers of mask parts (plates etc)
@@ -47,11 +49,11 @@ subroutine draw_funnel2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     ! parameter for smoothing function (width)
     h  = 1.5_rk*max(dx, dr)
     ! smooth width in x and y direction
-    do ir = g+1, Bs+g
+    do ir = g+1, Bs(2)+g
        ! calculate the radial distance from the coordinate origin
        r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix = g+1, Bs+g
+       do ix = g+1, Bs(1)+g
             x = dble(ix-(g+1)) * dx + x0
             !=============================
 !     /\     reset the mask function!
@@ -90,7 +92,8 @@ end subroutine  draw_funnel2D
 subroutine draw_sponge2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)             :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in)             :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs     !< grid parameter
     real(kind=rk), intent(in)                :: r0, x0, dr, dx !< coordinates of block and block spacing
     real(kind=rk), intent(inout)             :: mask(:,:,:)    !< mask function
     integer(kind=2), intent(inout), optional :: mask_color(:,:)!< identifyers of mask parts (plates etc)
@@ -104,11 +107,11 @@ subroutine draw_sponge2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     h  = 1.5_rk*max(dx, dr)
 
     ! smooth width in x and y direction
-    do ir=g+1, Bs+g
+    do ir=g+1, Bs(2)+g
       ! calculate the radial distance from the coordinate origin
       r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix=g+1, Bs+g
+       do ix=g+1, Bs(1)+g
             x = dble(ix-(g+1)) * dx + x0
                                        ! the temperature of the funnel
             ! Outlet flow: PUMPS
@@ -158,7 +161,8 @@ end subroutine  draw_sponge2D
 subroutine  compute_penal2D(mask_color, mask, phi, r0, dr, x0, dx, Bs, g ,phi_ref)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in)  :: g          !< grid parameter
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in)     :: r0, x0, dr, dx !< coordinates of block and block spacing
     integer(kind=2), intent(inout):: mask_color(:,:)!< identifyers of mask parts (plates etc)
     real(kind=rk), intent(in)     :: phi(:,:,:)     !< state vector
@@ -202,11 +206,11 @@ subroutine  compute_penal2D(mask_color, mask, phi, r0, dr, x0, dx, Bs, g ,phi_re
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
     endif
     ! smooth width in x and y direction
-    do ir=g+1, Bs+g
+    do ir=g+1, Bs(2)+g
       ! calculate the radial distance from the coordinate origin
        r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix=g+1, Bs+g
+       do ix=g+1, Bs(1)+g
             x = dble(ix-(g+1)) * dx + x0
             rho = phi(ix,ir,rhoF)
             u   = phi(ix,ir,UxF)
@@ -514,7 +518,8 @@ end function draw_sink
       implicit none
 
       !> grid parameter (g ghostnotes,Bs Bulk)
-      integer(kind=ik), intent(in)                     :: Bs, g
+      integer(kind=ik), intent(in)                     :: g
+      integer(kind=ik), dimension(3), intent(in) :: Bs
       !> density,pressure
       real(kind=rk), dimension(1:,1:,1:), intent(in)   :: u
       !> spacing and origin of block
@@ -533,10 +538,10 @@ end function draw_sink
       width =funnel%wall_thickness
       tmp   =  0.0_rk
       r0    =(R_domain-2*funnel%wall_thickness)
-       do ir=g+1, Bs+g
+       do ir=g+1, Bs(2)+g
          y = dble(ir-(g+1)) * dx(2) + x0(2)
          r = abs(y-R_domain)
-         do ix=g+1, Bs+g
+         do ix=g+1, Bs(1)+g
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
                   r>r0 .and. r<r0+width) then

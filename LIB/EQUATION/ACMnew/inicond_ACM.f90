@@ -29,14 +29,17 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     logical, intent(in) :: adapting
 
     real(kind=rk)    :: x,y,z
-    integer(kind=ik) :: Bs, ix, iy, iz, idir
+    integer(kind=ik) :: ix, iy, iz, idir
+    integer(kind=ik), dimension(3) :: Bs
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     u = 0.0_rk
 
@@ -52,8 +55,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     case("pressure-blob")
         if (params_acm%dim==2) then
             ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
-            do iy = 1, Bs+2*g
-                do ix = 1, Bs+2*g
+            do iy = 1, Bs(2)+2*g
+                do ix = 1, Bs(1)+2*g
                     ! compute x,y coordinates from spacing and origin
                     x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0_rk
                     y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk
@@ -71,9 +74,9 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
             end do
         else
             ! create gauss pulse
-            do iz = 1, Bs+2*g
-                do iy = 1, Bs+2*g
-                    do ix = 1, Bs+2*g
+            do iz = 1, Bs(3)+2*g
+                do iy = 1, Bs(2)+2*g
+                    do ix = 1, Bs(1)+2*g
                         ! compute x,y coordinates from spacing and origin
                         x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0_rk
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk
@@ -103,8 +106,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     case("sinewaves-nopress")
         ! some random sine waves, but no pressure imposed.
         if (params_acm%dim == 2) then
-            do iy= 1,Bs+2*g
-                do ix= 1, Bs+2*g
+            do iy= 1,Bs(2)+2*g
+                do ix= 1, Bs(1)+2*g
                     x = x0(1) + dble(ix-g-1)*dx(1)
                     y = x0(2) + dble(iy-g-1)*dx(2)
                     u(ix,iy,1,1) = sin( 2.0_rk*pi*x/params_acm%domain_size(1) ) + 0.5_rk*sin( 10.0_rk*pi*x/params_acm%domain_size(1) )
@@ -112,9 +115,9 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
                 enddo
             enddo
         else
-            do iz = 1, Bs+2*g
-                do iy= 1,Bs+2*g
-                    do ix= 1, Bs+2*g
+            do iz = 1, Bs(3)+2*g
+                do iy= 1,Bs(2)+2*g
+                    do ix= 1, Bs(1)+2*g
                         x = x0(1) + dble(ix-g-1)*dx(1)
                         y = x0(2) + dble(iy-g-1)*dx(2)
                         z = x0(3) + dble(iz-g-1)*dx(3)
@@ -129,8 +132,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
         endif
 
     case("taylor_green")
-        do iy= 1,Bs+2*g
-            do ix= 1, Bs+2*g
+        do iy= 1,Bs(2)+2*g
+            do ix= 1, Bs(1)+2*g
                 x = x0(1) + dble(ix-g-1)*dx(1)
                 y = x0(2) + dble(iy-g-1)*dx(2)
 
@@ -153,13 +156,13 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     if (adapting .and. params_acm%penalization) then
 
         if (params_acm%dim==3) then
-            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-            if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-            if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+            if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+            if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
         else
-            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1))
-            if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1))
-            if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1, 1:2))
+            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+            if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+            if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
         endif
 
 

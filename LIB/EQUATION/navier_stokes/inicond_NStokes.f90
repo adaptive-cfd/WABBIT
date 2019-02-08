@@ -23,13 +23,16 @@
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik)          :: Bs,ix,iy,iz,dF
+    integer(kind=ik)          :: ix,iy,iz,dF
+    integer(kind=ik), dimension(3) :: Bs
     real(kind=rk)             :: x,y_rel,tmp(1:3),b,mach,T_init,x_cntr(3),sigma,&
                                 left(size(u,4)),right(size(u,4)),phi_init(size(u,4))
     real(kind=rk),allocatable:: mask(:,:,:) ! we dont save this datafield, since it is only called once
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
     !------------------------------------------------------------------
     ! READ INITIAL CONDITION FROM FILE
     !------------------------------------------------------------------
@@ -155,7 +158,7 @@
         ! create gauss wave along the x axis
         x_cntr(1) = params_ns%domain_size(1)*0.5_rk
         sigma     = params_ns%inicond_width
-        do ix = 1,Bs+2*g
+        do ix = 1,Bs(1)+2*g
             ! compute x,y coordinates from spacing and origin
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             if (params_ns%periodic_BC(1)) then
@@ -212,7 +215,8 @@
       !> spacing and origin of block
       real(kind=rk), intent(in)    :: x0(1:3),dx(1:3)
       ! grid
-      integer(kind=ik),intent(in)  :: Bs, g
+      integer(kind=ik),intent(in)  :: g
+      integer(kind=ik), dimension(3), intent(in) :: Bs
       !------------------------------------------------------------
       ! variable for shear layer position
       real(kind=rk)                           :: mux1, mux2, muy, x, y, sigma, w
@@ -242,8 +246,8 @@
       else
           ! 2D case
           ! create shear layer, Uy field
-          do ix = 1,Bs+2*g
-              do iy = 1,Bs+2*g
+          do ix = 1,Bs(1)+2*g
+              do iy = 1,Bs(2)+2*g
 
                   ! compute x,y coordinates from spacing and origin
                   x = dble(ix-(g+1)) * dx(1) + x0(1)
@@ -290,7 +294,8 @@
         implicit none
         real(kind=rk), intent(inout)        :: u(:,:,:)                      !< actual block data
         real(kind=rk), intent(in)          :: x0(1:3),dx(1:3),L(1:3),sigma  !<standard diviation/width of gauss pulse \f$\sigma\f$
-        integer(kind=ik),intent(in)        :: Bs, g, dimension              !< note if the dimension is 0 the gaus blob is not normalized
+        integer(kind=ik),intent(in)        :: g, dimension              !< note if the dimension is 0 the gaus blob is not normalized
+        integer(kind=ik), dimension(3), intent(in) :: Bs
         real(kind=rk), intent(in),optional :: amplitude  !< maximum of the gauss blob \f$A\f$ is optional
 
 
@@ -312,8 +317,8 @@
         if (dimension==2) then
           ! 2D case
           ! create gauss pulse
-          do ix = g+1,Bs+g
-            do iy = g+1,Bs+g
+          do ix = g+1,Bs(1)+g
+            do iy = g+1,Bs(2)+g
               ! compute x,y coordinates from spacing and origin
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               y = dble(iy-(g+1)) * dx(2) + x0(2)
@@ -328,9 +333,9 @@
         else
           ! 3D case
           ! create gauss pulse
-          do ix = g+1,Bs+g
-            do iy = g+1,Bs+g
-              do iz = g+1,Bs+g
+          do ix = g+1,Bs(1)+g
+            do iy = g+1,Bs(2)+g
+              do iz = g+1,Bs(3)+g
 
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)

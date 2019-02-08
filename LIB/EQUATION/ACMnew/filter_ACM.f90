@@ -26,10 +26,13 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array )
   real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
 
   ! local variables
-  integer(kind=ik) :: Bs, i
+  integer(kind=ik) :: i
+  integer(kind=ik), dimension(3) :: Bs
 
   ! compute the size of blocks
-  Bs = size(u,1) - 2*g
+  Bs(1) = size(u,1) - 2*g
+  Bs(2) = size(u,2) - 2*g
+  Bs(3) = size(u,3) - 2*g
 
   select case (params_acm%filter_type)
   case ("no_filter")
@@ -60,7 +63,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
     !> params structure of navier stokes
     character(len=*), intent(in) :: order_predictor
     !> mesh params
-    integer(kind=ik), intent(in) :: Bs
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     integer(kind=ik), intent(in) :: g
     !> heavy data array - block data
     real(kind=rk), intent(inout) :: block_data(:, :, :)
@@ -69,7 +72,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
 
     if ( size(block_data,3)>1 ) then
         ! ********** 3D **********
-        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,(Bs+1)/2+g))
+        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,(Bs(3)+1)/2+g))
         ! now, coarsen array u1 (restriction)
         call restriction_3D( block_data, u3 )  ! fine, coarse
         ! then, re-interpolate to the initial level (prediciton)
@@ -77,7 +80,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
 
     else
         ! ********** 2D **********
-        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,1))
+        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,1))
         ! now, coarsen array u1 (restriction)
         call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
         ! then, re-interpolate to the initial level (prediciton)

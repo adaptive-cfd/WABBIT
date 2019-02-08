@@ -52,7 +52,8 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     ! number of files to read from
     integer(kind=ik)                      :: N_files
     ! loop variable
-    integer(kind=ik)                      :: dF, Bs, tc_length, dim
+    integer(kind=ik)                      :: dF, tc_length, dim
+    integer(kind=ik), dimension(3)        :: Bs
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
@@ -73,7 +74,7 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
         write(*,'(80("_"))')
         write(*,'("READING: Reading from file ",A)') trim(adjustl(params%input_files(1)))
         write(*,'("time=",g12.4," iteration=", i5)') time, iteration
-        write(*,'("Bs=",i4," dim=", i1, " tc_length=", i2)') Bs, dim, tc_length
+        write(*,'("Bs(1)=",i4,"Bs(2)=",i4,"Bs(3)=",i4," dim=", i1, " tc_length=", i2)') Bs(1),Bs(2),Bs(3), dim, tc_length
         write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4)') domain
         ! if the domain size doesn't match, proceed, but yell.
         if ((abs(params%domain_size(1)-domain(1))>1e-12_rk).or.(abs(params%domain_size(2)-domain(2))>1e-12_rk) &

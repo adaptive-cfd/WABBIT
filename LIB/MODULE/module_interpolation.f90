@@ -47,18 +47,18 @@ contains
 
         real(kind=rk), dimension(1:,1:), intent(in) :: fine
         real(kind=rk), dimension(1:,1:), intent(out) :: coarse
-        integer(kind=ik) :: nfine, ncoarse
+        integer(kind=ik), dimension(2) :: nfine, ncoarse
 
-        ncoarse = size(coarse,1)
-        nfine = size(fine,1)
+        ncoarse(1) = size(coarse,1)
+        nfine(1) = size(fine,1)
+        ncoarse(2) = size(coarse,2)
+        nfine(2) = size(fine,2)
 
-        if ( 2*ncoarse-1 /= nfine ) then
+        if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
           call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 
-        ! reseting not necessary
-        !coarse = 0.0_rk
-        coarse(:, :) = fine(1:nfine:2,1:nfine:2)
+        coarse(:, :) = fine(1:nfine(1):2,1:nfine(2):2)
 
     end subroutine restriction_2D
 
@@ -69,16 +69,20 @@ contains
 
         real(kind=rk), dimension(1:,1:,1:), intent(in)  :: fine
         real(kind=rk), dimension(1:,1:,1:), intent(out) :: coarse
-        integer(kind=ik) :: nfine, ncoarse
+        integer(kind=ik), dimension(3) :: nfine, ncoarse
 
-        ncoarse = size(coarse,1)
-        nfine = size(fine,1)
+        ncoarse(1) = size(coarse,1)
+        nfine(1) = size(fine,1)
+        ncoarse(2) = size(coarse,2)
+        nfine(2) = size(fine,2)
+        ncoarse(3) = size(coarse,3)
+        nfine(3) = size(fine,3)
 
-        if ( 2*ncoarse-1 /= nfine ) then
+        if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2) .or. 2*ncoarse(3)-1 /= nfine(3) ) then
           call abort(888192,"ERROR: restriction_3D: arrays wrongly sized..")
         endif
 
-        coarse(:, :, :) = fine(1:nfine:2,1:nfine:2,1:nfine:2)
+        coarse(:, :, :) = fine(1:nfine(1):2,1:nfine(2):2,1:nfine(3):2)
 
     end subroutine restriction_3D
 

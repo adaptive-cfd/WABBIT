@@ -29,9 +29,11 @@ subroutine update_grid_qtys_ACM( time, grid_qty, g, x0, dx, stage )
 
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
-    integer :: Bs
+    integer, dimension(3) :: Bs
     ! compute the size of blocks
-    Bs = size(grid_qty,1) - 2*g
+    Bs(1) = size(grid_qty,1) - 2*g
+    Bs(2) = size(grid_qty,2) - 2*g
+    Bs(3) = size(grid_qty,3) - 2*g
 
     select case(stage)
     case("init_stage")
@@ -45,7 +47,7 @@ subroutine update_grid_qtys_ACM( time, grid_qty, g, x0, dx, stage )
     case("main_stage")
         ! are we using insects? (3D only)
         if ( params_acm%geometry == "Insect" .and. Insect%body_moves == "no" .and. params_acm%dim==3 ) then
-            if (.not. allocated(mask_color)) allocate(mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g))
+            if (.not. allocated(mask_color)) allocate(mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g))
 
             ! the insect module can on its own delete the "old" wings from previous time steps
             ! and it usually tries to keep the body, if it does not move (flag avoid_drawing_static_body
@@ -60,15 +62,17 @@ subroutine update_grid_qtys_ACM( time, grid_qty, g, x0, dx, stage )
 
             ! in the tethered case, construct the body in the first 4 registers of
             ! grid_qty: mask, usx, usy, usz, color
+
             if (size(grid_qty,4) < 4) call abort(12121802,"[update_grid_qtys_ACM.f90]::not enough work arrays")
+
 
             ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
             ! know that the first g points are in fact ghost nodes...
-            call draw_insect_body( x0, dx, grid_qty(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,IDX_MASK), &
-            mask_color, grid_qty(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,IDX_USX:IDX_USZ), Insect, delete=.false.)
+            call draw_insect_body( x0, dx, grid_qty(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,IDX_MASK), &
+            mask_color, grid_qty(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,IDX_USX:IDX_USZ), Insect, delete=.false.)
 
             ! copy mask color array as well
-            grid_qty(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g,IDX_COLOR) = real( mask_color(g+1:Bs+g,g+1:Bs+g,g+1:Bs+g), kind=rk )
+            grid_qty(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,IDX_COLOR) = real( mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), kind=rk )
         endif
 
         ! are we using the sponge ? If so, the sponge mask is also a time-independent grid qty
@@ -83,7 +87,5 @@ subroutine update_grid_qtys_ACM( time, grid_qty, g, x0, dx, stage )
     case default
         call abort(17121801,"[update_grid_qtys_ACM.f90]::unknown stage.")
     end select
-
-
 
 end subroutine update_grid_qtys_ACM

@@ -31,7 +31,7 @@ subroutine ini_file_to_params( params, filename )
 
     !> user defined parameter structure
     type (type_params), intent(inout)               :: params
-    !> inifile name
+
     character(len=*), intent(in)                   :: filename
 
     ! process rank
@@ -40,6 +40,13 @@ subroutine ini_file_to_params( params, filename )
     integer(kind=ik)                                :: number_procs
     ! inifile structure
     type(inifile)                                   :: FILE
+    ! maximum memory available on all cpus
+    real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
+    ! string read from command line call
+    character(len=80)                               :: memstring
+    !
+    integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk
+    integer(kind=ik), dimension(3)                  :: Bs
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -113,11 +120,11 @@ subroutine ini_file_to_params( params, filename )
     !
     ! timing flag
     !call read_param_mpi(FILE, 'Debug', 'timing', params%timing, .true. )
-    call read_param_mpi(FILE, 'Debug', 'write_individual_timings', params%write_individual_timings, .false. )
+    call read_param_mpi(FILE, 'Timing', 'write_individual_timings', params%write_individual_timings, .false. )
     ! unit test treecode flag
-    call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
-    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
-    call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .true.)
+    call read_param_mpi(FILE, 'Timing', 'test_treecode', params%test_treecode, .false.)
+    call read_param_mpi(FILE, 'Timing', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
+    call read_param_mpi(FILE, 'Timing', 'check_redundant_nodes', params%check_redundant_nodes, .true.)
 
     !***************************************************************************
     ! read MPI parameters
@@ -127,6 +134,83 @@ subroutine ini_file_to_params( params, filename )
 
 
     ! NOTE: this routine initializes WABBIT AND NOT THE PHYSICS MODULES THEMSELVES!
+
+    !---------------------------------------------------------------------------
+    ! Automatic memory management. If specified --memory=0.3GB in the call line,
+    ! wabbit will automatically select the number of blocks per rank to be allocated
+    ! to consume this amount of memory. helpful on local machines.
+    !---------------------------------------------------------------------------
+    ! loop over all arguments until you find the string "--memory" in them (or not)
+    ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
+    do i = 1, command_argument_count()
+        call get_command_argument(i, memstring)
+        ! is memory limitation used?
+        if ( index(memstring,"--memory=")==1 ) then
+            if (params%rank==0) write(*,'(80("-"))')
+            if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
+            if (params%rank==0) write(*,'(80("-"))')
+
+            ! read memory from command line (in GB)
+            read(memstring(10:len_trim(memstring)-2),* ) maxmem
+            ! memory per MPIRANK (in GB)
+            maxmem = maxmem / dble(params%number_procs)
+
+            if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
+
+            if ( params%threeD_case ) then
+                d = 3
+                max_neighbors = 56.0
+            else
+                d = 2
+                max_neighbors = 12.0
+            endif
+
+            Bs      = params%Bs
+            g       = params%n_ghosts
+            Neqn    = params%n_eqn
+
+            if (params%time_step_method == "RungeKuttaGeneric") then
+                Nrk = size(params%butcher_tableau,1)
+            elseif (params%time_step_method == "Krylov") then
+                Nrk = params%M_krylov + 3
+            else
+                call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+            endif
+
+            nstages = 2.0
+
+            if (d==3) then
+              mem_per_block = real(Neqn) * (real(Bs(1)+2*g))*(Bs(2)+2*g)*(Bs(3)+2*g) & ! hvy_block
+              + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs(1)+2*g))*(Bs(2)+2*g)*(Bs(3)+2*g) & ! hvy_tmp
+              + real(Neqn) * real(Nrk) * (real(Bs(1)+2*g))*(Bs(2)+2*g)*(Bs(3)+2*g) & ! hvy_work
+              + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - Bs(1)*Bs(2)*Bs(3)) &  ! real buffer ghosts
+              + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
+            else
+              ! 2D case
+              mem_per_block = real(Neqn) * (real(Bs(1)+2*g))*(real(Bs(2)+2*g)) & ! hvy_block
+              + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs(1)+2*g))*(real(Bs(2)+2*g)) & ! hvy_tmp
+              + real(Neqn) * real(Nrk) * (real(Bs(1)+2*g))*(real(Bs(2)+2*g)) & ! hvy_work
+              + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(real(Bs(2)+2*g)) - Bs(1)*Bs(2)) &  ! real buffer ghosts
+              + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
+            endif
+
+            ! in GB:
+            mem_per_block = mem_per_block * 8.0e-9
+
+            params%number_blocks = nint( maxmem / mem_per_block)
+
+            if (params%rank==0) then
+                write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
+                write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
+                params%number_blocks*params%number_procs
+            endif
+
+            if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**d)) then
+                call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
+                & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
+            endif
+        endif
+    end do
 
     ! clean up
     if (params%rank==0) write(*,'("INIT: cleaning ini file")')
@@ -222,9 +306,11 @@ end subroutine ini_file_to_params
     !> params structure of WABBIT
     type(type_params),intent(inout)  :: params
     !> power used for dimensionality (d=2 or d=3)
-    integer(kind=ik)                                :: i
-    real(kind=rk), dimension(:), allocatable        :: tmp
-
+    integer(kind=ik) :: i, n_entries=0
+    real(kind=rk), dimension(:), allocatable  :: tmp
+    character(len=80) :: Bs_str, Bs_conc
+    character(:), allocatable :: Bs_short
+    real(kind=rk), dimension(3) :: Bs_real
     if (params%rank==0) then
       write(*,*)
       write(*,*)
@@ -233,7 +319,36 @@ end subroutine ini_file_to_params
     endif
 
     ! read number_block_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params%Bs, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
+    call merge_blancs(Bs_str)
+    Bs_short=trim(Bs_str)
+    call count_entries(Bs_short, " ", n_entries)
+    if (Bs_str .eq. "empty") then
+      Bs_conc="17 17 17"
+    elseif (n_entries==1) then
+      if (params%dim==3) then
+        Bs_conc=Bs_short // " " // Bs_short // " " // Bs_short
+      elseif (params%dim==2) then
+        Bs_conc=Bs_short//" "//Bs_short//" 1"
+      endif
+    elseif (n_entries==2) then
+      if (params%dim==3) then
+          call abort(231191737,"ERROR: You only gave two values for Bs, but want three to be read...")
+      elseif (params%dim==2) then
+        Bs_conc=Bs_short//" 1"
+      endif
+    elseif (n_entries==3) then
+      if (params%dim==2) then
+        call abort(231191738,"ERROR: You gave three values for Bs, but only want two to be read...")
+      elseif (params%dim==3) then
+        Bs_conc=trim(adjustl(Bs_str))
+      endif
+    elseif (n_entries .gt. 3) then
+      call abort(231191752,"ERROR: You gave too many arguments for Bs...")
+    endif
+    read(Bs_conc, *) Bs_real
+    params%Bs = int(Bs_real)
+
     ! read number_ghost_nodes
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     ! read number_blocks
@@ -331,6 +446,56 @@ end subroutine ini_file_to_params
       0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
-
-
     end subroutine ini_time
+
+    !-------------------------------------------------------------------------!
+    !> @brief remove (multiple) blancs as seperators in a string
+    subroutine merge_blancs(string_merge)
+      ! this routine removes blanks at the beginning and end of an string
+      ! and multiple blanks which are right next to each other
+
+      implicit none
+      character(len=*), intent(inout) :: string_merge
+      integer(kind=ik) :: i, j, len_str, count
+
+      len_str = len(string_merge)
+      count = 0
+
+      string_merge = string_merge
+      do i=1,len_str-1
+        if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
+          count = count + 1
+          string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+        end if
+      end do
+
+      string_merge = adjustl(string_merge)
+
+    end subroutine merge_blancs
+
+    !-------------------------------------------------------------------------!
+    !> @brief count number of vector elements in a string
+    subroutine count_entries(string_cnt, seperator, n_entries)
+      ! only to be used after merged blaks
+      ! this routine counts the seperators and gives back this value +1
+
+      implicit none
+      character(len=1), intent(in) :: seperator
+      character(len=*), intent(in) :: string_cnt
+      character(:), allocatable :: string_trim
+      integer(kind=ik), intent(out) :: n_entries
+      integer(kind=ik) :: count_seperator, i, l_string
+
+      count_seperator = 0
+      string_trim = trim(adjustl(string_cnt))
+      l_string = LEN(string_cnt)
+
+      do i=1,l_string
+        if (string_trim(i:i)==seperator) then
+          count_seperator = count_seperator + 1
+        end if
+      end do
+
+      n_entries = count_seperator + 1
+
+    end subroutine count_entries

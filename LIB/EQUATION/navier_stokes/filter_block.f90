@@ -159,7 +159,8 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
     real(kind=rk), intent(inout)        :: work_array(:, :, :, :)
     real(kind=rk), intent(inout)        :: u(:, :, :, :)
     !> grid parameter
-    integer(kind=ik),intent(in)         :: Bs, g
+    integer(kind=ik),intent(in)         :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     ! spacing and origin of a block
     real(kind=rk)                       :: x0(1:3), dx(1:3)
 
@@ -199,9 +200,9 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
               if (params_ns%dim==3 ) then
                   ! 3D
                   ! loop over block data
-                  do i = g+1, Bs+g
-                      do j = g+1, Bs+g
-                          do l = g+1, Bs+g
+                  do i = g+1, Bs(1)+g
+                      do j = g+1, Bs(2)+g
+                          do l = g+1, Bs(3)+g
                               ! x direction
                               call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l,dF_old ), phi_tilde(1), filter%stencil(1:stencil_size) )
                               ! y direction
@@ -216,8 +217,8 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
               else
                   ! 2D
                   ! loop over block data
-                  do i = g+1, Bs+g
-                      do j = g+1, Bs+g
+                  do i = g+1, Bs(1)+g
+                      do j = g+1, Bs(2)+g
                           ! x direction
                           call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1, dF_old ), phi_tilde(1), filter%stencil(1:stencil_size) )
                           ! y direction
@@ -262,7 +263,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
     !> params structure of navier stokes
     character(len=*), intent(in) :: order_predictor
     !> mesh params
-    integer(kind=ik), intent(in) :: Bs
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     integer(kind=ik), intent(in) :: g
     !> heavy data array - block data
     real(kind=rk), intent(inout) :: block_data(:, :, :)
@@ -271,7 +272,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
 
     if ( size(block_data,3)>1 ) then
         ! ********** 3D **********
-        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,(Bs+1)/2+g))
+        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,(Bs(3)+1)/2+g))
         ! now, coarsen array u1 (restriction)
         call restriction_3D( block_data, u3 )  ! fine, coarse
         ! then, re-interpolate to the initial level (prediciton)
@@ -279,7 +280,7 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
 
     else
         ! ********** 2D **********
-        if (.not.allocated(u3)) allocate(u3((Bs+1)/2+g,(Bs+1)/2+g,1))
+        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,1))
         ! now, coarsen array u1 (restriction)
         call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
         ! then, re-interpolate to the initial level (prediciton)
@@ -369,7 +370,8 @@ subroutine bogey_filter3D(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   implicit none
   !-----------------------------------------------------------------------
   type(type_params_filter),intent(in) :: filter      !< filter arguments
-  integer(kind=ik), intent(in)        :: g, Bs, N_dF       !< grid parameter
+  integer(kind=ik), intent(in)        :: g, N_dF       !< grid parameter
+  integer(kind=ik), dimension(3), intent(in) :: Bs
   real(kind=rk), intent(inout)        :: work_array(:, :, :, :) !< block data and work arrays
   real(kind=rk), intent(inout)        :: u(:,:,:,:)
   real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3) !< spacing and origin of a block
@@ -409,9 +411,9 @@ subroutine bogey_filter3D(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
 
   ! This routine is ugly but fucking fast and it saves memory!!
   ! Because filtering is done locally in every step.
-  do iz = g+1, Bs+g
-    do iy = g+1, Bs+g
-      do ix = g+1, Bs+g
+  do iz = g+1, Bs(3)+g
+    do iy = g+1, Bs(2)+g
+      do ix = g+1, Bs(1)+g
         do i=1,7 !shift the stencil loop
           !This loop shifts the stencil in every direction   direction shift(1)=-3,shift(2)=-2,...shift(6)=3
 
@@ -494,7 +496,8 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   implicit none
   !-----------------------------------------------------------------------
   type(type_params_filter),intent(in) :: filter      !< filter arguments
-  integer(kind=ik), intent(in)        :: g, Bs, N_dF       !< grid parameter
+  integer(kind=ik), intent(in)        :: g, N_dF       !< grid parameter
+  integer(kind=ik), dimension(3), intent(in) :: Bs
   real(kind=rk), intent(inout)        :: work_array(:, :, :, :) !< block data and work arrays
   real(kind=rk), intent(inout)        :: u(:,:,:,:)
   real(kind=rk), intent(in)           :: xx0(1:3), ddx(1:3) !< spacing and origin of a block
@@ -527,8 +530,8 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
 
   ! copy the non filtert data work_array to block_old
   do dF=1,N_dF
-      do iy = 1, Bs+2*g, 1
-         do ix = 1, Bs+2*g, 1
+      do iy = 1, Bs(2)+2*g, 1
+         do ix = 1, Bs(1)+2*g, 1
               block_old(ix,iy,1,df) = work_array(ix,iy,1,dF)
           end do
       end do
@@ -540,8 +543,8 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   ! This routine is ugly but fucking fast and it saves memory!!
   ! Because filtering is done locally in every step.
   iz=1
-  do iy = g+1, Bs+g
-    do ix = g+1, Bs+g
+  do iy = g+1, Bs(2)+g
+    do ix = g+1, Bs(1)+g
       do i=1,7 !shift the stencil loop
         !This loop shifts the stencil in every direction   direction shift(1)=-1,shift(2)=0,shift(3)=1
 
@@ -621,7 +624,8 @@ end subroutine bogey_filter2D_
 !     !> params structure of navier stokes
 !     type(type_params_filter),intent(in) :: filter
 !     !> grid parameter
-!     integer(kind=ik), intent(in)        :: g, Bs, N_dF
+!     integer(kind=ik), intent(in)        :: g, N_dF
+!     integer(kind=ik), dimension(3), intent(in) :: Bs
 !     ! !> heavy work
 !     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :)
 !     ! spacing and origin of a block

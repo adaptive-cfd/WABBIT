@@ -60,7 +60,8 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, h
     ! loop variables
     integer(kind=ik)                    :: k,  lgt_id
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: g
+    integer(kind=ik), dimension(3) :: Bs
 
 
 !---------------------------------------------------------------------------------------------

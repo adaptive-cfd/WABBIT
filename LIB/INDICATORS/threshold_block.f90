@@ -52,7 +52,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     ! detail
     real(kind=rk)                       :: detail( size(block_data,4) )
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: g
+    integer(kind=ik), dimension(3)      :: Bs
 
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0
@@ -79,9 +80,9 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
             if ( params%dim == 3 ) then
                 ! ********** 3D **********
                 ! allocate interpolation fields
-                if (.not.allocated(u2)) allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g ) )
+                if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ) )
                 ! coarsened field is half block size + 1/2
-                if (.not.allocated(u3)) allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1:(Bs+1)/2 + g) )
+                if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1:(Bs(3)+1)/2 + g) )
 
                 ! now, coarsen block data (restriction)
                 call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
@@ -90,9 +91,9 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
 
                 ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
                 ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
-                        do l = 1, Bs+2*g
+                do i = 1, Bs(1)+2*g
+                    do j = 1, Bs(2)+2*g
+                        do l = 1, Bs(3)+2*g
                             detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
                         end do
                     end do
@@ -100,9 +101,9 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
             else
                 ! ********** 2D **********
                 ! allocate interpolation fields
-                if (.not.allocated(u2)) allocate( u2( 1:Bs+2*g, 1:Bs+2*g, 1 ) )
+                if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ) )
                 ! coarsened field is half block size + 1/2
-                if (.not.allocated(u3)) allocate( u3( 1:(Bs+1)/2 + g , 1:(Bs+1)/2 + g, 1) )
+                if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1) )
 
                 ! now, coarsen block data (restriction)
                 call restriction_2D( block_data( :, :, 1, dF ), u3(:,:,1) )  ! fine, coarse
@@ -111,8 +112,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
 
                 ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
                 ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                do i = 1, Bs+2*g
-                    do j = 1, Bs+2*g
+                do i = 1, Bs(1)+2*g
+                    do j = 1, Bs(2)+2*g
                         detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
                     end do
                 end do
@@ -131,6 +132,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     else
         refinement_status = 0
     end if
+
 
     ! timings
     call toc( "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )

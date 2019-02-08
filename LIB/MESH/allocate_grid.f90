@@ -58,8 +58,9 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
-    integer(kind=ik)                                    :: Bs, g, Neqn,&
-    rank, number_procs,number_trees
+    integer(kind=ik)                                    :: g, Neqn, number_blocks,&
+                                                      rank, number_procs,number_trees, dim
+    integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
@@ -79,9 +80,9 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
     max_neighbors   = 74
-    nx = Bs+2*g
-    ny = Bs+2*g
-    nz = Bs+2*g
+    nx = Bs(1)+2*g
+    ny = Bs(2)+2*g
+    nz = Bs(3)+2*g
     d  = params%dim
 
     if (params%dim==2) then
@@ -137,12 +138,21 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                 ! stages (for ghost node synching)
                 nstages = 2.0
 
-                mem_per_block = real(Neqn) * (real(Bs+2*g))**d & ! hvy_block
-                + real(params%n_gridQ) * (real(Bs+2*g))**d & ! hvy_gridQ
-                + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs+2*g))**d & ! hvy_tmp
-                + real(Neqn) * real(nrhs_slots) * (real(Bs+2*g))**d & ! hvy_work
-                + 2.0 * nstages * real(Neqn) * real((Bs+2*g)**d - Bs**d) &  ! real buffer ghosts
-                + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                if (params%dim==3) then
+                  mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
+                  + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_gridQ
+                  + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_tmp
+                  + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_work
+                  + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                  + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                else
+                  mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
+                  + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_gridQ
+                  + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_tmp
+                  + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_work
+                  + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                  + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                endif
 
                 ! in GB:
                 mem_per_block = mem_per_block * 8.0e-9
@@ -168,7 +178,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank == 0) then
         write(*,'("INIT: mpisize=",i6)') params%number_procs
         write(*,'("INIT: nwork=",i6)') nwork
-        write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, params%number_blocks, params%number_blocks*number_procs
+        write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs(1),Bs(2),Bs(3), number_blocks, number_blocks*number_procs
         write(*,'("INIT: Allocating a ",i1,"D case.")') params%dim
     endif
 

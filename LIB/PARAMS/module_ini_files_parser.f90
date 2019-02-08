@@ -54,7 +54,7 @@ module module_ini_files_parser
 
 
 !!!!!!!!
-contains
+contains !count_entries, merge_blancs
 !!!!!!!!
 
 
@@ -473,7 +473,7 @@ end subroutine read_intarray_from_ascii_file
     real(kind=rk) :: params_vector(1:)
     real(kind=rk), optional, intent(in) :: defaultvalue(1:)
 
-    integer :: n,m
+    integer :: n, m
     character(len=maxcolumns) :: value
     character(len=14)::formatstring
 
@@ -1139,6 +1139,5 @@ if (verbosity) then
   write(*,'("Read ",A,"::",A," as Matrix of size ",i6," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
 endif
 end subroutine param_matrix_read
-
 
 end module

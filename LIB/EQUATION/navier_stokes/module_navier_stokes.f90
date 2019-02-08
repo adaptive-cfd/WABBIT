@@ -202,10 +202,13 @@ contains
 
 
     ! local variables
-    integer(kind=ik) :: Bs,dF
+    integer(kind=ik) :: dF
+    integer(kind=ik), dimension(3) :: Bs
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     select case(stage)
     case ("init_stage")
@@ -301,7 +304,8 @@ contains
     subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, boundary_flag)
         implicit none
         real(kind=rk), intent(in) :: time
-        integer(kind=ik), intent(in) :: g, Bs
+        integer(kind=ik), intent(in) :: g
+        integer(kind=ik), dimension(3), intent(in) :: Bs
         real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
         !> datafields, and velocity field
         real(kind=rk), intent(inout) :: phi(:,:,:)
@@ -325,7 +329,7 @@ contains
         ! |     |   v                |     |
         ! ---------------------------------
         ! x->
-        real(kind=rk)   :: phi_bound(Bs+2*g,params_ns%n_eqn),normal_vector(Bs+2*g,2)
+        real(kind=rk)   :: phi_bound(Bs(1)+2*g,params_ns%n_eqn),normal_vector(Bs(2)+2*g,2)
 
       !##################################################
       ! compute the boundary values in x direction
@@ -354,7 +358,7 @@ contains
               ! This should be changed so phi_xminus can be a function of
               ! time and space.
               if (.true.) then
-                phi_bound=phi(Bs+g-1,:,:)
+                phi_bound=phi(Bs(1)+g-1,:,:)
                 phi_bound(:,UxF)  = phi_bound(:,UxF) / phi_bound(:,rhoF)
                 phi_bound(:,UyF)  = phi_bound(:,UyF) / phi_bound(:,rhoF)
                 phi_bound(:,rhoF) = phi_bound(:,rhoF) * phi_bound(:,rhoF)
@@ -365,13 +369,13 @@ contains
                 phi_bound(:,  pF)=params_ns%bound%phi_xplus(  pF)
               endif
               ! compute the ingoing and outgoing characteristics and changes the state vector
-              call set_bound_open( normal_vector, phi(Bs+g,:,:), phi_bound)
+              call set_bound_open( normal_vector, phi(Bs(1)+g,:,:), phi_bound)
               ! Because this is a boundary block, which is not synchronized
               ! we have to do something with the ghost nodes of this block.
               ! An easy way to fill them is to use the last availavble point
               ! inside the domain.
-              do ix = Bs+g+1, Bs+2*g
-                phi(ix,:,:)=phi(Bs+g,:,:)
+              do ix = Bs(1)+g+1, Bs(1)+2*g
+                phi(ix,:,:)=phi(Bs(1)+g,:,:)
               end do
             endif
 
@@ -425,7 +429,7 @@ contains
             ! This should be changed so phi_xminus can be a function of
             ! time and space.
             if (.true.) then
-              phi_bound=phi(Bs+g-1,:,:)
+              phi_bound=phi(Bs(1)+g-1,:,:)
               phi_bound(:,UxF)  = phi_bound(:,UxF) / phi_bound(:,rhoF)
               phi_bound(:,UyF)  = phi_bound(:,UyF) / phi_bound(:,rhoF)
               phi_bound(:,rhoF) = phi_bound(:,rhoF) * phi_bound(:,rhoF)
@@ -436,13 +440,13 @@ contains
               phi_bound(:,  pF)=params_ns%bound%phi_xplus(  pF)
             endif
             ! compute the ingoing and outgoing characteristics and changes the state vector
-            call set_bound_open( normal_vector, phi(Bs+g,:,:), phi_bound)
+            call set_bound_open( normal_vector, phi(Bs(1)+g,:,:), phi_bound)
             ! Because this is a boundary block, which is not synchronized
             ! we have to do something with the ghost nodes of this block.
             ! An easy way to fill them is to use the last availavble point
             ! inside the domain.
-            do ix = Bs+g+1, Bs+2*g
-              phi(ix,:,:)=phi(Bs+g,:,:)
+            do ix = Bs(1)+g+1, Bs(1)+2*g
+              phi(ix,:,:)=phi(Bs(1)+g,:,:)
             end do
           endif
           ! to implement
@@ -484,8 +488,8 @@ contains
 
         select case(params_ns%bound%name(2))
         case("symmetryAxis-wall")
-            phi(:,Bs+g,UxF) = 0
-            phi(:,Bs+g,UyF) = 0
+            phi(:,Bs(2)+g,UxF) = 0
+            phi(:,Bs(2)+g,UyF) = 0
 
         !  to implement
         !case("open")
@@ -499,8 +503,8 @@ contains
         ! we have to do something with the ghost nodes of this block.
         ! An easy way to fill them is to use the last availavble point
         ! inside the domain.
-        do iy = Bs+g+1, Bs+2*g
-          phi(:,iy,:)=phi(:,Bs+g,:)
+        do iy = Bs(2)+g+1, Bs(2)+2*g
+          phi(:,iy,:)=phi(:,Bs(2)+g,:)
         end do
       end if
 
@@ -643,13 +647,16 @@ contains
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik)            :: Bs, mpierr,ix,iy
+    integer(kind=ik)            ::  mpierr,ix,iy
+    integer(kind=ik), dimension(3) :: Bs
     real(kind=rk),save          :: area
     real(kind=rk), allocatable  :: mask(:,:,:)
     real(kind=rk)               :: eta_inv,tmp(5),y,x,r
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     select case(stage)
     case ("init_stage")
@@ -675,8 +682,8 @@ contains
       endif
       ! compute mean density and pressure
       if(.not. allocated(mask)) then
-       if (params_ns%dim==2) allocate(mask(Bs+2*g, Bs+2*g, 1))
-       if (params_ns%dim==3) allocate(mask(Bs+2*g, Bs+2*g, Bs+2*g))
+       if (params_ns%dim==2) allocate(mask(Bs(1)+2*g, Bs(2)+2*g, 1))
+       if (params_ns%dim==3) allocate(mask(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g))
      endif
       if ( params_ns%penalization ) then
         call get_mask(params_ns, x0, dx, Bs, g , mask)
@@ -690,9 +697,9 @@ contains
         ! compute density and pressure only in physical domain
         tmp(1:5) =0.0_rk
         ! we do not want to sum over redudant points so exclude Bs+g!!!
-        do iy=g+1, Bs+g-1
+        do iy=g+1, Bs(2)+g-1
           y = dble(iy-(g+1)) * dx(2) + x0(2)
-          do ix=g+1, Bs+g-1
+          do ix=g+1, Bs(1)+g-1
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             if (mask(ix,iy,1)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
@@ -785,7 +792,8 @@ contains
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g, bs
+    integer, intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
 
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
@@ -806,10 +814,10 @@ contains
          call abort(65761,"ERROR [module_navier_stokes.f90]: statevector values out of physical range")
     endif
     if(params_ns%dim==2) then
-      if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs,2*g+Bs,1))
+      if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs(1),2*g+Bs(2),1))
       v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)
     else
-      if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs,2*g+Bs,2*g+Bs))
+      if( .not. allocated(v_physical))  allocate(v_physical(2*g+Bs(1),2*g+Bs(2),2*g+Bs(3)))
       v_physical = u(:,:,:,UxF)*u(:,:,:,UxF) + u(:,:,:,UyF)*u(:,:,:,UyF)+u(:,:,:,UzF)*u(:,:,:,UzF)
     endif
 
@@ -871,10 +879,12 @@ contains
     integer(kind=2), optional, intent(in):: boundary_flag(3)
 
     ! local variables
-    integer(kind=ik) :: Bs
+    integer(kind=ik), dimension(3) :: Bs
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     call filter_block(params_ns%filter, time, u, g, Bs, x0, dx, work_array )
     ! copy filtered state vector back to input state vector

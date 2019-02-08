@@ -68,7 +68,8 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
     real(kind=rk), intent(in)           :: rk_coeffs(:,:)
 
     ! loop variables
-    integer(kind=ik)                    :: dF, k, j, Neqn, Bs, g, z1, z2
+    integer(kind=ik)                    :: dF, k, j, Neqn, g, z1, z2
+    integer(kind=ik), dimension(3)      :: Bs
 
     Neqn  = params%n_eqn
     Bs    = params%Bs
@@ -79,14 +80,14 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
         z2 = 1
     else
         z1 = g+1
-        z2 = Bs+g
+        z2 = Bs(3)+g
     endif
 
 
     ! loop over all active heavy data blocks
     do k = 1, hvy_n
         !u_n = u_n +...
-        hvy_block( g+1:Bs+g, g+1:Bs+g, z1:z2, 1:Neqn, hvy_active(k)) = hvy_work( g+1:Bs+g, g+1:Bs+g, z1:z2, 1:Neqn,hvy_active(k), 1)
+        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_active(k)) = hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn,hvy_active(k), 1)
 
         do j = 2, size(rk_coeffs, 2)
             if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1e-8_rk) then
@@ -94,8 +95,8 @@ subroutine final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active, hvy_n, rk
                 ! ... dt*(b1*k1 + b2*k2+ ..)
                 ! rk_coeffs(size(rk_coeffs,1)) , since we want to access last line,
                 ! e.g. b1 = butcher(last line,2)
-                hvy_block( g+1:Bs+g, g+1:Bs+g, z1:z2, 1:Neqn, hvy_active(k)) = hvy_block( g+1:Bs+g, g+1:Bs+g, z1:z2, 1:Neqn, hvy_active(k)) &
-                       + dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( g+1:Bs+g, g+1:Bs+g, z1:z2, 1:Neqn, hvy_active(k), j)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_active(k)) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_active(k)) &
+                       + dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_active(k), j)
             end if
         end do
     end do

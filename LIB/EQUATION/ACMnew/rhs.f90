@@ -45,12 +45,16 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
     ! if they require such qantities. In many cases, the grid_qtys are probably not used.
     real(kind=rk), intent(in) :: grid_qty(1:,1:,1:,1:)
 
+
     ! local variables
-    integer(kind=ik) :: Bs, mpierr
+    integer(kind=ik) :: mpierr
+    integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     select case(stage)
     case ("init_stage")
@@ -83,29 +87,29 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
         endif
 
         if (params_acm%dim == 2) then
-            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1))*dx(1)*dx(2)
-            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2))*dx(1)*dx(2)
+            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1))*dx(1)*dx(2)
+            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2))*dx(1)*dx(2)
 
-            params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 3))*dx(1)*dx(2)
+            params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 3))*dx(1)*dx(2)
 
-            params_acm%urms(1) = params_acm%urms(1)  + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)**2)*dx(1)*dx(2)
-            params_acm%urms(2) = params_acm%urms(2)  + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)**2)*dx(1)*dx(2)
+            params_acm%urms(1) = params_acm%urms(1)  + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1)**2)*dx(1)*dx(2)
+            params_acm%urms(2) = params_acm%urms(2)  + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2)**2)*dx(1)*dx(2)
 
-            tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, 1, 2)**2)
+            tmp2 = maxval( u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1)**2 + u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2)**2)
             params_acm%umax = max( params_acm%umax, tmp2 )
         else
-            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1))*dx(1)*dx(2)*dx(3)
-            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2))*dx(1)*dx(2)*dx(3)
-            params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3))*dx(1)*dx(2)*dx(3)
+            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1))*dx(1)*dx(2)*dx(3)
+            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2))*dx(1)*dx(2)*dx(3)
+            params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3))*dx(1)*dx(2)*dx(3)
 
-            params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 4))*dx(1)*dx(2)*dx(3)
+            params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 4))*dx(1)*dx(2)*dx(3)
 
-            params_acm%urms(1) = params_acm%urms(1) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1)**2)*dx(1)*dx(2)*dx(3)
-            params_acm%urms(2) = params_acm%urms(2) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2)**2)*dx(1)*dx(2)*dx(3)
-            params_acm%urms(3) = params_acm%urms(3) + sum(u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3)**2)*dx(1)*dx(2)*dx(3)
+            params_acm%urms(1) = params_acm%urms(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1)**2)*dx(1)*dx(2)*dx(3)
+            params_acm%urms(2) = params_acm%urms(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2)**2)*dx(1)*dx(2)*dx(3)
+            params_acm%urms(3) = params_acm%urms(3) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3)**2)*dx(1)*dx(2)*dx(3)
 
-            tmp2 = maxval( u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 1)**2 + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 2)**2 &
-                         + u(g+1:Bs+g-1, g+1:Bs+g-1, g+1:Bs+g-1, 3)**2 )
+            tmp2 = maxval( u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1)**2 + u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2)**2 &
+                         + u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3)**2 )
 
             params_acm%umax = max( params_acm%umax, tmp2)
         endif ! NOTE: MPI_SUM is perfomed in the post_stage.
@@ -191,7 +195,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     implicit none
 
     !> grid parameter
-    integer(kind=ik), intent(in)            :: g, Bs
+    integer(kind=ik), intent(in)            :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> origin and spacing of the block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
     !> datafields
@@ -221,9 +226,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
-    if (.not. allocated(sponge)) allocate(sponge(1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:2))
+    if (.not. allocated(sponge)) allocate(sponge(1:Bs(1)+2*g, 1:Bs(2)+2*g))
+    if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g))
+    if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:2))
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -238,7 +243,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
     eps_inv = 1.0_rk / eps
 
-    if (size(phi,1)/=Bs+2*g .or. size(phi,2)/=Bs+2*g .or. size(phi,3)/=3) then
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=3) then
         call abort(66233,"wrong size, I go for a walk instead.")
     endif
 
@@ -268,8 +273,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs+g
-            do ix = g+1, Bs+g
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
 
                 u_dx   = (phi(ix+1,iy,1) - phi(ix-1,iy,1))*dx_inv*0.5_rk
                 u_dy   = (phi(ix,iy+1,1) - phi(ix,iy-1,1))*dy_inv*0.5_rk
@@ -301,8 +306,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         !-----------------------------------------------------------------------
         ! 4th order
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs+g
-            do ix = g+1, Bs+g
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
                 ! first derivatives of u, v, p
                 u_dx = (a(-3)*phi(ix-3,iy,1) + a(-2)*phi(ix-2,iy,1) + a(-1)*phi(ix-1,iy,1) &
                      +  a(0 )*phi(ix,iy,1) + a(+1)*phi(ix+1,iy,1) + a(+2)*phi(ix+2,iy,1) + a(+3)*phi(ix+3,iy,1))*dx_inv
@@ -371,8 +376,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
             case('taylor_green')
                 if (idir==1) then
-                    do iy = g+1, Bs+g
-                        do ix = g+1, Bs+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
                             x = x0(1) + dble(ix-g-1) * dx(1)
                             y = x0(2) + dble(iy-g-1) * dx(2)
                             call continue_periodic(x,params_acm%domain_size(1))
@@ -408,8 +413,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
-        do iy = g+1, Bs+g
-            do ix = g+1, Bs+g
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
                 ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                 ! which is different from the penalization term, which acts only on ux,uy and not p
                 spo = grid_qty(ix,iy,IDX_SPONGE) * eps_inv
@@ -431,7 +436,8 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     implicit none
 
     !> grid parameter
-    integer(kind=ik), intent(in)            :: g, Bs
+    integer(kind=ik), intent(in)            :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> origin and spacing of the block
     real(kind=rk), dimension(3), intent(in) :: x0, dx
     !> datafields
@@ -448,6 +454,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     real(kind=rk), allocatable, save :: mask(:, :, :), sponge(:, :, :)
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:, :, :, :)
+
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
@@ -472,10 +479,10 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    if (.not. allocated(mask_color)) allocate(mask_color(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(sponge)) allocate(sponge(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(mask)) allocate(mask(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g))
-    if (.not. allocated(us)) allocate(us(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3))
+    if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+    if (.not. allocated(sponge)) allocate(sponge(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+    if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+    if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -511,9 +518,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do iz = g+1, Bs+g
-            do iy = g+1, Bs+g
-                do ix = g+1, Bs+g
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
                     ! first and second derivatives of u,v,w
                     u_dx = (phi(ix+1, iy,   iz  , 1) - phi(ix-1, iy,   iz  , 1))*dx_inv*0.5_rk
                     u_dy = (phi(ix  , iy+1, iz  , 1) - phi(ix,   iy-1, iz  , 1))*dy_inv*0.5_rk
@@ -567,9 +574,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         !-----------------------------------------------------------------------
         ! 4th order
         !-----------------------------------------------------------------------
-        do iz = g+1, Bs+g
-            do iy = g+1, Bs+g
-                do ix = g+1, Bs+g
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
                     ! first derivatives of u, v, p
                     u_dx = (a(-3)*phi(ix-3,iy,iz,1) + a(-2)*phi(ix-2,iy,iz,1) + a(-1)*phi(ix-1,iy,iz,1) + a(0)*phi(ix,iy,iz,1) &
                          +  a(+1)*phi(ix+1,iy,iz,1) + a(+2)*phi(ix+2,iy,iz,1) + a(+3)*phi(ix+3,iy,iz,1))*dx_inv
@@ -664,9 +671,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
-        do iz = g+1, Bs+g
-            do iy = g+1, Bs+g
-                do ix = g+1, Bs+g
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
                     ! NOTE: sponge mask set in grid_qty

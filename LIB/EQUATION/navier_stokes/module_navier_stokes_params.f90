@@ -16,6 +16,7 @@ module module_navier_stokes_params
   use module_precision
   use module_ini_files_parser_mpi
   use mpi
+  use module_params, only: merge_blancs, count_entries
 
   implicit none
 
@@ -119,7 +120,8 @@ end type type_boundary
         ! number data fields
         integer(kind=ik)                            :: n_eqn
         ! number of block nodes
-        integer(kind=ik)                            :: Bs,g
+        integer(kind=ik)                            :: g
+        integer(kind=ik), dimension(3)              :: Bs
         ! maximal tree level
         integer(kind=ik)                            :: Jmax
         ! dimension
@@ -406,6 +408,11 @@ subroutine init_other_params( FILE )
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)        :: FILE
+    character(len=80) :: Bs_str, Bs_conc
+    character(:), allocatable :: Bs_short
+    real(kind=rk), dimension(3) :: Bs_real
+    integer(kind=ik) :: n_entries
+
 
     if (params_ns%mpirank==0) then
       write(*,*)
@@ -429,7 +436,37 @@ subroutine init_other_params( FILE )
     call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk)
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', params_ns%Bs, 1   )
+
+    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
+    call merge_blancs(Bs_str)
+    Bs_short=trim(Bs_str)
+    call count_entries(Bs_short, " ", n_entries)
+    if (Bs_str .eq. "empty") then
+      Bs_conc="17 17 17"
+    elseif (n_entries==1) then
+      if (params_ns%dim==3) then
+        Bs_conc=Bs_short // " " // Bs_short // " " // Bs_short
+      elseif (params_ns%dim==2) then
+        Bs_conc=Bs_short//" "//Bs_short//" 1"
+      endif
+    elseif (n_entries==2) then
+      if (params_ns%dim==3) then
+        call abort(231192248,"ERROR: You only gave two values for Bs, but want three to be read...")
+      elseif (params_ns%dim==2) then
+        Bs_conc=Bs_short//" 1"
+      endif
+    elseif (n_entries==3) then
+      if (params_ns%dim==2) then
+        call abort(231192249,"ERROR: You gave three values for Bs, but only want two to be read...")
+      elseif (params_ns%dim==3) then
+        Bs_conc=trim(adjustl(Bs_str))
+      endif
+    elseif (n_entries .gt. 3) then
+      call abort(231192249,"ERROR: You gave too many arguments for Bs...")
+    endif
+    read(Bs_conc, *) Bs_real
+    params_ns%Bs = int(Bs_real)
+
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_ns%g, 1   )
 
 
@@ -453,7 +490,7 @@ subroutine init_other_params( FILE )
         endif
 
         min_dx = 2.0_rk**(-params_ns%Jmax) * min(params_ns%domain_size(1),params_ns%domain_size(2))&
-                          / real(params_ns%Bs-1, kind=rk)
+                          / real(params_ns%Bs(1)-1, kind=rk)
         ! u(x=0) should be set equal to u(x=L)
         if ( abs(x-L)<min_dx*0.5_rk ) then
           x = 0.0_rk
@@ -470,10 +507,10 @@ subroutine init_other_params( FILE )
       ! compute min(dx,dy,dz)
       if ( params_ns%dim==2 ) then
         params_ns%dx_min = 2.0_rk**(-params_ns%Jmax) * min(params_ns%domain_size(1),params_ns%domain_size(2)) &
-                                                          / real(params_ns%Bs-1, kind=rk)
+                                                          / real(params_ns%Bs(1)-1, kind=rk)
       else
         params_ns%dx_min = 2.0_rk**(-params_ns%Jmax) * minval(params_ns%domain_size) &
-                                                          / real(params_ns%Bs-1, kind=rk)
+                                                          / real(params_ns%Bs(1)-1, kind=rk)
       end if
 
       ! initial speed of sound, Mach number, reynolds number
@@ -491,7 +528,7 @@ subroutine init_other_params( FILE )
         write(*,*)
         write(*,*) "Additional Information"
         write(*,'(" -----------------------")')
-        nx_max = (params_ns%Bs-1) * 2**(params_ns%Jmax)
+        nx_max = (params_ns%Bs(1)-1) * 2**(params_ns%Jmax)
         write(*,'("minimal lattice spacing:",T40,g12.4)') params_ns%dx_min
         write(*,'("maximal resolution: ",T40,i5," x",i5)') nx_max, nx_max
 
@@ -528,13 +565,14 @@ subroutine init_other_params( FILE )
         implicit none
         !data=(sqrt(rho),sqrt(rho)u,sqrt(rho)v,sqrt(rho)w,p )
         real(kind=rk), allocatable, intent(inout) :: data(:,:,:,:)
-        integer(kind=ik),              intent(in) :: Bs,g
+        integer(kind=ik),              intent(in) :: g
+        integer(kind=ik), dimension(3), intent(in) :: Bs
 
         if (.not.allocated(data)) then
           if (params_ns%dim==3) then
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, params_ns%n_eqn))
+            allocate(data(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, params_ns%n_eqn))
           else
-            allocate(data(1:Bs+2*g, 1:Bs+2*g, 1, params_ns%n_eqn))
+            allocate(data(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, params_ns%n_eqn))
         endif
       endif
     end subroutine allocate_statevector_ns

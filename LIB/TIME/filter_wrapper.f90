@@ -45,9 +45,11 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_activ
     ! loop variables
     integer(kind=ik)                    :: k, dF, neqn, lgt_id
     ! grid parameter, error variable
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: g
+    integer(kind=ik), dimension(3)      :: Bs
     !  surface normal
     integer(kind=2)                    :: surface(3)=0
+
 
     ! grid parameter
     Bs    = params%Bs

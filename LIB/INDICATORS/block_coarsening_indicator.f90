@@ -48,7 +48,8 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, Bs, g, refinement_status_mask
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g
+    integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, nnorm(1)
     logical :: thresholding_component(1:size(block_data,4))
@@ -114,8 +115,6 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
     end select
-
-
     ! mask thresholding on top of regular thresholding?
     ! it can be useful to also use the mask function (if penalization is used) for grid adaptation.
     ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization

@@ -168,9 +168,12 @@ contains
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik) :: neqn, nwork, Bs
+    integer(kind=ik) :: neqn, nwork
+    integer(kind=ik), dimension(3) :: Bs
 
-    Bs = size(u,1)-2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     ! copy state vector
     work(:,:,:,1:size(u,4)) = u(:,:,:,:)
@@ -236,7 +239,8 @@ contains
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
-    integer, intent(in) :: g, bs
+    integer, intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
 
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
@@ -246,7 +250,7 @@ contains
     real(kind=rk), intent(out) :: dt
 
     ! TODO: make this global and allocatable
-    real(kind=rk) :: u0(1:Bs+2*g, 1:Bs+2*g, 1:Bs+2*g, 1:3)
+    real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
     integer(kind=ik) :: i, ix, iy
     real(kind=rk) :: x,y,unorm
 
@@ -298,11 +302,14 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, iz, Bs,i
+    integer(kind=ik) :: ix, iy, iz, i
+    integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: x,y,c0x,c0y,z,c0z
 
     ! compute the size of blocks
-    Bs = size(u,1) - 2*g
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
 
     u = 0.0_rk
 
@@ -317,8 +324,8 @@ contains
 
       case ("cyclogenesis")
           if (params_convdiff%dim==2) then
-              do ix = 1, Bs+2*g
-                  do iy = 1, Bs+2*g
+              do ix = 1, Bs(1)+2*g
+                  do iy = 1, Bs(2)+2*g
                       ! compute x,y coordinates from spacing and origin
                       x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                       y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
@@ -333,8 +340,8 @@ contains
       case("blob")
           if (params_convdiff%dim==2) then
               ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
-              do iy = 1, Bs+2*g
-                  do ix = 1, Bs+2*g
+              do iy = 1, Bs(2)+2*g
+                  do ix = 1, Bs(1)+2*g
                       ! compute x,y coordinates from spacing and origin
                       x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                       y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
@@ -353,9 +360,9 @@ contains
               end do
           else
               ! create gauss pulse
-              do iz = 1, Bs+2*g
-                  do iy = 1, Bs+2*g
-                      do ix = 1, Bs+2*g
+              do iz = 1, Bs(3)+2*g
+                  do iy = 1, Bs(2)+2*g
+                      do ix = 1, Bs(1)+2*g
                           ! compute x,y coordinates from spacing and origin
                           x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                           y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y

@@ -65,7 +65,8 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
     ! loop variables
     integer(kind=ik)                    :: k, dF, neqn, lgt_id
     ! grid parameter, error variable
-    integer(kind=ik)                    :: Bs, g
+    integer(kind=ik)                    :: g
+    integer(kind=ik), dimension(3)      :: Bs
 
     logical :: first_substep2
 

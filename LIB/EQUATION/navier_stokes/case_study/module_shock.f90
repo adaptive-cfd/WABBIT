@@ -186,7 +186,8 @@ end subroutine read_params_shock_tube
    subroutine set_inicond_shock_tube(x0, dx, Bs, g, u)
        implicit none
        ! -----------------------------------------------------------------
-       integer(kind=ik), intent(in)  :: Bs, g        !< grid parameter
+       integer(kind=ik), intent(in) :: g
+       integer(kind=ik), dimension(3), intent(in) :: Bs !< grid parameter
        real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
        real(kind=rk), intent(inout)  :: u(:,:,:,:)    !< Statevector for t=0
        ! -----------------------------------------------------------------
@@ -236,14 +237,15 @@ subroutine draw_simple_shock(mask, x0, dx, Bs, g )
     implicit none
     !-----------------------------------------------------------
     ! grid
-    integer(kind=ik), intent(in)                     :: Bs, g
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(inout)   :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(3), intent(in)          :: x0, dx
     !-----------------------------------------------------------
 
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     if ( params_ns%dim==2 ) then
       call sponge_2D(mask(:,:,1), x0(1:2), dx(1:2), Bs, g, shock%normalvector)
@@ -268,7 +270,8 @@ subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
 
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs  !< grid parameter
     real(kind=rk), intent(in)     :: x0(3), dx(3)   !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)  :: phi_ref(:,:,:,:) !< reference values of penalized volume
     real(kind=rk), intent(inout)  :: mask(:,:,:,:)    !< mask function
@@ -279,7 +282,7 @@ subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
     ! left and right boundary
     real(kind=rk)       :: u_ref,u_R,u_L,rho_R,rho_L,p_L,p_R,width,rho_ref,p_ref
 
-    if (size(mask,3) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,3) /= Bs(3)+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     ! index x_alpha of the coordinate vector which is the normal of the shock front
     alpha=shock%normalvector
@@ -323,15 +326,15 @@ subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
 
     ! parameter for smoothing function (width)
 
-    do iz = 1, Bs+2*g
+    do iz = 1, Bs(3)+2*g
         ! z-coordinate
         X(3) = dble(iz-(g+1)) * dx(3) + x0(3)
 
-        do iy = 1, Bs+2*g
+        do iy = 1, Bs(2)+2*g
             ! y-coordinate
             X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
 
-            do ix = 1, Bs+2*g
+            do ix = 1, Bs(1)+2*g
                 ! x-coordinate
                 X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
 
@@ -374,7 +377,8 @@ subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)  :: Bs, g          !< grid parameter
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs!< grid parameter
     real(kind=rk), intent(in)     :: x0(2), dx(2)   !< coordinates of block and block spacinf
     real(kind=rk), intent(inout)  :: phi_ref(:,:,:) !< reference values of penalized volume
     real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
@@ -387,7 +391,7 @@ subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    if (size(mask,1) /= Bs+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
+    if (size(mask,1) /= Bs(1)+2*g) call abort(777109,"wrong array size, there's pirates, captain!")
 
     ! index x_alpha of the coordinate vector which is the normal of the shock front
     alpha=shock%normalvector
@@ -427,11 +431,11 @@ subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
     ! parameter for smoothing function (width)
 
-        do iy = 1, Bs+2*g
+        do iy = 1, Bs(2)+2*g
             ! y-coordinate
             X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
 
-            do ix = 1, Bs+2*g
+            do ix = 1, Bs(1)+2*g
                 ! x-coordinate
                 X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
 
@@ -468,7 +472,8 @@ end subroutine shock_tube_penalization2D
   subroutine set_shock_in_direction(x0, dx, Bs, g, phi, phi_left, phi_right, x0_shock, alpha)
     implicit none
     ! -----------------------------------------------------------------
-    integer(kind=ik), intent(in)       :: Bs, g            !< grid parameter
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs !< grid parameter
     real(kind=rk), intent(in)          :: x0(1:3), dx(1:3) !< block coordinate x0 and spacing dx
     !> direction \f$\vec{e}_\alpha\f$ along the shock front is moving (perpendicular to the initial shock front)
     !>          * alpha=1 : shock is put in x direction
@@ -499,15 +504,15 @@ end subroutine shock_tube_penalization2D
   ! loop over all fields
   if (params_ns%dim==3) then
     do nF = 1, params_ns%n_eqn
-      do iz = 1, Bs+2*g
+      do iz = 1, Bs(3)+2*g
           ! z-coordinate
           X(3) = dble(iz-(g+1)) * dx(3) + x0(3)
 
-          do iy = 1, Bs+2*g
+          do iy = 1, Bs(2)+2*g
               ! y-coordinate
               X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
 
-              do ix = 1, Bs+2*g
+              do ix = 1, Bs(1)+2*g
                   ! x-coordinate
                   X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
                   !default is 0
@@ -521,11 +526,11 @@ end subroutine shock_tube_penalization2D
     end do! field
   else
     do nF = 1, params_ns%n_eqn
-          do iy = 1, Bs+2*g
+          do iy = 1, Bs(2)+2*g
               ! y-coordinate
               X(2) = dble(iy-(g+1)) * dx(2) + x0(2)
 
-              do ix = 1, Bs+2*g
+              do ix = 1, Bs(1)+2*g
                   ! x-coordinate
                   X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
                   !default is 0

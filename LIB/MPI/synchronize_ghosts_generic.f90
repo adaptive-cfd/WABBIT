@@ -18,7 +18,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! MPI parameter
     integer(kind=ik)   :: myrank, mpisize
     ! grid parameter
-    integer(kind=ik)   :: Bs, g, NdF, ii0, ii1
+    integer(kind=ik)   :: g, NdF, ii0, ii1
+    integer(kind=ik), dimension(3) :: Bs
     ! loop variables
     integer(kind=ik)   :: N, k, neighborhood, level_diff
     ! id integers
@@ -633,7 +634,8 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     integer(kind=ik)                    :: hvy_id_k, lgt_id
 
     integer(kind=ik)                    :: i1, i2, iStep, j1, j2, jStep, k1, k2, kStep  , i,j,k, boundaryIndex
-    integer(kind=ik)                    :: Bs, g    , levelLocal , levelOrigin , lastRedundantOrigin=-1
+    integer(kind=ik)                    :: g , levelLocal , levelOrigin , lastRedundantOrigin=-1
+    integer(kind=ik), dimension(3)     :: Bs
 
     integer(kind=ik)                    :: redundantOriginLgtId, local_hvy_id, localLightId, spaceDirections
     logical                             :: shouldDominate , originHistoricFine, localHistoricFine , originLghtIdHigher
@@ -729,16 +731,16 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
 
         do boundaryIndex =1,spaceDirections !
             i1      = g + 1
-            i2      = g + Bs
+            i2      = g + Bs(1)
             iStep   = 1
 
             j1      = g + 1
-            j2      = g + Bs
+            j2      = g + Bs(2)
             jStep   = 1
 
             if (params%dim == 3 ) then
                 k1      = g+1
-                k2      = g+ Bs
+                k2      = g+ Bs(3)
                 kStep   = 1 !Bs -1
 
             else
@@ -749,11 +751,11 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
 
             select case (boundaryIndex)
             case (1)
-                iStep = Bs -1 ! by this i takes the values g+1 and   g+Bs which is the redundant nodes, j, k run ov the full surface
+                iStep = Bs(1) -1 ! by this i takes the values g+1 and   g+Bs which is the redundant nodes, j, k run ov the full surface
             case (2)
-                jStep = Bs -1  ! dito for j ,  in principle same
+                jStep = Bs(2) -1  ! dito for j ,  in principle same
             case (3)
-                kStep = Bs -1  ! dito for k ,  in principle same
+                kStep = Bs(3) -1  ! dito for k ,  in principle same
             end select
 
             ! loop over all redundant nodes

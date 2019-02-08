@@ -74,7 +74,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! loop variable
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id
     ! grid parameter
-    integer(kind=ik)                    :: Bs, g, dim
+    integer(kind=ik)                    :: g, dim
+    integer(kind=ik), dimension(3)      :: Bs
 
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
@@ -111,7 +112,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    allocate(myblockbuffer( 1:Bs, 1:Bs, 1:Bs, 1:hvy_n ))
+    allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ))
     allocate(coords_spacing(1:3, 1:hvy_n) )
     allocate(coords_origin(1:3, 1:hvy_n))
     allocate(procs(1:hvy_n))
@@ -146,19 +147,19 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! it may contain holes)
     if ( params%dim == 3 ) then
 
-        ! tell the hdf5 wrapper what part of the global [bs x bs x bs x n_active]
+        ! tell the hdf5 wrapper what part of the global [bsx x bsy x bsz x n_active]
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds3D = (/Bs, Bs, Bs, lbounds3D(4)+hvy_n/) - 1
+        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n/) - 1
 
     else
 
-        ! tell the hdf5 wrapper what part of the global [bs x bs x n_active]
+        ! tell the hdf5 wrapper what part of the global [bsx x bsy x n_active]
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds2D = (/Bs, Bs, lbounds2D(3)+hvy_n/) - 1
+        ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n/) - 1
 
     endif
 
@@ -181,7 +182,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
             if ( params%dim == 3 ) then
                 ! 3D
-                myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, g+1:Bs+g, dF, hvy_id)
+                myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(3)
@@ -195,7 +196,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             else
                 ! 2D
-                myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs+g, g+1:Bs+g, 1, dF, hvy_id)
+                myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(2)

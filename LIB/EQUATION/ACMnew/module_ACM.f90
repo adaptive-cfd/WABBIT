@@ -122,6 +122,7 @@ contains
 
     ! inifile structure
     type(inifile) :: FILE
+    integer :: g
 
     n_gridQ = 0
 
@@ -191,7 +192,7 @@ contains
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
-
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
     call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
     call merge_blancs(Bs_str)
     Bs_short=trim(Bs_str)
@@ -261,7 +262,7 @@ contains
 
     ! if used, setup insect
     if (params_acm%geometry == "Insect") then
-        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min)
+        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, g)
     endif
   end subroutine READ_PARAMETERS_ACM
 

@@ -33,7 +33,7 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
             return
         endif
     endif
-    
+
 
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
@@ -63,15 +63,13 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
             ! add the wings to the existing mask. note: the "old" wings from the previous
             ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)
             ! Hence, here, you do not have to delete again.
-            call draw_insect_wings( x0, dx, mask(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), &
-                mask_color, us(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1:3), Insect, delete=.false.)
+            ! Note: insect module is ghost-nodes aware, but requires origin shift.
+            call draw_insect_wings( x0-dble(g)*dx, dx, mask, mask_color, us, Insect, delete=.false.)
 
         ! case II: the body moves OR the grid qty is not available: delete & create everything
         else
-            ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
-            ! know that the first g points are in fact ghost nodes...
-            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), &
-                mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), us(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1:3) )
+            ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+            call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask, mask_color, us )
         endif
     case ('none')
         mask = 0.0_rk

@@ -1,5 +1,5 @@
 subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box_domain, &
-    viscosity, dx_reference)
+    viscosity, dx_reference, N_ghost_nodes, periodic)
   implicit none
   real(kind=rk), intent(in) :: time
   character(len=*), intent(in) :: fname_ini
@@ -13,6 +13,13 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! as the default wing thickness is 4*dx, pass lattice spacing here. In FLUSI, this is easy
   ! but in WABBIT it requires some thought, because dx is not a constant.
   real(kind=rk), intent(in) :: dx_reference
+  ! ghost nodes. If the insect module is used in a finite-differences code, then
+  ! the data that we have often has ghost nodes, i.e. points that overlap and exist
+  ! on several CPUS. On those, you normally would not create the mask (which is expensive)
+  ! so we skip the first and last "g" points on the arrays used for mask creation
+  integer, optional, intent(in) :: N_ghost_nodes
+  !
+  logical, optional, intent(in) :: periodic
 
   type(inifile) :: PARAMS
   real(kind=rk),dimension(1:3)::defaultvec
@@ -30,14 +37,23 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   nu = viscosity
 
   ! header information
- if (root) then
-    write(*,'(80("<"))')
-    write(*,*) "Initializing insect module!"
-    write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
-    write(*,'(80("<"))')
-    write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4," nu=",g12.4)') xl, yl, zl, nu
-    write(*,'("dx=",g12.4," nx_equidistant=",i6)') dx_reference, nint(xl/dx_reference)
- endif
+  if (root) then
+      write(*,'(80("<"))')
+      write(*,*) "Initializing insect module!"
+      write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
+      write(*,'(80("<"))')
+      write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4," nu=",g12.4)') xl, yl, zl, nu
+      write(*,'("dx=",g12.4," nx_equidistant=",i6)') dx_reference, nint(xl/dx_reference)
+  endif
+
+  ! ghost nodes are optional..
+  if (present(N_ghost_nodes)) then
+      ! g is a module global private variable.
+      g = N_ghost_nodes
+  else
+      g = 0
+  endif
+  if (root) write(*,'("n_ghosts=",i2)') g
 
   !-----------------------------------------------------------------------------
   ! read in parameters form ini file
@@ -201,6 +217,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   !-----------------------------------------------------------------------------
   ! other initialization
   !-----------------------------------------------------------------------------
+
+  if (present(periodic)) then
+      periodic_insect=periodic
+  else
+      periodic_insect=.false.
+  endif
 
   ! If required, initialize rigid solid dynamics solver
   if (Insect%BodyMotion=="free_flight") then

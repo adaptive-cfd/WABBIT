@@ -6,8 +6,6 @@ subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-    real(kind=rk)                 :: M_body(1:3,1:3)
-    integer(kind=2)               :: color_body
     integer                       :: ix, iy, iz
     real(kind=rk), dimension(1:3) :: x_glob, x_body, v_tmp
     logical, intent(in) :: delete
@@ -24,8 +22,11 @@ subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
         Insect%safety = 3.5d0*Insect%smooth
     endif
 
-    color_body = Insect%color_body
-    M_body = Insect%M_body
+    if (size(mask) /= size(mask_color) .or. size(us,4) /= 3) then
+        write(*,*) "mask:", shape(mask), "mask_color:", shape(mask_color), "us:", shape(us)
+        call abort (08021901,"Insects: arrays have wrong size..")
+    endif
+
 
     if (delete) then
         where (mask_color==Insect%color_body)
@@ -81,11 +82,11 @@ subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
     if (Insect%body_moves == "no") return
 
     ! add the solid velocity field to the body mask (i.e. create us)
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
                 ! skip all parts that do not belong to the body (ie they have a different color)
@@ -96,9 +97,9 @@ subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
 
                     ! add solid body rotation to the translational velocity field. Note
                     ! that rot_body_b and x_body are in the body reference frame
-                    v_tmp(1) = v_tmp(1) + Insect%rot_body_b(2)*x_body(3)-Insect%rot_body_b(3)*x_body(2)
-                    v_tmp(2) = v_tmp(2) + Insect%rot_body_b(3)*x_body(1)-Insect%rot_body_b(1)*x_body(3)
-                    v_tmp(3) = v_tmp(3) + Insect%rot_body_b(1)*x_body(2)-Insect%rot_body_b(2)*x_body(1)
+                    v_tmp(1) = Insect%rot_body_b(2)*x_body(3)-Insect%rot_body_b(3)*x_body(2)
+                    v_tmp(2) = Insect%rot_body_b(3)*x_body(1)-Insect%rot_body_b(1)*x_body(3)
+                    v_tmp(3) = Insect%rot_body_b(1)*x_body(2)-Insect%rot_body_b(2)*x_body(1)
 
                     ! the body motion is transformed to the global system, translation is added
                     us(ix,iy,iz,1:3) = matmul( Insect%M_body_inv, v_tmp ) + Insect%vc_body_g
@@ -139,11 +140,11 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! Body
     !-----------------------------------------------------------------------------
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
@@ -224,11 +225,11 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     dx_head = 0.5d0 * 0.2035d0
     dz_head = 0.5d0 * 0.297d0
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 x_body   = matmul(M_body,x_glob)
@@ -342,11 +343,11 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
 
 
     ! Assign values to mask pointwise
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 x_body   = matmul(M_body,x_glob)
@@ -441,11 +442,11 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
         a_body0 = 1.0d0
     endif
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
@@ -532,11 +533,11 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     dx_head = 0.5d0 * 0.185d0
     dz_head = 0.5d0 * 0.27d0
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
@@ -610,11 +611,11 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! Jerry's body is an ellipsoid
     !-----------------------------------------------------------------------------
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -876,9 +877,9 @@ subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
     !   enddo ! np
     !
     !
-    !   ! do iz = 0, size(mask,3)-1
-    !   !   do iy = 0, size(mask,2)-1
-    !   !     do ix = 0, size(mask,1)-1
+    !   ! do iz = g, size(mask,3)-1-g
+    !   !   do iy = g, size(mask,2)-1-g
+    !   !     do ix = g, size(mask,1)-1-g
     !   !       if (mask(ix,iy,iz) < 0.d0) then
     !   !         R=0.d0
     !   !         do k=iz-1,iz+1
@@ -908,8 +909,8 @@ subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
     !   ! start = per(nint( (Insect%xc_body_g(1)-0.5*xl)/dx), nx)
     !   ! if(root) write(*,*) "point is", Insect%xc_body_g(1)-0.5*xl
     ! start =0
-    !   do iz = 0, size(mask,3)-1
-    !     do iy = 0, size(mask,2)-1
+    !   do iz = g, size(mask,3)-1-g
+    !     do iy = g, size(mask,2)-1-g
     !       do ix = start, start+nx ! we run all points, still
     !         ! is the point not yet touched (i.e. large value)?
     !         if (mask(per(ix,nx),iy,iz) > 99.99e6) then
@@ -929,9 +930,9 @@ subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
     !   !-----------------------------------------------------------------------------
     !   ! convert signed distance function to mask function chi
     !   !-----------------------------------------------------------------------------
-    !   do iz = 0, size(mask,3)-1
-    !     do iy = 0, size(mask,2)-1
-    !       do ix = 0, size(mask,1)-1
+    !   do iz = g, size(mask,3)-1-g
+    !     do iy = g, size(mask,2)-1-g
+    !       do ix = g, size(mask,1)-1-g
     !         mask(ix,iy,iz) = steps( mask(ix,iy,iz),0.d0 )
     !       enddo
     !     enddo
@@ -966,11 +967,11 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     color_body = Insect%color_body
     M_body     = Insect%M_body
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
@@ -1023,11 +1024,11 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     color_body = Insect%color_body
     M_body     = Insect%M_body
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
                 ! x_body is in the body coordinate system
@@ -1079,11 +1080,11 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
     R0 = ( 0.5d0*Insect%WingThickness + Insect%Safety )**2
     RR0 = 0.5d0*Insect%WingThickness
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1144,11 +1145,11 @@ subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! The body is an ellipsoid
     !-----------------------------------------------------------------------------
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1251,11 +1252,11 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     b = 0.1603d0
     c = b ! HACK: for simplicity, assume b=c, otherwise it can be very tough to draw
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1294,11 +1295,11 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     ! angle by which the abdomen is tilted (measured from figure 1 in [1])
     alpha = deg2rad(-30.44d0)
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1379,11 +1380,11 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
         endif
     endif
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1448,11 +1449,11 @@ subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! The seed's core is an ellipsoid
     !-----------------------------------------------------------------------------
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1528,11 +1529,11 @@ subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect)
         endif
     endif
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1620,11 +1621,11 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     e_3 = e_3 / norm2(e_3)
 
     ! first we draw the cylinder, then the endpoint spheres
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - x1(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - x1(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - x1(1)
                 if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
@@ -1700,11 +1701,11 @@ subroutine drawsphere( xc,R0,xx0, ddx, mask, mask_color, us,Insect,icolor )
     if (xc(3)>=zl) xc(3)=xc(3)-zl
 
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x(3) = xx0(3) + dble(iz)*ddx(3) - xc(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x(2) = xx0(2) + dble(iy)*ddx(2) - xc(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - xc(1)
                 if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 

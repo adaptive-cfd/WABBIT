@@ -391,14 +391,14 @@ program main
             call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
 
             ! it is useful to save the number of blocks per rank into a log file.
-            call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
-            if (rank==0) then
-                 open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
-                 write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-                 min_active_level( lgt_block, lgt_active, lgt_n ), &
-                 max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-                 close(14)
-            end if
+            ! call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+            ! if (rank==0) then
+            !      open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
+            !      write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
+            !      min_active_level( lgt_block, lgt_active, lgt_n ), &
+            !      max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
+            !      close(14)
+            ! end if
 
             !*******************************************************************
             ! statistics
@@ -446,7 +446,7 @@ program main
         call timing_next_timestep( iteration )
 
         ! it is useful to save the number of blocks per rank into a log file.
-        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+!        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
 
         t2 = MPI_wtime() - t2
         ! output on screen
@@ -456,15 +456,15 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n )
 
              open(14,file='timesteps_info.t',status='unknown',position='append')
-             write (14,'(2(g15.8,1x),i6,1x,i5,1x,i2,1x,i2,1x,i5)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             write (14,'(2(g15.8,1x),i9,1x,i5,1x,i2,1x,i2,1x,i5)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n ), params%number_procs
              close(14)
 
-             open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-             min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-             close(14)
+             ! open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
+             ! write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
+             ! min_active_level( lgt_block, lgt_active, lgt_n ), &
+             ! max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
+             ! close(14)
         end if
 
         !***********************************************************************

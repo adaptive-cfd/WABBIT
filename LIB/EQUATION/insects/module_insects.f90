@@ -10,7 +10,8 @@ module module_insects
   PRIVATE
 
   ! functions
-  PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_Insect, insect_init, insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
+  PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_Insect, insect_init, &
+  insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
   aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_time_step, &
   BodyMotion, FlappingMotion_right, FlappingMotion_left, StrokePlane, mask_from_pointcloud, &
   body_rotation_matrix, wing_right_rotation_matrix, wing_left_rotation_matrix, write_kinematics_file
@@ -21,6 +22,11 @@ module module_insects
   logical :: root = .false.
   logical :: periodic_insect = .false.
 
+  ! ghost nodes. If the insect module is used in a finite-differences code, then
+  ! the data that we have often has ghost nodes, i.e. points that overlap and exist
+  ! on several CPUS. On those, you normally would not create the mask (which is expensive)
+  ! so we skip the first and last "g" points on the arrays used for mask creation
+  integer, private, save :: g
 
   ! size (global) of domain
   real(kind=rk) :: xl, yl, zl
@@ -361,16 +367,17 @@ contains
       ! load balancing problems, since many cores do not draw the body at all.
       ! We thus try to draw it only once and then simply not to erase it later.
       !-----------------------------------------------------------------------------
-      if (Insect%body_moves=="no" .and. .not. grid_time_dependent .and. .not. Insect%body_already_drawn) then
-          ! the body is at rest, but it is the first call to this routine, so draw it now
-          if (root) then
-              write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
-              write(*,*) "the body once: we do that now, and skip draw_insect_body"
-              write(*,*) "from now on. time=", time
+      if (Insect%body_moves=="no" .and. .not. grid_time_dependent) then
+          if (.not. Insect%body_already_drawn) then
+              ! the body is at rest, but it is the first call to this routine, so draw it now
+              if (root) then
+                  write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
+                  write(*,*) "the body once: we do that now, and skip draw_insect_body"
+                  write(*,*) "from now on. time=", time
+              endif
+              call draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
+              Insect%body_already_drawn = .true.
           endif
-
-          call draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
-          Insect%body_already_drawn = .true.
       else
           ! the body moves, draw it
           call draw_insect_body(xx0, ddx, mask, mask_color, us, Insect, delete=.false.)

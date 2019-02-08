@@ -12,6 +12,11 @@ subroutine draw_insect_wings(xx0, ddx, mask, mask_color, us, Insect, delete)
   real(kind=rk), dimension(1:3) :: x_glob, x_body, v_tmp
   integer(kind=2) :: c
 
+  if (size(mask) /= size(mask_color) .or. size(us,4) /= 3) then
+      write(*,*) "mask:", shape(mask), "mask_color:", shape(mask_color), "us:", shape(us)
+      call abort (08021902,"Insects: arrays have wrong size..")
+  endif
+
   if (delete) then
       where (mask_color==Insect%color_r .and. mask_color==Insect%color_l)
           mask = 0.00_rk
@@ -53,11 +58,11 @@ subroutine draw_insect_wings(xx0, ddx, mask, mask_color, us, Insect, delete)
   ! Add solid body rotation (i.e. the velocity field that originates
   ! from the body rotation and translation). Until now, the wing velocities
   ! were the only ones set plus they are in the body reference frame
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
       x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-      do iy = 0, size(mask,2)-1
+      do iy = g, size(mask,2)-1-g
           x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-          do ix = 0, size(mask,1)-1
+          do ix = g, size(mask,1)-1-g
               x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               c = mask_color(ix,iy,iz)
@@ -164,11 +169,11 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_
   call Setup_Wing_Fourier_coefficients(Insect)
 
   s = Insect%safety
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
       x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-      do iy = 0, size(mask,2)-1
+      do iy = g, size(mask,2)-1-g
           x(2) = xx0(2)+dble(iy)*ddx(2) - Insect%xc_body_g(2)
-          do ix = 0, size(mask,1)-1
+          do ix = g, size(mask,1)-1-g
               x(1) = xx0(1)+dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               !-- define the various coordinate systems we are going to use
@@ -321,11 +326,11 @@ subroutine draw_wing_pointcloud(xx0, ddx, mask, mask_color, us,Insect,color_wing
   !-----------------------------------------------------------------------------
   dxinv = 1.0d0 / ddx(1)
 
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
     x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-    do iy = 0, size(mask,2)-1
+    do iy = g, size(mask,2)-1-g
       x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-      do ix = 0, size(mask,1)-1
+      do ix = g, size(mask,1)-1-g
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use
@@ -380,11 +385,11 @@ subroutine draw_wing_pointcloud(xx0, ddx, mask, mask_color, us,Insect,color_wing
   ! ----------------------------------------------------------------------------
   ! add velocity field, inside the wing.
   ! ----------------------------------------------------------------------------
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
     x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-    do iy = 0, size(mask,2)-1
+    do iy = g, size(mask,2)-1-g
       x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-      do ix = 0, size(mask,1)-1
+      do ix = g, size(mask,1)-1-g
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         ! if this point belong to the wing we just created
@@ -442,11 +447,11 @@ subroutine draw_wing_suzuki(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_b
     y_right = 1.0d0
     y_left = 0.1667d0
 
-    do iz = 0, size(mask,3)-1
+    do iz = g, size(mask,3)-1-g
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = 0, size(mask,2)-1
+        do iy = g, size(mask,2)-1-g
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = 0, size(mask,1)-1
+            do ix = g, size(mask,1)-1-g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
                 !-- define the various coordinate systems we are going to use
@@ -527,11 +532,11 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
 
 
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
     x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-    do iy = 0, size(mask,2)-1
+    do iy = g, size(mask,2)-1-g
       x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-      do ix = 0, size(mask,1)-1
+      do ix = g, size(mask,1)-1-g
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use
@@ -623,11 +628,11 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
 
   a_body = 0.5d0 * Insect%L_span
 
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
     x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-    do iy = 0, size(mask,2)-1
+    do iy = g, size(mask,2)-1-g
       x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-      do ix = 0, size(mask,1)-1
+      do ix = g, size(mask,1)-1-g
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use
@@ -722,11 +727,11 @@ subroutine draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
   Insect%b_top = 0.1474d0
   Insect%b_bot = 0.1474d0
 
-  do iz = 0, size(mask,3)-1
+  do iz = g, size(mask,3)-1-g
     x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-    do iy = 0, size(mask,2)-1
+    do iy = g, size(mask,2)-1-g
       x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-      do ix = 0, size(mask,1)-1
+      do ix = g, size(mask,1)-1-g
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use

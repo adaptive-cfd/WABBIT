@@ -71,9 +71,9 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
     if (orientation == 'z') then
 
         call Rz( MM, alpha)
-        do iz = 0, size(mask,3)-1
-            do iy = 0, size(mask,2)-1
-                do ix = 0, size(mask,1)-1
+        do iz = g, size(mask,3)-1-g
+            do iy = g, size(mask,2)-1-g
+                do ix = g, size(mask,1)-1-g
                     ! x_glob is in the global coordinate system
                     ! note origin is shifted to x0
                     x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /) - x0
@@ -108,9 +108,9 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
 
         call Ry( MM, alpha)
 
-        do iz = 0, size(mask,3)-1
-            do iy = 0, size(mask,2)-1
-                do ix = 0, size(mask,1)-1
+        do iz = g, size(mask,3)-1-g
+            do iy = g, size(mask,2)-1-g
+                do ix = g, size(mask,1)-1-g
                     ! x_glob is in the global coordinate system
                     ! note origin is shifted to x0
                     x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /) - x0

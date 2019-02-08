@@ -157,11 +157,10 @@ subroutine ini_file_to_params( params, filename )
 
             if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
 
-            if ( params%threeD_case ) then
-                d = 3
+            d = params%dim
+            if ( params%dim==3 ) then
                 max_neighbors = 56.0
             else
-                d = 2
                 max_neighbors = 12.0
             endif
 

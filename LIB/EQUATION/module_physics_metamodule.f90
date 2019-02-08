@@ -38,7 +38,8 @@ subroutine CREATE_MASK_meta( physics, time, x0, dx, Bs, g, mask, mask_color, us,
     implicit none
     character(len=*), intent(in) :: physics
     ! grid
-    integer(kind=ik), intent(in) :: Bs, g
+    integer(kind=ik), intent(in) :: Bs(1:3)
+    integer(kind=ik), intent(in) :: g
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(inout) :: mask
     integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color

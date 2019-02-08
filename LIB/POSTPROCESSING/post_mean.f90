@@ -88,7 +88,7 @@ subroutine post_mean(params)
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
-    if (params%threeD_case) then
+    if (params%dim == 3) then
         nz = Bs(3)
     else
         nz = 1

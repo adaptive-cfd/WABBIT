@@ -20,7 +20,7 @@ module module_insects
 
   ! we use this so only root prints write statements...
   logical :: root = .false.
-  logical :: periodic_insect = .false.
+  logical :: periodic_insect = .true.
 
   ! ghost nodes. If the insect module is used in a finite-differences code, then
   ! the data that we have often has ghost nodes, i.e. points that overlap and exist
@@ -371,22 +371,24 @@ contains
           if (.not. Insect%body_already_drawn) then
               ! the body is at rest, but it is the first call to this routine, so draw it now
               if (root) then
+                  write(*,'(80("~"))')
                   write(*,*) "Flag Insect%body_moves is no and we did not yet draw"
                   write(*,*) "the body once: we do that now, and skip draw_insect_body"
                   write(*,*) "from now on. time=", time
+                  write(*,'(80("~"))')
               endif
-              call draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
+              call draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
               Insect%body_already_drawn = .true.
           endif
       else
           ! the body moves, draw it
-          call draw_insect_body(xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
+          call draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
       endif
 
       !-----------------------------------------------------------------------------
       ! Wings
       !-----------------------------------------------------------------------------
-      call draw_insect_wings(xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
+      call draw_insect_wings( time, xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
 
       ! this is a debug test, which suceeded.
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)

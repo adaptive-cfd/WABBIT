@@ -1,14 +1,20 @@
-subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
+
+! the old routine (<02/2019) created just the body mask but not its solid velocity field
+! now the routine does create the full body mask, including the velocity field. It sets us
+! only inside the body (hence the wings set u_wing + u_body)
+subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delete)
     implicit none
 
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in)    :: xx0(1:3), ddx(1:3)
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    real(kind=rk), intent(in)    :: time
+    type(diptera), intent(inout) :: Insect
+    real(kind=rk), intent(in)    :: xx0(1:3), ddx(1:3)
+    real(kind=rk), intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk), intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+    logical, intent(in)           :: delete
+
     integer                       :: ix, iy, iz
     real(kind=rk), dimension(1:3) :: x_glob, x_body, v_tmp
-    logical, intent(in) :: delete
 
     ! 28/01/2019: Thomas. Discovered that this was done block based, i.e. the smoothing layer
     ! had different thickness, if some blocks happened to be at different levels (and still carry
@@ -25,6 +31,11 @@ subroutine draw_insect_body( xx0, ddx, mask, mask_color, us, Insect, delete)
     if (size(mask) /= size(mask_color) .or. size(us,4) /= 3) then
         write(*,*) "mask:", shape(mask), "mask_color:", shape(mask_color), "us:", shape(us)
         call abort (08021901,"Insects: arrays have wrong size..")
+    endif
+
+    if ((dabs(Insect%time-time)>1.0d-10).and.root) then
+        write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
+        write(*,'("Did you call Update_Insect before draw_insect_body?")')
     endif
 
 

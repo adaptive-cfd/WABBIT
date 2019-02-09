@@ -55,6 +55,15 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   endif
   if (root) write(*,'("n_ghosts=",i2)') g
 
+  ! is the insect periodic?
+  ! attention: this functionality is not for free, so if you do not need it - disable it.
+  if (present(periodic)) then
+      periodic_insect = periodic
+  else
+      periodic_insect = .false.
+  endif
+  if (root) write(*,'("periodic_insect=",L1)') periodic_insect
+
   !-----------------------------------------------------------------------------
   ! read in parameters form ini file
   !-----------------------------------------------------------------------------
@@ -218,11 +227,6 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! other initialization
   !-----------------------------------------------------------------------------
 
-  if (present(periodic)) then
-      periodic_insect=periodic
-  else
-      periodic_insect=.false.
-  endif
 
   ! If required, initialize rigid solid dynamics solver
   if (Insect%BodyMotion=="free_flight") then

@@ -1,11 +1,16 @@
-subroutine draw_insect_wings(xx0, ddx, mask, mask_color, us, Insect, delete)
+
+! the new routine (2/2019) creates the wings (if both wings are used, maybe just one is)
+! and their solid body velocity field us. Note that us contains both contributions from
+! body and wing motion.
+subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delete)
   implicit none
 
-  type(diptera),intent(inout) :: Insect
-  real(kind=rk),intent(in)    :: xx0(1:3), ddx(1:3)
-  real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-  real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-  integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+  real(kind=rk), intent(in)    :: time
+  type(diptera), intent(inout) :: Insect
+  real(kind=rk), intent(in)    :: xx0(1:3), ddx(1:3)
+  real(kind=rk), intent(inout) :: mask(0:,0:,0:)
+  real(kind=rk), intent(inout) :: us(0:,0:,0:,1:)
+  integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
   logical, intent(in) :: delete
 
   integer :: ix, iy, iz
@@ -25,6 +30,11 @@ subroutine draw_insect_wings(xx0, ddx, mask, mask_color, us, Insect, delete)
           us(:,:,:,3) = 0.00_rk
           mask_color = 0
       end where
+  endif
+
+  if ((dabs(Insect%time-time)>1.0d-10).and.root) then
+      write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
+      write(*,'("Did you call Update_Insect before draw_insect_wings?")')
   endif
 
   ! 28/01/2019: Thomas. Discovered that this was done block based, i.e. the smoothing layer

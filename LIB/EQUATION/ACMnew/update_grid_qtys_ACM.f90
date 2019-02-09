@@ -62,13 +62,12 @@ subroutine update_grid_qtys_ACM( time, grid_qty, g, x0, dx, stage )
 
             ! in the tethered case, construct the body in the first 4 registers of
             ! grid_qty: mask, usx, usy, usz, color
-
             if (size(grid_qty,4) < 4) call abort(12121802,"[update_grid_qtys_ACM.f90]::not enough work arrays")
 
 
             ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
             ! know that the first g points are in fact ghost nodes...
-            call draw_insect_body( x0-dble(g)*dx, dx, grid_qty(:,:,:,IDX_MASK), &
+            call draw_insect_body( time, x0-dble(g)*dx, dx, grid_qty(:,:,:,IDX_MASK), &
             mask_color, grid_qty(:,:,:,IDX_USX:IDX_USZ), Insect, delete=.false.)
 
             ! copy mask color array as well

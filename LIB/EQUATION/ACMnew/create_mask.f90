@@ -57,14 +57,14 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
             ! module needs to add the wings to this existing data, not the other way around (i.e. not
             ! adding the body afterwards)
             mask = grid_qty(:,:,:,IDX_MASK)
-            us = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
+            us   = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
             mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
 
             ! add the wings to the existing mask. note: the "old" wings from the previous
             ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)
             ! Hence, here, you do not have to delete again.
             ! Note: insect module is ghost-nodes aware, but requires origin shift.
-            call draw_insect_wings( x0-dble(g)*dx, dx, mask, mask_color, us, Insect, delete=.false.)
+            call draw_insect_wings( time, x0-dble(g)*dx, dx, mask, mask_color, us, Insect, delete=.false.)
 
         ! case II: the body moves OR the grid qty is not available: delete & create everything
         else
@@ -73,7 +73,7 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
         endif
     case ('none')
         mask = 0.0_rk
-        us = 0.0_rk
+        us   =  0.0_rk
 
     case default
         call abort(120001,"ERROR: geometry for 3d VPM is unknown "//params_acm%geometry)

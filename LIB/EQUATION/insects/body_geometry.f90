@@ -274,149 +274,75 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     ! Legs, antennae and proboscis
     !-----------------------------------------------------------------------------
     if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="legs").or.(Insect%HasDetails=="antennae_proboscis")) then
-    ! Bounding box
-    xmin_bbox = -0.74-Insect%safety
-    xmax_bbox = 0.8+Insect%safety
-    ymin_bbox = -0.35-Insect%safety
-    ymax_bbox = 0.35+Insect%safety
-    zmin_bbox = -0.38-Insect%safety
-    zmax_bbox = 0.1+Insect%safety
+        ! Parameters of legs, antennae and proboscis
+        xl1 = (/-0.74,-0.63,-0.4,-0.1,0.1/)
+        yl1 = (/0.32,0.32,0.31,0.3,0.12/)
+        zl1 = (/-0.35,-0.37,-0.2,-0.1,-0.16/)
+        rl1 = (/0.015,0.03,0.04,0.03/)*1.3
+        xl2 = (/-0.24,-0.15,0.02,0.17,0.19/)
+        yl2 = (/0.33,0.33,0.32,0.3,0.15/)
+        zl2 = (/-0.29,-0.28,-0.2,-0.15,-0.19/)
+        rl2 = (/0.015,0.03,0.04,0.03/)*1.3
+        xl3 = (/0.28,0.35,0.45,0.4,0.35/)
+        yl3 = (/0.31,0.30,0.28,0.2,0.15/)
+        zl3 = (/-0.3,-0.28,-0.25,-0.18,-0.18/)
+        rl3 = (/0.015,0.02,0.03,0.02/)*1.3
+        xf = (/0.43,0.6/)
+        yf = (/0.0,0.0/)
+        zf = (/-0.28,-0.23/)
+        rf = 0.017*1.3
+        xan = (/0.63,0.8/)
+        yan = (/0.05,0.27/)
+        zan = (/-0.03,0.1/)
+        ran = 0.015*1.3
 
-    ! Parameters of legs, antennae and proboscis
-    xl1 = (/-0.74,-0.63,-0.4,-0.1,0.1/)
-    yl1 = (/0.32,0.32,0.31,0.3,0.12/)
-    zl1 = (/-0.35,-0.37,-0.2,-0.1,-0.16/)
-    rl1 = (/0.015,0.03,0.04,0.03/)*1.3
-    xl2 = (/-0.24,-0.15,0.02,0.17,0.19/)
-    yl2 = (/0.33,0.33,0.32,0.3,0.15/)
-    zl2 = (/-0.29,-0.28,-0.2,-0.15,-0.19/)
-    rl2 = (/0.015,0.03,0.04,0.03/)*1.3
-    xl3 = (/0.28,0.35,0.45,0.4,0.35/)
-    yl3 = (/0.31,0.30,0.28,0.2,0.15/)
-    zl3 = (/-0.3,-0.28,-0.25,-0.18,-0.18/)
-    rl3 = (/0.015,0.02,0.03,0.02/)*1.3
-    xf = (/0.43,0.6/)
-    yf = (/0.0,0.0/)
-    zf = (/-0.28,-0.23/)
-    rf = 0.017*1.3
-    xan = (/0.63,0.8/)
-    yan = (/0.05,0.27/)
-    zan = (/-0.03,0.1/)
-    ran = 0.015*1.3
+        ! ----------------------------------------------------------------------------
+        ! legs (composed of 3 cylinders)
+        ! ----------------------------------------------------------------------------
+        do j = 1,  4
+          ! transform coordinates to global system. they are defined in the body system
+          xa = matmul( transpose(M_body), (/xl1(j)  ,yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
+          xb = matmul( transpose(M_body), (/xl1(j+1),yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
+          ! note input to draw_cylinder_new is in global coordinates
+          call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-    ! ----------------------------------------------------------------------------
-    ! legs (composed of 3 cylinders)
-    ! ----------------------------------------------------------------------------
-    ! do j = 1,  4
-    !   ! transform coordinates to global system. they are defined in the body system
-    !   xa = matmul( transpose(M_body), (/xl1(j),yl1(j),zl1(j)/) ) + Insect%xc_body_g
-    !   xb = matmul( transpose(M_body), (/xl1(j+1),yl1(j+1),zl1(j+1)/) ) + Insect%xc_body_g
-    !   ! note input to draw_cylinder_new is in global coordinates
-    !   call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    !   xa = matmul( transpose(M_body), (/xl2(j),yl2(j),zl2(j)/) ) + Insect%xc_body_g
-    !   xb = matmul( transpose(M_body), (/xl2(j+1),yl2(j+1),zl2(j+1)/) ) + Insect%xc_body_g
-    !   call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    !   xa = matmul( transpose(M_body), (/xl3(j),yl3(j),zl3(j)/) ) + Insect%xc_body_g
-    !   xb = matmul( transpose(M_body), (/xl3(j+1),yl3(j+1),zl3(j+1)/) ) + Insect%xc_body_g
-    !   call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    !   ! right side of body (flip the sign of y)
-    !   xa = matmul( transpose(M_body), (/xl1(j),-yl1(j),zl1(j)/) ) + Insect%xc_body_g
-    !   xb = matmul( transpose(M_body), (/xl1(j+1),-yl1(j+1),zl1(j+1)/) ) + Insect%xc_body_g
-    !   call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    !   xa = matmul( transpose(M_body), (/xl2(j),-yl2(j),zl2(j)/) ) + Insect%xc_body_g
-    !   xb = matmul( transpose(M_body), (/xl2(j+1),-yl2(j+1),zl2(j+1)/) ) + Insect%xc_body_g
-    !   call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    !   xa = matmul( transpose(M_body), (/xl3(j),-yl3(j),zl3(j)/) ) + Insect%xc_body_g
-    !   xb = matmul( transpose(M_body), (/xl3(j+1),-yl3(j+1),zl3(j+1)/) ) + Insect%xc_body_g
-    !   call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-    ! enddo
-    !
-    ! ! antenna (left)
-    ! xa = matmul( transpose(M_body), (/xan(1),yan(1),zan(1)/) ) + Insect%xc_body_g
-    ! xb = matmul( transpose(M_body), (/xan(2),yan(2),zan(2)/) ) + Insect%xc_body_g
-    ! call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    ! ! antenna (right)
-    ! xa = matmul( transpose(M_body), (/xan(1),-yan(1),zan(1)/) ) + Insect%xc_body_g
-    ! xb = matmul( transpose(M_body), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
-    ! call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
-    !
-    !
-    ! ! proscrobis ( to drink )
-    ! xa = matmul( transpose(M_body), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
-    ! xb = matmul( transpose(M_body), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
-    ! call draw_cylinder_new( xa, xb, rf, xx0, ddx, mask, mask_color, us, Insect, color_body)
+          xa = matmul( transpose(M_body), (/xl2(j)  ,yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
+          xb = matmul( transpose(M_body), (/xl2(j+1),yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
+          call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
+          xa = matmul( transpose(M_body), (/xl3(j)  ,yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
+          xb = matmul( transpose(M_body), (/xl3(j+1),yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
+          call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-    ! Assign values to mask pointwise
-    do iz = g, size(mask,3)-1-g
-        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = g, size(mask,2)-1-g
-            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = g, size(mask,1)-1-g
-                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
-                x_body   = matmul(M_body,x_glob)
+          ! right side of body (flip the sign of y)
+          xa = matmul( transpose(M_body), (/xl1(j)  ,-yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
+          xb = matmul( transpose(M_body), (/xl1(j+1),-yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
+          call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-                !-- check bounds
-                if ((x_body(1)>=xmin_bbox).and.(x_body(1)<=xmax_bbox)&
-                .and.(x_body(2)>=ymin_bbox).and.(x_body(2)<=ymax_bbox)&
-                .and.(x_body(3)>=zmin_bbox).and.(x_body(3)<=zmax_bbox)) then
+          xa = matmul( transpose(M_body), (/xl2(j)  ,-yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
+          xb = matmul( transpose(M_body), (/xl2(j+1),-yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
+          call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-                !-- left and right legs, antennae and proboscis
-                if (x_body(2)>0) then
-                    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="legs")) then
-                        do j=1,4
-                            call draw_cylinder(x_body,xl1(j),yl1(j),zl1(j),xl1(j+1),yl1(j+1),zl1(j+1),rl1(j),&
-                            mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety, Insect%smooth)
-                        enddo
-                        do j=1,4
-                            call draw_cylinder(x_body,xl2(j),yl2(j),zl2(j),xl2(j+1),yl2(j+1),zl2(j+1),rl2(j),&
-                            mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety, Insect%smooth)
-                        enddo
-                        do j=1,4
-                            call draw_cylinder(x_body,xl3(j),yl3(j),zl3(j),xl3(j+1),yl3(j+1),zl3(j+1),rl3(j),&
-                            mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety, Insect%smooth)
-                        enddo
-                    endif
-                    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="antennae_proboscis")) then
-                        call draw_cylinder(x_body,xan(1),yan(1),zan(1),xan(2),yan(2),zan(2),ran,&
-                        mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety, Insect%smooth)
-                    endif
-                else
-                    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="legs")) then
-                        do j=1,4
-                            call draw_cylinder(x_body,xl1(j),-yl1(j),zl1(j),xl1(j+1),-yl1(j+1),zl1(j+1),rl1(j),&
-                            mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety, Insect%smooth)
-                        enddo
-                        do j=1,4
-                            call draw_cylinder(x_body,xl2(j),-yl2(j),zl2(j),xl2(j+1),-yl2(j+1),zl2(j+1),rl2(j),&
-                            mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety , Insect%smooth)
-                        enddo
-                        do j=1,4
-                            call draw_cylinder(x_body,xl3(j),-yl3(j),zl3(j),xl3(j+1),-yl3(j+1),zl3(j+1),rl3(j),&
-                            mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety , Insect%smooth)
-                        enddo
-                    endif
-                    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="antennae_proboscis")) then
-                        call draw_cylinder(x_body,xan(1),-yan(1),zan(1),     xan(2),-yan(2),zan(2),ran,&
-                        mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety , Insect%smooth)
-                    endif
-                endif
-                if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="antennae_proboscis")) then
-                    call draw_cylinder(x_body,xf(1),yf(1),zf(1), xf(2),yf(2),zf(2),rf,&
-                    mask(ix,iy,iz),mask_color(ix,iy,iz),color_body,Insect%safety, Insect%smooth)
-                endif
-            endif
+          xa = matmul( transpose(M_body), (/xl3(j)  ,-yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
+          xb = matmul( transpose(M_body), (/xl3(j+1),-yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
+          call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
         enddo
-    enddo
-enddo
-endif
+
+        ! antenna (left)
+        xa = matmul( transpose(M_body), (/xan(1),yan(1),zan(1)/) ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xan(2),yan(2),zan(2)/) ) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
+
+        ! antenna (right)
+        xa = matmul( transpose(M_body), (/xan(1),-yan(1),zan(1)/) ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
+
+        ! proscrobis ( to drink )
+        xa = matmul( transpose(M_body), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, rf, xx0, ddx, mask, mask_color, us, Insect, color_body)
+    endif
 
 end subroutine draw_body_bumblebee
 
@@ -707,24 +633,32 @@ subroutine draw_cylinder( xp,x1,y1,z1,x2,y2,z2,R0,mask_val,color_val,icolor,safe
     real(kind=rk)::x(1:3),R,xab,yab,zab,xu,yu,zu,xvp,yvp,zvp,&
     cbx,cby,cbz,rbx,rby,rbz
 
-    ! draw cylinder without endpoint treatment
+    ! coordinates centered around cylinder mid-point
     cbx = 0.5*(x1+x2) - xp(1)
     cby = 0.5*(y1+y2) - xp(2)
     cbz = 0.5*(z1+z2) - xp(3)
+
+    ! length of cylinder
     rbx = x1-x2
     rby = y1-y2
     rbz = z1-z2
-    if ( cbx*cbx+cby*cby+cbz*cbz < 0.25*(rbx*rbx+rby*rby+rbz*rbz) ) then
-        xab = xp(1)-x1
-        yab = xp(2)-y1
-        zab = xp(3)-z1
-        xu = x2-x1
-        yu = y2-y1
-        zu = z2-z1
-        xvp = yab*zu-zab*yu
-        yvp = zab*xu-xab*zu
-        zvp = xab*yu-yab*xu
-        R = sqrt((xvp*xvp+yvp*yvp+zvp*zvp)/(xu*xu+yu*yu+zu*zu))
+
+    ! draw cylinder without endpoint treatment
+    if ( cbx*cbx + cby*cby + cbz*cbz < 0.25*(rbx*rbx+rby*rby+rbz*rbz) ) then ! the 0.25 is from the 0.5 squared
+        xab = xp(1) - x1
+        yab = xp(2) - y1
+        zab = xp(3) - z1
+
+        ! e_x vector
+        xu = x2 - x1
+        yu = y2 - y1
+        zu = z2 - z1
+
+        xvp = yab*zu - zab*yu
+        yvp = zab*xu - xab*zu
+        zvp = xab*yu - yab*xu
+
+        R = sqrt( (xvp*xvp + yvp*yvp + zvp*zvp) / (xu*xu + yu*yu + zu*zu) )
         if ( R <= R0+safety ) then
             mask_val = max(steps(R,R0,h_smooth),mask_val)
             color_val = icolor
@@ -1606,11 +1540,23 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
     integer(kind=2),intent(in) :: color_val
 
-    real(kind=rk),dimension(1:3)::x_glob, e_x, tmp, e_r, e_3
-    real(kind=rk)::ceta1, ceta2, ceta3, R, clength, safety, t
+    real(kind=rk),dimension(1:3) ::  cb, rb, ab, u, vp
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, tmp, e_r, e_3
+    real(kind=rk)::ceta1, ceta2, ceta3, R, RR0, clength, safety, t
     integer :: ix,iy,iz
 
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer :: xmin,xmax,ymin,ymax,zmin,zmax
+    integer :: Nsafety
+
     safety = Insect%safety
+    Nsafety = nint(safety / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+
+    RR0 = R0 + safety
 
     ! unit vector in cylinder axis direction and cylinder length
     e_x = x2 - x1
@@ -1631,52 +1577,71 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     e_3 = cross(e_x,e_r)
     e_3 = e_3 / norm2(e_3)
 
+    ! bounding box of the vicinity of the cylinder.
+    t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+    xmin = nint( (t-xx0(1)) / ddx(1) )  ! safety already in RR0, no Nsafety here
+
+    t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+    xmax = nint( (t-xx0(1)) / ddx(1) )
+
+    t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+    ymin = nint( (t-xx0(2)) / ddx(2) )
+
+    t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+    ymax = nint( (t-xx0(2)) / ddx(2) )
+
+    t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+    zmin = nint( (t-xx0(3)) / ddx(3) )
+
+    t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+    zmax = nint( (t-xx0(3)) / ddx(3) )
+
+
     ! first we draw the cylinder, then the endpoint spheres
-    do iz = g, size(mask,3)-1-g
-        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - x1(3)
-        do iy = g, size(mask,2)-1-g
-            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - x1(2)
-            do ix = g, size(mask,1)-1-g
-                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - x1(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3)
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2)
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
 
-                ! position on cylinder axis (projection of x-x1 on e_x)
-                ceta1 = dot_product(x_glob, e_x)
-                ceta2 = dot_product(x_glob, e_r)
-                ceta3 = dot_product(x_glob, e_3)
+                cb = 0.5d0*(x1+x2) - x_glob
+                rb = x1 - x2
 
-                ! bounding box check
-                if ( ceta1>=-(R0+safety) .and. ceta1<=clength+R0+safety .and. abs(ceta2)<R0+safety .and. abs(ceta3)<R0+safety ) then
-                    if ( ceta1 <= 0.d0 ) then
-                        ! ZONE 1: sphere at the base
-                        R = norm2( x_glob )
-                    elseif ( ceta1 > 0.d0 .and. ceta1 < clength) then
-                        ! ZONE 2: the actual cylinder. to get its radius, we project x_glob on the
-                        ! 3 unit vectors defined previously: the e_r and e_3 components are in the
-                        ! plane perp. to the axis, and so their norm defines the radius
-                        R = dsqrt( ceta2**2 + ceta3**2)
-                    else
-                        ! ZONE 3: the sphere at the tip. (note we shift x_glob to x2, now)
-                        x_glob = periodize_coordinate(x_glob-(x2-x1), (/xl,yl,zl/))
-                        R = norm2( x_glob )
-                    end if
+                if ( sum(cb**2) < 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
+                    ab = x_glob -x1
+                    u = x2 -x1
 
-                    ! r is now the signed distance to the cylinder mid-line.
-                    ! since there may be other cylinders already, the closest one defines the
-                    ! actual signed distance, saved in mask array. we would thus take min(R-R0, mask(ix,iy,iz))
-                    ! is the mask contained the distance. BUT the mask contains chi, and chi is a monotonous function
-                    ! of -R, we take the max operator
-                    t = steps(R,R0, Insect%smooth)
-                    if (t >= mask(ix,iy,iz)) then
-                        mask(ix,iy,iz) = t
-                        mask_color(ix,iy,iz) = color_val
+                    vp = cross(ab, u)
+
+                    R = sqrt( sum(vp**2) / sum(u**2) )
+                    if (R <= R0+safety) then
+                        t = steps(R, R0, Insect%smooth)
+                        if (t >= mask(ix,iy,iz)) then
+                            mask(ix,iy,iz) = t
+                            mask_color(ix,iy,iz) = color_val
+                        endif
                     endif
-                end if
-
+                endif
             enddo
         enddo
     enddo
+
+    !---------------------------------------------------------------------------
+    ! endpoint spheres
+    !---------------------------------------------------------------------------
+    call drawsphere( x1, R0, xx0, ddx, mask, mask_color, us, Insect, color_val )
+    call drawsphere( x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val )
 end subroutine draw_cylinder_new
 
 
@@ -1687,7 +1652,7 @@ end subroutine draw_cylinder_new
 ! the head and eyes of Jerry. The velocity field inside the body is added
 ! later, thus, the field us is untouched in this routines.
 !-------------------------------------------------------------------------------
-subroutine drawsphere( xc,R0,xx0, ddx, mask, mask_color, us,Insect,icolor )
+subroutine drawsphere( xc, R0, xx0, ddx, mask, mask_color, us, Insect, icolor )
     implicit none
 
     real(kind=rk),intent(inout)::xc(1:3)
@@ -1701,6 +1666,9 @@ subroutine drawsphere( xc,R0,xx0, ddx, mask, mask_color, us,Insect,icolor )
 
     integer :: ix,iy,iz
     real(kind=rk)::x(1:3),R,tmp
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer :: xmin,xmax,ymin,ymax,zmin,zmax
+    integer :: Nsafety
 
     ! periodization: if the center point is out of the domain, then correct that
     if (xc(1)<0.0) xc(1)=xc(1)+xl
@@ -1711,34 +1679,42 @@ subroutine drawsphere( xc,R0,xx0, ddx, mask, mask_color, us,Insect,icolor )
     if (xc(2)>=yl) xc(2)=xc(2)-yl
     if (xc(3)>=zl) xc(3)=xc(3)-zl
 
+    Nsafety = nint( (R0+Insect%safety) / minval(ddx))
 
-    do iz = g, size(mask,3)-1-g
+    ! bounds of the current patch of data
+    lbounds = g
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+
+    ! bounding box of the vicinity of the sphere.
+    xmin = nint( (xc(1)-xx0(1)) / ddx(1) ) - (Nsafety)
+    xmax = nint( (xc(1)-xx0(1)) / ddx(1) ) + (Nsafety)
+    ymin = nint( (xc(2)-xx0(2)) / ddx(2) ) - (Nsafety)
+    ymax = nint( (xc(2)-xx0(2)) / ddx(2) ) + (Nsafety)
+    zmin = nint( (xc(3)-xx0(3)) / ddx(3) ) - (Nsafety)
+    zmax = nint( (xc(3)-xx0(3)) / ddx(3) ) + (Nsafety)
+
+
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
         x(3) = xx0(3) + dble(iz)*ddx(3) - xc(3)
-        do iy = g, size(mask,2)-1-g
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
             x(2) = xx0(2) + dble(iy)*ddx(2) - xc(2)
-            do ix = g, size(mask,1)-1-g
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x(1) = xx0(1) + dble(ix)*ddx(1) - xc(1)
                 if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
-                ! bounding box check
-                if (dabs(x(1)) <= R0+Insect%safety) then
-                    if (dabs(x(2)) <= R0+Insect%safety) then
-                        if (dabs(x(3)) <= R0+Insect%safety) then
-                            ! compute radius
-                            R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
-                            if ( R <= R0+Insect%safety ) then
-                                tmp = steps(R,R0, Insect%smooth)
-                                if (tmp>=mask(ix,iy,iz)) then
-                                    ! set new value
-                                    mask(ix,iy,iz) = tmp
-                                    mask_color(ix,iy,iz) = icolor
-                                endif
-                            endif
-                        endif
+                ! the bounding box check is incorporated in the loop bounds - no if clause!
+                ! compute radius
+                R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
+                if ( R <= R0+Insect%safety ) then
+                    tmp = steps(R, R0, Insect%smooth)
+                    if (tmp>=mask(ix,iy,iz)) then
+                        ! set new value
+                        mask(ix,iy,iz) = tmp
+                        mask_color(ix,iy,iz) = icolor
                     endif
                 endif
-
-
             enddo
         enddo
     enddo

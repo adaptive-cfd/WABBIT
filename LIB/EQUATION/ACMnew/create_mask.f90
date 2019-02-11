@@ -85,7 +85,7 @@ end subroutine create_mask_3D
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 
-subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
+subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us, stage )
     implicit none
 
     ! grid
@@ -96,6 +96,12 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     real(kind=rk), dimension(:,:,:), intent(inout) :: us
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:2), dx(1:2), time
+    ! sometimes one has to do preparatory work for the mask function => staging idea.
+    character(len=*), optional, intent(in) :: stage
+
+    if (present(stage)) then
+        if (stage /= "main_stage") return
+    endif
 
     ! some cheap checks
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then

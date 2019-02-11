@@ -56,7 +56,8 @@ subroutine CREATE_MASK_meta( physics, time, x0, dx, Bs, g, mask, mask_color, us,
     select case ( physics )
     case ('ACM-new')
         if (size(mask,3)==1) then
-            call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
+
+            call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2), stage2 )
         else
             if (present(grid_qty)) then
                 call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage2, grid_qty)

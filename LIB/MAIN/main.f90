@@ -322,9 +322,12 @@ program main
         if ( params%adapt_mesh ) then
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
             ! including the ghost nodes)
+            ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
+            ! Snych'ing becomes much mor expensive one the grid is refined.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
+            ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
+            ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
             call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif

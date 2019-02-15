@@ -47,6 +47,15 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
 
 
     select case (params_acm%geometry)
+    case ('fractal_tree')
+        if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
+            mask = grid_qty(:,:,:,IDX_MASK)
+!            us   = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
+            mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
+        else
+            call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask, mask_color, us)
+        endif
+
     case ('Insect')
         !-----------------------------------------------------------------------
         ! INSECT MODULE

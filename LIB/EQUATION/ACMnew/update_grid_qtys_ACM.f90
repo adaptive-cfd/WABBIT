@@ -74,6 +74,17 @@ subroutine update_grid_qtys_ACM( time, grid_qty, g, x0, dx, stage )
             grid_qty(:,:,:,IDX_COLOR) = real( mask_color(:,:,:), kind=rk )
         endif
 
+        if ( params_acm%geometry == "fractal_tree" ) then
+            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g,1:Bs(2)+2*g,1:Bs(3)+2*g))
+            mask_color = 0
+            grid_qty = 0.0_rk
+
+            call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, grid_qty(:,:,:,IDX_MASK), &
+            mask_color, grid_qty(:,:,:,IDX_USX:IDX_USZ))
+            ! copy mask color array as well
+            grid_qty(:,:,:,IDX_COLOR) = real( mask_color(:,:,:), kind=rk )
+        endif
+
         ! are we using the sponge ? If so, the sponge mask is also a time-independent grid qty
         ! and computed here
         if ( params_acm%use_sponge ) then

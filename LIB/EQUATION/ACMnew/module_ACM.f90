@@ -232,7 +232,7 @@ contains
 
     ! two things can be stored in the grid_qtys: the sponge and the mask.
     ! we therefore need to know where to store what (fixed indices do not work)
-    if (params_acm%penalization .and. params_acm%geometry=="Insect") then
+    if (params_acm%penalization .and. (params_acm%geometry=="Insect" .or. params_acm%geometry=="fractal_tree")) then
         n_gridQ = n_gridQ + 5
         IDX_MASK  = n_gridQ - 4
         IDX_USX   = n_gridQ - 3
@@ -261,7 +261,7 @@ contains
     endif
 
     ! if used, setup insect
-    if (params_acm%geometry == "Insect") then
+    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree") then
         call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, g)
     endif
   end subroutine READ_PARAMETERS_ACM

@@ -252,7 +252,6 @@ end subroutine insect_init
 
 
 
-
 subroutine insect_clean(Insect)
   implicit none
   type(diptera),intent(inout)::Insect

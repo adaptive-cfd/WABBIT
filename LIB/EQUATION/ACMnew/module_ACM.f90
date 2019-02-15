@@ -264,6 +264,10 @@ contains
     if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree") then
         call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, g)
     endif
+
+    if (params_acm%geometry=="fractal_tree") then
+        call fractal_tree_init()
+    endif
   end subroutine READ_PARAMETERS_ACM
 
 

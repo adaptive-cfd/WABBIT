@@ -10,7 +10,7 @@ module module_insects
   PRIVATE
 
   ! functions
-  PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_Insect, insect_init, &
+  PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_Insect, insect_init, fractal_tree_init, &
   insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
   aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_time_step, &
   BodyMotion, FlappingMotion_right, FlappingMotion_left, StrokePlane, mask_from_pointcloud, &
@@ -56,6 +56,10 @@ module module_insects
   real(kind=rk), dimension(1:3), save :: mask_wing_xl, mask_wing_x0
   integer, dimension(1:3), save :: mask_wing_nxyz
   integer, save :: mask_wing_safety=4
+
+  !-----------------------------------------------------------------------------
+  ! stuff for the fractal tree
+  real(kind=rk), allocatable, save :: treedata(:,:)
 
   !-----------------------------------------------------------------------------
   ! TYPE DEFINITIONS

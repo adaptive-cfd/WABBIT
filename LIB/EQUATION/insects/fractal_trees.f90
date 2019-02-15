@@ -2,58 +2,19 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     implicit none
 
     type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(in)    :: xx0(1:3), ddx(1:3)
     real(kind=rk),intent(inout) :: mask(0:,0:,0:)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
-    integer :: io_error, nlines, mpicode,i
-    real (kind=rk) :: R, safety, x1(1:3),x2(1:3), t1
-    character(len=2048) :: dummy
-    character(len=strlen) :: file
-    real(kind=rk), allocatable, save :: treedata(:,:)
+    real(kind=rk) :: x1(1:3), x2(1:3), R
+    integer ::  i
+
 
     ! reset everything
     mask = 0.d0
     mask_color = 0
     us = 0.d0
-
-    ! thickness of smoothing layer and safety distance
-    Insect%smooth = 1.0_rk*maxval(ddx)
-    Insect%safety = 3.5_rk*Insect%smooth
-
-    ! initialization
-    if (.not. allocated(treedata)) then
-        file = 'tree_data.in'
-        call check_file_exists( file )
-
-        !*****************************************************************************
-        ! phase one: read the number of lines (which is the number of rigid cylinders in the tree)
-        !*****************************************************************************
-        call count_lines_in_ascii_file_mpi(file, nlines, 0)
-        if (root) then
-            write(*,'("Building a fractal tree with ",i5," rigid cylinders")') nlines
-        endif
-
-        !*****************************************************************************
-        ! phase two: read all cylinders from the file into the array and bcast them
-        !*****************************************************************************
-        allocate( treedata(1:nlines, 1:7) )
-
-        if (root) then
-            open(unit=14,file=file,action='read',status='old')
-            do i=1,nlines
-                read (14,'(A)',iostat=io_error) dummy
-                if (io_error==0) then
-                    read (dummy,*) treedata(i,:)
-                    write(*,'("read cylinder ",7(es12.4,1x))') treedata(i,:)
-                endif
-            enddo
-            close (14)
-        endif
-
-        call MPI_BCAST(treedata,nlines*7,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpicode)
-    endif
 
     !*****************************************************************************
     ! phase 3: all ranks draw the individual cylinders...
@@ -68,3 +29,32 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     end do
 
 end subroutine draw_fractal_tree
+
+
+subroutine fractal_tree_init()
+    implicit none
+    character(len=80) :: file
+    integer :: nlines
+    ! note: smoothing is set in insect_init (which must be called also for fractal trees)
+
+    ! initialization
+    if (.not. allocated(treedata)) then
+        file = 'tree_data.in'
+        call check_file_exists( file )
+
+        !*****************************************************************************
+        ! phase one: read the number of lines (which is the number of rigid cylinders in the tree)
+        !*****************************************************************************
+        call count_lines_in_ascii_file_mpi(file, nlines, 0)
+        if (root) write(*,'("Building a fractal tree with ",i5," rigid cylinders")') nlines
+
+        !*****************************************************************************
+        ! phase two: read all cylinders from the file into the array and bcast them
+        !*****************************************************************************
+        allocate( treedata(1:nlines, 1:7) )
+        call read_array_from_ascii_file_mpi(file, treedata, n_header=0)
+
+        if (root) write(*,'("Done reading ",i5," rigid cylinders")') nlines
+    endif
+
+end subroutine

@@ -1580,27 +1580,27 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     ! bounding box of the vicinity of the cylinder.
     t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
                   x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-    xmin = nint( (t-xx0(1)) / ddx(1) )  ! safety already in RR0, no Nsafety here
+    xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
 
     t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
                   x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-    xmax = nint( (t-xx0(1)) / ddx(1) )
+    xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
 
     t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
                   x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-    ymin = nint( (t-xx0(2)) / ddx(2) )
+    ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
 
     t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
                   x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-    ymax = nint( (t-xx0(2)) / ddx(2) )
+    ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
 
     t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
                   x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-    zmin = nint( (t-xx0(3)) / ddx(3) )
+    zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
 
     t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
                   x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-    zmax = nint( (t-xx0(3)) / ddx(3) )
+    zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
 
 
     ! first we draw the cylinder, then the endpoint spheres
@@ -1614,17 +1614,19 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1)
                 ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
-
+                ! cb is the distance to the cylinder mid-point
                 cb = 0.5d0*(x1+x2) - x_glob
+                ! rb is the length of the clinder
                 rb = x1 - x2
 
+                ! this is a spherical bounding box, centered around the mid-point
                 if ( sum(cb**2) < 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
-                    ab = x_glob -x1
-                    u = x2 -x1
+                    ab = x_glob - x1
+                    u = x2 - x1
 
                     vp = cross(ab, u)
-
                     R = sqrt( sum(vp**2) / sum(u**2) )
+
                     if (R <= R0+safety) then
                         t = steps(R, R0, Insect%smooth)
                         if (t >= mask(ix,iy,iz)) then

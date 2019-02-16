@@ -74,7 +74,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! loop variable
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id
     ! grid parameter
-    integer(kind=ik)                    :: g, dim
+    integer(kind=ik)                    :: g, dim, Narg
     integer(kind=ik), dimension(3)      :: Bs
 
     ! block data buffer, need for compact data storage
@@ -90,6 +90,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! offset variables
     integer,dimension(1:4)              :: ubounds3D, lbounds3D
     integer,dimension(1:3)              :: ubounds2D, lbounds2D
+
+    character(len=80) :: arg
+    type(INIFILE) :: FILE
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -242,6 +245,23 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds2D(3)/), (/ubounds2D(3)/), procs)
         call write_int_dset_mpi_hdf5_1D(file_id, "refinement_status", (/lbounds2D(3)/), (/ubounds2D(3)/), refinement_status)
         call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds2D(3)/), (/ubounds2D(3)/), lgt_ids)
+    endif
+
+    ! check if we find a *.ini file name in the command line call
+    ! if we do, read it, and append it to the HDF5 file. this way, data
+    ! and parameters are always together. thomas, 16/02/2019
+    if (params%rank==0) then
+        k = 1
+        Narg = COMMAND_ARGUMENT_COUNT()
+        do k = 1, Narg
+            call get_command_argument( k, arg )
+            if (index(arg, ".ini") /= 0) then
+                ! found the ini file.
+                call read_ini_file(FILE, arg, .true., remove_comments=.false.)
+                call write_string_dset_hdf5(file_id, "params", FILE%PARAMS, maxcolumns)
+                call write_attribute(file_id, "params", "filename", arg)
+            end if
+        enddo
     endif
 
     ! add additional annotations

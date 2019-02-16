@@ -36,6 +36,8 @@ module module_IO
     use module_operators, only: compute_vorticity
     ! use physics modules to save the data
     use module_physics_metamodule
+    ! for reading parameters and storing them in each hdf file
+    use module_ini_files_parser_mpi
 
     use module_helpers, only : check_file_exists, block_contains_NaN
 

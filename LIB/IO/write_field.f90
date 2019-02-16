@@ -74,7 +74,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! loop variable
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id
     ! grid parameter
-    integer(kind=ik)                    :: g, dim, Narg
+    integer(kind=ik)                    :: g, dim
     integer(kind=ik), dimension(3)      :: Bs
 
     ! block data buffer, need for compact data storage
@@ -247,22 +247,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds2D(3)/), (/ubounds2D(3)/), lgt_ids)
     endif
 
-    ! check if we find a *.ini file name in the command line call
-    ! if we do, read it, and append it to the HDF5 file. this way, data
-    ! and parameters are always together. thomas, 16/02/2019
-    if (params%rank==0) then
-        k = 1
-        Narg = COMMAND_ARGUMENT_COUNT()
-        do k = 1, Narg
-            call get_command_argument( k, arg )
-            if (index(arg, ".ini") /= 0) then
-                ! found the ini file.
-                call read_ini_file(FILE, arg, .true., remove_comments=.false.)
-                call write_string_dset_hdf5(file_id, "params", FILE%PARAMS, maxcolumns)
-                call write_attribute(file_id, "params", "filename", arg)
-            end if
-        enddo
-    endif
 
     ! add additional annotations
     call write_attribute(file_id, "blocks", "time", (/time/))
@@ -279,4 +263,20 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     deallocate(coords_spacing)
     deallocate(block_treecode, procs, refinement_status, lgt_ids)
 
+    ! check if we find a *.ini file name in the command line call
+    ! if we do, read it, and append it to the HDF5 file. this way, data
+    ! and parameters are always together. thomas, 16/02/2019
+    if (params%rank==0) then
+        call open_file_hdf5_serial( trim(adjustl(fname)), file_id, .true.)
+        do k = 1, COMMAND_ARGUMENT_COUNT()
+            call get_command_argument( k, arg )
+            if (index(arg, ".ini") /= 0) then
+                ! found the ini file.
+                call read_ini_file(FILE, arg, .false., remove_comments=.false.)
+                call write_string_dset_hdf5(file_id, "params", FILE%PARAMS, maxcolumns)
+                call write_attribute(file_id, "params", "filename", arg)
+            end if
+        enddo
+        call close_file_hdf5_serial(file_id)
+    endif
 end subroutine write_field

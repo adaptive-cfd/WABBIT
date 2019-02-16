@@ -142,6 +142,41 @@ contains
     call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
   end subroutine close_file_hdf5
 
+  !-----------------------------------------------------------------------------
+  ! open an hdf5 file, return handle file_id
+  !-----------------------------------------------------------------------------
+  subroutine open_file_hdf5_serial(filename, file_id, ovrwrte)
+      implicit none
+      integer(hid_t),intent(out) ::  file_id
+      character(len=*), intent (in) :: filename
+      logical, intent(in) :: ovrwrte
+
+      integer(hid_t) :: plist_id
+      integer :: error
+      logical :: exist
+
+      ! Initialize HDF5 library and Fortran interfaces.
+      call h5open_f(error)
+
+      call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error)
+
+  end subroutine open_file_hdf5_serial
+
+
+  !-----------------------------------------------------------------------------
+  ! close a file handle.
+  !-----------------------------------------------------------------------------
+  subroutine close_file_hdf5_serial(file_id)
+      implicit none
+      integer(hid_t),intent(inout) ::  file_id
+
+      integer :: error
+      !!! Close dataspaces:
+      call h5fclose_f(file_id, error) ! Close the file.
+      call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
+  end subroutine close_file_hdf5_serial
+
+
   subroutine get_size_datafield(datarank, file_id, dsetname, dims_file)
     implicit none
     integer, intent(in)                       :: datarank ! data dimensionality (2D or 3D)

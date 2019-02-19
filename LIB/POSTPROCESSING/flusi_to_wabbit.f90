@@ -94,11 +94,46 @@ subroutine flusi_to_wabbit(params)
 
     ! read attributes such as number of discretisation points, time, domain size
     call get_attributes_flusi(file_in, nxyz, time, domain)
+
+    if (params%rank==0) then
+        write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        write(*,'(" Input file: ", A)') trim(adjustl(file_in))
+        write(*,'(" Output file: ", A)') trim(adjustl(file_out))
+        write(*,'(" Resolution in FLUSI input is: ", 3(i5,1x))') nxyz
+        write(*,'(" Domain information in FLUSI input is: ", 3(f5.3,1x))') domain
+    endif
+
+
+
     if (nxyz(1) /= 1) then
+        !-----------------------------------------------------------------------
+        ! 3D
+        !-----------------------------------------------------------------------
         params%dim = 3
+
+        if (mod(nxyz(1),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
+        if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
+        if (mod(nxyz(3),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
+
     else
+        !-----------------------------------------------------------------------
+        ! 2D
+        !-----------------------------------------------------------------------
         params%dim = 2
+
+        ! there is a goofy shift. in flusi, 2D runs ALWAYS need to set the x-direction to
+        ! 1 point (that is a memory consistency requirement)
+        ! Hence, a 2D flusi array has the dimensions 1 x NX x NY (from the wabbit point of view)
+        domain(1) = domain(2)
+        domain(2) = domain(3)
+
+        nxyz(1) = nxyz(2)
+        nxyz(2) = nxyz(3)
+
+        if (mod(nxyz(1),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
+        if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
     end if
+
 
     level_tmp = 0.0
     level = 0
@@ -108,21 +143,15 @@ subroutine flusi_to_wabbit(params)
         level(k) = int(level_tmp(k))
     enddo
 
+
     if (params%rank==0) then
-        write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-        write(*,'(" Input file: ", A)') trim(adjustl(file_in))
-        write(*,'(" Output file: ", A)') trim(adjustl(file_out))
-        write(*,'(" Resolution in FLUSI input is: ", 3(i5,1x))') nxyz
         write(*,'(" Data dimensionality is: ", i5)') params%dim
         write(*,'(" Wabbit level is: (should be integers)", 3(f4.1,1x))') level_tmp
         write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     endif
 
     ! this would actually now be possible but needs to be implemented:
-    if (nxyz(2)/=nxyz(3)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
-    ! this is maybe an irrelevant condition:
-    if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
-    if (mod(nxyz(3),2)/=0) call abort(8324, "ERROR: nx and ny need to be even!")
+    if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
 
     do k = 1, params%dim
         if (mod(nxyz(k),(Bs(k)-1)) /=0 ) then
@@ -155,7 +184,7 @@ subroutine flusi_to_wabbit(params)
 
     ! read the field from flusi file and organize it in WABBITs blocks
     call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
-    hvy_active, params, nxyz)
+    hvy_active, params, nxyz(2))
 
     ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
     ! they will therefore send their redundant points to the last blocks in x,y and z-direction

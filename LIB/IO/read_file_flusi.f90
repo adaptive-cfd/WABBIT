@@ -97,7 +97,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   integer(kind=ik), intent(in)        :: hvy_active(:)
   integer(kind=ik), intent(in)        :: lgt_block(:, :)
   integer(kind=ik), intent(in)        :: hvy_n
-  integer(kind=ik), dimension(3), intent(in) :: Bs_f
+  integer(kind=ik), intent(in)        :: Bs_f
   integer(kind=ik)                    :: g
   integer(kind=ik), dimension(3)      :: Bs
   integer(kind=ik)                    :: k, lgt_id, start_x, start_y, start_z
@@ -113,37 +113,46 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   g  = params%n_ghosts
   ! this is necessary in 2D because flusi data is organised as field(1,1:Bs_f,1:Bs_f)
   ! whereas in wabbit the field has only one component in z direction
-  if (.not. params%dim==3) allocate(blockbuffer(1,0:Bs(1)-1,0:Bs(2)-1))
-!----------------------------------------------------------------------------
+  if (.not. params%dim==3) allocate(blockbuffer(1,0:Bs(2)-1,0:Bs(3)-1))
+  !----------------------------------------------------------------------------
   call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
-    ! print a message
+
+  ! print a message
   if (params%rank==0) then
       write(*,'(80("_"))')
-      write(*,'("READING: Reading Flusi datafield from file ",A)') &
-          trim(adjustl(fname))
+      write(*,'("READING: Reading Flusi datafield from file ",A)') trim(adjustl(fname))
   end if
+
   !> \todo test for 3D
-  do k=1, hvy_n
+  do k = 1, hvy_n
       call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
       ! from spacing and origin of the block, get position in flusi matrix
-      start_x = nint(x0(1)/dx(1))
-      start_y = nint(x0(2)/dx(2))
-      if (params%dim==3) then
+      start_x = nint( x0(1) / dx(1) )
+      start_y = nint( x0(2) / dx(2) )
+
+      if (params%dim == 3) then
           start_z = nint(x0(3)/dx(3))
-          lbounds = (/start_x,start_y,start_z/)
-          ubounds = (/end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2)),&
-              end_bound(start_z,Bs(3),Bs_f(1))/)
+
+          lbounds = (/start_x, start_y, start_z/)
+          ubounds = (/end_bound(start_x,Bs(1),Bs_f), end_bound(start_y,Bs(2),Bs_f),&
+              end_bound(start_z,Bs(3),Bs_f)/)
+
           num_Bs = ubounds-lbounds+1
+
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
           hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k)))
       else
           lbounds = (/0, start_x, start_y/)
-          ubounds = (/0, end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2))/)
+          ubounds = (/0, end_bound(start_x,Bs(1),Bs_f), end_bound(start_y,Bs(2),Bs_f)/)
+
           num_Bs = ubounds-lbounds+1
+
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
           blockbuffer(1,0:num_Bs(2)-1,0:num_Bs(3)-1))
-          hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k)) = blockbuffer(1,0:num_Bs(2)-1,0:num_Bs(3)-1)
+
+          hvy_block(g+1:g+num_Bs(2),g+1:g+num_Bs(3), 1, 1, hvy_active(k)) = blockbuffer(1,0:num_Bs(2)-1,0:num_Bs(3)-1)
       end if
   end do
 

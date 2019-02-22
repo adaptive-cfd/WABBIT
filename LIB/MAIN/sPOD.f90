@@ -22,7 +22,7 @@ program sPOD
     !                   -> column(1:max_treelevel): block treecode, treecode -1 => block is inactive
     !                   -> column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
     !                   -> column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
-    integer(kind=ik), allocatable       :: lgt_block(:, :, :)
+    integer(kind=ik), allocatable       :: lgt_block(:, :)
     !                   -> dim 1: x coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 2: y coord   ( 1:number_block_nodes+2*number_ghost_nodes )
     !                   -> dim 3: z coord   ( 1:number_block_nodes+2*number_ghost_nodes )
@@ -57,17 +57,17 @@ program sPOD
     ! list of active blocks (light data)
     integer(kind=ik), allocatable       :: lgt_active(:,:)
     ! number of active blocks (light data)
-    integer(kind=ik)                    :: lgt_n
+    integer(kind=ik), allocatable   :: lgt_n(:)
     ! list of active blocks (heavy data)
     integer(kind=ik), allocatable       :: hvy_active(:)
     ! number of active blocks (heavy data)
-    integer(kind=ik)                    :: hvy_n
+    integer(kind=ik)                    :: hvy_n, tree_hvy_n
     integer(kind=ik), allocatable       :: blocks_per_rank(:)
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
     ! loop variable
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it,tree_id
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_id(2), tree_n
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt, time
     ! decide if data is saved or not
@@ -92,6 +92,8 @@ program sPOD
     call cpu_time(t0)
     tstart = MPI_wtime()
 
+    keep_running = .true.
+    iteration     = 0
 
     if ( rank == 0 ) then
         write(*,*) " HELLO here is sPODi your personal assistant..."
@@ -110,17 +112,28 @@ program sPOD
     call initialize_communicator(params)
 
     allocate(params%input_files(1))
-    params%input_files = "rho_000000000000.h5"
+    params%input_files = "daedalus_000000050000.h5"
     !call get_command_argument( 2, params%input_files(1) )
 
-    tree_id=1
-    call read_field2tree(params, params%input_files, size(params%input_files), &
-                        lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    call read_field2tree(params, params%input_files, size(params%input_files), tree_id, &
-                        lgt_block, lgt_active(:,tree_id), lgt_n, lgt_sortednumlist, &
-                        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    keep_running = .true.
-    iteration     = 0
+    tree_id(1) = 1
+    call read_field2tree(params, params%input_files, size(params%input_files), tree_id(1), &
+                        tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
+                        hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    tree_id(2) = 2
+    params%input_files = "daedalus_000000000000.h5"
+    call read_field2tree(params, params%input_files, size(params%input_files), tree_id(2), &
+                        tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
+                        hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    
+    call add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id(1), tree_id(2))
+
+
+    call write_tree_field("d1.h5", params, lgt_block, lgt_active, hvy_block, &
+                    lgt_n, hvy_n, hvy_active, 1, tree_id(2), 0.0_rk, iteration ) 
+    call write_tree_field("d2.h5", params, lgt_block, lgt_active, hvy_block, &
+                    lgt_n, hvy_n, hvy_active, 1, tree_id(1), 0.0_rk, iteration ) 
+
 
 ! #################################################################################
 !                   MAIN LOOP

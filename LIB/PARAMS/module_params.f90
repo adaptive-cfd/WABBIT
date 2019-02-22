@@ -69,7 +69,7 @@ module module_params
         ! maximal level for blocks in data tree
         integer(kind=ik)                             :: max_treelevel=0
         ! maximal numbers of trees in the forest
-        integer(kind=ik)                             :: max_forest_size=1
+        integer(kind=ik)                             :: forest_size=1
         ! order of refinement predictor
         character(len=80)                            :: order_predictor=""
         ! order of spatial discretization

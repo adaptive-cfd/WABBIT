@@ -25,7 +25,7 @@
 !
 ! ********************************************************************************************
 
-subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_nr_optional)
+subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -44,7 +44,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_nr_optional)
     !> light data array
     integer(kind=ik), intent(inout)   :: lgt_block(:,:)
     !> index of the tree you want to save the field in
-    integer(kind=ik), optional, intent(in)   :: tree_nr_optional
+    integer(kind=ik), optional, intent(in)   :: tree_id_optional
 
     ! treecode array
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
@@ -52,8 +52,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_nr_optional)
     integer(hid_t)        :: file_id
     ! process rank, number of procs
     integer(kind=ik)      :: rank, number_procs
-    ! grid parameter
-    integer(kind=ik)      :: Bs, g
     ! offset variables
     integer(kind=ik)      :: ubounds(2), lbounds(2)
     integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)
@@ -61,20 +59,17 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_nr_optional)
     integer(kind=ik)      :: ierr
     integer(kind=ik)      :: treecode_size
     integer(hsize_t)      :: dims_treecode(2)
-    integer(kind=ik)      :: tree_nr
+    integer(kind=ik)      :: tree_id
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-    if (present(tree_nr_optional)) then
-        tree_nr=tree_nr_optional
+    if (present(tree_id_optional)) then
+        tree_id=tree_id_optional
     else
-        tree_nr=1
+        tree_id=1
     endif
     ! set MPI parameters
     rank         = params%rank
     number_procs = params%number_procs
-    ! grid parameter
-    Bs   = params%Bs
-    g    = params%n_ghosts
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -151,7 +146,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_nr_optional)
         ! set refinement status
         lgt_block(lgt_id, params%max_treelevel+idx_refine_sts) = 0
         ! set number of the tree
-        lgt_block(lgt_id, params%max_treelevel+idx_tree_nr) = tree_nr
+        lgt_block(lgt_id, params%max_treelevel+idx_tree_id) = tree_id
     end do
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.

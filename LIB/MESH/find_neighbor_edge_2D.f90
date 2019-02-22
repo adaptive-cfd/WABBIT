@@ -26,17 +26,15 @@
 ! -------------------------------------------------------------------------------------------------------------------------
 !> \details
 !! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
-! -------------------------------------------------------------------------------------------------------------------------
-!> \details
-!! = log ======================================================================================
-!! \n
-!! 07/11/16 - switch to v0.4
+!!
+!!
+!! \date 7/11/16 - switch to v0.4
+!! \date 12/02/19 - update neighbor search for multipile trees (PKrah)
 ! ********************************************************************************************
 !> \image html neighborhood.svg "Neighborhood Relations in 2D" width=400
 
-subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, &
-    lgt_n, lgt_sortednumlist, error)
-
+subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
+            max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist, error)
 !---------------------------------------------------------------------------------------------
 ! modules
 
@@ -73,8 +71,8 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
     integer(kind=ik)                    :: my_treecode(max_treelevel), neighbor(max_treelevel), virt_treecode(max_treelevel)
     ! return value from function "does_block_exist"
     logical                             :: exists
-    ! neighbor light data id
-    integer(kind=ik)                    :: neighbor_light_id
+    ! neighbor light data id, and id of the tree in the forest
+    integer(kind=ik)                    :: neighbor_light_id, tree_id
 
 !---------------------------------------------------------------------------------------------
 ! interfaces
@@ -82,9 +80,9 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    my_treecode     = lgt_block( light_id, 1:max_treelevel )
-    level           = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
-
+    my_treecode= lgt_block( light_id, 1:max_treelevel )
+    level      = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
+    tree_id    = lgt_block( light_id, max_treelevel + idx_tree_id )
     neighborID_sameLevel    = -1
     virt_code1              = -1
     neighborID_finerLevel1  = -1
@@ -158,21 +156,22 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
     ! calculate treecode for neighbor on same level
     call adjacent_block_2D( my_treecode, neighbor, dir, level, max_treelevel)
     ! check existence of neighbor block and find light data id
-    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
-    !
+    call does_block_exist(neighbor, exists, neighbor_light_id, &
+                         lgt_sortednumlist, lgt_n, tree_id)
 
-    ! +++++++++++++++
-    ! non periodic B
-    ! +++++++++++++++
-    ! is a boundary of the domain in this direction? If yes then please dont comunicate
+    ! ++++++++++++++++++++++++++++++++++++++++++++
+    ! non periodic boundary
+    ! ++++++++++++++++++++++++++++++++++++++++++++
+    ! is a boundary of the domain in this direction? If yes then please dont communicate
     ! in this direction
     if ( .not. All(params%periodic_BC) ) then
         if ( block_is_adjacent_to_boundary(params,dir,my_treecode,neighbor,level,max_treelevel) ) then
+
             neighbor_light_id=-1
             ! write(*,('("my=",2(i1)," neigbor ",2(i1)," dir=",A3)')) my_treecode,neighbor,dir
         endif
     end if
-    ! +++++++++++++
+    ! ++++++++++++++++++++++++++++++++++++++++++++
 
     if (exists) then
         ! neighbor on same level
@@ -183,7 +182,8 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
         ! neighbor could be one level down
         neighbor( level ) = -1
         ! check existence of neighbor block
-        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+        call does_block_exist(neighbor, exists, neighbor_light_id, &
+                             lgt_sortednumlist, lgt_n, tree_id)
 
         if ( exists ) then
             ! neigbor is one level down
@@ -200,7 +200,8 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! check existence of neighbor block
-            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+            call does_block_exist(neighbor, exists, neighbor_light_id, &
+                                 lgt_sortednumlist, lgt_n, tree_id)
 
             if (exists) then
                 ! neigbor is one level up
@@ -221,7 +222,8 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, max_tree
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! check existence of neighbor block
-            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+            call does_block_exist(neighbor, exists, neighbor_light_id, &
+                                lgt_sortednumlist, lgt_n, tree_id)
 
             if (exists) then
                 ! neigbor is one level up

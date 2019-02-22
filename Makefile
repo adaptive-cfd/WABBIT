@@ -124,7 +124,7 @@ FFLAGS += $(PPFLAG) $(PRAGMAS)
 
 
 # Both programs are compiled by default.
-all: directories wabbit wabbit-post sPOD#doc
+all: directories wabbit wabbit-post sPOD #doc
 
 # Compile main programs, with dependencies.
 wabbit: wabbit.f90 $(MOBJS) $(OBJS)

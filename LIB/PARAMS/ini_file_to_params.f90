@@ -87,17 +87,8 @@ subroutine ini_file_to_params( params, filename )
 
     !***************************************************************************
     ! read DISCRETIZATION parameters
-    !
-    ! discretization order
-    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
-    ! order of predictor for refinement
-    call read_param_mpi(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
-    ! filter frequency
-    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
-    if (params%filter_type /= "no_filter") then
-        call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
-    endif
-
+    call ini_discretization(params, FILE)
+    
     !***************************************************************************
     ! read statistics parameters
     !
@@ -264,7 +255,12 @@ end function calculate_max_nr_blocks
   !##############################################################################
 
 
-!> @brief     reads parameters for initializing grid parameters
+
+
+
+
+  !##############################################################################
+  !> @brief     reads parameters for initializing grid parameters
   subroutine ini_domain(params, FILE )
     implicit none
     !> pointer to inifile
@@ -300,9 +296,17 @@ end function calculate_max_nr_blocks
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC(1:params%dim), &
                                                        params%periodic_BC(1:params%dim) )
   end subroutine ini_domain
+  !#################################################################################
 
 
-!> @brief     reads parameters for initializing grid parameters
+
+
+
+
+
+
+  !#################################################################################
+  !> @brief     reads parameters for initializing grid parameters
   subroutine ini_blocks(params, FILE )
     implicit none
     !> pointer to inifile
@@ -370,11 +374,9 @@ end function calculate_max_nr_blocks
 
   end subroutine ini_blocks
 
-  !-------------------------------------------------------------------------!!!!
-
-
+  !##############################################################################
   !> @brief     reads parameters for time stepping
-    subroutine ini_time(params, FILE )
+  subroutine ini_time(params, FILE )
       implicit none
       !> pointer to inifile
       type(inifile) ,intent(inout)     :: FILE
@@ -421,6 +423,34 @@ end function calculate_max_nr_blocks
       0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
       0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
+  end subroutine ini_time
+  !##############################################################################
 
 
-    end subroutine ini_time
+  !##############################################################################
+  !>reads parameters for initializing a bridge from file
+  subroutine ini_discretization( params, FILE )
+    implicit none
+    !> pointer to inifile
+    type(inifile) ,intent(inout)     :: FILE
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+
+    if (params%rank==0) then
+      write(*,*)
+      write(*,*)
+      write(*,*) "PARAMS: Discretization"
+      write(*,'(" -------------------------")')
+    endif
+
+    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
+    ! order of predictor for refinement
+    call read_param_mpi(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
+    ! filter frequency
+    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
+    if (params%filter_type /= "no_filter") then
+        call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
+    endif
+
+  end subroutine ini_discretization
+  !##############################################################################

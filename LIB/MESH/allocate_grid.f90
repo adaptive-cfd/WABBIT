@@ -40,7 +40,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> user defined parameter structure
     type (type_params), intent(inout)                   :: params
     !> light data array
-    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :, :)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
@@ -50,7 +50,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)          :: lgt_active(:, :)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_active(:)
     !> list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_active(:)
     !> sorted list of numerical treecodes, used for block finding
@@ -178,7 +178,6 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         endif
 
     end if
-
     !---------------------------------------------------------------------------)
     allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+extra_lgt_fields) )
     if (rank==0) then

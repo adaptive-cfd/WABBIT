@@ -95,7 +95,7 @@ subroutine reset_lgt_data(lgt_block, lgt_active,max_treelevel, lgt_n, lgt_sorted
     ! all blocks are inactive, reset treecode
     lgt_block(:,1:max_treelevel)   = -1
     ! start with only one tree in the forest (i.e. all blocks are associated with only one tree)
-    lgt_block(:, max_treelevel+idx_tree_nr) = 1
+    lgt_block(:, max_treelevel+idx_tree_id) = -1
     ! all blocks are inactive, reset mesh level
     lgt_block(:, max_treelevel+idx_mesh_lvl) = -1
     ! set refinement to 0

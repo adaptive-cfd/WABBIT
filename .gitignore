@@ -20,3 +20,6 @@ doc/output
 *.aux
 *.gz
 *.out
+*.un*
+*.swp
+*.swo

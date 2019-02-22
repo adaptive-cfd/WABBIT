@@ -24,6 +24,7 @@ module module_IO
     use hdf5
     ! global parameters
     use module_params
+    use module_globals
     ! debug module
     use module_debug
     ! hdf5 file wrapper

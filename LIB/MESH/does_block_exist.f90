@@ -12,11 +12,10 @@
 !! = log ======================================================================================
 !! \n
 !! 08/11/16 - switch to v0.4
+!! 12/02/19 - check if block does exist in the specified tree
 ! ********************************************************************************************
 
-subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n)
-
-!---------------------------------------------------------------------------------------------
+subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n, tree_id)
 ! modules
 
 !---------------------------------------------------------------------------------------------
@@ -34,6 +33,8 @@ subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n
     integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
     !> it helps to know how many active light blocks we have in total
     integer(kind=ik), intent(in)        :: lgt_n
+    !> index of the tree we are looking at
+    integer(kind=ik), optional, intent(in):: tree_id
     ! loop variables
     integer(kind=ik)                    :: k, i1, i2, imid
     ! numerical treecode
@@ -41,10 +42,15 @@ subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n
 
     exists   = .false.
     light_id = -1
+    
 
     !> 1st: given the array treecode, compute the numerical value of the treecode we're
     !! looking for. note these values are stored for easier finding in lgt_sortednumlist
-    num_treecode = treecode2int(treecode)
+    if (present(tree_id)) then
+       num_treecode = treecode2int(treecode,tree_id)
+    else
+       num_treecode = treecode2int(treecode)
+    endif
 
     !> 2nd: binary search. start with the entire interval, then choose either right or left half
     i1 = 1

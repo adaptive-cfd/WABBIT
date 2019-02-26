@@ -92,9 +92,9 @@ subroutine compute_vorticity_post(params)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
-    ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
-    !> \todo change that for 3d case
-    params%number_blocks = 2_ik*lgt_n/params%number_procs
+    ! no refinement is made in this postprocessing tool; we therefore allocate about
+    ! the number of blocks in the file (and not much more than that)
+    params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
     if (params%rank==0) params%number_blocks = params%number_blocks + &
     mod(lgt_n, params%number_procs)
 

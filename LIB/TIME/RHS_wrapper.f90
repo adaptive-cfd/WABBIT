@@ -27,7 +27,7 @@
 !
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, hvy_active, hvy_n, first_substep)
+subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, hvy_active, hvy_n)
 
 !----------------------------------------------------------------------------------------------
 ! modules
@@ -53,9 +53,6 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-    !> some operations might be done only in the first RK substep, hence we pass
-    !! this flag to check if this is the first call at the current time level.
-    logical, optional, intent(in)       :: first_substep
 
     !> global integral
     real(kind=rk), dimension(3)         :: volume_int
@@ -78,10 +75,6 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
     ! grid parameter
     Bs    = params%Bs
     g     = params%n_ghosts
-
-    ! the first_substep flag is optional and its default is "false"
-    first_substep2 = .false.
-    if (present(first_substep)) first_substep2=first_substep
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -136,7 +129,7 @@ subroutine RHS_wrapper(time, params, hvy_state, hvy_rhs, hvy_gridQ, lgt_block, h
         ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
         call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
       endif
-      
+
 
       call RHS_meta( params%physics_type, time, hvy_state(:,:,:,:, hvy_active(k)), g, &
            x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), hvy_gridQ(:,:,:,:, hvy_active(k)), "local_stage", &

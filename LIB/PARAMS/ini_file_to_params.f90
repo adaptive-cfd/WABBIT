@@ -279,6 +279,7 @@ end subroutine ini_file_to_params
     ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+
     ! read treelevel bounds
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
@@ -325,6 +326,7 @@ end subroutine ini_file_to_params
       type(inifile) ,intent(inout)     :: FILE
       !> params structure of WABBIT
       type(type_params),intent(inout)  :: params
+      real(kind=rk) :: butcher_RK4(1:5,1:5)
 
       if (params%rank==0) then
         write(*,*)
@@ -358,14 +360,15 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'dt_max', params%dt_max, 0.0_rk )
       ! read CFL number
       call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
-      ! read butcher tableau (set default value to RK4)
-      call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, &
-      reshape((/ 0.0_rk, 0.5_rk, 0.5_rk, 1.0_rk, 0.0_rk, &
-      0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk, &
-      0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
-      0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
-      0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
+      ! read butcher tableau (set default value to RK4)
+      butcher_RK4(1,1:5) = (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/)
+      butcher_RK4(2,1:5) = (/0.5_rk, 0.5_rk, 0.0_rk, 0.0_rk, 0.0_rk/)
+      butcher_RK4(3,1:5) = (/0.5_rk, 0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk/)
+      butcher_RK4(4,1:5) = (/1.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 0.0_rk/)
+      butcher_RK4(5,1:5) = (/0.0_rk, 1.0_rk/6.0_rk, 1.0_rk/3.0_rk, 1.0_rk/3.0_rk, 1.0_rk/6.0_rk/)
+
+      call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, butcher_RK4)
     end subroutine ini_time
 
     !-------------------------------------------------------------------------!

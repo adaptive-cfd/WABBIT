@@ -39,7 +39,7 @@ subroutine flusi_to_wabbit(params)
     integer(kind=ik) , dimension(3)   :: Bs
     real(kind=rk), dimension(3)       :: x0, dx
     real(kind=rk), dimension(3)       :: domain
-    character(len=3)                  :: dummy
+    character(len=5)                  :: dummy
     integer(kind=ik), dimension(3)    :: nxyz
     real(kind=rk), dimension(3)       :: level_tmp
     integer(kind=ik), dimension(3)    :: level
@@ -90,7 +90,10 @@ subroutine flusi_to_wabbit(params)
     read(dummy,*) Bs(2)
     call get_command_argument(6, dummy)
     read(dummy,*) Bs(3)
-    if (mod(Bs(1),2)==0 .or. mod(Bs(2),2)==0 .or. mod(Bs(3),2)==0) call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
+    if (mod(Bs(1),2)==0 .or. mod(Bs(2),2)==0 .or. mod(Bs(3),2)==0) then
+        write(*,*) Bs
+        call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
+    endif
 
     ! read attributes such as number of discretisation points, time, domain size
     call get_attributes_flusi(file_in, nxyz, time, domain)

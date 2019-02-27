@@ -58,8 +58,23 @@ end interface diag
 
 contains
 
-
+    !===============================================================================
     !> this routine inits the matrices used for derivatives
+    !> \details
+    !> The derivatives of a finite difference method can be represented by
+    !> matrices (discrete differential operators).
+    !> Depending on the position of the Block in the domain one has to take care
+    !> of boundary conditions. Therefore we use 3 different kinds of matrices:
+    !>          * Matrices close to the boundaries (left / right boundary)
+    !>          * Matrices which are not adjacent to any boundary 
+    !> Because all matrices are stored in a sparse format, each matrix is defined
+    !> by 3 arrays:
+    !>                  A=[a_1,a_2;
+    !>                     a_3, a_4]
+    !>
+    !>          * Array storing the values [a_1,a_2,a_3,...] (mostly called: <name>_VAL )
+    !>          * Array storing the row index [i_1, i_2, i_3,...] (mostly called: <name>_INDX )
+    !>          * Array storing the column index [j_1, j_2, j_3,...] (mostly called: <name>_JNDX )
     subroutine initialice_derivatives(boundary_type,Bs,g)
       implicit none
       !-----------------------------------------------
@@ -67,11 +82,12 @@ contains
       INTEGER(KIND=ik), INTENT(IN) :: g
       INTEGER(KIND=ik), DIMENSION(3), INTENT(IN) :: Bs
       !-----------------------------------------------
-      INTEGER :: Q,ierr,i
+      INTEGER ::Nx, Ny, ierr, i
       real(kind=rk), allocatable:: D_VAL(:),  EYE_VAL(:)
       integer, allocatable      :: D_INDX(:), EYE_INDX(:)
       integer, allocatable      :: D_JNDX(:), EYE_JNDX(:)
       integer                   :: D_SHAPE(2), EYE_SHAPE(2), Dx_SHAPE(2), Dy_SHAPE(2)
+                                !  
       real(kind=rk), allocatable:: Dx_VAL(:),  Dxminus_VAL(:),  Dxplus_VAL(:)
       integer, allocatable      :: Dx_INDX(:), Dxminus_INDX(:), Dxplus_INDX(:)
       integer, allocatable      :: Dx_JNDX(:), Dxminus_JNDX(:), Dxplus_JNDX(:)
@@ -80,31 +96,53 @@ contains
       integer, allocatable      :: Dy_JNDX(:), Dyminus_JNDX(:), Dyplus_JNDX(:)
 
       !> \Todo
-      if (Bs(1) .ne. Bs(2)) call abort(2401191523, "derivatives with module sparse operators only work for equal Bs in x and y direction (TODO!!!)")
+      if (Bs(1) .ne. Bs(2)) call abort(2401191, "derivatives with module sparse operators only work for equal Bs in x and y direction (TODO!!!)")
 
-      !--------------------------------
+      Nx = Bs(1) + 2*g !total number of grid points in x in every block
+      Ny = Bs(2) + 2*g !total number of grid points in y   
+      
+      !================================
       ! DERIVATIVE in x direction
-      !--------------------------------
-      Q=Bs(1)+2*g
-      allocate(EYE_VAL(Q),EYE_INDX(Q),EYE_JNDX(Q))
-      EYE_VAL=1
-
-
-
+      !================================
+      ! First we select the stencil for the type of BC used.
+      ! Depending on the BC (open,symmetric,periodic) there are
+      !         * left handed stencils:  D_openFourthOrdminus
+      !         * central stencils:      D_openFourthOrd
+      !         * right handed stencils: D_openFourthOrdplus
+      ! Use the print_mat(...) function to visualize the stencil
+      
+      ! EyE is the identity matrix. We need to construct the 2D stencil from the 1d
+      ! differential matrix using the kronecker product
+      ! In this case EyE has to be of size Ny times Ny because the resulting derivative
+      ! is going to be Nx*Ny times Nx*Ny:
+      !  Dx_2D = kron(Dx_1D , EyE_y)
+      allocate(EYE_VAL(Ny),EYE_INDX(Ny),EYE_JNDX(Ny))
+      EYE_VAL=1.0_rk
+      call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+     
       select case (boundary_type(1))
-      case ('periodic')
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+
+      case ('periodic')
+        ! In case of periodic BC all stencils are the same
+        call D_FourthOrd(Nx,D_VAL,D_INDX,D_JNDX,D_SHAPE)
+
+        ! Stencil for boundary blocks (adjacent to any domain boundary) 
+        ! Minus:
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                         D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                         Dxminus_VAL,Dxminus_INDX,Dxminus_JNDX,Dx_SHAPE)
-        call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
-                      D_VAL,D_INDX,D_JNDX,D_SHAPE,&
-                      Dx_VAL,Dx_INDX,Dx_JNDX,Dx_SHAPE)
+        ! Plus:
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                         D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                         Dxplus_VAL,Dxplus_INDX,Dxplus_JNDX,Dx_SHAPE)
+
+        ! Stencil for inner domain blocks (blocks not adjacent to any domain boundary) 
+        call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
+                      D_VAL,D_INDX,D_JNDX,D_SHAPE,&
+                      Dx_VAL,Dx_INDX,Dx_JNDX,Dx_SHAPE)
+
+     
       case ('symmetric-open')
         ! The matrix of the full Block with 10 points in x direction would
         ! look like:
@@ -137,8 +175,7 @@ contains
         !          | 0     0     0     1    -8     0     8|
         !          \ 0     0     0     0     1    -8     0/
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Nx,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         Dxminus_VAL,Dxminus_INDX,Dxminus_JNDX,Dx_SHAPE)
@@ -151,8 +188,7 @@ contains
         !          | 0     0     0     1    -8     0     8|
         !          \ 0     0     0     0     1    -8     0/
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Nx,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         Dx_VAL,Dx_INDX,Dx_JNDX,Dx_SHAPE)
@@ -170,7 +206,6 @@ contains
         !                \  0    0     8     0     0     0     0     0    0   0/
         call D_openFourthOrdplus(g,Bs(1),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                       D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                       Dxplus_VAL,Dxplus_INDX,Dxplus_JNDX,Dx_SHAPE)
@@ -203,7 +238,6 @@ contains
         !                \  0    0     0     0     0     1    -8     0  /
         call D_openFourthOrdminus(g,Bs(1),D_VAL,D_INDX,D_JNDX,D_SHAPE)
         !call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         Dxminus_VAL,Dxminus_INDX,Dxminus_JNDX,Dx_SHAPE)
@@ -216,8 +250,7 @@ contains
         !          | 0     0     0     1    -8     0     8|
         !          \ 0     0     0     0     1    -8     0/
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Nx,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         Dx_VAL,Dx_INDX,Dx_JNDX,Dx_SHAPE)
@@ -244,20 +277,33 @@ contains
       diffxminus_handl  = create_blas_handl(Dxminus_VAL,Dxminus_INDX,Dxminus_JNDX,Dx_SHAPE)
       diffx_handl       = create_blas_handl(Dx_VAL,Dx_INDX,Dx_JNDX,Dx_SHAPE)
       diffxplus_handl   = create_blas_handl(Dxplus_VAL,Dxplus_INDX,Dxplus_JNDX,Dx_SHAPE)
-
-
-      !--------------------------------
+      deallocate(EYE_VAL,EYE_INDX,EYE_JNDX)      
+      
+      
+      !================================
       ! DERIVATIVE in y direction
-      !--------------------------------
-      Q=Bs(2)+2*g
-      allocate(EYE_VAL(Q),EYE_INDX(Q),EYE_JNDX(Q))
-      EYE_VAL=1
-
+      !================================
+      ! First we select the stencil for the type of BC used.
+      ! Depending on the BC (open,symmetric,periodic) there are
+      !         * left handed stencils:  D_openFourthOrdminus
+      !         * central stencils:      D_openFourthOrd
+      !         * right handed stencils: D_openFourthOrdplus
+      ! Use the print_mat(...) function to visualize the stencil
+      
+      ! EyE is the identity matrix. We need to construct the 2D stencil from the 1d
+      ! differential matrix using the kronecker product
+      ! In this case EyE has to be of size Nx times Nx because the resulting derivative
+      ! is going to be Nx*Ny times Nx*Ny:
+      !  Dy_2D = kron(EyE_x, y_1D )
+      allocate(EYE_VAL(Nx),EYE_INDX(Nx),EYE_JNDX(Nx))
+      EYE_VAL=1.0_rk
+      call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+     
       select case (boundary_type(2))
+      
+      
       case ('periodic')
-
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Ny,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                       EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                       Dyminus_VAL,Dyminus_INDX,Dyminus_JNDX,Dx_SHAPE)
@@ -267,6 +313,8 @@ contains
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                       EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                       Dyplus_VAL,Dyplus_INDX,Dyplus_JNDX,Dy_SHAPE)
+              
+      
       case ('symmetric-open')
         ! The matrix of the full Block with 10 points in x direction would
         ! look like:
@@ -299,8 +347,7 @@ contains
         !          | 0     0     0     1    -8     0     8|
         !          \ 0     0     0     0     1    -8     0/
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Ny,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         Dyminus_VAL,Dyminus_INDX,Dyminus_JNDX,Dy_SHAPE)
@@ -313,8 +360,7 @@ contains
         !          | 0     0     0     1    -8     0     8|
         !          \ 0     0     0     0     1    -8     0/
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Ny,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         Dy_VAL,Dy_INDX,Dy_JNDX,Dy_SHAPE)
@@ -332,7 +378,6 @@ contains
         !                \  0    0     8     0     0     0     0     0    0   0/
         call D_openFourthOrdplus(g,Bs(2),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                       EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                       Dyplus_VAL,Dyplus_INDX,Dyplus_JNDX,Dy_SHAPE)
@@ -365,7 +410,6 @@ contains
         !                \  0    0     0     0     0     1    -8     0  /
         call D_openFourthOrdminus(g,Bs(2),D_VAL,D_INDX,D_JNDX,D_SHAPE)
         !call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         Dyminus_VAL,Dyminus_INDX,Dyminus_JNDX,Dy_SHAPE)
@@ -378,8 +422,7 @@ contains
         !          | 0     0     0     1    -8     0     8|
         !          \ 0     0     0     0     1    -8     0/
 
-        call D_FourthOrd(Q,D_VAL,D_INDX,D_JNDX,D_SHAPE)
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
+        call D_FourthOrd(Ny,D_VAL,D_INDX,D_JNDX,D_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
         EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
         Dy_VAL,Dy_INDX,Dy_JNDX,Dy_SHAPE)
@@ -395,7 +438,6 @@ contains
         !                \  0    0     8     0     0     0     0     0    0   0/
         call D_openFourthOrdplus(g,Bs(2),D_VAL,D_INDX,D_JNDX,D_SHAPE)
       !  call print_mat(DUS_full(d_val,d_indx,d_jndx,d_shape))
-        call diag(EYE_VAL,EYE_INDX, EYE_JNDX, EYE_SHAPE)
         call DUS_kron(D_VAL,D_INDX,D_JNDX,D_SHAPE,&
                       EYE_VAL,EYE_INDX,EYE_JNDX,EYE_SHAPE,&
                       Dyplus_VAL,Dyplus_INDX,Dyplus_JNDX,Dy_SHAPE)
@@ -408,14 +450,14 @@ contains
       diffy_handl = create_blas_handl(Dy_VAL,Dy_INDX,Dy_JNDX,Dy_SHAPE)
       diffyplus_handl = create_blas_handl(Dyplus_VAL,Dyplus_INDX,Dyplus_JNDX,Dy_SHAPE)
 
-
-
-
-
+      deallocate(D_val, D_INDX, D_JNDX, EYE_VAL, EYE_INDX, EYE_JNDX)
     end subroutine initialice_derivatives
+    !===============================================================================
 
 
 
+
+    !===============================================================================
     !> this routine calls the (CR)eate functions of BLAS
     function create_blas_handl(D_VAL,D_INDX,D_JNDX,D_SHAPE) result(D_handl)
       implicit none
@@ -440,10 +482,12 @@ contains
       CALL USCR_END(D_handl, ierr)
 
     end function create_blas_handl
+    !===============================================================================
 
 
 
 
+    !===============================================================================
     !> This function creates the sparse matrix stencil for periodic BC
     !> It should be only called once in the beginning of the programm to construct
     !> the matrix! Note: It is not optimized for calling it in every iteration!
@@ -509,7 +553,11 @@ contains
       end if
 
     end subroutine D_FourthOrd
+    !===============================================================================
 
+
+
+    !===============================================================================
     !> This function creates the sparse matrix stencil for open boundary CONDITIONS
     !> It should be only called once in the beginning of the programm to construct
     !> the matrix! Note: It is not optimized for calling it in every iteration!
@@ -599,7 +647,7 @@ contains
       D_JNDX=jndx_tmp(1:k)
 
     end subroutine D_openFourthOrdminus
-
+    !===============================================================================
 
 
 
@@ -631,8 +679,7 @@ contains
       real(kind=rk), ALLOCATABLE:: val_tmp(:)
       integer, ALLOCATABLE      :: indx_tmp(:)
       integer, ALLOCATABLE      :: jndx_tmp(:)
-      integer :: nmax,k,i,j
-      integer, dimension(3) :: N
+      integer :: nmax,k,i,j,N
 
       N=Bs+2*g
 
@@ -640,16 +687,16 @@ contains
         call abort(211181,"Error: number of ghost nodes needs to be increased")
       end if
       ! Calculate the matrix size:
-      D_SHAPE=(/N, N/)
+      D_SHAPE = (/N, N/)
 
-      nmax= N*N
+      nmax = N*N
       ! allocate the sparse matrix
       allocate(val_tmp(nmax),indx_tmp(nmax),jndx_tmp(nmax))
 
 
-      indx_tmp=1
-      jndx_tmp=1
-      val_tmp=0
+      indx_tmp = 1
+      jndx_tmp = 1
+      val_tmp  = 0
       ! we now loop over all the rows and columns of this N times N Matrix
       ! to set the desired values for the stencil
       k=1

@@ -3,8 +3,10 @@
 #		MAKEFILE for WABBIT
 ##################################################################
 ##################################################################
-include LIB/fortran.mk		# includes the makefile of fortran
-include LIB/python.mk 		# includes the makefile of python
+all: directories wabbit wabbit-post #python
+##################################################################
+include LIB/fortran.mk	# includes the makefile of fortran library
+include LIB/python.mk 	# includes the makefile of python library
 ##################################################################
 
 #================================================================
@@ -24,7 +26,8 @@ info:
 	@echo -e  "-------------------------------------------------------"
 	@echo -e "\n\n\n"
 
-.PHONY: doc test
+
+.PHONY: doc test directories
 #================================================================
 # Documentation using doxygen
 #================================================================
@@ -38,13 +41,17 @@ test:
 	./TESTING/runtests.sh
 
 #================================================================
-# Generate Ctags from WABBIT source Library
+# If the object directory doesn't exist, create it.
 #================================================================
-ctags:
-	mkdir -p OBJ
-	ctags -R --fortran-kinds=+i -f OBJ/wabbit_tags LIB/*
-	sed -i -e 's/\.\.\///' OBJ/wabbit_tags
+directories: ${OBJDIR}
 
+${OBJDIR}:
+	mkdir -p ${OBJDIR}
+
+#================================================================
+# If the object directory doesn't exist, create it.
+#================================================================
+clean: clean-fortran clean-python
 
 ##################################################################
 # Remarks:

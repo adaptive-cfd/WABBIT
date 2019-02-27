@@ -343,8 +343,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         phi_prime(:,:,pF  )= p
 
         call compute_mask_and_ref2D(params_ns, Bs, g, x0, delta_x, phi_prime, mask, phi_ref)
-        do j = g+1, Bs+g
-          do i = g+1, Bs+g
+        do j = g+1, Bs(2)+g
+          do i = g+1, Bs(1)+g
             ! density
             rhs(i,j,rhoF)=rhs(i,j,rhoF) -0.5_rk*phi1_inv(i,j)*mask(i,j,rhoF)*(rho(i,j)-  Phi_ref(i,j,rhoF) )
             ! x-velocity
@@ -365,7 +365,7 @@ end subroutine RHS_2D_navier_stokes_BC
 !---------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------
 
-subroutine  diffxy_c_opt( Bs, g, dx, dy, u, dudx, dudy,boundary_flag)
+subroutine  diffxy(Bs, g, dx, dy, u, dudx, dudy,boundary_flag)
     integer(kind=ik), intent(in)    :: g
     integer(kind=ik), dimension(3), intent(in) :: Bs
     integer(kind=2), intent(in)     :: boundary_flag(3)

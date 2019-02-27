@@ -69,7 +69,7 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     real(kind=rk)  :: r(Bs(1)+2*g,Bs(2)+2*g), r_inv(Bs(1)+2*g, Bs(2)+2*g), r0
     ! tmp1 field
     real(kind=rk)       :: tmp1(Bs(1)+2*g, Bs(2)+2*g)
-    integer(kind=ik)    :: ir,iz
+    integer(kind=ik)    :: ir,ix
     !----------------------------------------------------------
 
     ! pysical constants
@@ -206,7 +206,6 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
         subroutine  D_r( q, dqdr)
             real(kind=rk), intent(in)       :: q(Bs(1)+2*g, Bs(2)+2*g)
             real(kind=rk), intent(out)      :: dqdr(Bs(1)+2*g, Bs(2)+2*g)
-#ifdef SBLAS
             !> \details Note Bs, g, dz, boundary_flag are defined in the supfunction!
             call diffy( Bs, g, dr, q, dqdr, boundary_flag(2))
         end subroutine D_r
@@ -294,16 +293,16 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
             phi_prime(:, :, pF  )= p
 
             call compute_mask_and_ref2D(params_ns, Bs, g, x0, dx, phi_prime, mask, phi_ref)
-            do ir = g+1, Bs+g
-              do iz = g+1, Bs+g
+            do ir = g+1, Bs(2)+g
+              do ix = g+1, Bs(1)+g
                 ! density
-                rhs(iz, ir, rhoF)=rhs(iz, ir, rhoF) -0.5_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, rhoF)*(rho(iz, ir)-Phi_ref(iz, ir, rhoF) )
+                rhs(ix, ir, rhoF)=rhs(ix, ir, rhoF) -0.5_rk*sqrt_rho_inv(ix, ir)*mask(ix, ir, rhoF)*(rho(ix, ir)-Phi_ref(ix, ir, rhoF) )
                 ! x-velocity
-                rhs(iz, ir, UxF)=rhs(iz, ir, UxF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UxF)*(rho_v(iz, ir)-Phi_ref(iz, ir, UxF) )
+                rhs(ix, ir, UxF)=rhs(ix, ir, UxF) -1.0_rk*sqrt_rho_inv(ix, ir)*mask(ix, ir, UxF)*(rho_v(ix, ir)-Phi_ref(ix, ir, UxF) )
                 ! y-velocity
-                rhs(iz, ir, UyF)=rhs(iz, ir, UyF) -1.0_rk*sqrt_rho_inv(iz, ir)*mask(iz, ir, UyF)*(rho_u(iz, ir)-Phi_ref(iz, ir, UyF) )
+                rhs(ix, ir, UyF)=rhs(ix, ir, UyF) -1.0_rk*sqrt_rho_inv(ix, ir)*mask(ix, ir, UyF)*(rho_u(ix, ir)-Phi_ref(ix, ir, UyF) )
                 ! pressure
-                rhs(iz, ir, pF)=rhs(iz, ir, pF)                        -mask(iz, ir, pF)*(p(iz, ir)-Phi_ref(iz, ir, pF) )
+                rhs(ix, ir, pF)=rhs(ix, ir, pF)                        -mask(ix, ir, pF)*(p(ix, ir)-Phi_ref(ix, ir, pF) )
               end do
             end do
 

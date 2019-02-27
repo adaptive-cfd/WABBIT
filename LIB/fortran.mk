@@ -1,5 +1,8 @@
-
-# Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
+##################################################################
+##################################################################
+#		MAKEFILE - Fortran Routines
+##################################################################
+##################################################################
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 \
@@ -36,7 +39,7 @@ endif
 
 
 #Place of Sparse BLAS objects
-SB_LIB = #-L../sblas/SOFTWARE -lSparseBLAS_GNU
+SB_LIB =# -L../sblas/SOFTWARE -lSparseBLAS_GNU
 #Place of Sparse BLAS module0s
 SB_INCL =# -I../sblas/SOFTWARE
 #-------------------------------------------------------------------------------
@@ -75,7 +78,7 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -l
 FFLAGS += -I$(HDF_INC) $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
-PRAGMAS = #-DSBLAS #-DBLOCKINGSENDRECV
+PRAGMAS =# -DSBLAS #-DBLOCKINGSENDRECV
 endif
 
 #-------------------------------------------------------------------------------
@@ -122,9 +125,6 @@ endif
 # add the PRAGMAS to FFLAGS: (for all compilers)
 FFLAGS += $(PPFLAG) $(PRAGMAS)
 
-
-# Both programs are compiled by default.
-all: directories wabbit wabbit-post #doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)
@@ -292,14 +292,5 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 
 wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 		$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
-
-clean:
+clean-fortran:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
-
-# If the object directory doesn't exist, create it.
-.PHONY: directories
-
-directories: ${OBJDIR}
-
-${OBJDIR}:
-	mkdir -p ${OBJDIR}

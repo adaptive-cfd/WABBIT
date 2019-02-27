@@ -1055,7 +1055,7 @@ end subroutine adjacent4
 ! 2. coordinate transformation from cartesian to treecode
 !       ix -> treecode
 !       example for d=2
-!       ((101),(011))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
+!       ((101),(110))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
 !       compare to the quaternary codes in the quadrants above
 !
 

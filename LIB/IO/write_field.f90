@@ -91,6 +91,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     integer,dimension(1:4)              :: ubounds3D, lbounds3D
     integer,dimension(1:3)              :: ubounds2D, lbounds2D
 
+    character(len=80) :: arg
+    type(INIFILE) :: FILE
+
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
@@ -107,8 +110,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! grid parameter
     Bs   = params%Bs
     g    = params%n_ghosts
-    dim  = 2
-    if (params%threeD_case) dim = 3
+    dim  = params%dim
 
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
@@ -146,7 +148,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! fill blocks buffer (we cannot use the bvy_block array as it is not contiguous, i.e.
     ! it may contain holes)
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
 
         ! tell the hdf5 wrapper what part of the global [bsx x bsy x bsz x n_active]
         ! array we hold, so that all CPU can write to the same file simultaneously
@@ -181,7 +183,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             call get_block_spacing_origin( params, lgt_id , lgt_block, xx0, ddx )
 
 
-            if ( params%threeD_case ) then
+            if ( params%dim == 3 ) then
                 ! 3D
                 myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
 
@@ -223,7 +225,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     call open_file_hdf5( trim(adjustl(fname)), file_id, .true.)
 
     ! write heavy block data to disk
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         ! 3D data case
         call write_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
         call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2), params%domain_size(3)/))
@@ -245,6 +247,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds2D(3)/), (/ubounds2D(3)/), lgt_ids)
     endif
 
+
     ! add additional annotations
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
@@ -260,4 +263,20 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     deallocate(coords_spacing)
     deallocate(block_treecode, procs, refinement_status, lgt_ids)
 
+    ! check if we find a *.ini file name in the command line call
+    ! if we do, read it, and append it to the HDF5 file. this way, data
+    ! and parameters are always together. thomas, 16/02/2019
+    if (params%rank==0) then
+        call open_file_hdf5_serial( trim(adjustl(fname)), file_id, .true.)
+        do k = 1, COMMAND_ARGUMENT_COUNT()
+            call get_command_argument( k, arg )
+            if (index(arg, ".ini") /= 0) then
+                ! found the ini file.
+                call read_ini_file(FILE, arg, .false., remove_comments=.false.)
+                call write_string_dset_hdf5(file_id, "params", FILE%PARAMS, maxcolumns)
+                call write_attribute(file_id, "params", "filename", arg)
+            end if
+        enddo
+        call close_file_hdf5_serial(file_id)
+    endif
 end subroutine write_field

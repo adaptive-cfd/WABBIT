@@ -161,7 +161,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator,  hvy_tmp )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
 
             iter = iter + 1
             if (params%rank == 0) then

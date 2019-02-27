@@ -17,8 +17,7 @@
 !! ------------------ \n
 !! +1 refine \n
 !! 0 do nothing \n
-!! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
-!! -2 block will coarsen and be merged with her sisters \n
+!! -1 block wants to coarsen \n
 !! ------------------ \n
 !! \n
 !! = log ======================================================================================
@@ -46,14 +45,14 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     !> output is the refinement_status
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(inout)        :: norm(1:params%n_eqn)
+    real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask
     integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
-    real(kind=rk) :: crsn_chance, r
-    logical :: thresholding_component(1:params%n_eqn)
+    real(kind=rk) :: crsn_chance, r, nnorm(1)
+    logical :: thresholding_component(1:size(block_data,4))
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -75,13 +74,13 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         !! this should allow to consider only the rotational part, not the divergent one.
 
         thresholding_component = .false.
-        if (params%threeD_case) then
+        if (params%dim == 3) then
             thresholding_component(1:3) = .true.
         else
             thresholding_component(1) = .true.
         endif
 
-        !! note we assume hvy_work contains the vorticity
+        !! note we assume block_work contains the vorticity
         call threshold_block( params, block_work, thresholding_component, refinement_status, norm )
 
     case ("threshold-state-vector")
@@ -116,5 +115,23 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
     end select
+
+    
+    ! mask thresholding on top of regular thresholding?
+    ! it can be useful to also use the mask function (if penalization is used) for grid adaptation.
+    ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
+    ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
+    ! not available, the option is useless but can cause errors.
+    if (params%threshold_mask) then
+        ! assuming block_work holds mask function
+        nnorm = 1.0_rk
+        call threshold_block( params, block_work(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )
+
+        ! refinement_status_state: -1 refinemet_status_mask: -1 ==>  -1
+        ! refinement_status_state: 0  refinemet_status_mask: -1 ==>   0
+        ! refinement_status_state: 0  refinemet_status_mask: 0  ==>   0
+
+        refinement_status = max(refinement_status, refinement_status_mask)
+    endif
 
 end subroutine block_coarsening_indicator

@@ -78,12 +78,11 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     Ly = params%domain_size(2)
     Lz = params%domain_size(3)
 
+    d = params%dim
     ! set data dimension
-    if ( params%threeD_case ) then
-        d = 3
+    if ( params%dim == 3 ) then
         max_neighbors = 74
     else
-        d = 2
         max_neighbors = 12
     endif
 
@@ -157,7 +156,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
           enddo
 
           ! calculate f(x,y,z) for first datafield
-          if ( params%threeD_case ) then
+          if ( params%dim == 3 ) then
             ! 3D:
             call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
           else

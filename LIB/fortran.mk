@@ -2,7 +2,9 @@
 ##################################################################
 #		MAKEFILE - Fortran Routines
 ##################################################################
-##################################################################
+#################################################################
+
+# Makefile for WABBIT code, adapted from pseudospectators/FLUSI and pseudospectators/UP2D
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 \
@@ -39,9 +41,9 @@ endif
 
 
 #Place of Sparse BLAS objects
-SB_LIB =# -L../sblas/SOFTWARE -lSparseBLAS_GNU
-#Place of Sparse BLAS module0s
-SB_INCL =# -I../sblas/SOFTWARE
+SB_LIB = #-L../../sblas/SOFTWARE -lSparseBLAS_GNU
+#Place of Sparse BLAS modules
+SB_INCL = #-I../../sblas/SOFTWARE
 #-------------------------------------------------------------------------------
 # PRAGMAS part.
 #-------------------------------------------------------------------------------
@@ -67,18 +69,18 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
 # Debug flags for gfortran:
-FFLAGS += -fPIC -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
+FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
-# to lib64/ and not lib/ like on all other systems. As a workround, we use BOTH as linkdirs here.
+# to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm -lblas -llapack
 FFLAGS += -I$(HDF_INC) $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
-PRAGMAS =# -DSBLAS #-DBLOCKINGSENDRECV
+PRAGMAS = #-DSBLAS #-DBLOCKINGSENDRECV
 endif
 
 #-------------------------------------------------------------------------------
@@ -125,6 +127,9 @@ endif
 # add the PRAGMAS to FFLAGS: (for all compilers)
 FFLAGS += $(PPFLAG) $(PRAGMAS)
 
+
+# Both programs are compiled by default.
+all: directories wabbit wabbit-post #doc
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)
@@ -233,7 +238,7 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o \
-	set_initial_grid.f90 new_block_heavy.f90 \
+	set_initial_grid.f90 \
 	set_inicond_blocks.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -256,7 +261,7 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o \
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_indicators.o $(OBJDIR)/module_physics_metamodule.o \
 	$(OBJDIR)/module_boundary_conditions.o $(OBJDIR)/module_helpers.o update_neighbors_2D.f90 find_neighbor_edge_2D.f90 does_block_exist.f90 \
 	find_neighbor_corner_2D.f90 refine_mesh.f90 respect_min_max_treelevel.f90 refinement_execute_2D.f90 adapt_mesh.f90 threshold_block.f90 \
 	ensure_gradedness.f90 ensure_completeness.f90 coarse_mesh.f90 balance_load.f90 set_desired_num_blocks_per_rank.f90 \
@@ -286,11 +291,15 @@ $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(O
 	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
+	$(OBJDIR)/module_helpers.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 # Compile remaining objects from Fortran files.
 $(OBJDIR)/%.o: %.f90 $(MOBJS)
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
-		$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
+	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS)
 clean-fortran:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post

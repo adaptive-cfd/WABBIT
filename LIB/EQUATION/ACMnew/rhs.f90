@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage, first_substep )
+subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -45,10 +45,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage, first_substep )
     ! if they require such qantities. In many cases, the grid_qtys are probably not used.
     real(kind=rk), intent(in) :: grid_qty(1:,1:,1:,1:)
 
-
-    !> some operations might be done only in the first RK substep, hence we pass
-    !! this flag to check if this is the first call at the current time level.
-    logical, intent(in) :: first_substep
 
     ! local variables
     integer(kind=ik) :: mpierr
@@ -459,6 +455,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:, :, :, :)
 
+    integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
 
@@ -482,7 +479,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
-
+    if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
     if (.not. allocated(sponge)) allocate(sponge(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
     if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
     if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
@@ -509,7 +506,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
     if (params_acm%penalization) then
         ! create mask term for every grid point in this block
-        call create_mask_3D(time, x0, dx, Bs, g, mask, us, grid_qty)
+        call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty)
         mask = mask * eps_inv
     else
         ! note setting zero is required if params_acm%penalization = .false.

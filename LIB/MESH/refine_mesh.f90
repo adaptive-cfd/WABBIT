@@ -113,7 +113,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     !! except if they are already on the highest level. Note that those blocks have
     !! the status +11
     t1 = MPI_Wtime()
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
     else
         call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )

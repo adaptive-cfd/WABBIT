@@ -62,7 +62,7 @@ module module_hdf5_wrapper
     ! in attributes, for example the time, resolution and domain size
     ! both routines take vector values input
     interface write_attribute
-        module procedure write_attrib_dble, write_attrib_int
+        module procedure write_attrib_dble, write_attrib_int, write_attrib_str
     end interface
 
     ! we can also read attributes from existing files and datasets. thus, for example
@@ -141,6 +141,41 @@ contains
     call h5fclose_f(file_id, error) ! Close the file.
     call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
   end subroutine close_file_hdf5
+
+  !-----------------------------------------------------------------------------
+  ! open an hdf5 file, return handle file_id
+  !-----------------------------------------------------------------------------
+  subroutine open_file_hdf5_serial(filename, file_id, ovrwrte)
+      implicit none
+      integer(hid_t),intent(out) ::  file_id
+      character(len=*), intent (in) :: filename
+      logical, intent(in) :: ovrwrte
+
+      integer(hid_t) :: plist_id
+      integer :: error
+      logical :: exist
+
+      ! Initialize HDF5 library and Fortran interfaces.
+      call h5open_f(error)
+
+      call h5fopen_f(trim(adjustl(filename)), H5F_ACC_RDWR_F , file_id, error)
+
+  end subroutine open_file_hdf5_serial
+
+
+  !-----------------------------------------------------------------------------
+  ! close a file handle.
+  !-----------------------------------------------------------------------------
+  subroutine close_file_hdf5_serial(file_id)
+      implicit none
+      integer(hid_t),intent(inout) ::  file_id
+
+      integer :: error
+      !!! Close dataspaces:
+      call h5fclose_f(file_id, error) ! Close the file.
+      call h5close_f(error) ! Close Fortran interfaces and HDF5 library.
+  end subroutine close_file_hdf5_serial
+
 
   subroutine get_size_datafield(datarank, file_id, dsetname, dims_file)
     implicit none
@@ -1581,6 +1616,42 @@ end subroutine get_rank_datafield
   end subroutine write_int_dset_mpi_hdf5_4D
 
 
+  ! write an array of strings (of length slen)  to a separate dataset in an HDF5
+  ! file. used to backup parameter files.
+  subroutine write_string_dset_hdf5(file_id, dsetname, data, slen)
+      ! use h5lt
+      implicit none
+
+      integer(hid_t), intent(in) :: file_id
+      integer, intent(in) :: slen
+      character(len=*), intent(in) :: dsetname
+      character(len=slen), DIMENSION(:), intent(in) :: data
+
+      INTEGER(HID_T)  :: c_type, dset_id, dspace_id
+      integer :: hdferr
+      integer(HSIZE_T), dimension(:), allocatable  :: dims
+      integer(SIZE_T):: s_dim
+
+
+      allocate(dims(1))
+      dims  = size(data,1)
+      s_dim = slen
+
+      call h5tcopy_f(H5T_FORTRAN_S1, c_type, hdferr)
+
+      call h5tset_size_f(c_type, s_dim, hdferr)
+
+      call h5screate_simple_f(1, dims, dspace_id, hdferr)
+
+      call h5dcreate_f(file_id, dsetname, c_type, dspace_id, dset_id, hdferr)
+
+      call h5dwrite_f(dset_id, c_type, data, dims, hdferr)
+
+      call h5tclose_f(c_type, hdferr)
+      call h5dclose_f(dset_id, hdferr)
+      call h5sclose_f(dspace_id, hdferr)
+  end subroutine
+
 !-------------------------------------------------------------------------------
 ! write an attribute
 ! INPUT:
@@ -1593,7 +1664,6 @@ end subroutine get_rank_datafield
 !   none
 !-------------------------------------------------------------------------------
 subroutine write_attrib_dble(file_id,dsetname,aname,attribute)
-
   implicit none
 
   integer(hid_t), intent(in) :: file_id
@@ -1701,6 +1771,57 @@ subroutine write_attrib_int(file_id,dsetname,aname,attribute)
   call h5dclose_f(dset_id,error)
 
 end subroutine write_attrib_int
+
+
+subroutine write_attrib_str(file_id, dsetname, aname, attribute)
+
+  implicit none
+
+  integer(hid_t), intent(in) :: file_id
+  character(len=*), intent(in) :: dsetname, aname
+  character(len=*), intent(in) :: attribute
+
+  integer(hsize_t) :: adims(1)  ! Attribute dimension
+  integer, parameter :: arank = 1
+  integer :: dim
+  integer :: error  ! error flags
+  integer(hid_t) :: aspace_id ! Attribute Dataspace identifier
+  integer(hid_t) :: attr_id   ! Attribute identifier
+  integer(hid_t) :: dset_id  ! dataset identifier
+  logical :: exists
+
+
+  adims = 1
+
+  ! open the dataset
+  call h5dopen_f(file_id, dsetname, dset_id, error)
+
+  ! check if attribute exists already
+  call h5aexists_f(dset_id, aname, exists, error)
+
+  if (exists) then
+    ! open attribute (it exists already)
+    call h5aopen_f(dset_id, aname, attr_id, error)
+    ! Get dataspace
+    call h5aget_space_f(attr_id, aspace_id, error)
+    ! Write the attribute data attribute to the attribute identifier attr_id.
+    call h5awrite_f(attr_id, H5T_FORTRAN_S1, attribute, adims, error)
+  else
+    ! Determine the dataspace identifier aspace_id
+    call h5screate_simple_f(arank,adims,aspace_id,error)
+    ! set attr_id, ie create an attribute attached to the object dset_id
+    call h5acreate_f(dset_id,aname,H5T_FORTRAN_S1,aspace_id,attr_id,error)
+    ! Write the attribute data attribute to the attribute identifier attr_id.
+    call h5awrite_f(attr_id,H5T_FORTRAN_S1,attribute,adims,error)
+  endif
+
+  call h5aclose_f(attr_id,error) ! Close the attribute.
+  call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
+  call h5dclose_f(dset_id,error)
+
+end subroutine write_attrib_str
+
+
 
 !-------------------------------------------------------------------------------
 ! Read an attribute

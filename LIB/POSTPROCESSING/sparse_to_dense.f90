@@ -80,12 +80,10 @@ subroutine sparse_to_dense(params)
     ! after reading.
     call read_attributes(file_in, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
     if (params%dim==3) then
-        params%threeD_case = .true.
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
         max_neighbors = 74
     else
-        params%threeD_case = .false.
         number_dense_blocks = 4_ik**level
         max_neighbors = 12
     end if
@@ -182,7 +180,7 @@ subroutine sparse_to_dense(params)
         end do
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
-        if ( params%threeD_case ) then
+        if ( params%dim == 3 ) then
             ! 3D:
             call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
         else

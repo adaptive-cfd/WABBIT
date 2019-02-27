@@ -21,12 +21,13 @@ subroutine post_rhs(params)
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_gridQ(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
     character(len=80)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
-    real(kind=rk), allocatable :: us(:,:,:,:)
+    real(kind=rk), allocatable         :: us(:,:,:,:)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
 
@@ -49,72 +50,69 @@ subroutine post_rhs(params)
         return
     endif
 
-    call abort(99999,"routine disabled (grid qtys missing!)")
+    ! read ini-file and save parameters in struct
+    call ini_file_to_params( params, fname_ini )
+    ! have the pysics module read their own parameters
+    call init_physics_modules( params, fname_ini, params%n_gridQ  )
 
-    ! ! read ini-file and save parameters in struct
-    ! call ini_file_to_params( params, fname_ini )
-    ! ! have the pysics module read their own parameters
-    ! call init_physics_modules( params, fname_ini )
-    !
-    !
-    ! ! get some parameters from one of the files (they should be the same in all of them)
-    ! call get_command_argument(3, fname_input)
-    ! call read_attributes(fname_input, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
-    !
-    ! if (params%dim==3) then
-    !     params%threeD_case = .true.
-    ! else
-    !     params%threeD_case = .false.
-    ! end if
-    !
-    ! ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
-    ! ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)
-    ! deallocate(params%butcher_tableau)
-    ! allocate(params%butcher_tableau(1,1))
-    !
-    ! ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
-    ! !> \todo change that for 3d case
-    ! params%number_blocks = 4*lgt_n/params%number_procs
-    ! Bs = params%Bs
-    ! g = params%n_ghosts
-    !
-    ! ! allocate data
-    ! call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    ! lgt_active, hvy_active, lgt_sortednumlist, hvy_work=hvy_work, hvy_tmp=hvy_tmp)
-    !
-    ! ! read mesh and field
-    ! call read_mesh(fname_input, params, lgt_n, hvy_n, lgt_block)
-    !
-    !
-    ! ! read in all components of statevector
-    ! do k = 1, params%n_eqn
-    !     call get_command_argument(2+k, fname_input)
-    !     call read_field(fname_input, k, params, hvy_block, hvy_n)
-    ! enddo
-    !
-    ! ! create lists of active blocks (light and heavy data)
-    ! ! update list of sorted nunmerical treecodes, used for finding blocks
-    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    !
-    ! ! update neighbor relations
-    ! call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    ! lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-    !
-    !
-    ! ! compute right hand side
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    ! call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), lgt_block, &
-    ! hvy_active, hvy_n, first_substep=.true. )
-    !
-    ! write(*,*) "Warning: if the RHS is different for the very first substep (e.g. in RK4), this routine gives the first substep"
-    !
-    ! ! save result to disk
-    ! do k = 1, params%n_eqn
-    !     write( fname,'("rhs",i1,"_", i12.12, ".h5")') k, nint(time * 1.0e6_rk)
-    !
-    !     call write_field(fname, time, iteration, k, params, lgt_block,&
-    !     hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
-    ! enddo
+
+    ! get some parameters from one of the files (they should be the same in all of them)
+    call get_command_argument(3, fname_input)
+    call read_attributes(fname_input, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
+
+
+    ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
+    ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)
+    deallocate(params%butcher_tableau)
+    allocate(params%butcher_tableau(1,1))
+
+    ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
+    !> \todo change that for 3d case
+    params%number_blocks = 4*lgt_n/params%number_procs
+    Bs = params%Bs
+    g = params%n_ghosts
+
+    ! allocate data
+    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
+    lgt_active, hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ)
+
+    ! read mesh and field
+    call read_mesh(fname_input, params, lgt_n, hvy_n, lgt_block)
+
+
+    ! read in all components of statevector
+    do k = 1, params%n_eqn
+        call get_command_argument(2+k, fname_input)
+        call read_field(fname_input, k, params, hvy_block, hvy_n)
+    enddo
+
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+
+    ! compute right hand side
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_gridQ, lgt_block, &
+    hvy_active, hvy_n )
+
+    if (params%filter_type /= "no_filter") then
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active, hvy_n )
+        call filter_wrapper(time, params, hvy_work(:,:,:,:,:,1), hvy_tmp, lgt_block, hvy_active, hvy_n)
+    end if
+
+
+    ! save result to disk
+    do k = 1, params%n_eqn
+        write( fname,'("rhs",i1,"_", i12.12, ".h5")') k, nint(time * 1.0e6_rk)
+
+        call write_field(fname, time, iteration, k, params, lgt_block,&
+        hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
+    enddo
 
 end subroutine post_rhs

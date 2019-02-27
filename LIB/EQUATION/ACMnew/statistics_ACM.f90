@@ -4,7 +4,7 @@
 ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
 ! on individual blocks. This requires one to use the same staging concept as for the RHS.
 !-----------------------------------------------------------------------------
-subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
+subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -18,6 +18,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     ! work data, for mask, vorticity etc. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+    real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -44,6 +45,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:), div(:,:,:)
+    integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -51,11 +53,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
     Bs(3) = size(u,3) - 2*g
 
     if (params_acm%dim==3) then
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
         if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
         if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
         if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
         dV = dx(1)*dx(2)*dx(3)
     else
+        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
         if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
         if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
         if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
@@ -97,7 +101,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
 
         !-------------------------------------------------------------------------
         ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
-        ! we compute the error w.r.t. this solution heres
+        ! we compute the error w.r.t. this solution here
         if (params_acm%forcing_type(1) .eq. "taylor_green") then
             do iy = g+1,Bs(2)+g
                 do ix = g+1, Bs(1)+g
@@ -170,7 +174,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
             enddo
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            call create_mask_3D( time, x0, dx, Bs, g, mask, us )
+            call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
             eps_inv = 1.0_rk / params_acm%C_eta
 
             ! compute divergence on this block
@@ -308,6 +312,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work )
               dxyz(1) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
               dx_min = minval( (/dxyz(1),dxyz(2)/))
             endif
+
             CFL   = dt * (sqrt(umag) + sqrt(params_acm%c_0**2 + umag)) / dx_min
             CFL_nu = dt * params_acm%nu / dx_min**2
             CFL_eta = dt / params_acm%C_eta

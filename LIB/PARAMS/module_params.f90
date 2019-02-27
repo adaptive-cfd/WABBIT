@@ -63,7 +63,8 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk
         logical                                      :: eps_normalized=.false.
-        logical :: force_maxlevel_dealiasing=.false.
+        logical :: force_maxlevel_dealiasing = .false.
+        logical :: threshold_mask = .false.
         ! minimal level for blocks in data tree
         integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree
@@ -109,7 +110,6 @@ module module_params
         real(kind=rk)     :: domain_size(3)=0.0_rk
 
         ! use third dimension
-        logical           :: threeD_case=.false.
         integer(kind=ik)  :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------

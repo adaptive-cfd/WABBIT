@@ -59,13 +59,8 @@ subroutine compute_vorticity_post(params)
 
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
-    if (params%dim==3) then
-        params%threeD_case = .true.
-    else
-        params%threeD_case = .false.
-    end if
 
-    if (params%threeD_case) then
+    if (params%dim == 3) then
         call get_command_argument(4, file_uz)
         call check_file_exists(trim(file_uz))
         call get_command_argument(5, order)
@@ -97,9 +92,9 @@ subroutine compute_vorticity_post(params)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
-    ! only (4* , for safety) lgt_n/number_procs blocks necessary (since we do not want to refine)
-    !> \todo change that for 3d case
-    params%number_blocks = 2_ik*lgt_n/params%number_procs
+    ! no refinement is made in this postprocessing tool; we therefore allocate about
+    ! the number of blocks in the file (and not much more than that)
+    params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
     if (params%rank==0) params%number_blocks = params%number_blocks + &
     mod(lgt_n, params%number_procs)
 
@@ -111,7 +106,7 @@ subroutine compute_vorticity_post(params)
     call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
     call read_field(file_ux, 1, params, hvy_block, hvy_n)
     call read_field(file_uy, 2, params, hvy_block, hvy_n)
-    if (params%threeD_case) call read_field(file_uz, 3, params, hvy_block, hvy_n)
+    if (params%dim == 3) call read_field(file_uz, 3, params, hvy_block, hvy_n)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
@@ -129,7 +124,7 @@ subroutine compute_vorticity_post(params)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (operator == "--vorticity" .or. operator == "--vor-abs") then
-            if (params%threeD_case) then
+            if (params%dim == 3) then
                 call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
                 hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
                 dx, params%Bs, params%n_ghosts,&
@@ -163,7 +158,7 @@ subroutine compute_vorticity_post(params)
         call write_field(fname, time, iteration, 1, params, lgt_block,&
         hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
 
-        if (params%threeD_case) then
+        if (params%dim == 3) then
             write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
             call write_field(fname, time, iteration, 2, params, lgt_block,&
             hvy_tmp, lgt_active, lgt_n, hvy_n,  hvy_active)
@@ -174,7 +169,7 @@ subroutine compute_vorticity_post(params)
 
     elseif (operator == "--vor-abs") then
 
-        if (.not. params%threeD_case) then
+        if (.not. params%dim == 3) then
             call abort(221218, "--vor-abs makes no sense for 2D data...")
         endif
 

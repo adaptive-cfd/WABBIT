@@ -440,7 +440,7 @@ position_to_lgt_id=-999999
        !                    x0(2) -------------------------- x1(2)
 
        if (min(position(1)-x0(1),position(2)-x0(2))>=0 .and. max(position(1)-x1(1),position(2)-x1(2))<=0) then
-          if (params%threeD_case) then ! in 3d we have to check the 3. komponent as well
+          if (params%dim == 3) then ! in 3d we have to check the 3. komponent as well
           ! 3D case
               if (position(3)>x0(3) .and. position(3)<x1(3)) then
                 position_to_lgt_id=lgt_active(k)
@@ -542,7 +542,7 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
         !!! calculate grid point ibx, iby, ibz
         ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%n_ghosts +1
         iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%n_ghosts +1
-        if (params%threeD_case) then
+        if (params%dim == 3) then
           ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%n_ghosts +1
         else
           ibz = 1
@@ -581,7 +581,7 @@ subroutine interpolate_data(lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_ac
             / hvy_block(ibx, iby, ibz,1, particle_id(k) )
       v   =   hvy_block(ibx, iby, ibz,3, particle_id(k) ) &
             / hvy_block(ibx, iby, ibz,1, particle_id(k) )
-      if (params%threeD_case) then
+      if (params%dim == 3) then
         if (params%n_eqn /= 5) then
           call abort(333990,"[bridgefluid] number of data fields is less then 5, Stop")
         else

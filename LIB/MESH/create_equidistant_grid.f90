@@ -73,13 +73,13 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
   !-----------------------------------------------------------------------------
 
   ! data demensionality
-  if ( params%threeD_case) then
-    d = 3
+  d = params%dim
+  if ( params%dim == 3) then
     nz = 2**Jmin
   else
-    d = 2
     nz = 1
   endif
+
   ! therefore, the total number of blocks (on all cpus) is
   num_blocks = (2**Jmin)**d
   ! shortcut for number of cpu

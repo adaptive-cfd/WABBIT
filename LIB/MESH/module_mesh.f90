@@ -28,10 +28,13 @@ module module_mesh
 
     ! used in coarse_mesh
     use module_helpers, only: most_common_element
-
+    ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
+    ! hence we require the metamodule to be used.
+    use module_physics_metamodule
+    
     implicit none
 
-    logical, private,save ::  mesh_has_changed=.false.
+    logical, private, save ::  mesh_has_changed=.false.
 
 contains
 

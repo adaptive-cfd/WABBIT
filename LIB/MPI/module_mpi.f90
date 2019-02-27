@@ -148,7 +148,7 @@ subroutine init_ghost_nodes( params )
         if (rank==0) write(*,'("                     GHOST-INIT ")')
         if (rank==0) write(*,'("---------------------------------------------------------")')
 
-        if ( params%threeD_case ) then
+        if ( params%dim==3 ) then
             if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. g>=(Bs(3)+1)/2) then
               call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
               & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
@@ -167,10 +167,9 @@ subroutine init_ghost_nodes( params )
         ! max neighbor number: 2D = 12, 3D = 56
         ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
         ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
-        if ( params%threeD_case ) then
+        dim = params%dim
+        if ( params%dim == 3 ) then
             !---3d---3d---
-            ! space dimensions: used in the static arrays as index
-            dim = 3
             ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
             ! at most, we can have 56 neighbors ACTIVE per block
             buffer_N_int = number_blocks * 56 * 5
@@ -180,8 +179,6 @@ subroutine init_ghost_nodes( params )
             allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, Neqn) )
         else
             !---2d---2d---
-            ! space dimensions: used in the static arrays as index
-            dim = 2
             ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
             ! at most, we can have 12 neighbors ACTIVE per block
             buffer_N_int = number_blocks * 12 * 5
@@ -193,7 +190,7 @@ subroutine init_ghost_nodes( params )
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"
-        if ( params%threeD_case ) then
+        if ( params%dim==3 ) then
           buffer_N = number_blocks * Neqn * ((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)-(Bs(1)*Bs(2)*Bs(3)))
         else
           ! 2D case
@@ -259,7 +256,7 @@ subroutine init_ghost_nodes( params )
         allocate( communication_counter(1:Ncpu, 1:Nstages) )
         allocate( int_pos(1:Ncpu, 1:Nstages) )
         allocate( real_pos(1:Ncpu, 1:Nstages) )
-        if ( params%threeD_case ) then
+        if ( params%dim==3 ) then
           allocate( line_buffer( Neqn*(Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) ) )
         else
           ! 2D case

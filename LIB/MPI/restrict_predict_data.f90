@@ -26,8 +26,8 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
     ! some neighborhoods are intrinsically on the same level (level_diff=0)
     ! and thus it makes no sense to call the up/downsampling routine for those
-    if ( params%threeD_case .and. (neighborhood<=18) ) call abort(323223,"this case shouldnt appear")
-    if ((.not. params%threeD_case) .and. (neighborhood<=4) ) call abort(323223,"this case shouldnt appear")
+    if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldnt appear")
+    if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldnt appear")
 
     !---------------------------------------------------------------------------------------------
     ! main body
@@ -131,7 +131,7 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     ! main body
     ! The neighbor is finer: we have to interpolate the data
 
-    if ( params%threeD_case ) then      ! 3D
+    if ( params%dim == 3 ) then      ! 3D
 
         do dF = 1, NdF
             call prediction_3D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), &

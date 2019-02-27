@@ -65,7 +65,7 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     hvy_block(:, 1:g, :, :, : )           = 9.0e9_rk
     hvy_block(:, Bs(2)+g+1:Bs(2)+2*g, :, :, : ) = 9.0e9_rk
     !-- z-direction
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
       hvy_block(:, :, 1:g, :, : )           = 9.0e9_rk
       hvy_block(:, :, Bs(3)+g+1:Bs(3)+2*g, :, : ) = 9.0e9_rk
     end if

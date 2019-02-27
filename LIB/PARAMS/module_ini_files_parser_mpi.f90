@@ -135,12 +135,13 @@ end subroutine read_intarray_from_ascii_file_mpi
   ! Read the file paramsfile, count the lines and put the
   ! text in PARAMS.
   !-------------------------------------------------------------------------------
-  subroutine read_ini_file_mpi(PARAMS, file, verbose)
+  subroutine read_ini_file_mpi(PARAMS, file, verbose, remove_comments)
     implicit none
 
     type(inifile), intent(inout) :: PARAMS
     character(len=*) :: file ! this is the file we read the PARAMS from
     logical, intent(in) :: verbose
+    logical, optional, intent(in) ::  remove_comments
     integer :: mpirank, mpicode
 
     ! check if communicator is set
@@ -152,7 +153,11 @@ end subroutine read_intarray_from_ascii_file_mpi
     call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
     if (mpirank==0) then
-      call read_ini_file( PARAMS, file, verbose )
+        if (present(remove_comments)) then
+            call read_ini_file( PARAMS, file, verbose, remove_comments )
+        else
+            call read_ini_file( PARAMS, file, verbose )
+        endif
     endif
   end subroutine read_ini_file_mpi
 

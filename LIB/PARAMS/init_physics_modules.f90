@@ -43,6 +43,8 @@ subroutine init_physics_modules( params, filename, n_gridQ)
     write(*,'(80("-"))')
   endif
 
+  n_gridQ = 0
+
   ! call the initialization routines for the physics module that is in use
   call READ_PARAMETERS_meta( params%physics_type, filename, n_gridQ )
 

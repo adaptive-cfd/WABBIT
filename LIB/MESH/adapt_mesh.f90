@@ -20,7 +20,7 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp )
+    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp, hvy_gridQ )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -35,6 +35,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    !> grid-dependend qtys (mask, geometry factors..)
+    real(kind=rk), intent(in), optional :: hvy_gridQ(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -68,15 +70,13 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     lgt_n_old = 0
     iteration = 0
 
-
-
-
-
-    if ( params%threeD_case ) then
+    if ( params%dim == 3 ) then
         max_neighbors = 56
     else
         max_neighbors = 12
     end if
+
+
     ! 2D case:
     !       |          |         |
     !   1   |    2     |    3    |  4
@@ -114,8 +114,15 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
         t0 = MPI_Wtime()
-        call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-        hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
+        if (present(hvy_gridQ) .and. iteration==0) then
+            ! note: the grid changes here, so we can use the hvy_grid (which contains masks that do not
+            ! explicitly depend on time) only once
+            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
+            hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_gridQ)
+        else
+            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
+            hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
+        endif
         call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
 

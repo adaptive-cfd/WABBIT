@@ -3,7 +3,7 @@
 !   - grid_qty is given: we possibly use a part of grid_qty as time-independent mask function
 !   - grid_qty is not given: all masks are created, incl non-moving parts
 !-------------------------------------------------------------------------------
-subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
+subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, grid_qty )
     implicit none
 
     ! grid
@@ -11,16 +11,28 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
     integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(inout) :: mask
+    integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
+    ! sometimes one has to do preparatory work for the mask function => staging idea.
+    character(len=*), optional, intent(in) :: stage
     real(kind=rk), dimension(:,:,:,:), optional, intent(in) :: grid_qty
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
 
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if ( params_acm%penalization .eqv. .false.) return
+
+    ! the insects require us to determine their state vector before they can be drawn
+    ! as this is to do only once, not for all blocks, we have this stage here
+    if (present(stage)) then
+        if (stage == "init_stage") then
+            call Update_Insect(time, Insect)
+            ! that's all
+            return
+        endif
+    endif
 
 
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
@@ -28,48 +40,49 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, us, grid_qty )
     endif
 
     if (size(us,4) /= 3 ) then
+        write(*,*) shape(us)
         call abort(777108, "us: wrong array size, there's pirates, captain!")
     endif
 
 
-    mask = 0.0_rk
-    us = 0.0_rk
-
 
     select case (params_acm%geometry)
+    case ('fractal_tree')
+        if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
+            mask = grid_qty(:,:,:,IDX_MASK)
+!            us   = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
+            mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
+        else
+            call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask, mask_color, us)
+        endif
+
     case ('Insect')
         !-----------------------------------------------------------------------
         ! INSECT MODULE
         !-----------------------------------------------------------------------
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g,1:Bs(2)+2*g,1:Bs(3)+2*g))
-
         ! case I: the body is fixed and alread created on "grid_qty"
         if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
             ! the grid_qty already contains the body mask + fixed obstacles. Note that the insect
             ! module needs to add the wings to this existing data, not the other way around (i.e. not
             ! adding the body afterwards)
             mask = grid_qty(:,:,:,IDX_MASK)
+            us   = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
             mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
 
             ! add the wings to the existing mask. note: the "old" wings from the previous
             ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)
             ! Hence, here, you do not have to delete again.
-            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), &
-                mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), us(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1:3), &
-                with_body = .false., with_wings = .true., delete_before_drawing = .false. )
+            ! Note: insect module is ghost-nodes aware, but requires origin shift.
+            call draw_insect_wings( time, x0-dble(g)*dx, dx, mask, mask_color, us, Insect, delete=.false.)
 
-        ! case II: the body moves OR the grid qty is not available: create everything
+        ! case II: the body moves OR the grid qty is not available: delete & create everything
         else
-          
-            ! note the shift in origin: we pass the coordinates of point (1,1,1) since the insect module cannot
-            ! know that the first g points are in fact ghost nodes...
-            call Draw_Insect( time, Insect, x0, dx, mask(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), &
-                mask_color(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g), us(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1:3) )
+            ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+            call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask, mask_color, us )
         endif
-
     case ('none')
         mask = 0.0_rk
-        us = 0.0_rk
+        us   =  0.0_rk
 
     case default
         call abort(120001,"ERROR: geometry for 3d VPM is unknown "//params_acm%geometry)
@@ -81,7 +94,7 @@ end subroutine create_mask_3D
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 
-subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
+subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us, stage )
     implicit none
 
     ! grid
@@ -92,6 +105,12 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us )
     real(kind=rk), dimension(:,:,:), intent(inout) :: us
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:2), dx(1:2), time
+    ! sometimes one has to do preparatory work for the mask function => staging idea.
+    character(len=*), optional, intent(in) :: stage
+
+    if (present(stage)) then
+        if (stage /= "main_stage") return
+    endif
 
     ! some cheap checks
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then

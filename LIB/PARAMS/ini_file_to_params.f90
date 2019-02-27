@@ -122,95 +122,15 @@ subroutine ini_file_to_params( params, filename )
     !call read_param_mpi(FILE, 'Debug', 'timing', params%timing, .true. )
     call read_param_mpi(FILE, 'Timing', 'write_individual_timings', params%write_individual_timings, .false. )
     ! unit test treecode flag
-    call read_param_mpi(FILE, 'Timing', 'test_treecode', params%test_treecode, .false.)
-    call read_param_mpi(FILE, 'Timing', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
-    call read_param_mpi(FILE, 'Timing', 'check_redundant_nodes', params%check_redundant_nodes, .true.)
+    call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
+    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
+    call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .false.)
 
     !***************************************************************************
     ! read MPI parameters
     !
     ! data exchange method
     call ini_MPI(params, FILE )
-
-
-    ! NOTE: this routine initializes WABBIT AND NOT THE PHYSICS MODULES THEMSELVES!
-
-    !---------------------------------------------------------------------------
-    ! Automatic memory management. If specified --memory=0.3GB in the call line,
-    ! wabbit will automatically select the number of blocks per rank to be allocated
-    ! to consume this amount of memory. helpful on local machines.
-    !---------------------------------------------------------------------------
-    ! loop over all arguments until you find the string "--memory" in them (or not)
-    ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
-    do i = 1, command_argument_count()
-        call get_command_argument(i, memstring)
-        ! is memory limitation used?
-        if ( index(memstring,"--memory=")==1 ) then
-            if (params%rank==0) write(*,'(80("-"))')
-            if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
-            if (params%rank==0) write(*,'(80("-"))')
-
-            ! read memory from command line (in GB)
-            read(memstring(10:len_trim(memstring)-2),* ) maxmem
-            ! memory per MPIRANK (in GB)
-            maxmem = maxmem / dble(params%number_procs)
-
-            if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
-
-            if ( params%threeD_case ) then
-                d = 3
-                max_neighbors = 56.0
-            else
-                d = 2
-                max_neighbors = 12.0
-            endif
-
-            Bs      = params%Bs
-            g       = params%n_ghosts
-            Neqn    = params%n_eqn
-
-            if (params%time_step_method == "RungeKuttaGeneric") then
-                Nrk = size(params%butcher_tableau,1)
-            elseif (params%time_step_method == "Krylov") then
-                Nrk = params%M_krylov + 3
-            else
-                call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
-            endif
-
-            nstages = 2.0
-
-            if (d==3) then
-              mem_per_block = real(Neqn) * (real(Bs(1)+2*g))*(Bs(2)+2*g)*(Bs(3)+2*g) & ! hvy_block
-              + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs(1)+2*g))*(Bs(2)+2*g)*(Bs(3)+2*g) & ! hvy_tmp
-              + real(Neqn) * real(Nrk) * (real(Bs(1)+2*g))*(Bs(2)+2*g)*(Bs(3)+2*g) & ! hvy_work
-              + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - Bs(1)*Bs(2)*Bs(3)) &  ! real buffer ghosts
-              + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
-            else
-              ! 2D case
-              mem_per_block = real(Neqn) * (real(Bs(1)+2*g))*(real(Bs(2)+2*g)) & ! hvy_block
-              + real(max(2*Neqn, params%N_fields_saved)) * (real(Bs(1)+2*g))*(real(Bs(2)+2*g)) & ! hvy_tmp
-              + real(Neqn) * real(Nrk) * (real(Bs(1)+2*g))*(real(Bs(2)+2*g)) & ! hvy_work
-              + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(real(Bs(2)+2*g)) - Bs(1)*Bs(2)) &  ! real buffer ghosts
-              + 2.0 * nstages * max_neighbors * 5 / 2.0 ! int bufer (4byte hence /2)
-            endif
-
-            ! in GB:
-            mem_per_block = mem_per_block * 8.0e-9
-
-            params%number_blocks = nint( maxmem / mem_per_block)
-
-            if (params%rank==0) then
-                write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-                write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
-                params%number_blocks*params%number_procs
-            endif
-
-            if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**d)) then
-                call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
-                & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
-            endif
-        endif
-    end do
 
     ! clean up
     if (params%rank==0) write(*,'("INIT: cleaning ini file")')
@@ -282,11 +202,7 @@ end subroutine ini_file_to_params
 
 
     call read_param_mpi(FILE, 'Domain', 'dim', params%dim, 2 )
-    if ( params%dim==2 ) then
-          params%threeD_case = .false.
-    elseif(params%dim==3) then
-          params%threeD_case = .true.
-    else
+    if ( .not.(params%dim==2 .or. params%dim==3) ) then
          call abort(234534,"Hawking: ERROR! The idea of 10 dimensions might sound exciting, &
          & but they would cause real problems if you forget where you parked your car. Tip: &
          & Try dim=2 or dim=3 ")
@@ -363,6 +279,7 @@ end subroutine ini_file_to_params
     ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+
     ! read treelevel bounds
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
@@ -377,6 +294,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+    call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
     call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
 
@@ -408,6 +326,7 @@ end subroutine ini_file_to_params
       type(inifile) ,intent(inout)     :: FILE
       !> params structure of WABBIT
       type(type_params),intent(inout)  :: params
+      real(kind=rk) :: butcher_RK4(1:5,1:5)
 
       if (params%rank==0) then
         write(*,*)
@@ -441,14 +360,15 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'dt_max', params%dt_max, 0.0_rk )
       ! read CFL number
       call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
-      ! read butcher tableau (set default value to RK4)
-      call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, &
-      reshape((/ 0.0_rk, 0.5_rk, 0.5_rk, 1.0_rk, 0.0_rk, &
-      0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk, &
-      0.0_rk, 0.0_rk, 0.5_rk, 0.0_rk, 1.0_rk/3.0_rk,&
-      0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/3.0_rk,&
-      0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 1.0_rk/6.0_rk /), (/ 5,5 /)))
 
+      ! read butcher tableau (set default value to RK4)
+      butcher_RK4(1,1:5) = (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/)
+      butcher_RK4(2,1:5) = (/0.5_rk, 0.5_rk, 0.0_rk, 0.0_rk, 0.0_rk/)
+      butcher_RK4(3,1:5) = (/0.5_rk, 0.0_rk, 0.5_rk, 0.0_rk, 0.0_rk/)
+      butcher_RK4(4,1:5) = (/1.0_rk, 0.0_rk, 0.0_rk, 1.0_rk, 0.0_rk/)
+      butcher_RK4(5,1:5) = (/0.0_rk, 1.0_rk/6.0_rk, 1.0_rk/3.0_rk, 1.0_rk/3.0_rk, 1.0_rk/6.0_rk/)
+
+      call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, butcher_RK4)
     end subroutine ini_time
 
     !-------------------------------------------------------------------------!

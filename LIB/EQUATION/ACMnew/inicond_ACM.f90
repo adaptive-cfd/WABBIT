@@ -34,6 +34,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
+    integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -155,9 +156,11 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     if (adapting .and. params_acm%penalization) then
 
         if (params_acm%dim==3) then
+            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
             if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
             if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
         else
+            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
             if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
             if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
         endif
@@ -166,7 +169,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
         if (params_acm%dim == 2) then
             call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2))
         else
-            call create_mask_3D(time, x0, dx, Bs, g, mask, us)
+            call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us)
         endif
 
         do idir = 1, params_acm%dim

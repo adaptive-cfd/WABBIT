@@ -28,7 +28,7 @@
 ! ********************************************************************************************
 
 subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
-    hvy_n, hvy_tmp, hvy_active )
+    hvy_n, hvy_tmp, hvy_active, hvy_gridQ)
 
     !---------------------------------------------------------------------------------------------
     ! modules
@@ -51,6 +51,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(inout)                    :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), intent(inout)                    :: hvy_gridQ(:, :, :, :, :)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)                    :: hvy_active(:)
     !> list of active blocks (light data)
@@ -89,7 +90,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
         call PREPARE_SAVE_DATA_meta(params%physics_type, time, hvy_block(:,:,:,:,hvy_active(k)), &
-        params%n_ghosts, x0, dx, hvy_tmp(:,:,:,:,hvy_active(k)))
+        params%n_ghosts, x0, dx, hvy_tmp(:,:,:,:,hvy_active(k)), hvy_gridQ(:,:,:,:,hvy_active(k)))
 
     enddo
 

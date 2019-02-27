@@ -718,7 +718,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     Bs    = params%Bs
     g     = params%n_ghosts
 
-    if (params%threeD_case ) then
+    if (params%dim == 3 ) then
         spaceDirections = 3
     else
         spaceDirections = 2
@@ -738,7 +738,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
             j2      = g + Bs(2)
             jStep   = 1
 
-            if (params%threeD_case ) then
+            if (params%dim == 3 ) then
                 k1      = g+1
                 k2      = g+ Bs(3)
                 kStep   = 1 !Bs -1

@@ -65,12 +65,7 @@ subroutine keyvalues(fname, params)
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
-    params%dim = dim    
-    if (dim==3) then
-        params%threeD_case = .true.
-    else
-        params%threeD_case = .false.
-    end if
+    params%dim = dim
     params%Bs = Bs
     params%max_treelevel = tc_length
     params%n_eqn = 1
@@ -78,7 +73,6 @@ subroutine keyvalues(fname, params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%dim = dim
     ! make sure there is enough memory allocated
     params%number_blocks = (dim**2) * (lgt_n/params%number_procs)
 

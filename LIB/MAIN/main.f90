@@ -226,7 +226,8 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
+        hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
 
     end if
 
@@ -296,7 +297,8 @@ program main
             call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
 
             if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
+                hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -320,9 +322,12 @@ program main
         if ( params%adapt_mesh ) then
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
             ! including the ghost nodes)
+            ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
+            ! Snych'ing becomes much mor expensive one the grid is refined.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-            ! refine the mesh. afterwards, it can happen that two blocks on the same level differ in their redunant nodes.
+            ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
+            ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
             call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
         endif
@@ -389,14 +394,14 @@ program main
             call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
 
             ! it is useful to save the number of blocks per rank into a log file.
-            call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
-            if (rank==0) then
-                 open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
-                 write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-                 min_active_level( lgt_block, lgt_active, lgt_n ), &
-                 max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-                 close(14)
-            end if
+            ! call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+            ! if (rank==0) then
+            !      open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
+            !      write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
+            !      min_active_level( lgt_block, lgt_active, lgt_n ), &
+            !      max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
+            !      close(14)
+            ! end if
 
             !*******************************************************************
             ! statistics
@@ -405,7 +410,7 @@ program main
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n, hvy_gridQ)
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
         enddo
@@ -417,7 +422,7 @@ program main
         ! adapt the mesh
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_gridQ )
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n
@@ -433,7 +438,7 @@ program main
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
             call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-            lgt_n, hvy_n, hvy_tmp, hvy_active )
+            lgt_n, hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
 
             output_time = time
             params%next_write_time = params%next_write_time + params%write_time
@@ -444,7 +449,7 @@ program main
         call timing_next_timestep( iteration )
 
         ! it is useful to save the number of blocks per rank into a log file.
-        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
+!        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
 
         t2 = MPI_wtime() - t2
         ! output on screen
@@ -454,15 +459,15 @@ program main
              max_active_level( lgt_block, lgt_active, lgt_n )
 
              open(14,file='timesteps_info.t',status='unknown',position='append')
-             write (14,'(2(g15.8,1x),i6,1x,i5,1x,i2,1x,i2,1x,i5)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
+             write (14,'(2(g15.8,1x),i9,1x,i5,1x,i2,1x,i2,1x,i5)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n ), params%number_procs
              close(14)
 
-             open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-             min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-             close(14)
+             ! open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
+             ! write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
+             ! min_active_level( lgt_block, lgt_active, lgt_n ), &
+             ! max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
+             ! close(14)
         end if
 
         !***********************************************************************
@@ -508,7 +513,8 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_tmp, hvy_active )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, &
+        hvy_tmp, hvy_active, hvy_gridQ )
     end if
 
     ! at the end of a time step, we increase the total counters/timers for all measurements

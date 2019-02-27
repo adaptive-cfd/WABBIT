@@ -27,10 +27,64 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
               INICOND_meta, FIELD_NAMES_meta,&
-              STATISTICS_meta, FILTER_meta, UPDATE_GRID_QTYS_meta
+              STATISTICS_meta, FILTER_meta, UPDATE_GRID_QTYS_meta, CREATE_MASK_meta
     !**********************************************************************************************
 
 contains
+
+! this is a public routine to create the mask function for the penalization term
+! not all physics modules use it
+subroutine CREATE_MASK_meta( physics, time, x0, dx, Bs, g, mask, mask_color, us, stage, grid_qty )
+    implicit none
+    character(len=*), intent(in) :: physics
+    ! grid
+    integer(kind=ik), intent(in) :: Bs(1:3)
+    integer(kind=ik), intent(in) :: g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(inout) :: mask
+    integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
+    real(kind=rk), dimension(:,:,:,:), optional, intent(in) :: grid_qty
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+    character(len=*), optional, intent(in) :: stage
+    character(len=80) :: stage2
+
+    stage2 = "main_stage"
+    if (present(stage)) stage2=stage
+
+    select case ( physics )
+    case ('ACM-new')
+        if (size(mask,3)==1) then
+
+            call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2), stage2 )
+        else
+            if (present(grid_qty)) then
+                call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage2, grid_qty)
+            else
+                call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage2)
+            endif
+        endif
+
+    case ('ConvDiff-new')
+        ! not implemented yet (this module does not use penalization)
+        mask = 0.00_rk
+        mask_color = 0
+        us = 0.00_rk
+
+    case ('navier_stokes')
+        ! not implemented yet
+        mask = 0.00_rk
+        mask_color = 0
+        us = 0.00_rk
+
+    case default
+        call abort(1212,'unknown physics...say whaaat?')
+
+    end select
+
+end subroutine
+
 
  !-----------------------------------------------------------------------------
  !> \brief main level wrapper routine to read parameters in the physics module. It reads
@@ -126,7 +180,7 @@ contains
  ! NOTE that as we have way more work arrays than actual state variables (typically
  ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
  !-----------------------------------------------------------------------------
- subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work )
+ subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, grid_qty )
    implicit none
    character(len=*), intent(in) :: physics
 
@@ -148,10 +202,11 @@ contains
 
    ! output in work array.
    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+   real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
 
    select case(physics)
    case ('ACM-new')
-     call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work )
+     call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
 
    case ('ConvDiff-new')
      call PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )
@@ -207,7 +262,7 @@ end subroutine FIELD_NAMES_meta
  ! from that. Ghost nodes are assumed to be sync'ed.
  !-----------------------------------------------------------------------------
  subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, grid_qty, stage, &
-                      boundary_flag, first_substep)
+                      boundary_flag)
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -260,14 +315,9 @@ end subroutine FIELD_NAMES_meta
    ! currently only acessible in the local stage
    integer(kind=2), optional, intent(in):: boundary_flag(3)
 
-   !> some operations might be done only in the first RK substep, hence we pass
-   !! this flag to check if this is the first call at the current time level.
-   !! It is currently used only in ACM module
-   logical, intent(in) :: first_substep
-
    select case(physics)
    case ("ACM-new")
-     call RHS_ACM( time, u, g, x0, dx,  rhs, grid_qty, stage, first_substep )
+     call RHS_ACM( time, u, g, x0, dx,  rhs, grid_qty, stage )
 
    case ("ConvDiff-new")
      call RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag )
@@ -289,7 +339,7 @@ end subroutine FIELD_NAMES_meta
  ! NOTE: as for the RHS, some terms here depend on the grid as whole, and not just
  ! on individual blocks. This requires one to use the same staging concept as for the RHS.
  !-----------------------------------------------------------------------------
- subroutine STATISTICS_meta( physics, time, dt, u, g, x0, dx, rhs, stage )
+ subroutine STATISTICS_meta( physics, time, dt, u, g, x0, dx, rhs, stage, grid_qty )
    implicit none
 
    character(len=*), intent(in) :: physics
@@ -311,6 +361,8 @@ end subroutine FIELD_NAMES_meta
 
    ! output. Note assumed-shape arrays
    real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
+   real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
+
 
    ! stage. there is 3 stages, init_stage, integral_stage and post_stage. The 1st and 3rd
    ! stages are called only once, not for every block.
@@ -318,7 +370,7 @@ end subroutine FIELD_NAMES_meta
 
    select case(physics)
    case ("ACM-new")
-     call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs )
+     call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs, grid_qty )
 
    case ("ConvDiff-new")
     !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )

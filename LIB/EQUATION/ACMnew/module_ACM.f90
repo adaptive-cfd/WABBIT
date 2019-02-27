@@ -41,7 +41,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM, create_mask_2D, create_mask_3D
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -121,6 +121,7 @@ contains
 
     ! inifile structure
     type(inifile) :: FILE
+    integer :: g
 
     n_gridQ = 0
 
@@ -190,7 +191,7 @@ contains
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
-
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
     call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
     call merge_blancs(Bs_str)
     Bs_short=trim(Bs_str)
@@ -230,7 +231,7 @@ contains
 
     ! two things can be stored in the grid_qtys: the sponge and the mask.
     ! we therefore need to know where to store what (fixed indices do not work)
-    if (params_acm%penalization .and. params_acm%geometry=="Insect") then
+    if (params_acm%penalization .and. (params_acm%geometry=="Insect" .or. params_acm%geometry=="fractal_tree")) then
         n_gridQ = n_gridQ + 5
         IDX_MASK  = n_gridQ - 4
         IDX_USX   = n_gridQ - 3
@@ -253,12 +254,18 @@ contains
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
       write(*,'("n_gridQ=",i1)') n_gridQ
+      write(*,'("IDX_MASK=",i1," IDX_COLOR=",i1," IDX_USX=",i1," IDX_USY=",i1," IDX_USZ=",i1)')  &
+      IDX_MASK, IDX_COLOR, IDX_USX, IDX_USY, IDX_USZ
       write(*,'(80("<"))')
     endif
 
     ! if used, setup insect
-    if (params_acm%geometry == "Insect") then
-        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min)
+    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree") then
+        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, g)
+    endif
+
+    if (params_acm%geometry=="fractal_tree") then
+        call fractal_tree_init()
     endif
   end subroutine READ_PARAMETERS_ACM
 

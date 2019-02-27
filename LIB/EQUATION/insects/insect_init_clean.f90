@@ -1,4 +1,5 @@
-subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box_domain, viscosity, dx_reference)
+subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box_domain, &
+    viscosity, dx_reference, N_ghost_nodes, periodic)
   implicit none
   real(kind=rk), intent(in) :: time
   character(len=*), intent(in) :: fname_ini
@@ -12,6 +13,13 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! as the default wing thickness is 4*dx, pass lattice spacing here. In FLUSI, this is easy
   ! but in WABBIT it requires some thought, because dx is not a constant.
   real(kind=rk), intent(in) :: dx_reference
+  ! ghost nodes. If the insect module is used in a finite-differences code, then
+  ! the data that we have often has ghost nodes, i.e. points that overlap and exist
+  ! on several CPUS. On those, you normally would not create the mask (which is expensive)
+  ! so we skip the first and last "g" points on the arrays used for mask creation
+  integer, optional, intent(in) :: N_ghost_nodes
+  !
+  logical, optional, intent(in) :: periodic
 
   type(inifile) :: PARAMS
   real(kind=rk),dimension(1:3)::defaultvec
@@ -29,14 +37,32 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   nu = viscosity
 
   ! header information
- if (root) then
-    write(*,'(80("<"))')
-    write(*,*) "Initializing insect module!"
-    write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
-    write(*,'(80("<"))')
-    write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4," nu=",g12.4)') xl, yl, zl, nu
-    write(*,'("dx=",g12.4," nx_equidistant=",i6)') dx_reference, nint(xl/dx_reference)
- endif
+  if (root) then
+      write(*,'(80("<"))')
+      write(*,*) "Initializing insect module!"
+      write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
+      write(*,'(80("<"))')
+      write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4," nu=",g12.4)') xl, yl, zl, nu
+      write(*,'("dx=",g12.4," nx_equidistant=",i6)') dx_reference, nint(xl/dx_reference)
+  endif
+
+  ! ghost nodes are optional..
+  if (present(N_ghost_nodes)) then
+      ! g is a module global private variable.
+      g = N_ghost_nodes
+  else
+      g = 0
+  endif
+  if (root) write(*,'("n_ghosts=",i2)') g
+
+  ! is the insect periodic?
+  ! attention: this functionality is not for free, so if you do not need it - disable it.
+  if (present(periodic)) then
+      periodic_insect = periodic
+  else
+      periodic_insect = .false.
+  endif
+  if (root) write(*,'("periodic_insect=",L1)') periodic_insect
 
   !-----------------------------------------------------------------------------
   ! read in parameters form ini file
@@ -160,6 +186,17 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
   call read_param_mpi(PARAMS,"Insects","startup_conditioner",Insect%startup_conditioner,"no")
 
+  ! 28/01/2019: Thomas. Discovered that this was done block based, i.e. the smoothing layer
+  ! had different thickness, if some blocks happened to be at different levels (and still carry
+  ! a part of the smoothing layer.) I don't know if that made sense, because the layer shrinks/expands then
+  ! and because it might be discontinous. Both options are included now, default is "as before"
+  ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
+  ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
+  ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
+  call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
+  Insect%smooth = 1.0d0*dx_reference
+  Insect%safety = 3.5d0*Insect%smooth
+
   ! position vector of the head
   call read_param_mpi(PARAMS,"Insects","x_head",&
   Insect%x_head, (/0.5d0*Insect%L_body,0.d0,0.d0 /) )
@@ -190,6 +227,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! other initialization
   !-----------------------------------------------------------------------------
 
+
   ! If required, initialize rigid solid dynamics solver
   if (Insect%BodyMotion=="free_flight") then
     ! note we have to do that before init_fields as rigid_solid_init sets up
@@ -210,7 +248,6 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   endif
 
 end subroutine insect_init
-
 
 
 

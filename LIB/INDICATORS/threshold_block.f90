@@ -39,18 +39,18 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    !> it can be useful not to consider all components for threhsolding here.
+    !> it can be useful not to consider all components for thresholding here.
     !! e.g. to work only on the pressure or vorticity.
     logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
     !
-    real(kind=rk), intent(inout)        :: norm(1:params%n_eqn)
+    real(kind=rk), intent(inout)        :: norm( size(block_data,4) )
 
     ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
     ! detail
-    real(kind=rk)                       :: detail(1:params%n_eqn)
+    real(kind=rk)                       :: detail( size(block_data,4) )
     ! grid parameter
     integer(kind=ik)                    :: g
     integer(kind=ik), dimension(3)      :: Bs
@@ -69,26 +69,23 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
 
 
     ! reset detail
-    detail = 0.0_rk
+    detail = -1.0_rk
 
     ! loop over all datafields
-    do dF = 1, params%n_eqn
+    do dF = 1, size(block_data,4)
         ! is this component of the block used for thresholding or not?
         if (thresholding_component(dF)) then
             if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
 
-            if ( params%threeD_case ) then
+            if ( params%dim == 3 ) then
                 ! ********** 3D **********
                 ! allocate interpolation fields
-                if (.not.allocated(u1)) allocate( u1( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ) )
                 if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ) )
                 ! coarsened field is half block size + 1/2
                 if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1:(Bs(3)+1)/2 + g) )
 
-                ! copy block data to array u1
-                u1(:,:,:) = block_data( :, :, :, dF )
-                ! now, coarsen array u1 (restriction)
-                call restriction_3D( u1, u3 )  ! fine, coarse
+                ! now, coarsen block data (restriction)
+                call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
                 ! then, re-interpolate to the initial level (prediciton)
                 call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
@@ -97,22 +94,19 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                 do i = 1, Bs(1)+2*g
                     do j = 1, Bs(2)+2*g
                         do l = 1, Bs(3)+2*g
-                            detail(dF) = max( detail(dF), abs(u1(i,j,l)-u2(i,j,l)) / norm(dF) )
+                            detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
                         end do
                     end do
                 end do
             else
                 ! ********** 2D **********
                 ! allocate interpolation fields
-                if (.not.allocated(u1)) allocate( u1( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ) )
                 if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ) )
                 ! coarsened field is half block size + 1/2
                 if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1) )
 
-                ! copy block data to array u1
-                u1(:,:,1) = block_data( :, :, 1, dF )
-                ! now, coarsen array u1 (restriction)
-                call restriction_2D( u1(:,:,1), u3(:,:,1) )  ! fine, coarse
+                ! now, coarsen block data (restriction)
+                call restriction_2D( block_data( :, :, 1, dF ), u3(:,:,1) )  ! fine, coarse
                 ! then, re-interpolate to the initial level (prediciton)
                 call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
 
@@ -120,7 +114,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                 ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
                 do i = 1, Bs(1)+2*g
                     do j = 1, Bs(2)+2*g
-                        detail(dF) = max( detail(dF), abs(u1(i,j,1)-u2(i,j,1)) / norm(dF) )
+                        detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
                     end do
                 end do
 
@@ -135,7 +129,10 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     if ( maxval(detail) < params%eps) then
         ! coarsen block, -1
         refinement_status = -1
+    else
+        refinement_status = 0
     end if
+
 
     ! timings
     call toc( "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )

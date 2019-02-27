@@ -63,11 +63,6 @@ subroutine mult_mask(params)
         write(*,*) "------------------------------------------------------------------"
     endif
 
-    if (params%dim==3) then
-        params%threeD_case = .true.
-    else
-        params%threeD_case = .false.
-    end if
 
     params%max_treelevel = tc_length
     params%n_eqn = 2

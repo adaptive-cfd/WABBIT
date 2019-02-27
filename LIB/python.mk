@@ -125,11 +125,11 @@ $(OBJDIR)/%.fpp: %.f90
 	${FPP} ${FPP_F90FLAGS} $<  -o $@
 
 
-libsrc.a: ${LIBSRC_OBJECTS}
+libwabbit.a: ${LIBSRC_OBJECTS}
 	${LIBTOOL} $@ $?
 
 
-_${PYTHON_MODN}.so: libsrc.a ${LIBSRC_FPP_FILES}
+_${PYTHON_MODN}.so: libwabbit.a ${LIBSRC_FPP_FILES}
 	f90wrap -m ${PYTHON_MODN} ${LIBSRC_WRAP_FPP_FILES} -k ${KIND_MAP} -v -P
 	mv f90wrap* $(OBJDIR)
 	f2py-f90wrap --f90exec=$(F90) --fcompiler=$(FCOMP) --build-dir . -c -m _${PYTHON_MODN} -L. -lsrc $(OBJDIR)/f90wrap*.f90 \
@@ -142,7 +142,7 @@ clean-python:
 	rm -rf __pycache__
 	rm -rf $(wrap_dir)/* $(wrap_dir)/
 	rm -rf *WABBIT*.so src.linux*
-	rm -rf _${PYTHON_MODN}.so _${PYTHON_MODN}_pkg.so libsrc.a
+	rm -rf _${PYTHON_MODN}.so _${PYTHON_MODN}_pkg.so libwabbit.a
 	
 python: directories _${PYTHON_MODN}.so 
 	

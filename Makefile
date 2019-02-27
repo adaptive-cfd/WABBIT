@@ -17,17 +17,24 @@ info:
 	@echo -e  "command \t \t info"
 	@echo -e  "-------------------------------------------------------"
 	@echo -e "\e[1m make\e[0m \t\t \t generates all fortran binaries"
+	@echo -e "\e[1m make lib\e[0m \t\t fortran wabbit library libwabbit.a"
+	@echo -e "\e[1m make wabbit\e[0m \t\t generates wabbit main"
 	@echo -e "\e[1m make test\e[0m \t\t performs unit tests"
-	@echo -e "\e[1m make clean\e[0m \t \t cleans fortran binaries"
 	@echo -e "\e[1m make doc\e[0m \t \t generates documentation"
 	@echo -e "\e[1m make python\e[0m \t \t generate wabbit python lib"
-	@echo -e "\e[1m make python-clean\e[0m \t clean python binaries"
-	@echo -e "\e[1m make ctags\e[0m \t generates ctags for your editor"
+	@echo -e "\e[1m make clean\e[0m \t \t cleans binaries"
+	@echo -e "\e[1m make clean-python\e[0m \t clean python binaries"
+	@echo -e "\e[1m make clean-fortran\e[0m \t clean fortran binaries"
 	@echo -e  "-------------------------------------------------------"
 	@echo -e "\n\n\n"
 
 
 .PHONY: doc test directories
+#================================================================
+# Library of all wabbit modules
+#================================================================
+lib: directories libwabbit.a
+
 #================================================================
 # Documentation using doxygen
 #================================================================
@@ -37,7 +44,7 @@ doc:
 #================================================================
 # Unit Testing
 #================================================================
-test:
+test: all 
 	./TESTING/runtests.sh
 
 #================================================================

@@ -132,7 +132,7 @@ libwabbit.a: ${LIBSRC_OBJECTS}
 _${PYTHON_MODN}.so: libwabbit.a ${LIBSRC_FPP_FILES}
 	f90wrap -m ${PYTHON_MODN} ${LIBSRC_WRAP_FPP_FILES} -k ${KIND_MAP} -v -P
 	mv f90wrap* $(OBJDIR)
-	f2py-f90wrap --f90exec=$(F90) --fcompiler=$(FCOMP) --build-dir . -c -m _${PYTHON_MODN} -L. -lsrc $(OBJDIR)/f90wrap*.f90 \
+	f2py-f90wrap --f90exec=$(F90) --fcompiler=$(FCOMP) --build-dir . -c -m _${PYTHON_MODN} -L. -lwabbit $(OBJDIR)/f90wrap*.f90 \
 	-I$(OBJDIR) $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 \
 	-lz -ldl -lm -lblas -llapack -I$(HDF_INC) $(SB_LIB) $(SB_INCL) 
 

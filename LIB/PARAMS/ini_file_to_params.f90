@@ -405,13 +405,13 @@ end subroutine ini_file_to_params
       implicit none
       character(len=1), intent(in) :: seperator
       character(len=*), intent(in) :: string_cnt
-      character(:), allocatable :: string_trim
       integer(kind=ik), intent(out) :: n_entries
       integer(kind=ik) :: count_seperator, i, l_string
+      character(len=Len_trim(adjustl(string_cnt))):: string_trim
 
       count_seperator = 0
       string_trim = trim(adjustl(string_cnt))
-      l_string = LEN(string_cnt)
+      l_string = LEN(string_trim)
 
       do i=1,l_string
         if (string_trim(i:i)==seperator) then

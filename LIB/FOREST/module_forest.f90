@@ -180,7 +180,7 @@ contains
       rank = params%rank
       N = params%number_blocks
 
-      if (params%rank == 0 ) write(*,'("Copy tree: ",i3,"<-",i3)') tree_id1, tree_id2
+      !if (params%rank == 0 ) write(*,'("Copy tree: ",i3,"<-",i3)') tree_id1, tree_id2
       if (tree_id1 > fsize) call abort(0403191,"tree_id you are asking for does not exist!")
 
       ! first we delete tree_id1 if it is allocated
@@ -224,7 +224,7 @@ contains
   !##############################################################
   !> multiply every element of the tree with a given value alpha
   subroutine scalar_multiplication_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id, alpha)
+             hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id, alpha, verbosity)
 
       implicit none
       !-----------------------------------------------------------------
@@ -239,16 +239,18 @@ contains
       integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
       integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
+      logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
       !-----------------------------------------------------------------
       integer(kind=ik)    :: Jmax, lgt_id, hvy_id, fsize
       integer(kind=ik)    :: k, N, rank
-
+      logical :: verbose=.false.
+      if (present(verbosity)) verbose=verbosity
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
       rank = params%rank
       N = params%number_blocks
 
-      if (params%rank == 0 ) write(*,'("scalar multiplication tree: ",i3)') tree_id
+      if (params%rank == 0 .and. verbose ) write(*,'("scalar multiplication tree: ",i3)') tree_id
 
       ! Loop over the active hvy_data
       do k = 1, hvy_n
@@ -275,7 +277,7 @@ contains
   !> they have the same treecodes and number of blocks.
   !> Remark: You may want to balance the load after using this routine.
   subroutine refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
 
       implicit none
       !-----------------------------------------------------------------
@@ -290,15 +292,18 @@ contains
       integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
       real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
+      logical, intent(in),optional      :: verbosity
       !-----------------------------------------------------------------
       integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize
       integer(kind=ik)    :: k1, k2, Nblocks_refined, level_min
       integer(kind=tsize) :: treecode1, treecode2
+      logical :: verbose=.false.
 
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
 
-      if (params%rank == 0 ) write(*,'("Refining trees to same level: ",i9,",",i9)') tree_id1, tree_id2
+      if (present(verbosity)) verbose=verbosity
+      if (params%rank == 0 .and. verbose ) write(*,'("Refining trees to same level: ",i9,",",i9)') tree_id1, tree_id2
       ! The Trees can only be added when their grids are identical. At present we
       ! try to keep the finest levels of all trees. This means we refine
       ! all blocks which are not on the same level.
@@ -606,7 +611,7 @@ contains
 
 !##############################################################
 subroutine add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
 
     implicit none
     !-----------------------------------------------------------------
@@ -621,9 +626,12 @@ subroutine add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednuml
     integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
     integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
+    logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !-----------------------------------------------------------------
+    logical :: verbose=.false.
 
-    if (params%rank == 0) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
+    if (present(verbosity)) verbose=verbosity
+    if (params%rank == 0 .and. verbose) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
     call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
 
@@ -634,7 +642,7 @@ end subroutine
 
 !##############################################################
 subroutine multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
 
     implicit none
     !-----------------------------------------------------------------
@@ -649,9 +657,12 @@ subroutine multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sorte
     integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
     integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
+    logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !-----------------------------------------------------------------
+    logical :: verbose=.false.
 
-    if (params%rank == 0) write(*,'("Multiply trees: ",i4,",",i4)') tree_id1, tree_id2
+    if (present(verbosity)) verbose=verbosity
+    if (params%rank == 0 .and. verbose ) write(*,'("Multiply trees: ",i4,",",i4)') tree_id1, tree_id2
     call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"*")
 
@@ -730,7 +741,7 @@ end subroutine
                 end if
              end do ! loop over tree2
         end do ! loop over tree1
-        if (params%rank == 0) write(*,'("nr blocks redistributed: ",i9)') n_comm
+        !if (params%rank == 0) write(*,'("nr blocks redistributed: ",i9)') n_comm
         ! Transfer the blocks
         call block_xfer( params, comm_list, n_comm, lgt_block, hvy_block, &
                  lgt_active(:, fsize+1), lgt_n(fsize+1), lgt_sortednumlist, hvy_tmp )

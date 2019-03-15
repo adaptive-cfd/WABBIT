@@ -115,13 +115,13 @@ contains
     !---------------------------------------------------------------------------
     ! Covariance Matrix of snapshot matrix X: C = X^T*X 
     !---------------------------------------------------------------------------
+    if (rank == 0) write(*,*)
+    if (rank == 0) write(*,*) "Processing Covariance Matrix C = X^T*X"
+    if (rank == 0) write(*,*) 
     call compute_covariance_matrix( params, C, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp)
 
-    if ( rank == 0) write(*,*) "-------- Covariance Matrix ---------"
-    if ( rank == 0) call print_mat(C)
-    if ( rank == 0) write(*,*) "--------                   ---------"
     !---------------------------------------------------------------------------
     ! eigenvalues of covariance matrix
     !---------------------------------------------------------------------------
@@ -248,9 +248,9 @@ contains
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id
-    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank
-    real(kind=rk) :: truncation_error
+    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
+    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
+    real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk
     character(len=80) :: tmp_name
     character(len=2)  :: order
 
@@ -258,7 +258,7 @@ contains
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
             write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --order=[2|4] sources_*.h5 " 
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD [--order=[2|4] --nmodes=3 --error=1e-9] sources_*.h5 " 
         end if
         return
     end if
@@ -266,12 +266,27 @@ contains
     !----------------------------------
     ! read predefined params 
     !----------------------------------
-    ! order:
     n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
+
     do i = 1, command_argument_count()
-      call get_command_argument(i,args)
+      !-------------------------------
+      ! order of predictor
       if ( index(args,"--order=")==1 ) then
         read(args(9:len_trim(args)),* ) order 
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! TRUNCATION RANK
+      call get_command_argument(i,args)
+      if ( index(args,"--nmodes=")==1 ) then
+        read(args(10:len_trim(args)),* ) truncation_rank_in
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! TRUNCATION ERROR
+      call get_command_argument(i,args)
+      if ( index(args,"--error=")==1 ) then
+        read(args(9:len_trim(args)),* ) truncation_error_in
         n_opt_args = n_opt_args + 1
       end if
     end do
@@ -283,6 +298,13 @@ contains
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
     end if
+
+    if (truncation_rank_in /=-1) truncation_rank = truncation_rank_in
+    if (truncation_error_in >1e-16_rk ) truncation_error = truncation_error_in
+
+    !----------------------------------
+    ! set addtitional params
+    !----------------------------------
     ! block distirbution:
     params%block_distribution="sfc_hilbert"
     ! no time stepping:
@@ -355,8 +377,6 @@ contains
         
     endif
 
-    truncation_error=1e-13
-    truncation_rank =3
     !----------------------------------
     ! COMPUTE POD Modes
     !----------------------------------

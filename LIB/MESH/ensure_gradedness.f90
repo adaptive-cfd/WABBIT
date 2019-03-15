@@ -146,7 +146,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 ! loop over all neighbors
                 do i = 1, neighbor_num
                     if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
-
                         ! check neighbor treelevel
                         mylevel         = lgt_block( lgt_id, Jmax + idx_mesh_lvl )
                         neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + idx_mesh_lvl )
@@ -243,13 +242,11 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             end if ! refinement status
         end do ! loop over blocks
         call toc( "ensure_gradedness (processing part)", MPI_Wtime()-t0 )
-
         ! since not all mpiranks change something in their light data, but all have to perform
         ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed
         ! only the blocks it holds, not blocks held by other ranks.
         test2 = grid_changed
         call MPI_Allreduce(test2, grid_changed, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, ierr )
-
 
         !> after locally modifying refinement statusses, we need to synchronize light data
         t0 = MPI_wtime()

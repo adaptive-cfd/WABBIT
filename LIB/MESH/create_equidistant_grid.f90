@@ -19,7 +19,7 @@
 !! = log ======================================================================================
 !! \n
 !! 03 Apr 2017 - create
-!
+!! \date 12/02/19 - updated lgt_block for multitrees
 ! ********************************************************************************************
 
 subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
@@ -158,7 +158,7 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
               lgt_block( lgt_id, 1:params%max_treelevel ) = treecode
               lgt_block( lgt_id, params%max_treelevel+idx_mesh_lvl ) = Jmin
               lgt_block( lgt_id, params%max_treelevel+idx_refine_sts ) = 0
-              lgt_block( lgt_id, params%max_treelevel+idx_tree_nr ) = 1
+              lgt_block( lgt_id, params%max_treelevel+idx_tree_id ) = 1
 
               ! reset block data to zero
               hvy_block(:,:,:,:,heavy_id) = real(params%rank, kind=rk)

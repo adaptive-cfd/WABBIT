@@ -269,18 +269,12 @@ end subroutine ini_file_to_params
     read(Bs_conc, *) Bs_real
     params%Bs = int(Bs_real)
 
-    ! read number_ghost_nodes
+    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 1 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
-    ! read number_blocks
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
-
-    ! read number_data_fields
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
-    ! read threshold value
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
-
-    ! read treelevel bounds
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
     if ( params%max_treelevel < params%min_treelevel ) then
@@ -290,7 +284,6 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
     call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
-    ! block distribution
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
     call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )

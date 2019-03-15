@@ -220,6 +220,6 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
 
     !> after modifying all refinement statusses, we need to synchronize light data
-    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
 end subroutine grid_coarsening_indicator

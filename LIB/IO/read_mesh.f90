@@ -25,7 +25,7 @@
 !
 ! ********************************************************************************************
 
-subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
+subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -43,6 +43,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     integer(kind=ik), intent(inout)   :: hvy_n, lgt_n
     !> light data array
     integer(kind=ik), intent(inout)   :: lgt_block(:,:)
+     !> index of the tree you want to save the field in
+    integer(kind=ik), optional, intent(in)   :: tree_id_optional
 
     ! treecode array
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
@@ -56,13 +58,18 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     ! offset variables
     integer(kind=ik)      :: ubounds(2), lbounds(2)
     integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)
-    integer(kind=ik)      :: lgt_id, k
+    integer(kind=ik)      :: lgt_id, k, tree_id
     integer(kind=ik)      :: ierr
     integer(kind=ik)      :: treecode_size
     integer(hsize_t)      :: dims_treecode(2)
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
+    if (present(tree_id_optional)) then
+        tree_id=tree_id_optional
+    else
+        tree_id=1
+    endif
 
     ! set MPI parameters
     rank         = params%rank
@@ -146,6 +153,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
         lgt_block(lgt_id, params%max_treelevel+idx_mesh_lvl) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
         lgt_block(lgt_id, params%max_treelevel+idx_refine_sts) = 0
+        ! set number of the tree
+        lgt_block(lgt_id, params%max_treelevel+idx_tree_id) = tree_id
     end do
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.

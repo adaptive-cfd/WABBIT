@@ -67,9 +67,10 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
 
 
-    real(kind=rk)      :: maxmem, mem_per_block, nstages
+    real(kind=rk)      :: maxmem, mem_per_block
+    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=80)  :: memstring
-    integer(kind=ik)   :: d, i
+    integer(kind=ik)   :: i
 
 
 
@@ -79,23 +80,16 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     g               = params%n_ghosts
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
-    max_neighbors   = 74
     nx = Bs(1)+2*g
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
-    d  = params%dim
 
     if (params%dim==2) then
         nz = 1
         max_neighbors = 16
+    else
+      max_neighbors   = 74
     endif
-
-
-    if (rank == 0) then
-        write(*,'(80("_"))')
-        write(*,'(A)') "INIT: Beginning memory allocation and initialization."
-    endif
-
 
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
@@ -110,69 +104,70 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     nwork = max( 2*Neqn, params%N_fields_saved)
 
-
-    if (params%number_blocks < 1) then
-        !---------------------------------------------------------------------------
-        ! Automatic memory management. If specified --memory=0.3GB in the call line,
-        ! wabbit will automatically select the number of blocks per rank to be allocated
-        ! to consume this amount of memory. helpful on local machines.
-        !---------------------------------------------------------------------------
-        ! loop over all arguments until you find the string "--memory" in them (or not)
-        ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
-        do i = 1, command_argument_count()
-            call get_command_argument(i, memstring)
-            ! is memory limitation used?
-            if ( index(memstring,"--memory=")==1 ) then
-                if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
-
-                ! read memory from command line (in GB)
-                read(memstring(10:len_trim(memstring)-2),* ) maxmem
-
-                if (params%rank==0) write(*,'("INIT: total memory: ",f9.4,"GB")') maxmem
-
-                ! memory per MPIRANK (in GB)
-                maxmem = maxmem / dble(params%number_procs)
-
-                if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
-
-                ! stages (for ghost node synching)
-                nstages = 2.0
-
-                if (params%dim==3) then
-                  mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                  + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_gridQ
-                  + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_tmp
-                  + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_work
-                  + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
-                  + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
-                else
-                  mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                  + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_gridQ
-                  + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_tmp
-                  + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_work
-                  + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
-                  + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
-                endif
-
-                ! in GB:
-                mem_per_block = mem_per_block * 8.0e-9
-
-                params%number_blocks = nint( maxmem / mem_per_block)
-
-                if (params%rank==0) then
-                    write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-                    write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
-                    params%number_blocks*params%number_procs
-                endif
-
-                if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**d)) then
-                    call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
-                    & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
-                endif
-            endif
-        end do
+    if (rank == 0) then
+        write(*,'(80("_"))')
+        write(*,'(A)') "INIT: Beginning memory allocation and initialization."
     endif
 
+    !Automatic memory management. If specified --memory=0.3GB in the call line,
+    if (params%number_blocks < 1) then
+      !---------------------------------------------------------------------------
+      ! Automatic memory management. If specified --memory=0.3GB in the call line,
+      ! wabbit will automatically select the number of blocks per rank to be allocated
+      ! to consume this amount of memory. helpful on local machines.
+      !---------------------------------------------------------------------------
+      ! loop over all arguments until you find the string "--memory" in them (or not)
+      ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
+      do i = 1, command_argument_count()
+          call get_command_argument(i, memstring)
+          ! is memory limitation used?
+          if ( index(memstring,"--memory=")==1 ) then
+              if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
+
+              ! read memory from command line (in GB)
+              read(memstring(10:len_trim(memstring)-2),* ) maxmem
+
+              if (params%rank==0) write(*,'("INIT: total memory: ",f9.4,"GB")') maxmem
+
+              ! memory per MPIRANK (in GB)
+              maxmem = maxmem / dble(params%number_procs)
+
+              if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
+
+              if (params%dim==3) then
+                mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
+                + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_gridQ
+                + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_tmp
+                + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_work
+                + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+              else
+                mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
+                + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_gridQ
+                + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_tmp
+                + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_work
+                + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+              endif
+
+              ! in GB:
+              mem_per_block = mem_per_block * 8.0e-9
+
+              params%number_blocks = nint( maxmem / mem_per_block)
+
+              if (params%rank==0) then
+                  write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
+                  write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
+                  params%number_blocks*params%number_procs
+              endif
+
+              if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**params%dim)) then
+                  call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
+                  & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
+              endif
+          endif
+      end do
+    endif
 
 
     if (rank == 0) then

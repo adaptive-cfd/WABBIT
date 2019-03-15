@@ -56,7 +56,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1, t_misc
     ! MPI error variable
-    integer(kind=ik)                    :: ierr
+    integer(kind=ik)                    :: ierr, k1
     integer(kind=ik), save              :: counter=0
     logical, save                       :: never_balanced_load=.true.
 
@@ -131,15 +131,13 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
-
-
+  
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (ensure_gradedness)", MPI_Wtime()-t0 )
-
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()

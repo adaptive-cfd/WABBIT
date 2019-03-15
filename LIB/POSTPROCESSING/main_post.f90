@@ -19,7 +19,7 @@ program main_post
     use mpi
     ! global parameters
     use module_params
-
+    use module_MOR, only : post_POD
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -36,6 +36,7 @@ program main_post
     character(len=80)                   :: mode
     character(len=80)                   :: filename, key1, key2
 
+    real(kind=rk)                       :: elapsed_time
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -49,6 +50,7 @@ program main_post
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
     WABBIT_COMM         = MPI_COMM_WORLD
+    elapsed_time = MPI_wtime()
     ! output MPI status
     if (rank==0) then
         write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
@@ -97,6 +99,9 @@ program main_post
     case ("--flusi-to-wabbit")
         call flusi_to_wabbit(params)
 
+    case ("--POD")
+      call post_POD(params)
+
     case default
 
         if (params%rank==0) then
@@ -107,6 +112,7 @@ program main_post
             write(*,*) "--keyvalues"
             write(*,*) "--compare-keys"
             write(*,*) "--flusi-to-wabbit"
+            write(*,*) "--POD"
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
             else
@@ -115,10 +121,12 @@ program main_post
         end if
     end select
 
+    elapsed_time = MPI_wtime() - elapsed_time
     if (rank==0) then
+        write(*,*)
+        write(*,'("Elapsed time:", f16.4, " s")') elapsed_time
         write(*,'(40("*"),A,40("*"))') "(regular) EXIT wabbit-post"
     endif
-
     ! end mpi
     call MPI_Finalize(ierr)
 

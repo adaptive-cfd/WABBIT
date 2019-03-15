@@ -3,31 +3,41 @@ module module_treelib
 
   use module_globals
 
+
+          
 contains
 
     include "get_neighbor_treecode.f90"
 
   !===============================================================================
-
-  !> \brief from agiven treecode (in the form of an array), we compute a unique integer
-  !! identifier. this can be used to compare two treecodes much faster, and also
-  !! for sorting them in a sorted list
-    integer(kind=tsize) function treecode2int(treearray)
+  !> \brief from a tree id and treecode we make a tree-identifieer, which is 
+  !! an integer made of the tree_id and the treecode
+  !! Note: tree_id s start from 1
+  function treecode2int(treearray, tree_id) 
     implicit none
     integer(kind=ik), intent(in) :: treearray(:)
-    integer(kind=ik) :: N,i
-
+    integer(kind=ik),optional, intent(in) :: tree_id
+    integer(kind=ik) :: N,i, potency
+    integer(kind=tsize) :: treecode2int
     N = size(treearray,1)
-    treecode2int = 0
+
+    if (present(tree_id) .and. tree_id>0) then
+        treecode2int = tree_id
+        potency = ceiling(log10(real(tree_id)))
+    else
+    ! For the rest of wabbit not using tree_ids we have to make sure that
+    ! the results stay the same
+        potency = -1
+        treecode2int = 0 
+    endif
 
     do i = 1, N
       if (treearray(i) >= 0) then
         ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
         ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-        treecode2int = treecode2int + (10**(i-1)) * ( treearray(i) + 1 )
+        treecode2int = treecode2int + (10**(i+potency)) * ( treearray(i) + 1 )
       endif
     enddo
-
   end function
 
   !===============================================================================
@@ -1055,7 +1065,7 @@ end subroutine adjacent4
 ! 2. coordinate transformation from cartesian to treecode
 !       ix -> treecode
 !       example for d=2
-!       ((101),(110))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
+!       ((101),(011))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
 !       compare to the quaternary codes in the quadrants above
 !
 

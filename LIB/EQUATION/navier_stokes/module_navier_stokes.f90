@@ -260,7 +260,7 @@ contains
         ! periodic boundary conditions and one for various boundaries conditions.
         ! The latter one makes use of sparse implementation of the stencil and
         ! we therefore use sparse Blas implementation for the matrix multiplication.
-        if (.not. ALL(boundary_flag(:)==0)) then
+        if (.not. ALL(params_ns%periodic_BC)) then
           ! RHS using various boundary conditions
 #ifdef SBLAS
           call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)

@@ -12,7 +12,7 @@ subroutine post_rhs(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: fname_ini, fname_input
+    character(len=80)      :: fname_ini, fname_input, dummy
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
     integer(kind=ik), dimension(3) :: Bs
@@ -30,6 +30,8 @@ subroutine post_rhs(params)
     real(kind=rk), allocatable         :: us(:,:,:,:)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
+    logical                            :: adaptive
+    integer                            :: i
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -60,6 +62,12 @@ subroutine post_rhs(params)
     call get_command_argument(3, fname_input)
     call read_attributes(fname_input, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
 
+
+    adaptive = .false.
+    do i = 1, command_argument_count()
+        call get_command_argument(i, dummy)
+        if (index(dummy,'--adaptive') /= 0) adaptive = .true.
+    enddo
 
     ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
     ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)
@@ -96,15 +104,21 @@ subroutine post_rhs(params)
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
 
+
+    if ( adaptive ) then
+        call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_gridQ )
+    endif
+
     ! compute right hand side
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_gridQ, lgt_block, &
     hvy_active, hvy_n )
 
-    if (params%filter_type /= "no_filter") then
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active, hvy_n )
-        call filter_wrapper(time, params, hvy_work(:,:,:,:,:,1), hvy_tmp, lgt_block, hvy_active, hvy_n)
-    end if
+    ! if (params%filter_type /= "no_filter") then
+    !     call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active, hvy_n )
+    !     call filter_wrapper(time, params, hvy_work(:,:,:,:,:,1), hvy_tmp, lgt_block, hvy_active, hvy_n)
+    ! end if
 
 
     ! save result to disk

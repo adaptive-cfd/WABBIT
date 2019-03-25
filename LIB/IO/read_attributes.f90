@@ -86,6 +86,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     if ( Nb /= lgt_n ) then
         ! the number of blocks stored in metadata and the dimensionality of the
         ! array do not match.
+        write(*,*) "Nb= ", Nb, "lgt_n= ", lgt_n
         call abort(333139, "the number of blocks stored in metadata and the dimensionality of the array do not match.")
     endif
 

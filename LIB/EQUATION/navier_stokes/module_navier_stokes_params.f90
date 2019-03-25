@@ -229,13 +229,11 @@ contains
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params_ns%n_eqn, 1 )
     ! dimension
     call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
-    !
     call read_param_mpi(FILE, 'Navier_Stokes', 'Coordinate_system', params_ns%coordinates, &
                                                                     params_ns%coordinates )
-
     ! spatial domain size
-    call read_param_mpi(FILE, 'Domain', 'dim', params_ns%dim, 2 )
-    call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    params_ns%domain_size = (/ 1.0_rk, 1.0_rk, 1.0_rk /)
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim),  params_ns%domain_size(1:params_ns%dim))
 
     if ( params_ns%coordinates=="cylindrical" ) then
       params_ns%R_max=params_ns%domain_size(2)*0.5_rk

@@ -51,7 +51,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
     ! treecode variable
     integer(kind=ik), allocatable, save :: all_treecodes(:,:)
     ! block level
-    integer(kind=ik)                    :: N_sisters
+    integer(kind=ik)                    :: N_sisters, tree_id
     integer(kind=ik)                    :: mother_level, my_level
     logical                             :: exists
 
@@ -97,9 +97,10 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
           all_treecodes(i,1:mother_level) = lgt_block(lgt_my_id, 1:mother_level)
           ! the last index is (0..3) or (0..7)
           all_treecodes(i,mother_level+1) = i-1
+          tree_id = lgt_block(lgt_my_id, params%max_treelevel + idx_tree_id)
           ! look for the sisters in the list of blocks (light data), store their ID if found
           ! (-1 otherwise)
-          call does_block_exist(all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n)
+          call does_block_exist(all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n, tree_id)
 
       end if
   enddo

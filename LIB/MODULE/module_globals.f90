@@ -25,7 +25,7 @@ module module_globals
   ! we define the global indices idx_<quantity> here, because it enables us to choose the order of indexing
   ! if necessary
   integer, parameter, public  :: idx_refine_sts      = 2 ! refinement status
-  integer, parameter, public  :: idx_tree_nr         = 3 ! number of the tree in the forest
+  integer, parameter, public  :: idx_tree_id         = 3 ! number of the tree in the forest
   integer, parameter, public  :: idx_mesh_lvl        = 1 ! current mesh level of the block
   integer, parameter, public  :: extra_lgt_fields    = 3 ! number of data fields additionaly to treecode
   !subroutines of this module

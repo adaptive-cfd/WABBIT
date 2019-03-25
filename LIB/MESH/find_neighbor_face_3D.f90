@@ -101,7 +101,7 @@ subroutine find_neighbor_face_3D(params, heavy_id, lgt_id, lgt_block, max_treele
     ! return value from function "does_block_exist"
     logical                             :: exists
     ! neighbor light data id
-    integer(kind=ik)                    :: neighbor_light_id
+    integer(kind=ik)                    :: neighbor_light_id, tree_id
 
     ! loop variable
     integer(kind=ik)                    :: k
@@ -112,9 +112,9 @@ subroutine find_neighbor_face_3D(params, heavy_id, lgt_id, lgt_block, max_treele
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    my_treecode     = lgt_block( lgt_id, 1:max_treelevel )
-    level           = lgt_block( lgt_id, max_treelevel + idx_mesh_lvl )
-
+    my_treecode= lgt_block( lgt_id, 1:max_treelevel )
+    level      = lgt_block( lgt_id, max_treelevel + idx_mesh_lvl )
+    tree_id    = lgt_block( lgt_id, max_treelevel + idx_tree_id )
     neighborID_sameLevel     = -1
     neighborID_coarserLevel  = -1
     virt_code                = -1
@@ -290,7 +290,9 @@ subroutine find_neighbor_face_3D(params, heavy_id, lgt_id, lgt_block, max_treele
     ! calculate treecode for neighbor on same level
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
     ! check existence of neighbor block and find light data id
-    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+    call does_block_exist(neighbor, exists, neighbor_light_id, &
+                         lgt_sortednumlist, lgt_n, tree_id)
+
 
     if (exists) then
         ! neighbor on same level
@@ -303,7 +305,9 @@ subroutine find_neighbor_face_3D(params, heavy_id, lgt_id, lgt_block, max_treele
         neighbor( level ) = -1
 
         ! check existence of neighbor block
-        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+        call does_block_exist(neighbor, exists, neighbor_light_id, &
+                         lgt_sortednumlist, lgt_n, tree_id)
+
         if ( exists ) then
             ! neighbor is one level down (coarser)
             hvy_neighbor( heavy_id, neighborID_coarserLevel ) = neighbor_light_id
@@ -321,7 +325,9 @@ subroutine find_neighbor_face_3D(params, heavy_id, lgt_id, lgt_block, max_treele
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
                 ! check existence of neighbor block
-                call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n)
+                call does_block_exist(neighbor, exists, neighbor_light_id, &
+                         lgt_sortednumlist, lgt_n, tree_id)
+
 
                 if (exists) then
                     ! neigbor is one level up

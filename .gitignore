@@ -20,3 +20,8 @@ doc/output
 *.aux
 *.gz
 *.out
+*.swp
+*.un~
+*.so
+*.a
+runtime_control

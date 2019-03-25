@@ -36,6 +36,12 @@ module module_mesh
 
     logical, private, save ::  mesh_has_changed=.false.
 
+    ! interface generalising the mono-tree to multi-trees
+    interface create_active_and_sorted_lists 
+        module procedure create_active_and_sorted_lists_tree, &
+                         create_active_and_sorted_lists_forest
+    end interface
+
 contains
 
     ! create all active (lgt/hvy) lists, create also sorted lgt data list

@@ -36,7 +36,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   ! what CPU is responsible for merging:
   integer(kind=ik) :: data_rank(8)
   ! list of block ids, proc ranks
-  integer(kind=ik) :: heavy_ids(8)
+  integer(kind=ik) :: heavy_ids(8), tree_id
 
   integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, maxtL, hvy_merge_id
   integer(kind=ik), dimension(3) ::  bound1, bound2, boundm, Bs
@@ -51,6 +51,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   maxtL = params%max_treelevel
   ! level of merged block
   level = lgt_block( lgt_blocks_to_merge(1), maxtL + idx_mesh_lvl )
+  tree_id = lgt_block( lgt_blocks_to_merge(1), maxtL + idx_tree_id )
 !  write(*,*) "level= ",level
   if ( N_merge /= 4 .and. N_merge /= 8) then
     call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
@@ -93,7 +94,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
   lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
   lgt_block( lgt_merge_id, maxtl+ idx_mesh_lvl ) = level-1
   lgt_block( lgt_merge_id, maxtl+ idx_refine_sts ) = 0
-
+  lgt_block( lgt_merge_id, maxtl+ idx_tree_id ) = tree_id
 
   ! b) heavy data merging (individual operation)
   if ( data_rank(1) == params%rank) then
@@ -149,7 +150,6 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge )
           hvy_block( :,:,:,:,heavy_ids(i) ) = 5.0e5_rk
       enddo
   end if
-
 
   ! merging is complete now, remove the original blocks from light data:
   do i = 1, N_merge

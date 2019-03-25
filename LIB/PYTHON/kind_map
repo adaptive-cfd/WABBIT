@@ -1,0 +1,16 @@
+{
+ 'real':     {  '': 'float',
+               '8': 'double',
+               'rk_timing': 'double',
+               'pr': 'double',
+             'rk': 'double'},
+ 'integer' : {  '': 'int',
+	         '8': 'long_long',
+	         '2': 'short',
+	         '4': 'int',
+	         'ik': 'int',
+	         'hid_t': 'long_long',
+	         'hsize_t': 'long_long',
+	         'tsize': 'long_long',
+	        'dp': 'long_long' }
+}

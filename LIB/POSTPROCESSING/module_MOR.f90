@@ -250,7 +250,7 @@ contains
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
-    real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk
+    real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk
     character(len=80) :: tmp_name
     character(len=2)  :: order
 
@@ -269,6 +269,7 @@ contains
     n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
 
     do i = 1, command_argument_count()
+      call get_command_argument(i,args)
       !-------------------------------
       ! order of predictor
       if ( index(args,"--order=")==1 ) then
@@ -277,18 +278,23 @@ contains
       end if
       !-------------------------------
       ! TRUNCATION RANK
-      call get_command_argument(i,args)
       if ( index(args,"--nmodes=")==1 ) then
         read(args(10:len_trim(args)),* ) truncation_rank_in
         n_opt_args = n_opt_args + 1
       end if
       !-------------------------------
       ! TRUNCATION ERROR
-      call get_command_argument(i,args)
       if ( index(args,"--error=")==1 ) then
         read(args(9:len_trim(args)),* ) truncation_error_in
         n_opt_args = n_opt_args + 1
       end if
+      !-------------------------------
+      ! MEMORY AVAILABLE
+      if ( index(args,"--memory=")==1 ) then
+              read(args(10:len_trim(args)-2),* ) maxmem
+              n_opt_args = n_opt_args + 1
+      endif
+      
     end do
 
     if (order == "4") then
@@ -302,7 +308,7 @@ contains
     if (truncation_rank_in /=-1) truncation_rank = truncation_rank_in
     if (truncation_error_in >1e-16_rk ) truncation_error = truncation_error_in
 
-    !----------------------------------
+       !----------------------------------
     ! set addtitional params
     !----------------------------------
     ! block distirbution:
@@ -333,12 +339,17 @@ contains
     end do
     fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
     params%forest_size = fsize
-    number_dense_blocks = 2_ik**(dim*level)
-    params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
+    number_dense_blocks = 2_ik**(dim*level-3)
     params%n_eqn = 1
+
+    if (maxmem < 0.0_rk) then
+      params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
+    endif
+
     !----------------------------------
     ! allocate data
     !----------------------------------
+
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
               lgt_active, lgt_n, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
     call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &

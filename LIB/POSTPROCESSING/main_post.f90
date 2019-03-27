@@ -82,6 +82,9 @@ program main_post
     case("--sparse-to-dense")
         call sparse_to_dense(params)
 
+    case("--dense-to-sparse")
+        call dense_to_sparse(params)
+
     case("--vorticity", "--divergence", "--vor-abs")
         call compute_vorticity_post(params)
 
@@ -107,6 +110,7 @@ program main_post
         if (params%rank==0) then
             write(*,*) "Available Postprocessing tools are:"
             write(*,*) "--sparse-to-dense"
+            write(*,*) "--dense-to-sparse"
             write(*,*) "--mean"
             write(*,*) "--vorticity"
             write(*,*) "--keyvalues"

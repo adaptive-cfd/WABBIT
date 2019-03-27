@@ -469,7 +469,7 @@ contains
           phi(:, g+1, UyF) = 0
 
         case default
-          call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+          call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(2))
         end select
         ! Because this is a boundary block, which is not synchronized
         ! we have to do something with the ghost nodes of this block.
@@ -497,7 +497,7 @@ contains
         !case("wall")
         ! to implement
         case default
-          call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(1))
+          call abort(81020164,"OHHHH no, Unknown Boundary Condition: "// params_ns%bound%name(2))
         end select
         ! Because this is a boundary block, which is not synchronized
         ! we have to do something with the ghost nodes of this block.

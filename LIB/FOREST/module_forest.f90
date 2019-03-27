@@ -926,7 +926,8 @@ end subroutine read_tree
     integer(kind=ik)                                    :: Bs(3), g, Neqn, number_blocks,&
                                                       rank, number_procs,number_trees
     integer(kind=ik)    :: rk_steps, i
-    real(kind=rk)       :: effective_memory, mem_per_block, nstages, maxmem
+    real(kind=rk)       :: effective_memory, mem_per_block, maxmem
+    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=80)   :: memstring
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
     !-----------------------------------------------------------------
@@ -971,7 +972,7 @@ end subroutine read_tree
         write(*,'(A)') "INIT: Beginning memory allocation and initialization."
         write(*,'("INIT: mpisize=",i6)') params%number_procs
         write(*,'("INIT: nwork=",i6)') nwork
-        write(*,'("INIT: Bs=",i7," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
+        write(*,'("INIT: Bs=",3(i7)," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
     endif
 
    !Automatic memory management. If specified --memory=0.3GB in the call line,
@@ -1017,9 +1018,8 @@ end subroutine read_tree
 
               ! in GB:
               mem_per_block = mem_per_block * 8.0e-9
-
               params%number_blocks = nint( maxmem / mem_per_block)
-
+              number_blocks = params%number_blocks
               if (params%rank==0) then
                   write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
                   write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &

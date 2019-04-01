@@ -57,7 +57,7 @@ contains
     !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     !> size of active lists
-    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n
+    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n(:)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
@@ -67,7 +67,7 @@ contains
     !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)          :: hvy_active(:)
+    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:)
     !> number of POD modes
@@ -241,10 +241,10 @@ contains
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), tree_n
+    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :)
+    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                        :: hvy_n,  max_neighbors, level, k, Bs(3), tc_length
+    integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
@@ -322,12 +322,12 @@ contains
     allocate(params%input_files(N_snapshots))
     allocate(time(N_snapshots)) 
     allocate(iteration(N_snapshots)) 
-    !----------------------------------
-    ! check and find common params
-    !----------------------------------
+    !-------------------------------------------
+    ! check and find common params in all h5-files
+    !-------------------------------------------
     call get_command_argument(n_opt_args+1, params%input_files(1))
     call read_attributes(params%input_files(1), lgt_n_tmp, time(1), iteration(1), params%domain_size, &
-                         params%Bs,params%max_treelevel, params%dim)
+                         params%Bs, params%max_treelevel, params%dim)
     do i = 2, N_snapshots
       call get_command_argument(n_opt_args+i, file_in)
       params%input_files(i) = file_in
@@ -349,9 +349,8 @@ contains
     !----------------------------------
     ! allocate data
     !----------------------------------
-
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
-              lgt_active, lgt_n, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+              lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
     call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
               params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist)
     hvy_neighbor = -1
@@ -428,7 +427,7 @@ contains
     !> light data array
     integer(kind=ik),  intent(inout):: lgt_block(:, :)
     !> size of active lists
-    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n
+    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
     !> heavy temp data: needed in blockxfer which is called in add_tree 
@@ -438,13 +437,13 @@ contains
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout) :: lgt_active(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout) :: hvy_active(:)
+    integer(kind=ik), intent(inout) :: hvy_active(:, :)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:)
     !---------------------------------------------------------------
     integer(kind=ik) :: tree_id1, tree_id2, free_tree_id, Jmax, Bs(3), g, &
                         N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: C_val, Volume
+    real(kind=rk) :: C_val, Volume, t_elapse
     real(kind=rk) :: x0(3), dx(3)
     
     N_snapshots = size(C,1)
@@ -460,6 +459,7 @@ contains
     ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
+        t_elapse = MPI_wtime()
         !---------------------------
         ! copy tree_id1 -> free_tree_id
         !----------------------------
@@ -479,12 +479,9 @@ contains
         ! sum over all elements of the tree with free_tree_id
         !-----------------------------------------------------
         C_val = 0.0_rk
-        do k = 1, hvy_n
-          hvy_id = hvy_active(k)
+        do k = 1, hvy_n(free_tree_id)
+          hvy_id = hvy_active(k, free_tree_id)
           call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
-          ! first we have to find out if the hvy data 
-          ! belongs to the tree we want to sum over
-          if ( lgt_block(lgt_id, Jmax + idx_tree_id) .ne. free_tree_id) cycle
           ! calculate the lattice spacing.
           ! It is needed to perform the L2 inner product
           call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -498,6 +495,12 @@ contains
         ! Construct correlation matrix
         C(tree_id1, tree_id2) = C_val 
         C(tree_id2, tree_id1) = C_val
+        !  
+        t_elapse = MPI_WTIME() - t_elapse
+        if (rank == 0) then
+          write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4)') &
+          tree_id1, tree_id2, t_elapse
+        endif
       end do
     end do
     ! sum over all Procs

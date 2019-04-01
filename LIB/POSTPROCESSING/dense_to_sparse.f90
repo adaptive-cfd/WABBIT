@@ -120,7 +120,7 @@ subroutine dense_to_sparse(params)
       if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203195, "Domain size is not consistent ")
       ! Concatenate "sparse" with filename
       params%input_files(i) = trim(file_in)
-      file_out(i) = "sparse_"// trim(file_in)
+      file_out(i) = trim(file_in)
     end do
     ! set max_treelevel for allocation of hvy_block
     params%min_treelevel = 1

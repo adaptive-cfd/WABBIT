@@ -49,17 +49,17 @@ contains
       type (type_params), intent(inout) :: params           !< params structure
       integer(kind=ik), intent(in)      :: N_files     !< number of fields/quantities to read
       character(len=*), intent(in)      :: fnames(N_files)  !< file names
-      integer(kind=ik), intent(inout)   :: hvy_n, tree_n !< number of heavy and light active blocks
+      integer(kind=ik), intent(inout)   :: tree_n       !< number of active trees
       integer(kind=ik), intent(in)      :: tree_id     !< number of the tree
-      integer(kind=ik), allocatable, intent(inout)   :: lgt_n(:)  !< number of trees and active blocks
+      integer(kind=ik), allocatable, intent(inout)   :: lgt_n(:),hvy_n(:)   !< number of active light and heavy blocks
       integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_block(:, : )  !< light data array
       real(kind=rk), ALLOCATABLE, intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       integer(kind=ik), ALLOCATABLE, intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-      integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_active(:,:), hvy_active(:) !< active lists
+      integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_active(:,:), hvy_active(:,:) !< active lists
       integer(kind=tsize), ALLOCATABLE, intent(inout):: lgt_sortednumlist(:,:)
       real(kind=rk), ALLOCATABLE, intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
       !-------------------------------- ---------------------------------
-      integer(kind=ik)  :: iteration, dF, tc_length, dim, i, lgt_n_tmp,  &
+      integer(kind=ik)  :: iteration, dF, tc_length, dim, i, lgt_n_tmp, &
                            rank, level, Bs(3), fsize, number_dense_blocks
       real(kind=rk)     :: time, domain(3)
 
@@ -85,7 +85,7 @@ contains
           params%domain_size = domain
           ! we have to allocate grid if this routine is called for the first time
           call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
-                        lgt_active, lgt_n, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+                        lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
           call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
                             params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist)
           hvy_neighbor = -1
@@ -93,9 +93,8 @@ contains
           tree_n= 0 ! reset number of trees in forest
       endif
       ! read treecode from first input file
-      call read_tree(fnames, N_files, params, lgt_n_tmp, hvy_n, lgt_block, &
+      call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, &
                         hvy_block, hvy_tmp, tree_id)
-
       ! * We save the number of all active lgt_ids in lgt_n_tmp, which is actually
       ! not needed here, since
       ! create_active_and_sorted_lists is calculating sum(lgt_n) again.
@@ -109,14 +108,14 @@ contains
       if (lgt_n_tmp .ne. lgt_n( fsize + 1 )) call abort(132191,"There is something wrong with the light data")
 
       call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
-                            lgt_n(fsize + 1), lgt_sortednumlist, hvy_active, hvy_n )
+                            lgt_n(fsize + 1), lgt_sortednumlist, hvy_active(:,fsize +1) , hvy_n(fsize +1) )
 
-      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,fsize+1), hvy_n(fsize+1) )
 
   end subroutine read_field2tree
   !##############################################################
 
-  
+
   !##############################################################
   !> deletes the lgt_block data of tree with given tree_id and creates new
   !> active and sorted lists
@@ -129,16 +128,16 @@ contains
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)!< light data array
     integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n!< number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: tree_n!< highest tree id
     integer(kind=ik), intent(in)        :: tree_id!< highest tree id
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)!< sorted light data with numerical treecodes
     !-----------------------------------------------------------------
     integer(kind=ik)                    :: k, lgt_id
 
-    ! loop over active list of tree 
-    do k = 1, lgt_n(tree_id) 
+    ! loop over active list of tree
+    do k = 1, lgt_n(tree_id)
         ! block is active
         lgt_id = lgt_active(k, tree_id)
         lgt_block(lgt_id,:) = -1_ik
@@ -154,70 +153,69 @@ contains
 
   !##############################################################
   !> copy hvy and lgt data of tree_id2 to tree_id1
-  !> after copy the active and sorted lists are updated, as well 
+  !> after copy the active and sorted lists are updated, as well
   !> as neighbors and ghost nodes
   subroutine copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id1, tree_id2)
+             hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest, tree_id_source)
 
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
-      integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< all data from tree_id2 gets copied to tree_id1
+      integer(kind=ik), intent(in)      :: tree_id_dest, tree_id_source !< all data from tree_id_source gets copied to destination_tree_id
       integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
       integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
       !-----------------------------------------------------------------
-      integer(kind=ik)    :: Jmax, lgt_id1, lgt_id2, hvy_id1, hvy_id2, fsize
-      integer(kind=ik)    :: k2, N, rank
+      integer(kind=ik)    :: Jmax, lgt_id_dest, lgt_id_source, hvy_id_dest, hvy_id_source, fsize
+      integer(kind=ik)    :: k, N, rank
 
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
       rank = params%rank
       N = params%number_blocks
 
-      !if (params%rank == 0 ) write(*,'("Copy tree: ",i3,"<-",i3)') tree_id1, tree_id2
-      if (tree_id1 > fsize) call abort(0403191,"tree_id you are asking for does not exist!")
+      if (tree_id_dest > fsize) call abort(0403191,"tree_id you are asking for does not exist!")
 
-      ! first we delete tree_id1 if it is allocated
-      if (tree_id1 <= tree_n)then ! tree_id1 only exists if it is in the list of active trees
+      ! first we delete tree_id_dest if it is allocated
+      if (tree_id_dest <= tree_n)then ! tree_id_dest only exists if it is in the list of active trees
         call delete_tree(params, tree_n, lgt_block, lgt_active, lgt_n, &
-                        lgt_sortednumlist, hvy_active, hvy_n, tree_id1)
+                        lgt_sortednumlist, hvy_active, hvy_n, tree_id_dest)
       end if
 
       ! Loop over the active hvy_data
-      do k2 = 1, hvy_n
-        hvy_id2 = hvy_active(k2)
-        call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+      do k = 1, hvy_n(tree_id_source)
+        hvy_id_source = hvy_active(k, tree_id_source)
+        call hvy_id_to_lgt_id(lgt_id_source, hvy_id_source, rank, N )
         ! first we have to find out if the hvy data belongs to the tree we want to copy
-        if ( lgt_block(lgt_id2, Jmax + idx_tree_id) .ne. tree_id2) cycle
-        call get_free_local_light_id( params, rank, lgt_block, lgt_id1)
-        call lgt_id_to_hvy_id( hvy_id1, lgt_id1, rank, N )
+        call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
+        call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
         !--------------------
         ! Light DATA
         !--------------------
-        lgt_block(lgt_id1, :) = lgt_block(lgt_id2, :)  ! copy light data
-        lgt_block(lgt_id1, Jmax + idx_tree_id) = tree_id1  ! asign new tree_id
+        lgt_block(lgt_id_dest, :) = lgt_block(lgt_id_source, :)  ! copy light data
+        lgt_block(lgt_id_dest, Jmax + idx_tree_id) = tree_id_dest  ! asign new tree_id
         !--------------------
         ! Heavy DATA
         !--------------------
-        hvy_block( :, :, :, :, hvy_id1) = hvy_block( :, :, :, :, hvy_id2)
-      end do ! loop over tree2
+        hvy_block( :, :, :, :, hvy_id_dest) = hvy_block( :, :, :, :, hvy_id_source)
+      end do ! loop over source tree
 
-      ! always synchronice lgt_data when you have changed lgt_block locally 
+      ! always synchronice lgt_data when you have changed lgt_block locally
       ! (i.e. when looping over lgt_ids which originate from a hvy_id)
       call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
       call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
       call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
-                            lgt_n(fsize + 1), lgt_sortednumlist, hvy_active, hvy_n )
-      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+           lgt_n(fsize + 1), lgt_sortednumlist, hvy_active(:,fsize+1), hvy_n(fsize+1) )
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+           hvy_active(:,fsize+1), hvy_n(fsize+1))
 
-   
+
   end subroutine
   !##############################################################
 
@@ -229,7 +227,7 @@ contains
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
       integer(kind=ik), intent(in)      :: tree_id !< all data from tree_id2 gets copied to tree_id1
       integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
@@ -237,7 +235,7 @@ contains
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       real(kind=rk), intent(in)      :: alpha !< heavy data array - block data
       integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:, :) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
       logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
       !-----------------------------------------------------------------
@@ -253,18 +251,13 @@ contains
       if (params%rank == 0 .and. verbose ) write(*,'("scalar multiplication tree: ",i3)') tree_id
 
       ! Loop over the active hvy_data
-      do k = 1, hvy_n
-        hvy_id = hvy_active(k)
+      do k = 1, hvy_n(tree_id)
+        hvy_id = hvy_active(k, tree_id)
         call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
-        ! first we have to find out if the hvy data belongs to the tree we want to copy
-        if ( lgt_block(lgt_id, Jmax + idx_tree_id) .ne. tree_id) cycle
-        !--------------------
-        ! Heavy DATA
-        !--------------------
         hvy_block( :, :, :, :, hvy_id) = alpha * hvy_block( :, :, :, :, hvy_id)
       end do ! loop over tree2
 
-   
+
   end subroutine
   !##############################################################
 
@@ -282,14 +275,14 @@ contains
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
       integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
       integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
       integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
       real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
       logical, intent(in),optional      :: verbosity
@@ -364,27 +357,31 @@ contains
               !----------------------------
               ! refine the marked blocks
               !----------------------------
-              if (params%rank == 0) write(*,'("Number of blocks marked for refinement: ",i9)') Nblocks_refined
+              if (params%rank == 0 .and. verbose ) &
+                write(*,'("Number of blocks marked for refinement: ",i9)') Nblocks_refined
               ! 1) check gradedness of the grid (meshlevel of ajacent blocks should not differe by more than 1
               call ensure_gradedness( params, lgt_block, hvy_neighbor, &
-              lgt_active(:, fsize+1), lgt_n(fsize+1), lgt_sortednumlist, hvy_active, hvy_n )
+              lgt_active(:, fsize+1), lgt_n(fsize+1), lgt_sortednumlist, hvy_active(:,fsize+1), hvy_n(fsize+1) )
               ! 2) refine blocks
               if ( params%dim==3 ) then
                 ! 3D:
-                call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+                call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1) )
+                call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2) )
               else
                 ! 2D:
                 call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_active, hvy_n )
+                hvy_active(:,tree_id1), hvy_n(tree_id1) )
+                call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
+                hvy_active(:,tree_id2), hvy_n(tree_id2) )
               end if
               ! since lgt_block was synced we have to create the active lists again
               call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
               lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n )
               ! update neighbor relations
               call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, fsize+1), &
-              lgt_n(fsize+1), lgt_sortednumlist, hvy_active, hvy_n )
+              lgt_n(fsize+1), lgt_sortednumlist, hvy_active(:, fsize+1), hvy_n(fsize+1) )
               ! synchronice
-              call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+              call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, fsize+1), hvy_n(fsize+1))
           endif
       end do
   end subroutine
@@ -396,7 +393,7 @@ contains
 !> Perform pointwise operations (+, -, /, *) for two given trees.
 !> The trees will be refined to same treestructure and then the
 !> operation will be executed on each block pointwise.
-!> Its like the Matlabs .* or ./ for trees  
+!> Its like the Matlabs .* or ./ for trees
 !                                                      @@@
 !                       @                              @@@                               @
 !         @             @    @ @                                          @             @    @ @
@@ -430,14 +427,14 @@ contains
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
       integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
       integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
       integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
       real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
       character (len=*)                 :: operation !< which arithmetical operation (+,-,*,/) which is applied
@@ -463,7 +460,8 @@ contains
       ! and therefore balance the load will try to distribute blocks with the same
       ! treecode (but different trees) at the same rank.
       call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-          lgt_active(:, fsize + 1), lgt_n(fsize + 1), lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp )
+          lgt_active(:, fsize + 1), lgt_n(fsize + 1), lgt_sortednumlist, &
+          hvy_active(:, fsize+1), hvy_n(fsize+1), hvy_tmp )
       ! after balance_load the active and sorted lists have to be allways updated.
       call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
@@ -483,23 +481,20 @@ contains
 !  /caution\
 ! +--------+
     select case(operation)
-        case("+")  
-             !         # 
+        case("+")
+             !         #
              !         #
              !    ###########           ADDITION
              !         #
              !         #
-             do k1 = 1, hvy_n
-                hvy_id1 = hvy_active(k1)
+             do k1 = 1, hvy_n(tree_id1)
+                hvy_id1 = hvy_active(k1,tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
-                ! we want to add everything to tree1
-                if (lgt_block(lgt_id1, Jmax + idx_tree_id) .ne. tree_id1) cycle
                 level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
-                do k2 = 1, hvy_n
-                    hvy_id2 = hvy_active(k2)
+                do k2 = 1, hvy_n(tree_id2)
+                    hvy_id2 = hvy_active(k2,tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    if (lgt_block(lgt_id2, Jmax + idx_tree_id) .ne. tree_id2) cycle
                     level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -513,23 +508,21 @@ contains
                 end do
              end do
          case("-")
-             
-             !          
-             !         
+
+             !
+             !
              !    ###########           SUBSTRACTION
-             !         
-             !         
-             do k1 = 1, hvy_n
-                hvy_id1 = hvy_active(k1)
+             !
+             !
+             do k1 = 1, hvy_n(tree_id1)
+                hvy_id1 = hvy_active(k1, tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
                 ! we want to add everything to tree1
-                if (lgt_block(lgt_id1, Jmax + idx_tree_id) .ne. tree_id1) cycle
                 level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
-                do k2 = 1, hvy_n
-                    hvy_id2 = hvy_active(k2)
+                do k2 = 1, hvy_n(tree_id2)
+                    hvy_id2 = hvy_active(k2,tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    if (lgt_block(lgt_id2, Jmax + idx_tree_id) .ne. tree_id2) cycle
                     level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -543,22 +536,20 @@ contains
                 end do
              end do
          case("/")
-             !         # 
-             !         
-             !    ###########          Division 
-             !         
-             !         # 
-             do k1 = 1, hvy_n
-                hvy_id1 = hvy_active(k1)
+             !         #
+             !
+             !    ###########          Division
+             !
+             !         #
+             do k1 = 1, hvy_n(tree_id1)
+                hvy_id1 = hvy_active(k1, tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
                 ! we want to add everything to tree1
-                if (lgt_block(lgt_id1, Jmax + idx_tree_id) .ne. tree_id1) cycle
                 level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
-                do k2 = 1, hvy_n
-                    hvy_id2 = hvy_active(k2)
+                do k2 = 1, hvy_n(tree_id2)
+                    hvy_id2 = hvy_active(k2, tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    if (lgt_block(lgt_id2, Jmax + idx_tree_id) .ne. tree_id2) cycle
                     level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -572,22 +563,20 @@ contains
                 end do
              end do
          case("*")
-             !        # # 
-             !         # 
-             !     #########        Multiply 
-             !         # 
-             !        # # 
-             do k1 = 1, hvy_n
-                hvy_id1 = hvy_active(k1)
+             !        # #
+             !         #
+             !     #########        Multiply
+             !         #
+             !        # #
+             do k1 = 1, hvy_n(tree_id1)
+                hvy_id1 = hvy_active(k1,tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
                 ! we want to add everything to tree1
-                if (lgt_block(lgt_id1, Jmax + idx_tree_id) .ne. tree_id1) cycle
                 level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
-                do k2 = 1, hvy_n
-                    hvy_id2 = hvy_active(k2)
+                do k2 = 1, hvy_n(tree_id2)
+                    hvy_id2 = hvy_active(k2,tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    if (lgt_block(lgt_id2, Jmax + idx_tree_id) .ne. tree_id2) cycle
                     level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -604,7 +593,7 @@ contains
          case default
              call abort(135,"Operation unknown")
     end select
-  end subroutine 
+  end subroutine
   !##############################################################
 
 
@@ -616,14 +605,14 @@ subroutine add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednuml
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(inout) :: params   !< params structure
-    integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+    integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
     integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
     integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
     integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
     integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-    integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+    integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:, :) !< active lists
     integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
@@ -647,14 +636,14 @@ subroutine multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sorte
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in) :: params   !< params structure
-    integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+    integer(kind=ik), intent(inout)   :: hvy_n(:) !< number of active heavy blocks
     integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
     integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
     integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
     integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-    integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+    integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
     integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
@@ -683,13 +672,13 @@ end subroutine
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
       integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
       integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
       integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:) !< active lists
+      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:, :) !< active lists
       integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
       real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
       !-----------------------------------------------------------------
@@ -754,7 +743,7 @@ end subroutine
 
 
   !##############################################################
-  subroutine read_tree(fnames, N_files, params, lgt_n, hvy_n, lgt_block, &
+  subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, &
                         hvy_block, hvy_tmp, tree_id_optional)
 
     implicit none
@@ -763,7 +752,7 @@ end subroutine
       integer(kind=ik), intent(in)   :: N_files!< number of files
       character(len=*), intent(in)      :: fnames(N_files) !< name of file
       type (type_params), intent(in)    :: params !< user defined parameter structure
-      integer(kind=ik), intent(inout)   :: hvy_n, lgt_n !< number of active blocks (heavy and light data)
+      integer(kind=ik), intent(inout)   :: lgt_n !< number of active blocks (heavy and light data)
       integer(kind=ik), intent(inout)   :: lgt_block(:,:) !< light data array
       integer(kind=ik), optional, intent(in)   :: tree_id_optional !< index of the tree you want to save the field in
       real(kind=rk), intent(inout):: hvy_block(:, :, :, :, :) !< heavy data array - block data
@@ -886,7 +875,7 @@ end subroutine
     endif
 
     ! add the amount of hvy_n to the new data
-    hvy_n = hvy_n + free_hvy_n
+    !hvy_n = hvy_n + free_hvy_n
 
 end subroutine read_tree
 !##############################################
@@ -895,7 +884,7 @@ end subroutine read_tree
 
   !##############################################################
   subroutine allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
-                  lgt_active, lgt_n, hvy_active, lgt_sortednumlist, hvy_work, &
+                  lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_work, &
                   hvy_gridQ, hvy_tmp)
     implicit none
 
@@ -905,7 +894,7 @@ end subroutine read_tree
     !> light data array
     integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> light data size
-    integer(kind=ik), allocatable, intent(out)          :: lgt_n(:)
+    integer(kind=ik), allocatable, intent(out)          :: lgt_n(:), hvy_n(:)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
@@ -919,7 +908,7 @@ end subroutine read_tree
     !> list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)          :: lgt_active(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_active(:)
+    integer(kind=ik), allocatable, intent(out)          :: hvy_active(:, :)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:)
     ! local shortcuts:
@@ -967,13 +956,6 @@ end subroutine read_tree
 
     nwork = max( 2*Neqn, params%N_fields_saved)
 
-    if (rank == 0) then
-        write(*,'(80("_"))')
-        write(*,'(A)') "INIT: Beginning memory allocation and initialization."
-        write(*,'("INIT: mpisize=",i6)') params%number_procs
-        write(*,'("INIT: nwork=",i6)') nwork
-        write(*,'("INIT: Bs=",3(i7)," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
-    endif
 
    !Automatic memory management. If specified --memory=0.3GB in the call line,
     if (params%number_blocks < 1) then
@@ -1019,7 +1001,7 @@ end subroutine read_tree
               ! in GB:
               mem_per_block = mem_per_block * 8.0e-9
               params%number_blocks = nint( maxmem / mem_per_block)
-              number_blocks = params%number_blocks
+
               if (params%rank==0) then
                   write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
                   write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
@@ -1034,7 +1016,15 @@ end subroutine read_tree
       end do
     endif
 
+    number_blocks = params%number_blocks
 
+    if (rank == 0) then
+        write(*,'(80("_"))')
+        write(*,'(A)') "INIT: Beginning memory allocation and initialization."
+        write(*,'("INIT: mpisize=",i6)') params%number_procs
+        write(*,'("INIT: nwork=",i6)') nwork
+        write(*,'("INIT: Bs=",3(i7)," blocks-per-rank=",i7," total blocks=", i7)') Bs, number_blocks, number_blocks*number_procs
+    endif
     !==========================
     ! hvy_data
     !==========================
@@ -1082,12 +1072,18 @@ end subroutine read_tree
 
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
-    allocate( hvy_active( size(hvy_block, 5) ) )
+    allocate( hvy_active( size(hvy_block, 5) , params%forest_size + 1) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "hvy_active", product(real(shape(hvy_active)))*4.0e-9, shape(hvy_active)
     endif
 
+    !---------------------------------------------------------------------------
+    allocate( hvy_n( params%forest_size + 1 ) )
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
+        "hvy_n", product(real(shape(hvy_n)))*4.0e-9, shape(hvy_n)
+    endif
     !==========================
     ! lgt_data
     !==========================
@@ -1125,7 +1121,7 @@ end subroutine read_tree
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*number_blocks
         write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') number_blocks
 
-        effective_memory = (dble(size(hvy_block)) + & ! real data
+        effective_memory = (dble(size(hvy_block)) + dble(size(hvy_n)) + dble(size(lgt_n)) + & ! real data
         dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
         )*8.0e-9 ! in GB
 
@@ -1190,8 +1186,8 @@ end subroutine read_tree
     type (type_params), intent(in) :: params
     integer(kind=ik), intent(in)   :: lgt_block(:, :) !< ligh block data
     integer(kind=ik), intent(in)   :: lgt_active(:,:) !< list of active blocks for each tree
-    integer(kind=ik), intent(in)   :: lgt_n(:), hvy_n !< length of active lists
-    integer(kind=ik), intent(in)   :: hvy_active(:) !< list of active hvy blocks
+    integer(kind=ik), intent(in)   :: lgt_n(:), hvy_n(:) !< length of active lists
+    integer(kind=ik), intent(in)   :: hvy_active(:,:) !< list of active hvy blocks
     real(kind=rk), intent(in)      :: hvy_block(:, :, :, :, :)
     !--------------------
     ! optional parameter
@@ -1226,11 +1222,9 @@ end subroutine read_tree
         it = 0
     endif
 
-    ! calculate how many hvy_n belong to the tree
-    tree_hvy_n = count_tree_hvy_n(params, lgt_block, hvy_active, hvy_n, treeid)
     ! write the data
     call write_field(fname, t, it, dataField, params, lgt_block, hvy_block, &
-                    lgt_active(:,treeid), lgt_n(treeid), tree_hvy_n, hvy_active)
+         lgt_active(:,treeid), lgt_n(treeid), hvy_n(treeid), hvy_active(:, treeid))
   end subroutine
   !##############################################################
 

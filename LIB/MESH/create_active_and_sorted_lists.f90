@@ -166,7 +166,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
     integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of active blocks (light data) in each tree
     integer(kind=ik), intent(out) :: tree_n!< highest tree id
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)!< sorted light data with numerical treecodes
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
     logical, intent(in)                 :: create_sorted_list!< switch for sorted list creation
     !-----------------------------------------------------------------
     
@@ -174,6 +174,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     integer(kind=ik)                    :: k, N, heavy_id, block_rank, fsize
     ! process rank
     integer(kind=ik)                    :: rank, tree_id, tree_id_idx, lgt_n_sum, hvy_n_sum
+    integer(kind=tsize) :: treecode_int
 
     rank = params%rank
     N    = params%number_blocks
@@ -229,12 +230,16 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
 
             if (create_sorted_list) then
                 ! sorted list
+                treecode_int = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_id ) 
                 ! first index stores the light id of the block
-                lgt_sortednumlist(lgt_n_sum, 1) = k
+                lgt_sortednumlist(lgt_n_sum, 1,fsize+1) = k
                 ! second index stores the numerical treecode
-                lgt_sortednumlist(lgt_n_sum, 2) = treecode2int( &
-                        lgt_block(k, 1:params%max_treelevel), tree_id )
-            end if
+                lgt_sortednumlist(lgt_n_sum, 2,fsize+1) = treecode_int
+                ! first index stores the light id of the block
+                lgt_sortednumlist(lgt_n(tree_id), 1,tree_id) = k
+                ! second index stores the numerical treecode
+                lgt_sortednumlist(lgt_n(tree_id), 2,tree_id) = treecode_int
+              end if
 
         end if
     end do
@@ -242,10 +247,14 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     
     lgt_n(fsize + 1) = lgt_n_sum
     if (create_sorted_list) then
-        ! sort list
-        if (lgt_n_sum > 1) then
-            call quicksort(lgt_sortednumlist, 1, lgt_n_sum, 2)
-        end if
+        ! sort list of every single tree
+        do tree_id = 1, tree_n
+          if (lgt_n(tree_id) > 1) then
+              call quicksort(lgt_sortednumlist(:,:,tree_id), 1, lgt_n(tree_id), 2)
+          end if
+        end do
+        ! sort the list for all active lgt ids in all trees
+        call quicksort(lgt_sortednumlist(:,:,fsize+1), 1, lgt_n(fsize+1), 2)
     end if
 
     ! check if the number of trees is not bigger then the size of the forest

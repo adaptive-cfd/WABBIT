@@ -57,7 +57,7 @@ contains
     !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     !> size of active lists
-    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n
+    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n(:)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
@@ -67,9 +67,9 @@ contains
     !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)          :: hvy_active(:)
+    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !> number of POD modes
     integer(kind=ik),optional, intent(inout)     :: truncation_rank
     !> Threshold value for truncating POD modes. If the singular value is smaller,
@@ -77,7 +77,7 @@ contains
     real(kind=rk), optional, intent(in)     :: truncation_error 
     !---------------------------------------------------------------
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
-                    eigenvalues(tree_n), alpha(tree_n), max_err  
+                    eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse  
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
                       free_tree_id,tree_id, N_modes, max_nr_pod_modes
 
@@ -106,6 +106,7 @@ contains
       write(*,'("Number of SNAPSHOTS used: ",i4)') N_snapshots
       write(*,'("Desired Truncation Rank: ", i4)') max_nr_pod_modes
       write(*,'("Maximal Error in L2 norm: ",es12.4)') max_err
+      write(*,'("Compression threshold eps: ",es12.4)') params%eps
       write(*,'(80("-"))')
       write(*, *)
     endif
@@ -150,21 +151,22 @@ contains
   if ( rank == 0 ) write(*,*) "Constructing POD modes (X*V)"
   do i = N_snapshots, 1, -1
   ! compute normalized eigenvectors. If eigenvalues are to small discard modes
-  ! We loop in an ascending order since the eigenvalues are sorted from largest to 
-  ! smallest.
+  ! We loop in an ascending order since the eigenvalues are sorted from smallest to 
+  ! largest.
   ! If the max nr of modes (=desired POD rank) or the desired precission (smallest eigenvalue=sigma**2)
   ! is reached, we exit the for loop, since we have build enough POD modes.
   
     if ( eigenvalues(i) < max_err .or. N_modes > max_nr_pod_modes-1 ) exit
+    t_elapse = MPI_wtime()
+    
     N_modes = N_modes +1
-    if (rank == 0) write(*,*) "constructing POD mode", N_modes
     alpha = V(:,i)/sqrt(N_snapshots*eigenvalues(i))
     ! calculate pod modes:
     pod_mode_tree_id = pod_mode_tree_id + 1
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, pod_mode_tree_id, 1) 
-    call scalar_multiplication_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_neighbor, pod_mode_tree_id, alpha(1))
+    call scalar_multiplication_tree(params, hvy_block, hvy_active, hvy_n, &
+                                    pod_mode_tree_id, alpha(1))
 
     free_tree_id = free_tree_id + 1
 
@@ -172,12 +174,27 @@ contains
       call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id) 
 
-      call scalar_multiplication_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, alpha(tree_id))
+      call scalar_multiplication_tree(params, hvy_block, hvy_active, hvy_n, &
+                                      free_tree_id, alpha(tree_id))
            
       call add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)    
+
+      if ( params%adapt_mesh ) then
+            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+            pod_mode_tree_id, tree_n )
+      endif
+
     end do
+
+    t_elapse = MPI_WTIME() - t_elapse
+    if (rank == 0) then
+          write(*,'("POD mode ", i4," constructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
+          N_modes, t_elapse,&
+          min_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
+          max_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) )
+    endif
   end do
   ! the truncation_rank can be lower then the default (N_snapshots) or input value,
   ! when the singular values are smaller as the desired presicion! Therefore we update
@@ -188,8 +205,9 @@ contains
       write(*, *)
       write(*,'(80("-"))')
       write(*,'("Estimated Truncation Rank r= ",i4)') truncation_rank 
-      if (truncation_rank < N_snapshots) then
-        write(*,'("Error in L2 norm (sigma_{r+1}): ",es12.4)') sqrt(eigenvalues(truncation_rank+1))
+      if (truncation_rank < N_snapshots ) then
+        if ( eigenvalues(N_snapshots-truncation_rank)>0) &
+        write(*,'("Error in L2 norm (sigma_{r+1}): ",es12.4)') sqrt(eigenvalues(N_snapshots-truncation_rank))
       else
         write(*,'("Error in L2 norm (sigma_{r+1}): 0")') 
       endif
@@ -241,16 +259,17 @@ contains
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), tree_n
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                        :: hvy_n,  max_neighbors, level, k, Bs(3), tc_length
+    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :)
+    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
+    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
-    real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk
+    real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
+                     eps=-1.0_rk
     character(len=80) :: tmp_name
     character(len=2)  :: order
 
@@ -294,40 +313,57 @@ contains
               read(args(10:len_trim(args)-2),* ) maxmem
               n_opt_args = n_opt_args + 1
       endif
+      !-------------------------------
+      ! adaptation
+      if ( index(args,"--adapt=")==1 ) then
+        read(args(9:len_trim(args)),* ) eps
+        n_opt_args = n_opt_args + 1
+      end if
+
       
     end do
 
-    if (order == "4") then
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-    else 
+    if (order == "2") then
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
+    else
+        params%order_predictor = "multiresolution_4th"
+        params%n_ghosts = 4_ik
     end if
-
+    if ( eps > 0) then
+      ! adapt the mesh if possible
+      params%adapt_mesh = .True.! .False.!.True.
+      params%eps=eps
+    else
+      params%adapt_mesh = .False.
+      params%eps = 0.0_rk
+    endif
     if (truncation_rank_in /=-1) truncation_rank = truncation_rank_in
     if (truncation_error_in >1e-16_rk ) truncation_error = truncation_error_in
 
-       !----------------------------------
+    !----------------------------------
     ! set addtitional params
     !----------------------------------
     ! block distirbution:
     params%block_distribution="sfc_hilbert"
     ! no time stepping:
     params%time_step_method="no" 
-    
+    params%min_treelevel=1
+    ! coarsening indicator
+    params%coarsening_indicator="threshold-state-vector"
+    params%threshold_mask=.False.
     ! read ini-file and save parameters in struct
     N_snapshots = command_argument_count()
     N_snapshots = N_snapshots - n_opt_args ! because of the first nargs arguments which are not files
     allocate(params%input_files(N_snapshots))
     allocate(time(N_snapshots)) 
     allocate(iteration(N_snapshots)) 
-    !----------------------------------
-    ! check and find common params
-    !----------------------------------
+    !-------------------------------------------
+    ! check and find common params in all h5-files
+    !-------------------------------------------
     call get_command_argument(n_opt_args+1, params%input_files(1))
     call read_attributes(params%input_files(1), lgt_n_tmp, time(1), iteration(1), params%domain_size, &
-                         params%Bs,params%max_treelevel, params%dim)
+                         params%Bs, params%max_treelevel, params%dim)
     do i = 2, N_snapshots
       call get_command_argument(n_opt_args+i, file_in)
       params%input_files(i) = file_in
@@ -339,9 +375,10 @@ contains
     end do
     fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
     params%forest_size = fsize
-    number_dense_blocks = 2_ik**(dim*level-3)
+    number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     params%n_eqn = 1
-
+    allocate(params%threshold_state_vector_component(params%n_eqn))
+    params%threshold_state_vector_component(1)=.True.
     if (maxmem < 0.0_rk) then
       params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
     endif
@@ -349,21 +386,29 @@ contains
     !----------------------------------
     ! allocate data
     !----------------------------------
-
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
-              lgt_active, lgt_n, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+              lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
     call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist)
+              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
     !----------------------------------
     ! READ ALL SNAPSHOTS
     !----------------------------------
-    do i = 1, N_snapshots
-      call read_field2tree(params, params%input_files(i), 1, i, &
+    do tree_id = 1, N_snapshots
+      call read_field2tree(params, params%input_files(tree_id), params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+      !----------------------------------
+      ! Adapt the data to the given eps 
+      !----------------------------------
+      if (params%adapt_mesh) then
+          ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
+          ! adapt-mesh also performs neighbor and active lists updates
+          call adapt_tree_mesh( time(tree_id), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+          lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+      endif
     end do
 
     if (params%rank==0) then
@@ -371,21 +416,26 @@ contains
         write(*,*) "WABBIT POD." 
         write(*,*) "Snapshot matrix build from:"
         do i = 1, N_snapshots
-          write(*, '("Snapshot=",i3 ," File=", A, " it=",i7,1x," time=",f16.9,1x, " Nblocks=", i6)') &
-          i, trim(params%input_files(i)), iteration(i), time(i), lgt_n(i)
+          write(*, '("Snapshot=",i3 ," File=", A, " it=",i7,1x," time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
+          i, trim(params%input_files(i)), iteration(i), time(i), lgt_n(i), &
+          100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
+          100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
+          min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
+          max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+
         end do
-        write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
-        write(*,'(A20,1x,i3," using ",i9," Blocks")') "Jmax: ", level, number_dense_blocks
         write(*,'(80("-"))')
         write(*,'("Data dimension: ",i1,"D")') params%dim
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("NCPU=",i6)') params%number_procs
-        write(*,'("Memory Nb=",i6)') params%number_blocks
-        write(*,'("Dense  Nb=",i6)') number_dense_blocks
-        write(*,'(80("-"))')
+        write(*,'("Number Trees=",1x,i4)') fsize
+        write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
+        write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
+        write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
+        write(*,'("Nblocks used (sparse)=",i6)') lgt_n(fsize+1)
         write(*,'("Predictor=",A)') params%order_predictor
         write(*,'("block_distribution=",A)') params%block_distribution
-        
+        write(*,'(80("-"))')
     endif
 
     !----------------------------------
@@ -428,7 +478,7 @@ contains
     !> light data array
     integer(kind=ik),  intent(inout):: lgt_block(:, :)
     !> size of active lists
-    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n
+    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
     !> heavy data array - block data
     real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
     !> heavy temp data: needed in blockxfer which is called in add_tree 
@@ -438,13 +488,13 @@ contains
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout) :: lgt_active(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout) :: hvy_active(:)
+    integer(kind=ik), intent(inout) :: hvy_active(:, :)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------
     integer(kind=ik) :: tree_id1, tree_id2, free_tree_id, Jmax, Bs(3), g, &
                         N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: C_val, Volume
+    real(kind=rk) :: C_val, Volume, t_elapse
     real(kind=rk) :: x0(3), dx(3)
     
     N_snapshots = size(C,1)
@@ -460,6 +510,7 @@ contains
     ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
+        t_elapse = MPI_wtime()
         !---------------------------
         ! copy tree_id1 -> free_tree_id
         !----------------------------
@@ -475,16 +526,22 @@ contains
         call multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, free_tree_id, tree_id2)
 
+        !---------------------------------------------------
+        ! adapt the mesh before summing it up
+        !---------------------------------------------------
+        if ( params%adapt_mesh ) then
+            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+            free_tree_id, tree_n )
+        endif
+
         !----------------------------------------------------
         ! sum over all elements of the tree with free_tree_id
         !-----------------------------------------------------
         C_val = 0.0_rk
-        do k = 1, hvy_n
-          hvy_id = hvy_active(k)
+        do k = 1, hvy_n(free_tree_id)
+          hvy_id = hvy_active(k, free_tree_id)
           call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
-          ! first we have to find out if the hvy data 
-          ! belongs to the tree we want to sum over
-          if ( lgt_block(lgt_id, Jmax + idx_tree_id) .ne. free_tree_id) cycle
           ! calculate the lattice spacing.
           ! It is needed to perform the L2 inner product
           call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -498,6 +555,12 @@ contains
         ! Construct correlation matrix
         C(tree_id1, tree_id2) = C_val 
         C(tree_id2, tree_id1) = C_val
+        !  
+        t_elapse = MPI_WTIME() - t_elapse
+        if (rank == 0) then
+          write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
+          tree_id1, tree_id2, t_elapse
+        endif
       end do
     end do
     ! sum over all Procs

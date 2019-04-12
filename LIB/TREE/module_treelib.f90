@@ -23,7 +23,7 @@ contains
 
     if (present(tree_id) .and. tree_id>0) then
         treecode2int = tree_id
-        potency = ceiling(log10(real(tree_id)))
+        potency = floor(log10(real(tree_id)))+1
     else
     ! For the rest of wabbit not using tree_ids we have to make sure that
     ! the results stay the same

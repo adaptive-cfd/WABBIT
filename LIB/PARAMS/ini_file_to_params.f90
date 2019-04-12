@@ -118,9 +118,6 @@ subroutine ini_file_to_params( params, filename )
     !***************************************************************************
     ! read DEBUG parameters
     !
-    ! timing flag
-    !call read_param_mpi(FILE, 'Debug', 'timing', params%timing, .true. )
-    call read_param_mpi(FILE, 'Timing', 'write_individual_timings', params%write_individual_timings, .false. )
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)

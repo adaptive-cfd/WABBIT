@@ -49,11 +49,11 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     myrank  = params%rank
     mpisize = params%number_procs
 
-    ! debug check if hvy_active is sorted
+    ! debug check if hvy_active is sorted the way we assumed when designing this code
     if (hvy_n>1) then
         hvyId_temp =  hvy_active(1)
         do k = 2, hvy_n
-            if  (hvyId_temp> hvy_active(k))  then
+            if  (hvyId_temp > hvy_active(k))  then
                 call abort(1212,' hvy_active is not sorted as assumed. Panic!')
             end if
             hvyId_temp = hvy_active(k)
@@ -83,8 +83,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         ! we do not count our internal nodes (.false. as last argument), as they are not put in the
         ! buffer at any time.
         call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
-        recv_counter(:, istage), send_counter(:, istage), &
-        int_recv_counter(:, istage), int_send_counter(:, istage), INCLUDE_REDUNDANT, .false.)
+             recv_counter(:, istage), send_counter(:, istage), &
+             int_recv_counter(:, istage), int_send_counter(:, istage), INCLUDE_REDUNDANT, .false.)
 
         ! reset int_send_buffer, but only the parts that will actually be treated.
         do k = 1, params%number_procs
@@ -99,7 +99,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
 
         ! loop over active heavy data. NOTE: hvy_id has a linear correspondance to lgt_id,
-        ! i.e.g the ordering in hvy_id and lgt_id is the same. this is very important for the
+        ! i.e. the ordering in hvy_id and lgt_id is the same. this is very important for the
         ! secondary rule, which is that larger lgt_id wins. this works only if I treat the blocks
         ! in INCREASING lgt_id ordering.
         do k = 1, hvy_n
@@ -121,7 +121,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! neighbor heavy id
                     call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
                     ! define level difference: sender - receiver, so +1 means sender on higher level
-                    level_diff = lgt_block( sender_lgt_id, params%max_treelevel + idx_mesh_lvl ) - lgt_block( neighbor_lgt_id, params%max_treelevel + idx_mesh_lvl )
+                    level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
 
                     !  ----------------------------  here decide which values are taken for redundant nodes --------------------------------
 
@@ -129,11 +129,11 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! primary criterion: (very fine/historic fine) wins over (fine) wins over (same) wins over (coarse)
                     ! secondary criterion: the higher light id wins NOTE: this is an IMPLICIT rule, enforced by loop ordering ONLY.
 
-                    ! comment: the same dominance rules within the ghos nodes are realized by the sequence of filling in the values,
-                    ! first coarse then same then finer, always in the sequence of the hvy id the redundant nodes within the ghost nodes and maybe in the
-                    ! redundant nodes are written several time, the one following the above rules should win
+                    ! comment: the same dominance rules within the ghost nodes are realized by the sequence of filling in the values,
+                    ! first coarse then same level then finer, always in the sequence of the hvy_id the redundant nodes within the
+                    ! ghost nodes and maybe in the redundant nodes are written several time, the one following the above rules should win
                     call set_bounds_according_to_ghost_dominance_rules( params, bounds_type, entrySortInRound, &
-                    lgt_block, sender_lgt_id, neighbor_lgt_id )
+                         lgt_block, sender_lgt_id, neighbor_lgt_id )
 
                     if ( istage == 1 ) then
                         if ( level_diff == -1 ) Then
@@ -243,11 +243,11 @@ subroutine set_bounds_according_to_ghost_dominance_rules( params, bounds_type, e
     logical :: receiverIsOnSameLevel, lgtIdSenderIsHigher
 
     ! define level difference: sender - receiver, so +1 means sender on higher level
-    level_diff = lgt_block( sender_lgt_id, params%max_treelevel + idx_mesh_lvl ) - lgt_block( neighbor_lgt_id, params%max_treelevel + idx_mesh_lvl )
+    level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
 
     ! the criteria
-    senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel + idx_refine_sts)==11 )
-    recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel + idx_refine_sts)==11 )
+    senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel + IDX_REFINE_STS)==11 )
+    recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel + IDX_REFINE_STS)==11 )
     receiverIsCoarser       = ( level_diff>0_ik )
     receiverIsOnSameLevel   = ( level_diff==0_ik )
     lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
@@ -759,10 +759,10 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
             end select
 
             ! loop over all redundant nodes
-            localHistoricFine   = (lgt_block( localLightId , params%max_treelevel + idx_refine_sts)==11 )
-            levelLocal          =  lgt_block( localLightId  , params%max_treelevel + idx_mesh_lvl )
+            localHistoricFine   = (lgt_block( localLightId , params%max_treelevel + IDX_REFINE_STS)==11 )
+            levelLocal          =  lgt_block( localLightId  , params%max_treelevel + IDX_MESH_LVL )
 
-            !                level_diff =  - lgt_block( neighbor_lgt_id, params%max_treelevel + idx_mesh_lvl )
+            !                level_diff =  - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
 
             ! TBD: sequence important for speed?
             do i= i1,i2,iStep
@@ -771,15 +771,15 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
 
                         redundantOriginLgtId    = int( hvy_block_test(i,j,k,1, local_hvy_id ) +0.001 , ik )  ! checking only first field, other should be the same
                         ! am i too optimistic?
-                        levelOrigin             = lgt_block( redundantOriginLgtId, params%max_treelevel + idx_mesh_lvl )
+                        levelOrigin             = lgt_block( redundantOriginLgtId, params%max_treelevel + IDX_MESH_LVL )
 
                         originLghtIdHigher      = ( redundantOriginLgtId.gt.localLightId            )
 
                         if (.not.(redundantOriginLgtId.eq.localLightId) ) then  ! the block owns the redundant nodes, that's locally ok
                             if ( .not.(redundantOriginLgtId.eq.lastRedundantOrigin) )  then ! in many cases we get the same id over and over again..
 
-                                originHistoricFine  =  (lgt_block( redundantOriginLgtId  , params%max_treelevel + idx_refine_sts)==11 )
-                                levelOrigin         = lgt_block( redundantOriginLgtId  , params%max_treelevel + idx_mesh_lvl )
+                                originHistoricFine  =  (lgt_block( redundantOriginLgtId  , params%max_treelevel + IDX_REFINE_STS)==11 )
+                                levelOrigin         = lgt_block( redundantOriginLgtId  , params%max_treelevel + IDX_MESH_LVL )
 
                                 ! do the check, it should only be there if it dominates the current block
                                 shouldDominate = .false. ! overwritten if domination is found by one of the following conditions
@@ -1137,7 +1137,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
                     ! neighbor heavy id
                     call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
                     ! define level difference: sender - receiver, so +1 means sender on higher level
-                    level_diff = lgt_block( sender_lgt_id, params%max_treelevel + idx_mesh_lvl ) - lgt_block( neighbor_lgt_id, params%max_treelevel + idx_mesh_lvl )
+                    level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
 
                     inverse = inverse_neighbor(neighborhood, dim)
 

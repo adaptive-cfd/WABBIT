@@ -1,3 +1,11 @@
+! This code does something very simple in a very complicated way.
+! In fact, if you had two blocks treecodes for all neighboring relations, everything would be nice
+! and smooth.
+! Why you ask? because from that you can direcly compute their origin and spacing in a straightforward way,
+! and you hence have all coordinates of all point on both blocks.
+! Now you can be clever: synchronizing ghosts means copying points with THE SAME COORDINATES. Makes sense, doesnt't it?
+! So all you would have to do is compute the sender bounds (from the given, manually set recver bounds)
+
 subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff, TYPE)
     implicit none
     type (type_params), intent(in)      :: params
@@ -254,7 +262,7 @@ subroutine get_block_spacing_origin( params, treecode, x0, dx )
     real(kind=rk), dimension(1:3), intent(out) :: x0, dx
     ! loop variables and shortcuts
     integer(kind=ik)                           :: ix,iy,iz,level
-    integer(kind=ik), dimension(3)              :: Bs
+    integer(kind=ik), dimension(3)             :: Bs
 
     bs = params%Bs
 

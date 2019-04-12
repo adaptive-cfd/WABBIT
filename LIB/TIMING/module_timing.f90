@@ -1,221 +1,83 @@
 !===========================================================================
-!> Module for all debug subroutines
-!-------------------------------------------------------------------------!!!!
-!> \details
-!>
-!> \version 0.4
-!> \author msr
-!!
-!!
-!> \date 29.11.16 - create
-!! \date 30.04.19 - check if debug arrays are allocated
-!!
-!!
-!! \todo  union with debug data structure
+!> Module to perform runtime timings using MPI_WTIME
 ! *****************************************************************************
 module module_timing
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
 
-!---------------------------------------------------------------------------------------------
-! variables
+    ! variables
     implicit none
 
+    ! everything is private unless explicitly marked public
     PRIVATE
 
     !**********************************************************************************************
     ! These are the important routines that are visible to other modules:
     !**********************************************************************************************
-    PUBLIC :: write_times, toc, timing_next_timestep, summarize_profiling, setup_indiv_timings
+    PUBLIC :: toc, summarize_profiling
     !*********************************************************************************************
 
-    ! precision in this module
-    integer, parameter, public      :: rk_timing=selected_real_kind(8)
-    
-    !> global user defined arrays
+    ! precision of reals in this module. we use this separated precision in order for
+    ! the timing module to be completely independent of the rest of the code (and hence to be
+    ! reusable in other projects)
+    integer, parameter :: dp = selected_real_kind(8)
 
-    ! computing time measurement array
-    ! row number: id corresponding to names list
-    ! column 1: number of subroutine calls for one time loop
-    ! column 2: sum (time) of all subroutine calls for one time loop
-    ! column 3: number of subroutine calls over complete program
-    ! column 4: sum (time) of all subroutine calls over complete program
-    real(kind=rk_timing), dimension(:,:), allocatable          :: comp_time
+    ! we provide at most this many slots for timing:
+    integer, PARAMETER :: MAX_TIMING_SLOTS = 250
 
-    ! names of time measurements
-    ! row number: id
-    ! column: name
-    character(len=40), dimension(:), allocatable        :: name_comp_time
+    ! array of time measurements and call counters
+    real(kind=dp), dimension(:,:), allocatable :: comp_time
 
-    logical :: write_individual_timings = .false.
-    logical :: setup_completed = .false.
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !type (type_timing), save :: timing
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! each timing slot gets a name so it can be easily identified
+    character(len=100), dimension(:), allocatable :: name_comp_time
 
 contains
 
-!========================================================================================
-    !> \brief reads flag of write_individual_timings from params
-    subroutine  setup_indiv_timings( write_indiv_timings )
 
-      implicit none
-      ! value from params
-      logical, intent(in) :: write_indiv_timings
-
-      if ( .not. setup_completed ) then
-          write_individual_timings = write_indiv_timings
-      endif
-
-      setup_completed = .true.
-
-    end subroutine setup_indiv_timings
-
-!========================================================================================
-    !> \brief write time measurements
-    subroutine write_times( iteration )
-        implicit none
-        !-----------------------------------------------------------
-        integer, intent(in)     :: iteration !< iteration
-        !------------------------------------------------------------
-        ! process rank
-        integer      :: k,file_size, proc_rank, ierr
-        integer,save ::counter =0
-        ! file name
-        character(len=80)     :: fname
-
-        call MPI_comm_rank(MPI_COMM_WORLD, proc_rank, ierr)
-        write( fname,'(i5.5, "times.dat")') proc_rank
-
-        ! filesize in byte
-        INQUIRE(FILE=fname, SIZE=file_size)
-        ! if file is larger than 100MB or this function is called for the first time
-        ! we replace the old file by a new file, otherwise we append the iterations
-        if ( file_size/1e6> 100 .or. counter == 0 ) then
-          open(unit=99,file=fname, status='replace')
-        else
-          open(unit=99,file=fname,  status='old', position='append', action='write')
-        end if
-        ! write file header
-        write(99,'(80("_"))')
-        write(99, '(42x, "calls", 2x, "sum", 5x, "time", 6x, "sum")', advance='no')
-        write(99,*)
-
-        ! write times
-        k = 1
-        do while (  name_comp_time(k) /= "---" )
-            ! write name
-            write(99, '(a)', advance='no')  name_comp_time(k)
-            ! write number of calls
-            write(99, '(2x,i5)', advance='no') int( comp_time(k,1))
-            ! write global number of calls
-            write(99, '(2x,i7)', advance='no') int( comp_time(k,3))
-            ! write time
-            write(99, '(2x,f12.6)', advance='no')  comp_time(k,2)
-            ! write global time
-            write(99, '(2x,f12.6)', advance='no')  comp_time(k,4)
-            ! next line
-            write(99,*)
-            ! loop variable
-            k = k + 1
-        end do
-
-        write(99,'(80("-"))')
-        write(99, '("iteration: ", i7)', advance='no') iteration
-        write(99,*)
-        ! close file
-        close(unit=99)
-
-    end subroutine write_times
-!========================================================================================
-
-
-
-!========================================================================================
-    !> allocates the arrays for profiling subroutines and parts of the code
-    subroutine allocate_init_timing
-
-      implicit none
-
-      ! note: fix size of time measurements array
-      ! allocate array for time measurements - data
-      allocate(  comp_time( 150, 4 )  )
-      ! reset times
-      comp_time = 0.0_rk_timing
-      ! allocate array for time measurements - names
-      allocate(  name_comp_time( 150 )  )
-      ! reset names
-      name_comp_time = "---"
-
-    end subroutine allocate_init_timing
-!========================================================================================
-
-
-
-!========================================================================================
     !> For a given NAME, increase the function call counter by one and store the
     !> elapsed time in the global arrays.
     subroutine toc( name, t_elapsed_this, call_counter )
         implicit none
-        character(len=*), intent(in) :: name
-        real(kind=rk_timing), intent(in) :: t_elapsed_this
+        character(len=*), intent(in)  :: name
+        real(kind=dp), intent(in)     :: t_elapsed_this
         integer, optional, intent(in) :: call_counter
 
         integer :: k
 
-        ! write time
         ! check if allocate_init_debbuging was called before
         if (.not. allocated( name_comp_time)) then
-            call allocate_init_timing
+            ! note: fix size of time measurements array
+            ! allocate array for time measurements - data
+            allocate(  comp_time( MAX_TIMING_SLOTS, 2 )  )
+            ! reset times
+            comp_time = 0.0_dp
+            ! allocate array for time measurements - names
+            allocate(  name_comp_time( MAX_TIMING_SLOTS )  )
+            ! reset names
+            name_comp_time = "---"
         endif
 
-        ! find free or corresponding line
+        ! find a free or the corresponding slot in the array:
         k = 1
         do while (  name_comp_time(k) /= "---" )
             ! entry for current subroutine exists
             if (  name_comp_time(k) == name ) exit
             k = k + 1
         end do
+
         ! write time
-         name_comp_time(k) = name
+        name_comp_time(k) = name
         if (present(call_counter)) then
-             comp_time(k, 1)   =  comp_time(k, 1) + real( call_counter, kind=rk_timing)
+            ! increase by the number given in argument
+            comp_time(k, 1)   =  comp_time(k, 1) + real( call_counter, kind=dp)
         else
-             comp_time(k, 1)   =  comp_time(k, 1) + 1.0_rk_timing
+            ! increase by one
+            comp_time(k, 1)   =  comp_time(k, 1) + 1.0_dp
         endif
-         comp_time(k, 2)   =  comp_time(k, 2) + t_elapsed_this
+        comp_time(k, 2)   =  comp_time(k, 2) + t_elapsed_this
 
     end subroutine toc
-!========================================================================================
 
 
-
-!========================================================================================
-    !> at the end of a time step, we increase the total counters/timers for all measurements
-    !> by what has been done in the last time step, then we flush the current timing to disk.
-    subroutine timing_next_timestep( iteration )! params , ...
-        implicit none
-        !type (type_params), intent(in) :: params
-        integer, intent(in) :: iteration
-
-        ! debug info
-        ! sum and reset times and calls
-         comp_time(:,3) =  comp_time(:,3) +  comp_time(:,1)
-         comp_time(:,4) =  comp_time(:,4) +  comp_time(:,2)
-        ! write debug infos to file
-        if (write_individual_timings) call write_times( iteration )
-        ! reset loop values
-         comp_time(:,1) = 0.0_rk_timing
-         comp_time(:,2) = 0.0_rk_timing
-
-    end subroutine timing_next_timestep
-!========================================================================================
-
-!========================================================================================
     !> This function summarizes the profile of the Simulation.
     !> It should be called on the end of the program, when the statistics of
     !> the profiled functions is large.
@@ -225,60 +87,57 @@ contains
     subroutine summarize_profiling( comm )
         implicit none
         !---------------------------------------
-        integer         , intent(in)   :: comm        !< MPI communicator
+        !< MPI communicator
+        integer, intent(in)   :: comm
         !---------------------------------------
         integer :: rank,k,number_procs,ierr
+        real(kind=dp), dimension(:), allocatable :: avg, std
 
         call MPI_Comm_rank(comm, rank, ierr)
         call MPI_Comm_size(comm, number_procs, ierr)
-        ! debug info output
-          ! sum times
-           comp_time(:,2) = 0.0_rk_timing
-          call MPI_Allreduce( comp_time(:,4),  comp_time(:,2), size( comp_time,1), &
-                              MPI_REAL8, MPI_SUM,  comm, ierr)
-          ! MPI Barrier before program ends
-          call MPI_Barrier(comm, ierr)
 
-          ! average times
-           comp_time(:,2) =  comp_time(:,2) / number_procs
-          ! standard deviation
-           comp_time(:,3) = 0.0_rk_timing
-           comp_time(:,4) = ( comp_time(:,4) -  comp_time(:,2))**2.0_rk_timing
-          call MPI_Allreduce(  comp_time(:,4),  comp_time(:,3), &
-                              size( comp_time,1), MPI_REAL8, MPI_SUM, comm, ierr)
-          ! MPI Barrier before program ends
-          call MPI_Barrier(comm, ierr)
+        if (.not. allocated(comp_time)) then
+            if (rank==0) write(*,*) "Timing information not available (no toc used?)"
+            return
+        endif
 
-          if (number_procs == 1) then
-               comp_time(:,3) = 0.0_rk_timing
-          else
-               comp_time(:,3) = sqrt( comp_time(:,3) / ( number_procs - 1 ))
-          end if
+        allocate(avg(1:size(comp_time,1)))
+        allocate(std(1:size(comp_time,1)))
 
-          ! output
-          if (rank==0) then
-              write(*,'(80("_"))')
-              write(*, '("time (average value +- standard deviation) :")')
-              k = 1
-              do while (  name_comp_time(k) /= "---" )
-                  ! write name
-                  write(*, '(a)', advance='no')  name_comp_time(k)
-                  ! write average time
-                  write(*, '(2x,f12.3)', advance='no')  comp_time(k,2)
-                  ! write standard deviation
-                  write(*, '(2x,f12.3)', advance='no')  comp_time(k,3)
-                  ! next line
-                  write(*,*)
-                  ! loop variable
-                  k = k + 1
-              end do
-              write(*,'(80("_"))')
-              write(*, '("sum: ", 2x,f12.3)', advance='yes') sum( comp_time(:,2))
-          end if
+        ! sum times (over all mpi processes) for all slots
+        call MPI_Allreduce( comp_time(:,2), avg, size(comp_time,1), MPI_REAL8, MPI_SUM,  comm, ierr)
+
+        ! average times (over all mpi processes) for all slots
+        avg = avg / dble(number_procs)
+
+        ! standard deviation
+        std = (comp_time(:,2) -  avg)**2.0_dp
+        call MPI_Allreduce( MPI_IN_PLACE, std, size(comp_time,1), MPI_REAL8, MPI_SUM, comm, ierr)
+
+        if (number_procs == 1) then
+            std = 0.0_dp
+        else
+            std = sqrt( std / dble(number_procs - 1 ))
+        end if
+
+        ! output
+        if (rank==0) then
+            write(*,'(80("_"))')
+            write(*, '("time (average value +- standard deviation) :")')
+            k = 1
+            do while (  name_comp_time(k) /= "---" )
+                write(*,'(A100, 2(2x, f12.3))') name_comp_time(k), avg(k), std(k)
+                k = k + 1
+            end do
+            write(*,'(80("_"))')
+        end if
+
+        ! MPI Barrier to be sure to see the above write statements
+        call MPI_Barrier(comm, ierr)
+
+        deallocate(avg)
+        deallocate(std)
 
     end subroutine summarize_profiling
-!========================================================================================
-
-
 
 end module module_timing

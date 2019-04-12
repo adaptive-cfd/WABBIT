@@ -117,7 +117,6 @@ program main
     integer(kind=ik), allocatable       :: hvy_active(:)
     ! number of active blocks (heavy data)
     integer(kind=ik)                    :: hvy_n
-    integer(kind=ik), allocatable       :: blocks_per_rank(:)
     ! time loop variables
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
@@ -148,7 +147,6 @@ program main
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs=number_procs
-    allocate(blocks_per_rank(1:number_procs))
     ! output MPI status
     WABBIT_COMM=MPI_COMM_WORLD
 
@@ -178,8 +176,6 @@ program main
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
-    ! read flag write_individual_timings from params, to be used in module_timings
-    call setup_indiv_timings( write_indiv_timings = params%write_individual_timings )
     ! have the pysics module read their own parameters. They also decide how many grid-qtys
     ! they want
     call init_physics_modules( params, filename, params%n_gridQ )
@@ -242,7 +238,7 @@ program main
         close(77)
         open (44, file='dt.t', status='replace')
         close(44)
-        open (44, file='timesteps_info.t', status='replace')
+        open (44, file='performance.t', status='replace')
         close(44)
         open (44, file='blocks_per_mpirank.t', status='replace')
         close(44)
@@ -267,7 +263,9 @@ program main
         write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
         close(44)
     endif
-    call Initialize_runtime_control_file()
+    if (rank==0) then
+        call Initialize_runtime_control_file()
+    endif
 
     ! next write time for reloaded data
     if (params%write_method == 'fixed_time') then
@@ -393,16 +391,6 @@ program main
             end if
             call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
 
-            ! it is useful to save the number of blocks per rank into a log file.
-            ! call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
-            ! if (rank==0) then
-            !      open(14,file='blocks_per_mpirank_rhs.t',status='unknown',position='append')
-            !      write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-            !      min_active_level( lgt_block, lgt_active, lgt_n ), &
-            !      max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-            !      close(14)
-            ! end if
-
             !*******************************************************************
             ! statistics
             !*******************************************************************
@@ -444,13 +432,6 @@ program main
             params%next_write_time = params%next_write_time + params%write_time
         endif
 
-        ! at the end of a time step, we increase the total counters/timers for all measurements
-        ! by what has been done in the last time step, then we flush the current timing to disk.
-        call timing_next_timestep( iteration )
-
-        ! it is useful to save the number of blocks per rank into a log file.
-!        call blocks_per_mpirank( params, blocks_per_rank, hvy_n)
-
         t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
@@ -458,16 +439,14 @@ program main
              iteration, time, t2, Nblocks_rhs, Nblocks, min_active_level( lgt_block, lgt_active, lgt_n ), &
              max_active_level( lgt_block, lgt_active, lgt_n )
 
-             open(14,file='timesteps_info.t',status='unknown',position='append')
-             write (14,'(2(g15.8,1x),i9,1x,i5,1x,i2,1x,i2,1x,i5)') time, t2, iteration, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n ), params%number_procs
+             ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
+             ! information, so I renamed it when adding those (since post-scripts would no longer be compatible
+             ! it made sense to me to change the name)
+             open(14,file='performance.t',status='unknown',position='append')
+             write (14,'(g15.8,1x,i9,1x,g15.8,1x,i6,1x,i6,1x,i2,1x,i2,1x,i6)') time, iteration, t2, Nblocks_rhs, Nblocks, &
+             min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n ), &
+             params%number_procs
              close(14)
-
-             ! open(14,file='blocks_per_mpirank.t',status='unknown',position='append')
-             ! write (14,'(g15.8,1x,i6,1x,i6,1x,i3,1x,i3,1x,4096(i4,1x))') time, iteration, lgt_n, &
-             ! min_active_level( lgt_block, lgt_active, lgt_n ), &
-             ! max_active_level( lgt_block, lgt_active, lgt_n ), blocks_per_rank
-             ! close(14)
         end if
 
         !***********************************************************************
@@ -517,10 +496,6 @@ program main
         hvy_tmp, hvy_active, hvy_gridQ )
     end if
 
-    ! at the end of a time step, we increase the total counters/timers for all measurements
-    ! by what has been done in the last time step, then we flush the current timing to disk.
-    call timing_next_timestep( iteration )
-
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)
 
@@ -538,7 +513,6 @@ program main
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 
-    deallocate(blocks_per_rank)
     ! end mpi
     call MPI_Finalize(ierr)
 

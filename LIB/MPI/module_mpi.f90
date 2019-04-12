@@ -191,10 +191,10 @@ subroutine init_ghost_nodes( params )
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"
         if ( params%dim==3 ) then
-          buffer_N = number_blocks * Neqn * ((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)-(Bs(1)*Bs(2)*Bs(3)))
+          buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
         else
           ! 2D case
-          buffer_N = number_blocks * Neqn * ((Bs(1)+2*g)*(Bs(2)+2*g)-(Bs(1)*Bs(2)))
+          buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)) )
         end if
 
         !-----------------------------------------------------------------------
@@ -280,9 +280,13 @@ subroutine init_ghost_nodes( params )
         do ineighbor = 1, Nneighbor
             do leveldiff = -1, 1
                 do idata_bounds_type = 1, 3
+                    ! The receiver bounds are hard-coded with a huge amount of tedious indices.
                     call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, idata_bounds_type, 'receiver')
                     ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RECVER) = ijkrecv
 
+                    ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
+                    ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
+                    ! up or down sampled.
                     call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, idata_bounds_type)
                     ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, SENDER) = ijksend
                     ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RESPRE) = ijkbuffer

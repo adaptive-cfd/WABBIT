@@ -98,9 +98,6 @@ module module_params
         ! block distribution for load balancing (also used for start distribution)
         character(len=80)                            :: block_distribution=""
 
-        ! debug flag
-        logical                                      :: write_individual_timings = .false.
-
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------

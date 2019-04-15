@@ -246,6 +246,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     ! =======================================================
     
     lgt_n(fsize + 1) = lgt_n_sum
+    hvy_n(fsize + 1) = hvy_n_sum
     if (create_sorted_list) then
         ! sort list of every single tree
         do tree_id = 1, tree_n

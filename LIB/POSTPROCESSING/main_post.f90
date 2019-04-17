@@ -20,6 +20,7 @@ program main_post
     ! global parameters
     use module_params
     use module_MOR, only : post_POD
+    use module_timing
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -131,6 +132,14 @@ program main_post
         write(*,'("Elapsed time:", f16.4, " s")') elapsed_time
         write(*,'(40("*"),A,40("*"))') "(regular) EXIT wabbit-post"
     endif
+    ! MPI Barrier before program ends
+    call MPI_Barrier(WABBIT_COMM, ierr)
+
+    ! make a summary of the program parts, which have been profiled using toc(...)
+    ! and print it to stdout
+    if (rank==0 .and. mode == "--POD") &
+      call summarize_profiling( WABBIT_COMM )
+
     ! end mpi
     call MPI_Finalize(ierr)
 

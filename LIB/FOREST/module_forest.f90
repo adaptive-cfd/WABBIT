@@ -27,7 +27,7 @@ module module_forest
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: read_field2tree,  write_tree_field, &
-            add_tree, count_tree_hvy_n, allocate_hvy_lgt_data, delete_tree, &
+            add_tree, count_tree_hvy_n, allocate_hvy_lgt_data, &
             copy_tree, multiply_tree, scalar_multiplication_tree, &
             adapt_tree_mesh
   !**********************************************************************************************
@@ -118,22 +118,17 @@ contains
 
 
   !##############################################################
-  !> deletes the lgt_block data of tree with given tree_id and creates new
-  !> active and sorted lists
-  subroutine delete_tree(params, tree_n, lgt_block, lgt_active, lgt_n, &
-                        lgt_sortednumlist, hvy_active, hvy_n, tree_id)
+  !> deletes the lgt_block data of tree with given tree_id 
+  !> CAUTION: active lists will be outdated!!!
+  subroutine delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in)      :: params    !< user defined parameter structure
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)!< light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: tree_n!< highest tree id
+    integer(kind=ik), intent(in)     :: lgt_active(:,:)!< list of active blocks (light data)
+    integer(kind=ik), intent(in)     :: lgt_n(:)!< number of active blocks (light data)
     integer(kind=ik), intent(in)        :: tree_id!< highest tree id
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
     !-----------------------------------------------------------------
     integer(kind=ik)                    :: k, lgt_id
 
@@ -143,8 +138,6 @@ contains
         lgt_id = lgt_active(k, tree_id)
         lgt_block(lgt_id,:) = -1_ik
     end do
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
 
 
   end subroutine delete_tree
@@ -174,6 +167,7 @@ contains
       !-----------------------------------------------------------------
       integer(kind=ik)    :: Jmax, lgt_id_dest, lgt_id_source, hvy_id_dest, hvy_id_source, fsize
       integer(kind=ik)    :: k, N, rank
+      real(kind=rk) :: t_elapse
 
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
@@ -184,11 +178,11 @@ contains
 
       ! first we delete tree_id_dest if it is allocated
       if (tree_id_dest <= tree_n)then ! tree_id_dest only exists if it is in the list of active trees
-        call delete_tree(params, tree_n, lgt_block, lgt_active, lgt_n, &
-                        lgt_sortednumlist, hvy_active, hvy_n, tree_id_dest)
+        ! Caution: active lists will be outdated
+        call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id_dest)
       end if
-
       ! Loop over the active hvy_data
+      t_elapse = MPI_WTIME()
       do k = 1, hvy_n(tree_id_source)
         hvy_id_source = hvy_active(k, tree_id_source)
         call hvy_id_to_lgt_id(lgt_id_source, hvy_id_source, rank, N )
@@ -205,6 +199,8 @@ contains
         !--------------------
         hvy_block( :, :, :, :, hvy_id_dest) = hvy_block( :, :, :, :, hvy_id_source)
       end do ! loop over source tree
+      call toc( "copy_tree (copy heavy_data)", MPI_Wtime()-t_elapse )
+      t_elapse = MPI_WTIME()
 
       ! always synchronice lgt_data when you have changed lgt_block locally
       ! (i.e. when looping over lgt_ids which originate from a hvy_id)
@@ -214,8 +210,9 @@ contains
       call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
            lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize+1), hvy_n(fsize+1) )
       call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-           hvy_active(:,fsize+1), hvy_n(fsize+1))
+           hvy_active(:,tree_id_dest), hvy_n(tree_id_dest))
 
+      call toc( "copy_tree (copy synchronice hvy and lgt)", MPI_Wtime()-t_elapse )
 
   end subroutine
   !##############################################################
@@ -351,6 +348,7 @@ contains
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         t0 = MPI_Wtime()
+        
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id), hvy_n(tree_id))
         call toc( "adapt_mesh (sync_ghosts)", MPI_Wtime()-t0 )
 
@@ -640,6 +638,7 @@ contains
       integer(kind=ik)    :: k1, k2, N, level_min, rank1, rank2, iq, iz, iy, ix, &
                              hvy_id1, hvy_id2, Bs(3), g
       integer(kind=tsize) :: treecode1, treecode2
+      real (kind=rk) :: t_elapse
 
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
@@ -654,22 +653,40 @@ contains
       ! The Trees can only be added when their grids are identical. At present we
       ! try to keep the finest levels of all trees. This means we refine
       ! all blocks which are not on the same level.
+
+      t_elapse = MPI_WTIME()
       call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
              hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+      call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+      t_elapse = MPI_WTIME()
+
       ! because all trees have the same treestructrue thier hilbertcurve is identical
       ! and therefore balance the load will try to distribute blocks with the same
       ! treecode (but different trees) at the same rank.
       call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
           lgt_active(:, fsize + 1), lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), &
           hvy_active(:, fsize+1), hvy_n(fsize+1), hvy_tmp )
+      call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+      t_elapse = MPI_WTIME()
+
       ! after balance_load the active and sorted lists have to be allways updated.
       call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .false. , tree_n)
+      call toc( "pointwise_tree_arithmetic (create_active)", MPI_Wtime()-t_elapse )
+      t_elapse = MPI_WTIME()
       ! because it may happen that after balance_load blocks with the same treecode
       ! are not on the same rank, we have to make sure that they are
       ! before we can add them!
       call same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
                                 hvy_block, hvy_active, hvy_n, hvy_tmp, tree_n, tree_id1, tree_id2)
+      call toc( "pointwise_tree_arithmetic (same_block_distribution)", MPI_Wtime()-t_elapse )
+      t_elapse = MPI_WTIME()
+      ! because we have send blocks arround we have to make sure that the hvy_neighbors 
+      ! stay updated
+      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
+           lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize +1) , hvy_n(fsize +1) )
+      call toc( "pointwise_tree_arithmetic (update_neighbors)", MPI_Wtime()-t_elapse )
+      t_elapse = MPI_WTIME()
 
       !=================================================
       ! Decide which pointwice arithmetic shell be used
@@ -840,6 +857,8 @@ contains
          case default
              call abort(135,"Operation unknown")
     end select
+    call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
+
   end subroutine
   !##############################################################
 

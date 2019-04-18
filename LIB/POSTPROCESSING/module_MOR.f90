@@ -14,6 +14,7 @@ module module_MOR
   use mpi
   use module_forest
   use module_precision
+  use module_globals
   use module_params
   use module_IO
 
@@ -139,6 +140,9 @@ contains
         write(*,'(1(es12.4,1x))') eigenvalues(i)
       enddo
       write(*,*) "----^ eigenvalues ^-----"
+      write(*,*)
+      write(*,'("sum(eigs) = ", g12.4)') sum(eigenvalues)
+      write(*,*)
     endif
 
     
@@ -269,9 +273,10 @@ contains
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
-                     eps=-1.0_rk
+                     eps=-1.0_rk, Frobnorm
     character(len=80) :: tmp_name
     character(len=2)  :: order
+    logical, parameter :: verbosity = .true.
 
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
@@ -411,16 +416,21 @@ contains
       endif
       tmp_name = "test/test"
       write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
-
       call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
           lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id ) 
-
     end do
 
+    ! -----------------
+    ! Frobenius norm
+    !-----------------
+    ! norm(X) = sqrt(sum(X**2))
+    Frobnorm = compute_frobenius_norm(params, lgt_block, hvy_block, hvy_active, &
+                        hvy_n, N_snapshots, verbosity) 
+  
     if (params%rank==0) then
         write(*,'(80("-"))')
         write(*,*) "WABBIT POD." 
-        write(*,*) "Snapshot matrix build from:"
+        write(*,*) "Snapshot matrix X build from:"
         do i = 1, N_snapshots
           write(*, '("Snapshot=",i3 ," File=", A, " it=",i7,1x," time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
           i, trim(params%input_files(i)), iteration(i), time(i), lgt_n(i), &
@@ -428,9 +438,9 @@ contains
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
           min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
-
         end do
         write(*,'(80("-"))')
+        write(*,*) "Frobenius norm ||X||_F: ", Frobnorm
         write(*,'("Data dimension: ",i1,"D")') params%dim
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("NCPU=",i6)') params%number_procs
@@ -466,7 +476,68 @@ contains
   end subroutine 
   !##############################################################
 
+  !##############################################################
+  !> Frobenius norm of snapshotmatrix
+  function compute_frobenius_norm(params, lgt_block, hvy_block, hvy_active, hvy_n,  &
+                              N_snapshots, verbosity) result(Fnorm)
 
+      implicit none
+      !-----------------------------------------------------------------
+      ! inputs:
+      type (type_params), intent(in) :: params   !< params structure
+      integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
+      real(kind=rk), intent(in)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+      integer(kind=ik), intent(in)   :: lgt_block(:, :)
+      integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
+      integer(kind=ik), intent(in)   :: N_snapshots !< number of snapshots 
+      logical, intent(in),optional   :: verbosity !< if true aditional stdout is printed
+      !-----------------------------------------------------------------
+      ! result
+      real(kind=rk) :: Fnorm
+      !-----------------------------------------------------------------
+      integer(kind=ik)    :: lgt_id, hvy_id, ierr, tree_id = 1
+      integer(kind=ik)    :: k, N, rank, g, Bs(3), dF=1
+      real(kind=rk) :: norm, x0(3), dx(3)
+      logical :: verbose=.false.
+
+      if (present(verbosity)) verbose = verbosity
+      rank = params%rank
+      N = params%number_blocks
+      Bs= params%Bs
+      g = params%n_ghosts
+
+      norm = 0.0_rk
+      ! Loop over the active hvy_data
+      do tree_id =1, N_snapshots
+        do dF = 1, params%n_eqn
+          do k = 1,hvy_n(tree_id)
+              hvy_id = hvy_active(k, tree_id)
+              call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N) 
+              call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+              ! ----------------------------
+              ! integrate squared quantity
+              ! ----------------------------
+              if (params%dim == 3) then
+                  norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, &
+                                                       g+1:Bs(3)+g-1,dF , hvy_id)**2)
+              else
+                  norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, &
+                                                        dF, hvy_id)**2)
+              endif
+          end do
+        end do
+      end do
+      ! -------------------
+      ! sum over all procs
+      ! -------------------
+      !call MPI_ALLREDUCE(MPI_IN_PLACE, norm,1, MPI_DOUBLE_PRECISION, &
+                       !MPI_SUM,WABBIT_COMM, ierr)
+
+      call MPI_REDUCE(norm,Fnorm, 1 ,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM, ierr)
+      Fnorm =sqrt(Fnorm)
+      if (params%rank == 0 .and. verbose ) write(*,'("Frobenius norm: ",g12.8)') Fnorm
+  end function
+  !##############################################################
 
 
   !##############################################################
@@ -556,9 +627,9 @@ contains
           ! It is needed to perform the L2 inner product
           call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
           if ( params%dim == 3 ) then
-              C_val = C_val + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, :, hvy_id))
+              C_val = C_val + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, :, hvy_id))
           else
-              C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
+              C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
           endif
         end do 
         t_inc(3) = MPI_wtime()-t_inc(3)

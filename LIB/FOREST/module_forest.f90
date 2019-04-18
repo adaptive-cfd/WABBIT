@@ -225,34 +225,29 @@ contains
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+      integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(in)      :: tree_id !< all data from tree_id2 gets copied to tree_id1
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       real(kind=rk), intent(in)      :: alpha !< heavy data array - block data
       integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
       logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
       !-----------------------------------------------------------------
-      integer(kind=ik)    :: Jmax, lgt_id, hvy_id, fsize
-      integer(kind=ik)    :: k, N, rank
+      integer(kind=ik)    :: Jmax,  hvy_id, k
       logical :: verbose=.false.
       if (present(verbosity)) verbose=verbosity
-      Jmax = params%max_treelevel ! max treelevel
-      fsize= params%forest_size   ! maximal number of trees in forest
-      rank = params%rank
-      N = params%number_blocks
-
       if (params%rank == 0 .and. verbose ) write(*,'("scalar multiplication tree: ",i3)') tree_id
 
       ! Loop over the active hvy_data
       do k = 1, hvy_n(tree_id)
         hvy_id = hvy_active(k, tree_id)
-        call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
         hvy_block( :, :, :, :, hvy_id) = alpha * hvy_block( :, :, :, :, hvy_id)
-      end do ! loop over tree2
+      end do 
 
 
   end subroutine
   !##############################################################
+
+
 
 
 

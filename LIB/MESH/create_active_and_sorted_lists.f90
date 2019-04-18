@@ -165,7 +165,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
     integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of active blocks (light data) in each tree
-    integer(kind=ik), intent(out) :: tree_n!< highest tree id
+    integer(kind=ik), intent(inout)     :: tree_n!< highest tree id
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
     logical, intent(in)                 :: create_sorted_list!< switch for sorted list creation
     !-----------------------------------------------------------------
@@ -180,11 +180,25 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     N    = params%number_blocks
     fsize= params%forest_size
     tree_id_idx = params%max_treelevel + idx_tree_id
+    ! =======================================================
+    ! Reset active lists of all trees
+    ! =======================================================
+    ! note: this seems to be a complicated way of reseting the 
+    !       active lists, but it is very crucial for performance!
+    !       NEVER RESET the full array without reasons!!!
+    do tree_id = 1, fsize + 1
+      ! check if lgt_n or hvy_n of tree is valid (not to small or to large)
+      if (lgt_n(tree_id)>size(lgt_active(:,tree_id)) .or. lgt_n(tree_id) <=0) &
+        lgt_n(tree_id) = size(lgt_active(:,tree_id))
+      if (hvy_n(tree_id)>size(hvy_active(:,tree_id)) .or. hvy_n(tree_id) <=0) &
+        hvy_n(tree_id) = size(hvy_active(:,tree_id))
 
-    ! reset the active lists 
-    lgt_active = -1
-    hvy_active = -1
-    lgt_sortednumlist = -1
+      ! reset the active lists 
+      lgt_active(1:lgt_n(tree_id),tree_id) = -1
+      hvy_active(1:hvy_n(tree_id),tree_id) = -1
+      if (create_sorted_list) lgt_sortednumlist(1:lgt_n(tree_id),:,tree_id) = -1
+    end do
+
 
     ! reset active block numbers
     lgt_n_sum = 0 ! lgt_n_sum = sum(lgt_n(1:tree_n))
@@ -202,8 +216,9 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
 
             ! which tree id has the current block k?
             tree_id = lgt_block(k,tree_id_idx)
-            ! find the highest tree number tree_n
-            if (tree_id > tree_n) tree_n = tree_id
+            ! find the highest tree number. this is should be the same then
+            ! the number of active trees: tree_n
+            tree_n = max(tree_id, tree_n)
 
             ! ---------------------------
             ! update light active
@@ -246,6 +261,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     ! =======================================================
     
     lgt_n(fsize + 1) = lgt_n_sum
+    hvy_n(fsize + 1) = hvy_n_sum
     if (create_sorted_list) then
         ! sort list of every single tree
         do tree_id = 1, tree_n

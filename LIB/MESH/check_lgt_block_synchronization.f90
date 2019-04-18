@@ -122,7 +122,7 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
     !> light data array
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     integer(kind=ik) , allocatable, save :: tmp(:,:), tmp2(:,:)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
+    integer(kind=ik), intent(in)     :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)     :: hvy_n
     character(len=*), intent(in) :: file

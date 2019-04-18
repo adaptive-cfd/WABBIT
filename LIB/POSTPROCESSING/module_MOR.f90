@@ -106,7 +106,7 @@ contains
       write(*,'("Number of SNAPSHOTS used: ",i4)') N_snapshots
       write(*,'("Desired Truncation Rank: ", i4)') max_nr_pod_modes
       write(*,'("Maximal Error in L2 norm: ",es12.4)') max_err
-      write(*,'("Compression threshold eps: ",es12.4)') params%eps
+      if (params%adapt_mesh) write(*,'("Compression threshold eps: ",es12.4)') params%eps
       write(*,'(80("-"))')
       write(*, *)
     endif
@@ -180,10 +180,10 @@ contains
       call add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)    
 
-      if ( params%adapt_mesh ) then
-            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-            pod_mode_tree_id, tree_n )
+      if ( params%adapt_mesh) then
+            !call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            !lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+            !pod_mode_tree_id, tree_n )
       endif
 
     end do
@@ -409,6 +409,12 @@ contains
           call adapt_tree_mesh( time(tree_id), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
           lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
       endif
+      tmp_name = "test/test"
+      write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
+
+      call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id ) 
+
     end do
 
     if (params%rank==0) then
@@ -494,7 +500,7 @@ contains
     !---------------------------------------------------------------
     integer(kind=ik) :: tree_id1, tree_id2, free_tree_id, Jmax, Bs(3), g, &
                         N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: C_val, Volume, t_elapse
+    real(kind=rk) :: C_val, Volume, t_elapse, t_inc(3)
     real(kind=rk) :: x0(3), dx(3)
     
     N_snapshots = size(C,1)
@@ -517,27 +523,31 @@ contains
         ! copy tree with tree_id1 to tree with free_tree_id
         ! note: this routine deletes lgt_data of the "free_tree_id" before copying 
         !       the tree
+        t_inc(1) = MPI_wtime()
         call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id1) 
-
+        t_inc(1) = MPI_wtime()-t_inc(1)
         !---------------------------------------------------
         ! multiply tree_id2 * free_tree_id -> free_tree_id
         !---------------------------------------------------
+        t_inc(2) = MPI_wtime()
         call multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, free_tree_id, tree_id2)
+        t_inc(2) = MPI_wtime()-t_inc(2)
 
         !---------------------------------------------------
         ! adapt the mesh before summing it up
         !---------------------------------------------------
         if ( params%adapt_mesh ) then
-            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-            free_tree_id, tree_n )
+            !call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            !lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+            !free_tree_id, tree_n )
         endif
 
         !----------------------------------------------------
         ! sum over all elements of the tree with free_tree_id
         !-----------------------------------------------------
+        t_inc(3) = MPI_wtime()
         C_val = 0.0_rk
         do k = 1, hvy_n(free_tree_id)
           hvy_id = hvy_active(k, free_tree_id)
@@ -551,7 +561,7 @@ contains
               C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
           endif
         end do 
-
+        t_inc(3) = MPI_wtime()-t_inc(3)
         ! Construct correlation matrix
         C(tree_id1, tree_id2) = C_val 
         C(tree_id2, tree_id1) = C_val
@@ -560,6 +570,7 @@ contains
         if (rank == 0) then
           write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
           tree_id1, tree_id2, t_elapse
+          write(*,'("copy tree: ",es12.4," mult trees: ",es12.4," integrate ",es12.4)') t_inc
         endif
       end do
     end do

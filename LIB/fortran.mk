@@ -179,7 +179,7 @@ $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o\
-	$(OBJDIR)/module_ini_files_parser_mpi.o 
+	$(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
@@ -215,7 +215,7 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_timing.o: module_timing.f90 
+$(OBJDIR)/module_timing.o: module_timing.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
@@ -281,7 +281,7 @@ $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_pa
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90
+	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
@@ -302,4 +302,3 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 
 clean-fortran:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
-

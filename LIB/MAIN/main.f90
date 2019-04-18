@@ -128,8 +128,6 @@ program main
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
-    ! flag of write_individual_timings to pass value from params to module_timing
-    logical                             :: write_indiv_timings=.false.
 
     ! init time loop
     time          = 0.0_rk
@@ -239,10 +237,6 @@ program main
         open (44, file='dt.t', status='replace')
         close(44)
         open (44, file='performance.t', status='replace')
-        close(44)
-        open (44, file='blocks_per_mpirank.t', status='replace')
-        close(44)
-        open (44, file='blocks_per_mpirank_rhs.t', status='replace')
         close(44)
         open (44, file='eps_norm.t', status='replace')
         close(44)
@@ -371,7 +365,7 @@ program main
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1
 
-            ! determine if it is time to save data our not.
+            ! determine if it is time to save data
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then

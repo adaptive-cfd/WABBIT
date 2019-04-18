@@ -34,12 +34,12 @@ PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_vorticity, divergence
+PUBLIC :: compute_vorticity, divergence, compute_Qcriterion
 
 
 contains
 
-    ! include "volume_integral.f90"
+    include "compute_Qcriterion.f90"
     include "compute_vorticity.f90"
     include "divergence.f90"
 

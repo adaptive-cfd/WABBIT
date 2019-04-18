@@ -85,7 +85,7 @@ program main_post
     case("--dense-to-sparse")
         call dense_to_sparse(params)
 
-    case("--vorticity", "--divergence", "--vor-abs")
+    case("--vorticity", "--divergence", "--vor-abs", "--Q")
         call compute_vorticity_post(params)
 
     case("--keyvalues")
@@ -113,6 +113,9 @@ program main_post
             write(*,*) "--dense-to-sparse"
             write(*,*) "--mean"
             write(*,*) "--vorticity"
+            write(*,*) "--vor-abs"
+            write(*,*) "--divergence"
+            write(*,*) "--Q"
             write(*,*) "--keyvalues"
             write(*,*) "--compare-keys"
             write(*,*) "--flusi-to-wabbit"

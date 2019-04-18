@@ -45,9 +45,33 @@ subroutine compute_vorticity_post(params)
     ! does the user need help?
     if (file_ux=='--help' .or. file_ux=='--h') then
         if (params%rank==0) then
-            write(*,*) "wabbit postprocessing routine for subsequent vorticity calculation"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence|--vor-abs] source_ux.h5 source_uy.h5 derivative-order(2 or 4)"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post [--vorticity|--divergence|--vor-abs] source_ux.h5 source_uy.h5 source_uz.h5 derivative-order(2 or 4)"
+            write(*,*) "-----------------------------------------------------------"
+            write(*,*) " Wabbit postprocessing: vorticity / divergence / Q-criterion"
+            write(*,*) "-----------------------------------------------------------"
+            write(*,*) " Computes either quantity from velocity files. Output is stored"
+            write(*,*) " in predefined files."
+            write(*,*) "-----------------------------------------------------------"
+            write(*,*) " --vorticity"
+            write(*,*) "./wabbit-post --vorticity source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*,*) " Computes 3 (3D) or 1 (2D) vorticity component, saves in "
+            write(*,*) " vorx_*.h5 [vory_*.h5] [vorz_*.h5]"
+            write(*,*) " order = 2 or 4"
+            write(*,*) "-----------------------------------------------------------"
+            write(*,*) " --vor-abs"
+            write(*,*) "./wabbit-post --vor-abs source_ux.h5 source_uy.h5 source_uz.h5 [ORDER]"
+            write(*,*) " Computes vorticity magnitude of 3D velocity field, saves in "
+            write(*,*) " vorabs_*.h5"
+            write(*,*) "-----------------------------------------------------------"
+            write(*,*) " --divergence"
+            write(*,*) "./wabbit-post --divergence source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*,*) " Computes divergence of 2D/3D velocity field, saves in "
+            write(*,*) " divu_*.h5"
+            write(*,*) "-----------------------------------------------------------"
+            write(*,*) " --Q"
+            write(*,*) "./wabbit-post --Q source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*,*) " Computes Q-criterion of 2D/3D velocity field, saves in "
+            write(*,*) " Qcrit_*.h5"
+            write(*,*) "-----------------------------------------------------------"
         end if
         return
     endif
@@ -145,8 +169,15 @@ subroutine compute_vorticity_post(params)
             dx, params%Bs, params%n_ghosts, &
             params%order_discretization, hvy_tmp(:,:,:,1,hvy_active(k)))
 
+        elseif (operator == "--Q") then
+            call compute_Qcriterion( hvy_block(:,:,:,1,hvy_active(k)), &
+            hvy_block(:,:,:,2,hvy_active(k)), &
+            hvy_block(:,:,:,3,hvy_active(k)),&
+            dx, params%Bs, params%n_ghosts, &
+            params%order_discretization, hvy_tmp(:,:,:,1,hvy_active(k)))
+
         else
-            call abort(1812011,"operator is neither --vorticity nor --divergence")
+            call abort(1812011,"operator is neither --vorticity --vor-abs --divergence --Q")
 
         endif
     end do
@@ -186,6 +217,12 @@ subroutine compute_vorticity_post(params)
 
     elseif (operator=="--divergence") then
         write( fname,'(a, "_", i12.12, ".h5")') 'divu', nint(time * 1.0e6_rk)
+
+        call write_field(fname, time, iteration, 1, params, lgt_block,&
+        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+
+    elseif (operator=="--Q") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'Qcrit', nint(time * 1.0e6_rk)
 
         call write_field(fname, time, iteration, 1, params, lgt_block,&
         hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )

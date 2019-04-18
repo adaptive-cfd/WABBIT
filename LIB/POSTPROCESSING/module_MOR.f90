@@ -141,7 +141,7 @@ contains
       enddo
       write(*,*) "----^ eigenvalues ^-----"
       write(*,*)
-      write(*,'("sum(eigs) = ", g12.4)') sum(eigenvalues)
+      write(*,'("sum(eigs) = ", g18.8)') sum(eigenvalues)
       write(*,*)
     endif
 
@@ -164,7 +164,7 @@ contains
     t_elapse = MPI_wtime()
     
     N_modes = N_modes +1
-    alpha = V(:,i)/sqrt(N_snapshots*eigenvalues(i))
+    alpha = V(:,i)/sqrt(dble(N_snapshots)*eigenvalues(i))
     ! calculate pod modes:
     pod_mode_tree_id = pod_mode_tree_id + 1
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
@@ -273,10 +273,10 @@ contains
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
-                     eps=-1.0_rk, Frobnorm
+                     eps=-1.0_rk, L2norm, Volume
     character(len=80) :: tmp_name
     character(len=2)  :: order
-    logical, parameter :: verbosity = .true.
+    logical, parameter :: verbosity = .false.
 
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
@@ -420,13 +420,12 @@ contains
           lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id ) 
     end do
 
-    ! -----------------
-    ! Frobenius norm
-    !-----------------
-    ! norm(X) = sqrt(sum(X**2))
-    Frobnorm = compute_frobenius_norm(params, lgt_block, hvy_block, hvy_active, &
+    ! --------------------
+    ! Compute the L2 norm
+    !---------------------
+    L2norm = compute_L2norm(params, lgt_block, hvy_block, hvy_active, &
                         hvy_n, N_snapshots, verbosity) 
-  
+    Volume = product(domain(1:params%dim))
     if (params%rank==0) then
         write(*,'(80("-"))')
         write(*,*) "WABBIT POD." 
@@ -440,7 +439,7 @@ contains
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
         end do
         write(*,'(80("-"))')
-        write(*,*) "Frobenius norm ||X||_F: ", Frobnorm
+        write(*,'("L2 norm ||X||_2^2/N_snapshots/Volume: ",g18.8)') L2norm**2/dble(N_snapshots)/Volume
         write(*,'("Data dimension: ",i1,"D")') params%dim
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("NCPU=",i6)') params%number_procs
@@ -477,9 +476,9 @@ contains
   !##############################################################
 
   !##############################################################
-  !> Frobenius norm of snapshotmatrix
-  function compute_frobenius_norm(params, lgt_block, hvy_block, hvy_active, hvy_n,  &
-                              N_snapshots, verbosity) result(Fnorm)
+  !> Compute the L2 norm of the snapshotmatrix
+  function compute_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n,  &
+                              N_snapshots, verbosity) result(L2norm)
 
       implicit none
       !-----------------------------------------------------------------
@@ -493,11 +492,11 @@ contains
       logical, intent(in),optional   :: verbosity !< if true aditional stdout is printed
       !-----------------------------------------------------------------
       ! result
-      real(kind=rk) :: Fnorm
+      real(kind=rk) :: L2norm
       !-----------------------------------------------------------------
       integer(kind=ik)    :: lgt_id, hvy_id, ierr, tree_id = 1
       integer(kind=ik)    :: k, N, rank, g, Bs(3), dF=1
-      real(kind=rk) :: norm, x0(3), dx(3)
+      real(kind=rk) :: norm, x0(3), dx(3), Volume
       logical :: verbose=.false.
 
       if (present(verbosity)) verbose = verbosity
@@ -505,26 +504,14 @@ contains
       N = params%number_blocks
       Bs= params%Bs
       g = params%n_ghosts
-
-      norm = 0.0_rk
+      Volume = product(params%domain_size(1:params%dim))
+      L2norm = 0.0_rk
       ! Loop over the active hvy_data
       do tree_id =1, N_snapshots
         do dF = 1, params%n_eqn
-          do k = 1,hvy_n(tree_id)
-              hvy_id = hvy_active(k, tree_id)
-              call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N) 
-              call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-              ! ----------------------------
-              ! integrate squared quantity
-              ! ----------------------------
-              if (params%dim == 3) then
-                  norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, &
-                                                       g+1:Bs(3)+g-1,dF , hvy_id)**2)
-              else
-                  norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, &
-                                                        dF, hvy_id)**2)
-              endif
-          end do
+          norm = compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt=dF, &
+                              tree_id_opt=tree_id, verbosity=verbose) 
+          L2norm = L2norm + norm**2
         end do
       end do
       ! -------------------
@@ -533,9 +520,9 @@ contains
       !call MPI_ALLREDUCE(MPI_IN_PLACE, norm,1, MPI_DOUBLE_PRECISION, &
                        !MPI_SUM,WABBIT_COMM, ierr)
 
-      call MPI_REDUCE(norm,Fnorm, 1 ,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM, ierr)
-      Fnorm =sqrt(Fnorm)
-      if (params%rank == 0 .and. verbose ) write(*,'("Frobenius norm: ",g12.8)') Fnorm
+      L2norm =sqrt(L2norm)
+      if (params%rank == 0 .and. verbose ) write(*,*) "sum(eigs)= ", L2norm**2/dble(N_snapshots)/Volume
+
   end function
   !##############################################################
 

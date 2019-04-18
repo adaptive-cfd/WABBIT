@@ -140,8 +140,7 @@ program main_post
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout
-    if (rank==0 .and. mode == "--POD") &
-      call summarize_profiling( WABBIT_COMM )
+    if ( mode == "--POD") call summarize_profiling( WABBIT_COMM )
 
     ! end mpi
     call MPI_Finalize(ierr)

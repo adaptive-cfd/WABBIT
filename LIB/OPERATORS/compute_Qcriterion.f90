@@ -44,18 +44,13 @@ subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
         !-----------------------------------------------------------------------
         dz_inv = 1.0_rk / dx(3)
         if (discretization == "FD_2nd_central" ) then
-            ! do ix = g+1, Bs(1)+g
-            !     do iy = g+1, Bs(2)+g
-            !         do iz = g+1, Bs(3)+g
-            !
-            !         end do
-            !     end do
-            ! end do
+            call abort(0112181, "ERROR: Q-criterion using 2nd order not implemented.")
+
         else if (discretization == "FD_4th_central_optimized") then
             do ix = g+1, Bs(1)+g
                 do iy = g+1, Bs(2)+g
                     do iz = g+1, Bs(3)+g
-                        uxdx = (a(-3)*u(ix-3,iy,iz) + a(-2)*u(ix-2,iy,iz) + a(-1)*u(ix-1,iy,iz) + a(0)*u(ix,iy,iz)  &
+                        uxdx = (a(-3)*u(ix-3,iy,iz) + a(-2)*u(ix-2,iy,iz) + a(-1)*u(ix-1,iy,iz) + a(0)*u(ix,iy,iz) &
                              +  a(+1)*u(ix+1,iy,iz) + a(+2)*u(ix+2,iy,iz) + a(+3)*u(ix+3,iy,iz))*dx_inv
                         uxdy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + a(-1)*u(ix,iy-1,iz) + a(0)*u(ix,iy,iz) &
                              +  a(+1)*u(ix,iy+1,iz) + a(+2)*u(ix,iy+2,iz) + a(+3)*u(ix,iy+3,iz))*dy_inv
@@ -89,33 +84,6 @@ subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
             call abort(0112181, "ERROR: discretization method in discretization is unknown")
         end if
     else
-        !-----------------------------------------------------------------------
-        ! 2D case 2D case 2D case 2D case
-        !-----------------------------------------------------------------------
-        ! if (discretization == "FD_2nd_central" ) then
-        !     do ix = g+1, Bs(1)+g
-        !         do iy = g+1, Bs(2)+g
-        !             u_dx = (u(ix+1,iy,1)-u(ix-1,iy,1))*dx_inv*0.5_rk
-        !             v_dy = (v(ix,iy+1,1)-v(ix,iy-1,1))*dy_inv*0.5_rk
-        !             Qcrit(ix,iy,1) = u_dx + v_dy
-        !         end do
-        !     end do
-        ! else if (discretization == "FD_4th_central_optimized") then
-        !     do ix = g+1, Bs(1)+g
-        !         do iy = g+1, Bs(2)+g
-        !             u_dx = (a(-3)*u(ix-3,iy,1) + a(-2)*u(ix-2,iy,1) + &
-        !             a(-1)*u(ix-1,iy,1) + a(0)*u(ix,iy,1)&
-        !             +  a(+1)*u(ix+1,iy,1) + a(+2)*u(ix+2,iy,1) + a(+3)*u(ix+3,iy,1))*dx_inv
-        !
-        !             v_dy = (a(-3)*v(ix,iy-3,1) + a(-2)*v(ix,iy-2,1) + &
-        !             a(-1)*v(ix,iy-1,1) + a(0)*v(ix,iy,1)&
-        !             +  a(+1)*v(ix,iy+1,1) + a(+2)*v(ix,iy+2,1) + a(+3)*v(ix,iy+3,1))*dy_inv
-        !
-        !             Qcrit(ix,iy,1) = u_dx + v_dy
-        !         end do
-        !     end do
-        ! else
-        !     call abort(0112182, "ERROR: discretization method in discretization is unknown")
-        ! end if
+        call abort(0112181, "ERROR: Q-criterion for 2D not implemented.")
     end if
 end subroutine compute_Qcriterion

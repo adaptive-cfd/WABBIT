@@ -49,7 +49,7 @@ contains
   !>      squared singular value bigger then the given or default truncation error
   subroutine snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       truncation_error, truncation_rank)
+                       truncation_error, truncation_rank, save_all)
     implicit none
 
     !-----------------------------------------------------------------
@@ -76,12 +76,15 @@ contains
     !> Threshold value for truncating POD modes. If the singular value is smaller,
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk), optional, intent(in)     :: truncation_error 
+    !> if true we write out all temporal coefficients and eigenvalues
+    !> filenames eigenvalues.txt, acoef.txt
+    logical, optional, intent(in)     :: save_all
     !---------------------------------------------------------------
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
                     eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse  
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
                       free_tree_id,tree_id, N_modes, max_nr_pod_modes
-
+    character(len=80):: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
     !---------------------------------------------------------------------------
@@ -144,8 +147,18 @@ contains
       write(*,'("sum(eigs) = ", g18.8)') sum(eigenvalues)
       write(*,*)
     endif
+    ! Save Eigenvalues if requested:
+    if (save_all .and. rank==0) then
+      filename ="eigenvalues.txt"
+      write(*,'( "eigenvalues saved to file: ", A30 )') filename
+      write(*,*)
+      open(14,file=filename,status='replace')
+      do i = 1, N_snapshots
+        write (14,'(i4,1x,g18.8)') i, eigenvalues(i)
+      end do
+      close(14)
+    end if
 
-    
   !---------------------------------------------------------------------------
   ! construct POD basis functions (modes)
   !---------------------------------------------------------------------------
@@ -185,9 +198,9 @@ contains
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)    
 
       if ( params%adapt_mesh) then
-            !call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            !lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-            !pod_mode_tree_id, tree_n )
+            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+            pod_mode_tree_id, tree_n )
       endif
 
     end do
@@ -204,6 +217,17 @@ contains
   ! when the singular values are smaller as the desired presicion! Therefore we update
   ! the truncation rank here.
   truncation_rank = N_modes
+
+  if (rank==0 .and. save_all) then
+    write(*,*)
+    filename = "a_coefs.txt" 
+    write(*,'( "Temporal coefficients saved to file: ", A30 )') filename
+    open(14, file=filename, status='replace')
+    do i = 1, N_snapshots
+      write(14,'(400(es15.8,1x))') V(i, 1:N_modes)
+    enddo
+    close(14)
+  end if
 
   if (rank == 0) then
       write(*, *)
@@ -276,13 +300,13 @@ contains
                      eps=-1.0_rk, L2norm, Volume
     character(len=80) :: tmp_name
     character(len=2)  :: order
-    logical, parameter :: verbosity = .false.
+    logical :: verbosity = .false., save_all = .true.
 
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
             write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD [--order=[2|4] --nmodes=3 --error=1e-9] sources_*.h5 " 
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD [--save_all --order=[2|4] --nmodes=3 --error=1e-9 --adapt=0.1] sources_*.h5" 
         end if
         return
     end if
@@ -319,12 +343,17 @@ contains
               n_opt_args = n_opt_args + 1
       endif
       !-------------------------------
-      ! adaptation
+      ! ADAPTION
       if ( index(args,"--adapt=")==1 ) then
         read(args(9:len_trim(args)),* ) eps
         n_opt_args = n_opt_args + 1
       end if
-
+      !-------------------------------
+      ! SAVE Additional data to files
+      if ( index(args,"--save_all")==1 ) then
+        save_all = .true.
+        n_opt_args = n_opt_args + 1
+      end if
       
     end do
 
@@ -414,10 +443,10 @@ contains
           call adapt_tree_mesh( time(tree_id), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
           lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
       endif
-      tmp_name = "test/test"
-      write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
-      call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id ) 
+      !tmp_name = "adapted"
+      !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
+      !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id ) 
     end do
 
     ! --------------------
@@ -458,7 +487,7 @@ contains
     !----------------------------------
     call snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       truncation_error, truncation_rank)
+                       truncation_error, truncation_rank, save_all)
     !----------------------------------
     ! Save Modes
     !----------------------------------
@@ -514,11 +543,6 @@ contains
           L2norm = L2norm + norm**2
         end do
       end do
-      ! -------------------
-      ! sum over all procs
-      ! -------------------
-      !call MPI_ALLREDUCE(MPI_IN_PLACE, norm,1, MPI_DOUBLE_PRECISION, &
-                       !MPI_SUM,WABBIT_COMM, ierr)
 
       L2norm =sqrt(L2norm)
       if (params%rank == 0 .and. verbose ) write(*,*) "sum(eigs)= ", L2norm**2/dble(N_snapshots)/Volume

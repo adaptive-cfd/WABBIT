@@ -60,7 +60,7 @@ module module_acm
     ! the mean pressure has no meaning in incompressible fluids, but sometimes it can
     ! be nice to ensure the mean is zero, e.g., for comparison wit other codes. if set to true
     ! wabbit removes the mean pressure at every time step.
-    logical :: p_mean_zero
+    logical :: p_mean_zero=.false., u_mean_zero=.false.
     ! sponge term:
     logical :: use_sponge=.false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
@@ -162,6 +162,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'u_mean_zero', params_acm%u_mean_zero, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
 
 

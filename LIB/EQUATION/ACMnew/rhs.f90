@@ -403,6 +403,12 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
     end if
 
+    ! remove mean flow
+    if (params_acm%u_mean_zero) then
+        phi(:,:,1) = phi(:,:,1) - params_acm%mean_flow(1)
+        phi(:,:,2) = phi(:,:,2) - params_acm%mean_flow(2)
+    end if
+
     ! --------------------------------------------------------------------------
     ! sponge term.
     ! --------------------------------------------------------------------------
@@ -656,6 +662,13 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     ! state vector and not the RHS.
     if (params_acm%p_mean_zero) then
         phi(:,:,:,4) = phi(:,:,:,4) - params_acm%mean_p
+    end if
+
+    ! remove mean flow
+    if (params_acm%u_mean_zero) then
+        phi(:,:,:,1) = phi(:,:,:,1) - params_acm%mean_flow(1)
+        phi(:,:,:,2) = phi(:,:,:,2) - params_acm%mean_flow(2)
+        phi(:,:,:,3) = phi(:,:,:,3) - params_acm%mean_flow(3)
     end if
 
     ! --------------------------------------------------------------------------

@@ -29,7 +29,7 @@ module module_forest
   PUBLIC :: read_field2tree,  write_tree_field, &
             add_tree, count_tree_hvy_n, allocate_hvy_lgt_data, &
             copy_tree, multiply_tree, scalar_multiplication_tree, &
-            adapt_tree_mesh
+            adapt_tree_mesh, compute_tree_L2norm
   !**********************************************************************************************
 contains
 
@@ -225,33 +225,87 @@ contains
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+      integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
       integer(kind=ik), intent(in)      :: tree_id !< all data from tree_id2 gets copied to tree_id1
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       real(kind=rk), intent(in)      :: alpha !< heavy data array - block data
       integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
       logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
       !-----------------------------------------------------------------
-      integer(kind=ik)    :: Jmax, lgt_id, hvy_id, fsize
-      integer(kind=ik)    :: k, N, rank
+      integer(kind=ik)    :: Jmax,  hvy_id, k
       logical :: verbose=.false.
       if (present(verbosity)) verbose=verbosity
-      Jmax = params%max_treelevel ! max treelevel
-      fsize= params%forest_size   ! maximal number of trees in forest
-      rank = params%rank
-      N = params%number_blocks
-
       if (params%rank == 0 .and. verbose ) write(*,'("scalar multiplication tree: ",i3)') tree_id
 
       ! Loop over the active hvy_data
       do k = 1, hvy_n(tree_id)
         hvy_id = hvy_active(k, tree_id)
-        call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
         hvy_block( :, :, :, :, hvy_id) = alpha * hvy_block( :, :, :, :, hvy_id)
-      end do ! loop over tree2
+      end do 
 
 
   end subroutine
+  !##############################################################
+
+  !##############################################################
+  !> L2 norm of all components in the statevector: 
+  !             norm(q_f) = sqrt( sum_ijk q_f^2 * dx_i dx_j dz_k )
+  function compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt, &
+                              tree_id_opt, verbosity) result(L2norm)
+
+      implicit none
+      !-----------------------------------------------------------------
+      ! inputs:
+      type (type_params), intent(in) :: params   !< params structure
+      integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
+      real(kind=rk), intent(in)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+      integer(kind=ik), intent(in)   :: lgt_block(:, :)
+      integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
+      integer(kind=ik), intent(in),optional:: dF_opt ! statevector index (dF_opt = 1...,number equations) default:1
+      integer(kind=ik), intent(in),optional:: tree_id_opt !< which tree is used (default:1)
+      logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
+      !-----------------------------------------------------------------
+      ! result
+      real(kind=rk) :: L2norm
+      !-----------------------------------------------------------------
+      integer(kind=ik)    :: lgt_id, hvy_id, ierr, tree_id = 1
+      integer(kind=ik)    :: k, N, rank, g, Bs(3), dF=1
+      real(kind=rk) :: norm, x0(3), dx(3)
+      logical :: verbose=.false.
+
+      if (present(dF_opt)) dF = dF_opt
+      if (present(tree_id_opt)) tree_id = tree_id_opt
+      if (present(verbosity)) verbose = verbosity
+      rank = params%rank
+      N = params%number_blocks
+      Bs= params%Bs
+      g = params%n_ghosts
+
+      norm = 0.0_rk
+      ! Loop over the active hvy_data
+      do k = 1,hvy_n(tree_id)
+          hvy_id = hvy_active(k, tree_id)
+          call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N) 
+          call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+          ! ----------------------------
+          ! integrate squared quantity
+          ! ----------------------------
+          if (params%dim == 3) then
+              norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, &
+                                                   g+1:Bs(3)+g-1,dF , hvy_id)**2)*dx(1)*dx(2)*dx(3)
+          else
+              norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, &
+                                                    dF, hvy_id)**2)*dx(1)*dx(2)
+          endif
+      end do
+      ! -------------------
+      ! sum over all blocks
+      ! -------------------
+      call MPI_ALLREDUCE( norm, L2norm, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, ierr)
+
+      L2norm = sqrt(L2norm)
+      if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e12.6)') L2norm
+  end function
   !##############################################################
 
 

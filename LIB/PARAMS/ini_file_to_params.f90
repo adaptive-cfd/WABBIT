@@ -223,11 +223,8 @@ end subroutine ini_file_to_params
     !> params structure of WABBIT
     type(type_params),intent(inout)  :: params
     !> power used for dimensionality (d=2 or d=3)
-    integer(kind=ik) :: i, n_entries=0
+    integer(kind=ik) :: i
     real(kind=rk), dimension(:), allocatable  :: tmp
-    character(len=80) :: Bs_str, Bs_conc
-    character(:), allocatable :: Bs_short
-    real(kind=rk), dimension(3) :: Bs_real
     if (params%rank==0) then
       write(*,*)
       write(*,*)
@@ -236,35 +233,7 @@ end subroutine ini_file_to_params
     endif
 
     ! read number_block_nodes
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
-    call merge_blancs(Bs_str)
-    Bs_short=trim(Bs_str)
-    call count_entries(Bs_short, " ", n_entries)
-    if (Bs_str .eq. "empty") then
-      Bs_conc="17 17 17"
-    elseif (n_entries==1) then
-      if (params%dim==3) then
-        Bs_conc=Bs_short // " " // Bs_short // " " // Bs_short
-      elseif (params%dim==2) then
-        Bs_conc=Bs_short//" "//Bs_short//" 1"
-      endif
-    elseif (n_entries==2) then
-      if (params%dim==3) then
-          call abort(231191737,"ERROR: You only gave two values for Bs, but want three to be read...")
-      elseif (params%dim==2) then
-        Bs_conc=Bs_short//" 1"
-      endif
-    elseif (n_entries==3) then
-      if (params%dim==2) then
-        call abort(231191738,"ERROR: You gave three values for Bs, but only want two to be read...")
-      elseif (params%dim==3) then
-        Bs_conc=trim(adjustl(Bs_str))
-      endif
-    elseif (n_entries .gt. 3) then
-      call abort(231191752,"ERROR: You gave too many arguments for Bs...")
-    endif
-    read(Bs_conc, *) Bs_real
-    params%Bs = int(Bs_real)
+    params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
 
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 1 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
@@ -385,6 +354,42 @@ end subroutine ini_file_to_params
       string_merge = adjustl(string_merge)
 
     end subroutine merge_blancs
+
+
+    !-------------------------------------------------------------------------!
+    !> @brief Read Bs from inifile for unknown number of Bs in inifile
+function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
+  type(inifile) ,intent(inout)     :: FILE
+  character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+  character(len=*), intent(in)    :: keyword ! what keyword do you
+  integer(kind=ik), intent(in)    :: default_Bs(:)
+  integer(kind=ik), intent(in)    :: dims !number of dimensions
+  character(len=:), allocatable :: output_trim
+  integer(kind=ik):: Bs(3)
+  integer(kind=ik):: i, n_entries
+  character(len=80):: output
+
+  Bs = 1
+  ! read number_block_nodes
+  call read_param_mpi(FILE, section, keyword, output, "empty")
+  if (trim(output) .eq. "empty") then
+      write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
+      Bs=default_Bs
+  else
+    call merge_blancs(output)
+    output_trim=trim(output)
+    call count_entries(output_trim, " ", n_entries)
+    ! check if the number of entries is valid
+    if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
+    ! Cast the output string into the integer
+    read(output_trim,*) (Bs(i), i=1,n_entries)
+    ! If only one Bs is given in the ini file, we duplicate it 
+    ! for the rest of the Bs array:
+    if (n_entries==1) then
+      Bs(1:dims) = Bs(1)
+    endif
+  endif
+end function
 
     !-------------------------------------------------------------------------!
     !> @brief count number of vector elements in a string

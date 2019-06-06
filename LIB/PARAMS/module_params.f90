@@ -162,7 +162,8 @@ module module_params
         ! frequency
         integer(kind=ik)                            :: filter_freq=-1
         ! save filter strength sigma
-        logical                                     :: save_filter_strength
+        logical :: save_filter_strength
+        logical :: filter_only_maxlevel = .false.
 
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions

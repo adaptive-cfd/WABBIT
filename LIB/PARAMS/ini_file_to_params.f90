@@ -101,6 +101,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
+    call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
     if (params%filter_type /= "no_filter") then
         call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
     endif
@@ -136,9 +137,9 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    if ( (params%n_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
-        call abort("ERROR: need more ghost nodes for given refinement order")
-    end if
+    ! if ( (params%n_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
+    !     call abort("ERROR: need more ghost nodes for given refinement order")
+    ! end if
     if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if

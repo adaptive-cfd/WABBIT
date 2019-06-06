@@ -27,7 +27,7 @@ subroutine init_filter(filter, FILE )
       write(*,'(" ---------------")')
     endif
     ! filter type
-    call read_param_mpi(FILE, 'Discretization', 'filter_type', filter%name, "no-filter" )
+    call read_param_mpi(FILE, 'Discretization', 'filter_type', filter%name, "no_filter" )
     ! reset stencil_size
     stencil_size = 0
 
@@ -181,7 +181,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
     call convert_statevector(work_array(:,:,:,1:N_dF),'conservative')
 
     ! loop over all datafields
-    work_array(:,:,:,N_dF+1:2*N_dF)=work_array(:,:,:,1:N_dF)
+    work_array(:,:,:,N_dF+1:2*N_dF) = work_array(:,:,:,1:N_dF)
 
     select case (filter%name)
     case ('bogey_shock')
@@ -191,7 +191,7 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
         call bogey_filter2D_(filter, u, g, Bs, N_dF, x0, dx, work_array) !new bogey_filter
       !  call bogey_filter2D(filter, Bs, g, N_dF ,work_array,x0,dx) !old bogey filter
       endif
-      
+
     case('explicit_5pt','explicit_7pt','explicit_9pt','explicit_11pt') ! explicit filtering
       do dF = 1, N_dF
           dF_old = dF+N_dF

@@ -16,7 +16,7 @@ module module_navier_stokes_params
   use module_precision
   use module_ini_files_parser_mpi
   use mpi
-  use module_params, only: merge_blancs, count_entries
+  use module_params, only: read_bs
 
   implicit none
 
@@ -233,11 +233,13 @@ contains
                                                                     params_ns%coordinates )
     ! spatial domain size
     params_ns%domain_size = (/ 1.0_rk, 1.0_rk, 1.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim),  params_ns%domain_size(1:params_ns%dim))
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_ns%domain_size(1:params_ns%dim), &
+                        params_ns%domain_size(1:params_ns%dim))
 
     if ( params_ns%coordinates=="cylindrical" ) then
       params_ns%R_max=params_ns%domain_size(2)*0.5_rk
-      if ( params_ns%mpirank==0 ) write(*,'("maximal Radius" ,T30,"R_max",T60,"=",TR1, e10.2 )') params_ns%R_max
+      if ( params_ns%mpirank==0 ) write(*,'("maximal Radius" ,T30,"R_max",T60,"=",TR1, e10.2 )') &
+                                  params_ns%R_max
     end if
 
     ! read adiabatic coefficient
@@ -406,11 +408,6 @@ subroutine init_other_params( FILE )
     implicit none
     !> pointer to inifile
     type(inifile) ,intent(inout)        :: FILE
-    character(len=80) :: Bs_str, Bs_conc
-    character(:), allocatable :: Bs_short
-    real(kind=rk), dimension(3) :: Bs_real
-    integer(kind=ik) :: n_entries
-
 
     if (params_ns%mpirank==0) then
       write(*,*)
@@ -435,35 +432,7 @@ subroutine init_other_params( FILE )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
 
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
-    call merge_blancs(Bs_str)
-    Bs_short=trim(Bs_str)
-    call count_entries(Bs_short, " ", n_entries)
-    if (Bs_str .eq. "empty") then
-      Bs_conc="17 17 17"
-    elseif (n_entries==1) then
-      if (params_ns%dim==3) then
-        Bs_conc=Bs_short // " " // Bs_short // " " // Bs_short
-      elseif (params_ns%dim==2) then
-        Bs_conc=Bs_short//" "//Bs_short//" 1"
-      endif
-    elseif (n_entries==2) then
-      if (params_ns%dim==3) then
-        call abort(231192248,"ERROR: You only gave two values for Bs, but want three to be read...")
-      elseif (params_ns%dim==2) then
-        Bs_conc=Bs_short//" 1"
-      endif
-    elseif (n_entries==3) then
-      if (params_ns%dim==2) then
-        call abort(231192249,"ERROR: You gave three values for Bs, but only want two to be read...")
-      elseif (params_ns%dim==3) then
-        Bs_conc=trim(adjustl(Bs_str))
-      endif
-    elseif (n_entries .gt. 3) then
-      call abort(231192249,"ERROR: You gave too many arguments for Bs...")
-    endif
-    read(Bs_conc, *) Bs_real
-    params_ns%Bs = int(Bs_real)
+    params_ns%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_ns%Bs, params_ns%dim)
 
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_ns%g, 1   )
 

@@ -98,7 +98,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
     !> we iterate until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -
-    !! if it's constant, its because no more blocks are refined)
+    !! if it's constant, its because no more blocks are coarsened)
     do while ( lgt_n_old /= lgt_n )
 
         lgt_n_old = lgt_n
@@ -131,7 +131,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
-  
+
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &

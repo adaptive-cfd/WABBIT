@@ -4,20 +4,20 @@ module module_treelib
   use module_globals
 
 
-          
+
 contains
 
     include "get_neighbor_treecode.f90"
 
   !===============================================================================
-  !> \brief from a tree id and treecode we make a tree-identifieer, which is 
+  !> \brief from a tree id and treecode we make a tree-identifieer, which is
   !! an integer made of the tree_id and the treecode
   !! Note: tree_id s start from 1
-  function treecode2int(treearray, tree_id) 
+  function treecode2int(treearray, tree_id)
     implicit none
     integer(kind=ik), intent(in) :: treearray(:)
     integer(kind=ik),optional, intent(in) :: tree_id
-    integer(kind=ik) :: N,i, potency
+    integer(kind=tsize) :: N, i, potency
     integer(kind=tsize) :: treecode2int
     N = size(treearray,1)
 
@@ -26,20 +26,21 @@ contains
         potency = floor(log10(real(tree_id))) + 1
         ! the +1 is necessary because it seperates the treecode from the tree_id with a 0
     else
-    ! For the rest of wabbit not using tree_ids we have to make sure that
-    ! the results stay the same
+        ! For the rest of wabbit not using tree_ids we have to make sure that
+        ! the results stay the same
         potency = -1
-        treecode2int = 0 
+        treecode2int = 0_tsize
     endif
 
     do i = 1, N
-      if (treearray(i) >= 0) then
-        ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
-        ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-        treecode2int = treecode2int + (10**(i+potency)) * ( treearray(i) + 1 )
-      endif
+        if (treearray(i) >= 0) then
+            ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
+            ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
+            treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
+        endif
     enddo
-  end function
+    
+end function
 
   !===============================================================================
   !> \brief from an integer, return the first (rightmost) digit and remove it from

@@ -27,7 +27,7 @@ module module_MOR
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: snapshot_POD, post_POD
+  PUBLIC :: snapshot_POD, post_POD, post_reconstruct
   !**********************************************************************************************
 contains
 
@@ -83,7 +83,7 @@ contains
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
                     eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse  
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
-                      free_tree_id,tree_id, N_modes, max_nr_pod_modes
+                      free_tree_id, tree_id, N_modes, max_nr_pod_modes
     character(len=80):: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
@@ -497,7 +497,7 @@ contains
       write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), i 
 
       call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , 0.0_rk , tree_id - N_snapshots ) 
+          lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , 0.0_rk , i ) 
 
     end do
 
@@ -584,7 +584,7 @@ contains
                         N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
     real(kind=rk) :: C_val, Volume, t_elapse, t_inc(3)
     real(kind=rk) :: x0(3), dx(3)
-    
+
     N_snapshots = size(C,1)
     N = params%number_blocks
     rank = params%rank
@@ -606,15 +606,24 @@ contains
         ! note: this routine deletes lgt_data of the "free_tree_id" before copying 
         !       the tree
         t_inc(1) = MPI_wtime()
+        
         call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id1) 
         t_inc(1) = MPI_wtime()-t_inc(1)
+
         !---------------------------------------------------
         ! multiply tree_id2 * free_tree_id -> free_tree_id
         !---------------------------------------------------
         t_inc(2) = MPI_wtime()
         call multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, free_tree_id, tree_id2)
+        !call write_tree_field("field1_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
+                    !lgt_n, hvy_n, hvy_active, 1, free_tree_id )
+        !call write_tree_field("field2_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
+                    !lgt_n, hvy_n, hvy_active, 1, tree_id2 )
+                  !call abort(134)
+
+
         t_inc(2) = MPI_wtime()-t_inc(2)
 
         !---------------------------------------------------
@@ -667,7 +676,370 @@ contains
   !##############################################################
   
 
+!##############################################################
+  !> Main routine of the POD postprocessing procedure.
+  !> If post_reconstruct is called from wabbit-post it will read in files
+  !> specified on input and use it as snapshot data. After 
+  !> decomposition the Modes will be safed to a file!
+  subroutine post_reconstruct(params)
+    use module_precision
+    use module_params
+    use module_forest
+    use module_mpi
 
+    implicit none
+
+    !> parameter struct
+    !--------------------------------------------
+    type (type_params), intent(inout)  :: params
+    !--------------------------------------------
+    character(len=80)      :: file_in, file_out, args
+    integer(kind=ik), allocatable           :: lgt_block(:, :)
+    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
+    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :)
+    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
+    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
+    integer(hid_t)                          :: file_id
+    real(kind=rk), dimension(3)             :: domain
+    integer(hsize_t), dimension(2)          :: dims_treecode
+    integer(kind=ik) :: iteration, N_modes_used=1_ik, max_nr_modes, N_modes_given
+    integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
+    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank 
+    real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
+    character(len=80) :: fname_acoefs, tmp_name
+    character(len=2)  :: order
+    logical :: verbosity = .false., save_all = .true.
+
+    call get_command_argument(2, file_in)
+    if (file_in == '--help' .or. file_in == '--h') then
+        if ( params%rank==0 ) then
+            write(*,*) "postprocessing subroutine to reconstruct field from POD modes" 
+            write(*,*) "./wabbit-post --POD-reconstruct a_coef.txt " // &
+              "[--save_all --order=[2|4] --nmodes=3 --adapt=0.1] POD_modes_*.h5" 
+        end if
+        return
+    end if
+
+    !----------------------------------
+    ! read predefined params 
+    !----------------------------------
+    n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
+
+    do i = 1, command_argument_count()
+      call get_command_argument(i,args)
+      !-------------------------------
+      ! order of predictor
+      if ( index(args,"--order=")==1 ) then
+        read(args(9:len_trim(args)),* ) order 
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! MEMORY AVAILABLE
+      if ( index(args,"--memory=")==1 ) then
+              read(args(10:len_trim(args)-2),* ) maxmem
+              n_opt_args = n_opt_args + 1
+      endif
+      !-------------------------------
+      ! ADAPTION
+      if ( index(args,"--adapt=")==1 ) then
+        read(args(9:len_trim(args)),* ) eps
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! SAVE Additional data to files
+      if ( index(args,"--save_all")==1 ) then
+        save_all = .true.
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! TEMPORAL COEFFS
+      if ( index(args,"--POD-reconstruct")==1 ) then
+        call get_command_argument(i+1, fname_acoefs)
+        if (rank==0) write(*,*) "Temporal coefficients are read from", fname_acoefs
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! TIMESTEP
+      if ( index(args,"--timestep=")==1 ) then
+        N_snapshots = 1
+        read(args(12:len_trim(args)),* ) iteration
+        if (rank==0) write(*,*) "Iteration reconstructed: " ,iteration
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! TRUNCATION RANK
+      if ( index(args,"--nmodes=")==1 ) then
+        read(args(10:len_trim(args)),* ) N_modes_used
+        n_opt_args = n_opt_args + 1
+      end if
+
+    end do
+
+    !----------------------------------
+    ! READ a_coefficient from file 
+    !----------------------------------
+    call check_file_exists(fname_acoefs)
+    call count_lines_in_ascii_file_mpi(fname_acoefs, N_snapshots, n_header=0_ik)
+    call count_cols_in_ascii_file_mpi(fname_acoefs, max_nr_modes, n_header=0_ik)
+    if (N_modes_used>max_nr_modes) call abort(270419,"Try to use more modes then available")
+    if (N_modes_used< 0) N_modes_used = max_nr_modes
+    allocate( a_coefs(1:N_snapshots, 1:max_nr_modes))
+    call read_array_from_ascii_file_mpi(fname_acoefs, a_coefs, n_header=0_ik)
+    if (rank==0) then
+        write(*,*) "~~~~v      ", fname_acoefs
+        do k = 1, N_snapshots
+           write(*,'(400(es15.8,1x))') a_coefs(k, :)
+        enddo
+        write(*,*) "~~~~^      ", fname_acoefs
+    endif
+
+    !----------------------------------
+    ! some wabbit params
+    !----------------------------------
+
+    if (order == "2") then
+        params%order_predictor = "multiresolution_2nd"
+        params%n_ghosts = 2_ik
+    else
+        params%order_predictor = "multiresolution_4th"
+        params%n_ghosts = 4_ik
+    end if
+    if ( eps > 0) then
+      ! adapt the mesh if possible
+      params%adapt_mesh = .True.! .False.!.True.
+      params%eps=eps
+    else
+      params%adapt_mesh = .False.
+      params%eps = 0.0_rk
+    endif
+
+    !----------------------------------
+    ! set addtitional params
+    !----------------------------------
+    ! block distirbution:
+    params%block_distribution="sfc_hilbert"
+    ! no time stepping:
+    params%time_step_method="no" 
+    params%min_treelevel=1
+    ! coarsening indicator
+    params%coarsening_indicator="threshold-state-vector"
+    params%threshold_mask=.False.
+    ! read ini-file and save parameters in struct
+    N_modes_given = command_argument_count()
+    N_modes_given = N_modes_given - n_opt_args ! because of the first nargs arguments which are not files
+    if (N_modes_given /= max_nr_modes) write(*,*) "Warning!!! Given number of modes not consistent with file:"//fname_acoefs
+    if (N_modes_given < N_modes_used) call abort(280419,"Error! You try to use more modes then available")
+    allocate(params%input_files(N_modes_used))
+
+
+    !-------------------------------------------
+    ! check and find common params in all h5-files
+    !-------------------------------------------
+    call get_command_argument(n_opt_args+1, params%input_files(1))
+    call read_attributes(params%input_files(1), lgt_n_tmp, tmp_time, iter, params%domain_size, &
+                         params%Bs, params%max_treelevel, params%dim)
+    do i = 2, N_modes_used
+      call get_command_argument(n_opt_args+i, file_in)
+      params%input_files(i) = file_in
+      call read_attributes(file_in, lgt_n_tmp, tmp_time, iter, domain, bs, level, dim)
+      params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+      if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
+      if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
+      if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
+    end do
+    fsize = N_modes_used + N_snapshots + 1 !we need some extra fields for storing etc
+    params%forest_size = fsize
+    number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
+    params%n_eqn = 1
+    allocate(params%threshold_state_vector_component(params%n_eqn))
+    params%threshold_state_vector_component=.True.
+    if (maxmem < 0.0_rk) then
+      params%number_blocks = ceiling( 4.0_rk * fsize * number_dense_blocks / params%number_procs )
+    endif
+
+    !----------------------------------
+    ! allocate data
+    !----------------------------------
+    call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
+              lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
+              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
+    hvy_neighbor = -1
+    lgt_n = 0 ! reset number of acitve light blocks
+    tree_n= 0 ! reset number of trees in forest
+    !----------------------------------
+    ! READ ALL Modes needed
+    !----------------------------------
+    do tree_id = 1, N_modes_used
+      call read_field2tree(params, params%input_files(tree_id), params%n_eqn, tree_id, &
+                  tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
+                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+      !----------------------------------
+      ! Adapt the data to the given eps 
+      !----------------------------------
+      if (params%adapt_mesh) then
+          ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
+          ! adapt-mesh also performs neighbor and active lists updates
+          call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+          lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+      endif
+      !tmp_name = "adapted"
+      !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
+      !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id ) 
+    end do
+
+      if (params%rank==0) then
+        write(*,'(80("-"))')
+        write(*,*) "WABBIT POD-reconstruction." 
+        write(*,*) "POD modes for reconstruction:"
+        do i = 1, N_Modes_used
+          write(*, '("Mode=",i3 ," File=", A ," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
+          i, trim(params%input_files(i)), lgt_n(i), &
+          100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
+          100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
+          min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
+          max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+        end do
+        write(*,'(80("-"))')
+        write(*,'("Temporal coefficients from:",A)') fname_acoefs
+        write(*,'("Number modes used/available=",1x,i4,"/",i4)') N_modes_used, max_nr_modes
+        write(*,'("Data dimension: ",i1,"D")') params%dim
+        write(*,'("Domain size is ",3(g12.4,1x))') domain
+        write(*,'("NCPU=",i6)') params%number_procs
+        write(*,'("Number Trees=",1x,i4)') fsize
+        write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
+        write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
+        write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
+        write(*,'("Nblocks used (sparse)=",i6)') lgt_n(fsize+1)
+        write(*,'("Predictor=",A)') params%order_predictor
+        write(*,'("block_distribution=",A)') params%block_distribution
+        write(*,'(80("-"))')
+    endif
+
+    !----------------------------------
+    ! COMPUTE POD Modes
+    !----------------------------------
+    reconst_tree_id = tree_n + 1
+    call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                       a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
+    !----------------------------------
+    ! Save Reconstructed Snapshots
+    !----------------------------------
+    tmp_name = "Reconstruct"
+    write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), iteration
+    call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, params%n_eqn, reconst_tree_id , 0.0_rk , iteration ) 
+
+
+  end subroutine 
+  !##############################################################
+
+
+  !##############################################################
+  subroutine reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                       a_coefs, iteration, N_modes, dest_tree_id, save_all)
+    implicit none
+
+    !-----------------------------------------------------------------
+    !> user defined parameter structure
+    type (type_params), intent(inout)     :: params
+    !> light data array
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
+    !> size of active lists
+    integer(kind=ik),  intent(inout)        :: lgt_n(:), hvy_n(:)
+    !> heavy data array - block data
+    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk),  intent(inout)           :: hvy_tmp(:, :, :, :, :)
+    !> neighbor array (heavy data)
+    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)
+    !> list of active blocks (light data)
+    integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    !> tree id of the reconstructed field and number of active trees
+    integer(kind=ik), intent(inout)       :: dest_tree_id, tree_n
+    !> number of POD modes
+    integer(kind=ik), intent(in)     :: iteration, N_modes
+    !> Threshold value for truncating POD modes. If the singular value is smaller,
+    !> then the given treshold we discard the corresponding POD MODE.
+    real(kind=rk),  intent(in)     :: a_coefs(:,:)
+    !> if true we write out all temporal coefficients and eigenvalues
+    !> filenames eigenvalues.txt, acoef.txt
+    logical, optional, intent(in)     :: save_all
+    !---------------------------------------------------------------
+    integer(kind=ik)::  i, rank, free_tree_id
+    real(kind=rk) :: a, t_elapse
+    character(len=80):: filename
+    !---------------------------------------------------------------------------
+    ! check inputs and set default values
+    !---------------------------------------------------------------------------
+    rank= params%rank 
+
+    if (rank == 0) then
+      write(*, *)
+      write(*,'(80("-"))')
+      write(*,'(30("#"), " Reconstruct ", 30("#"))')
+      write(*,'(80("-"))')
+      write(*,'("Number of Modes used: ",i4)') N_modes
+      if (params%adapt_mesh) write(*,'("Compression threshold eps: ",es12.4)') params%eps
+      write(*,'(80("-"))')
+      write(*, *)
+    endif
+
+    ! in this algorithm we need at least N_mode trees plus 2 additional fields for
+    ! saving the reconstructed field and a temporary field
+    if ( params%forest_size <= N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
+    if ( dest_tree_id<= N_modes) call abort(200419,"Error! Destination tree id overwrites POD Modes!")
+    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, 1_ik) 
+    call scalar_multiplication_tree(params, hvy_block, hvy_active, hvy_n, &
+                                    dest_tree_id, a_coefs(iteration,1))
+    free_tree_id = dest_tree_id + 1
+  !---------------------------------------------------------------------------
+  ! reconstruct field
+  !---------------------------------------------------------------------------
+  t_elapse = MPI_wtime()
+  do i = 2, N_modes
+    
+    a = a_coefs(iteration, i)
+    ! calculate pod modes:
+    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id , i) 
+    call scalar_multiplication_tree(params, hvy_block, hvy_active, hvy_n, &
+                                    free_tree_id, a)
+    call add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, dest_tree_id, free_tree_id)    
+
+
+  end do
+  !---------------------------------------------------------------------------
+  ! adapted reconstructed field
+  !---------------------------------------------------------------------------
+  if ( params%adapt_mesh) then
+      call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+      lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+      dest_tree_id, tree_n )
+  endif
+
+  t_elapse = MPI_WTIME() - t_elapse
+  if (rank == 0) then
+          write(*,'("Snapshot ", i4,"reconstructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
+          iteration, t_elapse, &
+          min_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) ), &
+          max_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) )
+  endif
+
+  end subroutine reconstruct_iteration
+  !##############################################################
+  
 
 
 

@@ -312,11 +312,11 @@ contains
       call wing_angular_accel( time, Insect )
 
       !-----------------------------------------------------------------------------
-      ! vector from body centre to left/right pivot point in global reference frame,
+      ! absolute coordinates of L/R pivot point in global reference frame,
       ! for aerodynamic power
       !-----------------------------------------------------------------------------
-      Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
-      Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
+      Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b) + Insect%xc_body_g
+      Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b) + Insect%xc_body_g
 
 
       if (first_call) then

@@ -41,7 +41,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
     real(kind=rk) :: force_block(1:3, 0:5), moment_block(1:3,0:5), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:5), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu
-    real(kind=rk) :: eps_inv, dV, dx_min, x, y, z, penal(1:3)
+    real(kind=rk) :: C_eta_inv, dV, dx_min, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), save :: umag
     ! we have quite some of these work arrays in the code, but they are very small,
@@ -104,11 +104,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
             call Update_Insect(time, Insect)
             x0_moment = 0.0_rk
             ! body moment
-            x0_moment(1:3,1) = Insect%xc_body_g
+            x0_moment(1:3, 1) = Insect%xc_body_g
             ! left wing
-            x0_moment(1:3,2) = Insect%x_pivot_l_g
+            x0_moment(1:3, 2) = Insect%x_pivot_l_g
             ! right wing
-            x0_moment(1:3,3) = Insect%x_pivot_r_g
+            x0_moment(1:3, 3) = Insect%x_pivot_r_g
         endif
 
     case ("integral_stage")
@@ -158,7 +158,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
             call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
-            eps_inv = 1.0_rk / params_acm%C_eta
+            C_eta_inv = 1.0_rk / params_acm%C_eta
 
             ! note in 2D case, uz is ignored, so we pass p just for fun.
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
@@ -181,7 +181,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
                 tmp_volume = tmp_volume + mask(ix,iy,1)
 
                 ! for the penalization term, we need to divide by C_eta
-                mask(ix,iy,1) = mask(ix,iy,1) * eps_inv
+                mask(ix,iy,1) = mask(ix,iy,1) * C_eta_inv
 
                 ! forces acting on body
                 force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-us(ix,iy,1,1))*mask(ix,iy,1)
@@ -205,7 +205,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
             call create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
-            eps_inv = 1.0_rk / params_acm%C_eta
+            C_eta_inv = 1.0_rk / params_acm%C_eta
 
             ! compute divergence on this block
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
@@ -218,8 +218,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
 
             do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
                 z = x0(3) + dble(iz-(g+1)) * dx(3)
+
                 do iy = g+1, Bs(2)+g-1
                     y = x0(2) + dble(iy-(g+1)) * dx(2)
+
                     do ix = g+1, Bs(1)+g-1
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
@@ -234,28 +236,35 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
                         tmp_volume = tmp_volume + mask(ix, iy, iz)
 
                         ! for the penalization term, we need to divide by C_eta
-                        mask(ix,iy,iz) = mask(ix,iy,iz) * eps_inv
+                        mask(ix,iy,iz) = mask(ix,iy,iz) * C_eta_inv
 
                         ! penalization term
                         penal = -mask(ix,iy,iz) * (u(ix,iy,iz,1:3) - us(ix,iy,iz,1:3))
 
-                        ! forces acting on body
+                        ! forces acting on this color
                         force_block(1:3, color) = force_block(1:3, color) - penal
 
                         ! moments. For insects, we compute the total moment wrt to the body center, and
                         ! the wing moments wrt to the hinge points. The latter two are used to compute the
                         ! aerodynamic power. Makes sense only in 3D.
                         if (is_insect) then
-                            ! moment with color-dependent lever
-                            x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
+                            ! exclude walls, trees, etc...
+                            if (color > 0_2) then
+                                ! moment with color-dependent lever
+                                x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
 
-                            ! is the obstacle is near the boundary, parts of it may cross the periodic
-                            ! boundary. therefore, ensure that xlev is periodized:
-                            ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+                                ! is the obstacle is near the boundary, parts of it may cross the periodic
+                                ! boundary. therefore, ensure that xlev is periodized:
+                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
 
-                            ! Compute moments relative to each part
-                            moment_block(:,color) = moment_block(:,color) - cross(x_lev, penal)
+                                ! Compute moments relative to each part
+                                moment_block(:,color) = moment_block(:,color) - cross(x_lev, penal)
 
+                                ! in the fifth color, we compute the total moment for the whole
+                                ! insect wrt the center point (body+wingS)
+                                x_lev(1:3) = (/x, y, z/) - Insect%xc_body_g(1:3)
+                                moment_block(:,5)  = moment_block(:,5) - cross(x_lev, penal)
+                            endif
                         endif
 
                         ! residual velocity in the solid domain
@@ -405,12 +414,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
             sum(params_acm%force_color(2,:)), sum(params_acm%force_color(3,:))
             close(14)
 
-            open(14,file='moments.t',status='unknown',position='append')
-            write(14,'(4(es15.8,1x))') time, sum(params_acm%moment_color(1,:)), &
-            sum(params_acm%moment_color(2,:)), sum(params_acm%moment_color(3,:))
-            close(14)
 
             if (is_insect) then
+                color = 5_2
+                open(14,file='moments.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
+                close(14)
+
                 open(14,file='aero_power.t',status='unknown',position='append')
                 write(14,'(3(es15.8,1x))') time, apowtotal, ipowtotal
                 close(14)

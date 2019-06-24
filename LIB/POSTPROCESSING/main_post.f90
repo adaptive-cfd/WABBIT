@@ -19,7 +19,7 @@ program main_post
     use mpi
     ! global parameters
     use module_params
-    use module_MOR, only : post_POD
+    use module_MOR, only : post_POD, post_reconstruct
     use module_timing
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -103,9 +103,12 @@ program main_post
     case ("--flusi-to-wabbit")
         call flusi_to_wabbit(params)
 
-    case ("--POD")
-      call post_POD(params)
+  case ("--POD")
+    call post_POD(params)
 
+  case ("--POD-reconstruct")
+    call post_reconstruct(params)
+  
     case default
 
         if (params%rank==0) then
@@ -121,6 +124,7 @@ program main_post
             write(*,*) "--compare-keys"
             write(*,*) "--flusi-to-wabbit"
             write(*,*) "--POD"
+            write(*,*) "--POD-reconstruct"
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
             else

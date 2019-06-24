@@ -256,7 +256,24 @@ program main
         open (44, file='CFL.t', status='replace')
         write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
         close(44)
+        open (14, file='moments.t', status='replace')
+        close(14)
+        open (14, file='aero_power.t', status='replace')
+        close(14)
+        open (14, file='forces_body.t', status='replace')
+        close(14)
+        open (14, file='moments_body.t', status='replace')
+        close(14)
+        open (14, file='forces_leftwing.t', status='replace')
+        close(14)
+        open (14, file='moments_leftwing.t', status='replace')
+        close(14)
+        open (14, file='forces_rightwing.t', status='replace')
+        close(14)
+        open (14, file='moments_rightwing.t', status='replace')
+        close(14)
     endif
+
     if (rank==0) then
         call Initialize_runtime_control_file()
     endif
@@ -473,7 +490,7 @@ program main
     !***************************************************************************
     if (rank==0) write(*,*) "This is the end of the main time loop!"
 
-    ! save end field to disk, only if timestep is not saved already
+    ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
@@ -483,7 +500,7 @@ program main
             call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
         end if
 
-        ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+        ! Note new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, &
@@ -506,6 +523,15 @@ program main
         write(*,'(80("_"))')
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
+
+    ! on HPC clusters, one is often confronted with a limited runtime (walltime limit)
+    ! and has to resume expensive simulations quite often. this process is usually automatized
+    ! but for this it is nice to have a quick-to-evaluate criterion to know if a run ended normally
+    ! or with an error. So write an empty success file if the run ended normally
+    if (rank==0) then
+        open (77, file='success', status='replace')
+        close(77)
+    endif
 
     ! end mpi
     call MPI_Finalize(ierr)

@@ -35,17 +35,26 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz
+    integer(kind=ik) :: mpierr, ix, iy, iz, k
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:6), tmp_meanflow(1:3), tmp_force(1:3), tmp_residual(1:3), tmp_ekin, tmp_volume
-    real(kind=rk) :: x, y, CFL, CFL_eta, CFL_nu
-    real(kind=rk) :: eps_inv, dV, dx_min
+    real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume
+    real(kind=rk) :: force_block(1:3, 0:5), moment_block(1:3,0:5), x_glob(1:3), x_lev(1:3)
+    real(kind=rk) :: x0_moment(1:3,0:5), ipowtotal=0.0_rk, apowtotal=0.0_rk
+    real(kind=rk) :: CFL, CFL_eta, CFL_nu
+    real(kind=rk) :: eps_inv, dV, dx_min, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), save :: umag
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:), div(:,:,:)
+    ! Color         Description
+    !   0           Boring parts (channel walls, cavity)
+    !   1           Interesting parts (e.g. a cylinder), for the insects this is BODY
+    !   2           Other parts, for the insects, this is LEFT WING
+    !   3           For the insects, this is RIGHT WING
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
+    integer(kind=2) :: color
+    logical :: is_insect
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -66,6 +75,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         dV = dx(1)*dx(2)
     endif
 
+    ! save some computing time by using a logical and not comparing every time
+    is_insect = .false.
+    if (params_acm%geometry == "Insect") is_insect = .true.
+
+
 
     select case(stage)
     case ("init_stage")
@@ -76,7 +90,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         ! performs initializations in the RHS module, such as resetting integrals
         params_acm%mean_flow = 0.0_rk
         if (params_acm%forcing_type(1) .eq. "taylor_green") params_acm%error = 0.0_rk
-        params_acm%force = 0.0_rk
+        params_acm%force_color = 0.0_rk
+        params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
         params_acm%mask_volume = 0.0_rk
@@ -85,7 +100,16 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         params_acm%div_min = 0.0_rk
         umag = 0.0_rk
 
-        if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+        if (is_insect) then
+            call Update_Insect(time, Insect)
+            x0_moment = 0.0_rk
+            ! body moment
+            x0_moment(1:3,1) = Insect%xc_body_g
+            ! left wing
+            x0_moment(1:3,2) = Insect%x_pivot_l_g
+            ! right wing
+            x0_moment(1:3,3) = Insect%x_pivot_r_g
+        endif
 
     case ("integral_stage")
         !-------------------------------------------------------------------------
@@ -109,12 +133,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
                     y = x0(2) + dble(iy-g-1)*dx(2)
                     tmp(1) = params_acm%u_mean_set(1) + dsin(x-params_acm%u_mean_set(1)*time)*&
                     dcos(y-params_acm%u_mean_set(2)*time)*dcos(time)
+
                     tmp(2) = params_acm%u_mean_set(2) - dcos(x-params_acm%u_mean_set(1)*time)*&
                     dsin(y-params_acm%u_mean_set(2)*time)*dcos(time)
+
                     tmp(3) = 0.25_rk*(dcos(2.0_rk*(x-params_acm%u_mean_set(1)*time)) +&
                     dcos(2.0_rk*(y-params_acm%u_mean_set(2)*time)))*dcos(time)**2
-                    params_acm%error(1:3) = params_acm%error(1:3) + abs(u(ix,iy,1,:)-&
-                    tmp(1:3))
+
+                    params_acm%error(1:3) = params_acm%error(1:3) + abs(u(ix,iy,1,:)-tmp(1:3))
                     params_acm%error(4:6) = params_acm%error(4:6) + sqrt(tmp(1:3)**2)
                 end do
             end do
@@ -122,10 +148,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         end if
 
         ! tmp values for computing the current block only
-        tmp_meanflow = 0.0_rk
-        tmp_force = 0.0_rk
-        tmp_residual = 0.0_rk
-        tmp_ekin = 0.0_rk
+        meanflow_block = 0.0_rk
+        force_block = 0.0_rk
+        moment_block = 0.0_rk
+        residual_block = 0.0_rk
+        ekin_block = 0.0_rk
         tmp_volume = 0.0_rk
 
         if (params_acm%dim == 2) then
@@ -143,9 +170,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
 
             do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
             do ix = g+1, Bs(1)+g-1
+                ! coloring not implemented for 2D
+                color = 0_2
+
                 ! compute mean flow for output in statistics
-                tmp_meanflow(1) = tmp_meanflow(1) + u(ix,iy,1,1)
-                tmp_meanflow(2) = tmp_meanflow(2) + u(ix,iy,1,2)
+                meanflow_block(1) = meanflow_block(1) + u(ix,iy,1,1)
+                meanflow_block(2) = meanflow_block(2) + u(ix,iy,1,2)
 
                 ! volume of mask (useful to see if it is properly generated)
                 tmp_volume = tmp_volume + mask(ix,iy,1)
@@ -154,15 +184,15 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
                 mask(ix,iy,1) = mask(ix,iy,1) * eps_inv
 
                 ! forces acting on body
-                tmp_force(1) = tmp_force(1) + (u(ix,iy,1,1)-us(ix,iy,1,1))*mask(ix,iy,1)
-                tmp_force(2) = tmp_force(2) + (u(ix,iy,1,2)-us(ix,iy,1,2))*mask(ix,iy,1)
+                force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-us(ix,iy,1,1))*mask(ix,iy,1)
+                force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-us(ix,iy,1,2))*mask(ix,iy,1)
 
                 ! residual velocity in the solid domain
-                tmp_residual(1) = max( tmp_residual(1), (u(ix,iy,1,1)-us(ix,iy,1,1)) * mask(ix,iy,1))
-                tmp_residual(2) = max( tmp_residual(2), (u(ix,iy,1,2)-us(ix,iy,1,2)) * mask(ix,iy,1))
+                residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-us(ix,iy,1,1)) * mask(ix,iy,1))
+                residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-us(ix,iy,1,2)) * mask(ix,iy,1))
 
                 ! kinetic energy
-                tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
+                ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
 
                 ! maximum of velocity in the field
                 umag = max( umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
@@ -185,50 +215,75 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
                 div = 0.00_rk
             end where
 
+
             do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
-            do iy = g+1, Bs(2)+g-1
-            do ix = g+1, Bs(1)+g-1
-                ! compute mean flow for output in statistics
-                tmp_meanflow(1) = tmp_meanflow(1) + u(ix,iy,iz,1)
-                tmp_meanflow(2) = tmp_meanflow(2) + u(ix,iy,iz,2)
-                tmp_meanflow(3) = tmp_meanflow(3) + u(ix,iy,iz,3)
+                z = x0(3) + dble(iz-(g+1)) * dx(3)
+                do iy = g+1, Bs(2)+g-1
+                    y = x0(2) + dble(iy-(g+1)) * dx(2)
+                    do ix = g+1, Bs(1)+g-1
+                        x = x0(1) + dble(ix-(g+1)) * dx(1)
 
-                ! volume of mask (useful to see if it is properly generated)
-                tmp_volume = tmp_volume + mask(ix, iy, iz)
+                        ! get this points color
+                        color = mask_color(ix, iy, iz)
 
-                ! for the penalization term, we need to divide by C_eta
-                mask(ix,iy,iz) = mask(ix,iy,iz) * eps_inv
+                        ! compute mean flow for output in statistics
+                        meanflow_block(1:3) = meanflow_block(1:3) + u(ix,iy,iz,1:3)
 
-                ! forces acting on body
-                tmp_force(1) = tmp_force(1) + (u(ix,iy,iz,1) - us(ix,iy,iz,1)) * mask(ix,iy,iz)
-                tmp_force(2) = tmp_force(2) + (u(ix,iy,iz,2) - us(ix,iy,iz,2)) * mask(ix,iy,iz)
-                tmp_force(3) = tmp_force(3) + (u(ix,iy,iz,3) - us(ix,iy,iz,3)) * mask(ix,iy,iz)
+                        ! volume of mask (useful to see if it is properly generated)
+                        ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
+                        tmp_volume = tmp_volume + mask(ix, iy, iz)
 
-                ! residual velocity in the solid domain
-                tmp_residual(1) = max( tmp_residual(1), (u(ix,iy,iz,1)-us(ix,iy,iz,1))*mask(ix,iy,iz) )
-                tmp_residual(2) = max( tmp_residual(2), (u(ix,iy,iz,2)-us(ix,iy,iz,2))*mask(ix,iy,iz) )
-                tmp_residual(3) = max( tmp_residual(3), (u(ix,iy,iz,3)-us(ix,iy,iz,3))*mask(ix,iy,iz) )
+                        ! for the penalization term, we need to divide by C_eta
+                        mask(ix,iy,iz) = mask(ix,iy,iz) * eps_inv
 
-                tmp_ekin = tmp_ekin + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
+                        ! penalization term
+                        penal = -mask(ix,iy,iz) * (u(ix,iy,iz,1:3) - us(ix,iy,iz,1:3))
 
-                ! maximum of velocity in the field
-                umag = max( umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
+                        ! forces acting on body
+                        force_block(1:3, color) = force_block(1:3, color) - penal
 
-                ! maximum/min divergence in velocity field
-                params_acm%div_max = max( params_acm%div_max, div(ix,iy,iz) )
-                params_acm%div_min = min( params_acm%div_min, div(ix,iy,iz) )
-            enddo
-            enddo
+                        ! moments. For insects, we compute the total moment wrt to the body center, and
+                        ! the wing moments wrt to the hinge points. The latter two are used to compute the
+                        ! aerodynamic power. Makes sense only in 3D.
+                        if (is_insect) then
+                            ! moment with color-dependent lever
+                            x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
+
+                            ! is the obstacle is near the boundary, parts of it may cross the periodic
+                            ! boundary. therefore, ensure that xlev is periodized:
+                            ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+
+                            ! Compute moments relative to each part
+                            moment_block(:,color) = moment_block(:,color) - cross(x_lev, penal)
+
+                        endif
+
+                        ! residual velocity in the solid domain
+                        residual_block(1) = max( residual_block(1), (u(ix,iy,iz,1)-us(ix,iy,iz,1))*mask(ix,iy,iz) )
+                        residual_block(2) = max( residual_block(2), (u(ix,iy,iz,2)-us(ix,iy,iz,2))*mask(ix,iy,iz) )
+                        residual_block(3) = max( residual_block(3), (u(ix,iy,iz,3)-us(ix,iy,iz,3))*mask(ix,iy,iz) )
+
+                        ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
+
+                        ! maximum of velocity in the field
+                        umag = max( umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
+
+                        ! maximum/min divergence in velocity field
+                        params_acm%div_max = max( params_acm%div_max, div(ix,iy,iz) )
+                        params_acm%div_min = min( params_acm%div_min, div(ix,iy,iz) )
+                    enddo
+                enddo
             enddo
         endif
 
         ! we just computed the values on the current block, which we now add to the
         ! existing blocks in the variables (recall normalization by dV)
-        params_acm%u_residual = params_acm%u_residual + tmp_residual * dV
-        params_acm%mean_flow = params_acm%mean_flow + tmp_meanflow * dV
+        params_acm%u_residual = params_acm%u_residual + residual_block * dV
+        params_acm%mean_flow = params_acm%mean_flow + meanflow_block * dV
         params_acm%mask_volume = params_acm%mask_volume + tmp_volume * dV
-        params_acm%force = params_acm%force + tmp_force * dV
-        params_acm%e_kin = params_acm%e_kin + tmp_ekin * dV
+        params_acm%force_color = params_acm%force_color + force_block * dV
+        params_acm%moment_color = params_acm%moment_color + moment_block * dV
+        params_acm%e_kin = params_acm%e_kin + ekin_block * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
@@ -258,9 +313,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         endif
 
         !-------------------------------------------------------------------------
-        ! force
-        tmp(1:3) = params_acm%force
-        call MPI_ALLREDUCE(tmp(1:3), params_acm%force, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        ! force & moment
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_color, size(params_acm%moment_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! residual velocity in solid domain
@@ -293,6 +348,18 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
         tmp(1) = umag
         call MPI_ALLREDUCE(tmp(1), umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
+
+        ! compute aerodynamic power
+        if (is_insect) then
+            ! store moments for the insect (so that it can compute the aerodynamic power)
+            Insect%PartIntegrals( Insect%color_body )%Torque = params_acm%moment_color(:, Insect%color_body )
+            Insect%PartIntegrals( Insect%color_l )%Torque = params_acm%moment_color(:, Insect%color_l )
+            Insect%PartIntegrals( Insect%color_r )%Torque = params_acm%moment_color(:, Insect%color_r )
+
+            call aero_power (Insect, apowtotal)
+            call inert_power(Insect, ipowtotal)
+        endif
+
         !-------------------------------------------------------------------------
         ! write statistics to ascii files.
         if (params_acm%mpirank == 0) then
@@ -301,6 +368,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
             params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
             close(14)
 
+            ! find minimum spacing (so that we can print the CFL number)
             if (params_acm%dim==3) then
               dxyz(3) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(3) / real(params_acm%Bs(3)-1, kind=rk)
               dxyz(2) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(2) / real(params_acm%Bs(2)-1, kind=rk)
@@ -333,8 +401,50 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, grid_qty )
 
             ! write forces to disk...
             open(14,file='forces.t',status='unknown',position='append')
-            write(14,'(4(es15.8,1x))') time, params_acm%force
+            write(14,'(4(es15.8,1x))') time, sum(params_acm%force_color(1,:)), &
+            sum(params_acm%force_color(2,:)), sum(params_acm%force_color(3,:))
             close(14)
+
+            open(14,file='moments.t',status='unknown',position='append')
+            write(14,'(4(es15.8,1x))') time, sum(params_acm%moment_color(1,:)), &
+            sum(params_acm%moment_color(2,:)), sum(params_acm%moment_color(3,:))
+            close(14)
+
+            if (is_insect) then
+                open(14,file='aero_power.t',status='unknown',position='append')
+                write(14,'(3(es15.8,1x))') time, apowtotal, ipowtotal
+                close(14)
+
+                ! body
+                color = Insect%color_body
+                open(14,file='forces_body.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%force_color(:,color)
+                close(14)
+
+                open(14,file='moments_body.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
+                close(14)
+
+                ! left wing
+                color = Insect%color_l
+                open(14,file='forces_leftwing.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%force_color(:,color)
+                close(14)
+
+                open(14,file='moments_leftwing.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
+                close(14)
+
+                ! right wing
+                color = Insect%color_r
+                open(14,file='forces_rightwing.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%force_color(:,color)
+                close(14)
+
+                open(14,file='moments_rightwing.t',status='unknown',position='append')
+                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
+                close(14)
+            endif
 
             ! write kinetic energy to disk...
             open(14,file='e_kin.t',status='unknown',position='append')

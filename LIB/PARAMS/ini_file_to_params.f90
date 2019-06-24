@@ -244,9 +244,19 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+
     if ( params%max_treelevel < params%min_treelevel ) then
-      call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
+        call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
     end if
+    
+    if ( params%max_treelevel > 18 ) then
+        ! as we internally convert the treecode to a single integer number, the number of digits is
+        ! limited by that type. The largest 64-bit integer is 9 223 372 036 854 775 807
+        ! which is 19 digits, but the 18th digit cannot be arbitrarily set. Therefore, 18 refinement levels
+        ! are the maximum this code can currently perform.
+        call abort(170619,"Error: Max treelevel cannot be larger 18 (64bit long integer problem) ")
+    end if
+
     ! read switch to turn on|off mesh refinement
     call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
     call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
@@ -384,7 +394,7 @@ function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
     if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
     ! Cast the output string into the integer
     read(output_trim,*) (Bs(i), i=1,n_entries)
-    ! If only one Bs is given in the ini file, we duplicate it 
+    ! If only one Bs is given in the ini file, we duplicate it
     ! for the rest of the Bs array:
     if (n_entries==1) then
       Bs(1:dims) = Bs(1)

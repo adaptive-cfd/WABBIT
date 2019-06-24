@@ -466,7 +466,7 @@ contains
 
 
   ! Compute aerodynamic power
-  subroutine aero_power(Insect,apowtotal)
+  subroutine aero_power(Insect, apowtotal)
     implicit none
 
     integer :: color_body, color_l, color_r

@@ -147,7 +147,7 @@ integer                              :: n,m
     ! number of blocks
     n      = size(lgt_block,1)
     ! number of columns in matrix
-    m        = params%max_treelevel + extra_lgt_fields-1
+    m        = params%max_treelevel + EXTRA_LGT_FIELDS-1
     ! send number of active and maximal number of blocks
     call MPI_send((/lgt_n/), 1, MPI_integer, &
                   params%bridge%minOtherWorldRank, parameters_delivery, &

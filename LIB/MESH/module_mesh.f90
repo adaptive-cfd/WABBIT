@@ -107,12 +107,6 @@ contains
     ! create list with number of blocks per rank
     include "set_desired_num_blocks_per_rank.f90"
 
-    ! create friends table
-    include "compute_friends_table.f90"
-
-    ! affinity list
-    include "compute_affinity.f90"
-
     ! treecode to 2D z-sfc position
     include "treecode_to_sfc_id_2D.f90"
 

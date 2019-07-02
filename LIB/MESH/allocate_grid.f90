@@ -247,7 +247,7 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
     !---------------------------------------------------------------------------)
-    allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+extra_lgt_fields) )
+    allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)

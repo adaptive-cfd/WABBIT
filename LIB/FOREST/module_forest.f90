@@ -30,16 +30,83 @@ module module_forest
             add_two_trees, count_tree_hvy_n, allocate_hvy_lgt_data, &
             copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
             adapt_tree_mesh, compute_tree_L2norm, &
-            read_tree, same_block_distribution
+            read_tree, same_block_distribution, prune_tree
   !**********************************************************************************************
 contains
 
 
+    subroutine prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id)
+        implicit none
+        !-----------------------------------------------------------------
+        type (type_params), intent(in) :: params   !< params structure
+        integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+        integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
+        integer(kind=ik), intent(in)      :: tree_id
+        integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
+        integer(kind=ik), intent(inout)   :: lgt_block(:, :)  !< light data array
+        real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+        integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
+        integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
+        integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
+
+        integer(kind=ik)                 :: k, lgt_id, Jmax, hvy_id, rank, N
+
+        Jmax = params%max_treelevel ! max treelevel
+        rank = params%rank
+        N = params%number_blocks
+
+        do k = 1, lgt_n(tree_id)
+
+            lgt_id = lgt_active(k, tree_id)
+
+            lgt_block(lgt_id, Jmax+IDX_PRUNED) = 1_ik
+
+        end do
 
 
-  !##############################################################
-  !> This function reads a set of data into a specified tree.
-  !> The set of data can involve multiple files. Each file should
+        do k = 1, hvy_n(tree_id)
+
+            hvy_id = hvy_active(k, tree_id)
+            call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
+
+            if ( all( (hvy_block(:,:,:,1,hvy_id)<=1.0e-1) )) then
+                ! now prune
+                ! write(*,*) "I prune"
+                lgt_block(lgt_id, :) = -1_ik
+            endif
+
+        end do
+
+
+      call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+
+    end subroutine
+
+subroutine add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned, tree_id_full)
+        implicit none
+        !-----------------------------------------------------------------
+        type (type_params), intent(in) :: params   !< params structure
+        integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+        integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
+        integer(kind=ik), intent(in)      :: tree_id_pruned, tree_id_full
+        integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
+        integer(kind=ik), intent(inout)   :: lgt_block(:, :)  !< light data array
+        real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+        integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
+        integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
+        integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
+
+        integer(kind=ik)                 :: k, lgt_id, Jmax, hvy_id, rank, N
+
+        ! a pruned tree has fewer entries: loop over it instead of the other one?
+
+end subroutine
+
+    !##############################################################
+    !> This function reads a set of data into a specified tree.
+    !> The set of data can involve multiple files. Each file should
   !> contain a quantity at the same snapshot (i.e. same iteration/time).
   !> If no data has been read in before. This function will allocate
   !> the heavy data for you.
@@ -1469,7 +1536,7 @@ end subroutine read_tree
     !==========================
     ! lgt_data
     !==========================
-    allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+extra_lgt_fields) )
+    allocate( lgt_block( number_procs*number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)

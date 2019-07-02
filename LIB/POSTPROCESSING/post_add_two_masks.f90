@@ -97,18 +97,21 @@ subroutine post_add_two_masks(params)
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
-    call read_field2tree(params, (/fname2/), 1, 2, tree_n, &
-    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    ! call read_field2tree(params, (/fname2/), 1, 2, tree_n, &
+    ! lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    ! hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
-    do j = 3, params%forest_size
-        call read_field2tree(params, (/fname2/), 1, j, tree_n, &
-        lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    enddo
+    ! do j = 3, params%forest_size
+    !     call read_field2tree(params, (/fname2/), 1, j, tree_n, &
+    !     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    !     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    ! enddo
 
-    call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, verbosity=.true.)
+call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+           hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
+
+    ! call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    ! hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, verbosity=.true.)
 
 !     do j = 1,4
 !         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
@@ -123,16 +126,29 @@ subroutine post_add_two_masks(params)
 !         lgt_active(:, fsize + 1), lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), &
 !         hvy_active(:, fsize+1), hvy_n(fsize+1), hvy_tmp )
 
-    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
 
-    call same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                                  hvy_block, hvy_active, hvy_n, hvy_tmp, &
-                                  tree_n, tree_id1=1, tree_id2=2)
+! call same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+!                               hvy_block, hvy_active, hvy_n, hvy_tmp, &
+!                               tree_n, tree_id1=1, tree_id2=2)
+
+call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
+
+call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+
+j = 2
+call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+lgt_active(:, j), lgt_n(j), lgt_sortednumlist(:,:,j), hvy_active(:, j), hvy_n(j), hvy_tmp )
+
+call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
 
 
-    call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
+call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
+lgt_n, hvy_n, hvy_active, dF=1, tree_id=2, time=time, iteration=iteration )
 
 !====================================================
 !     call read_field2tree(params, (/fname1/), 1, 1, tree_n, &

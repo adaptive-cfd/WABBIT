@@ -132,7 +132,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     allocate(block_treecode(1:dims_treecode(1), 1:hvy_n))
     block_treecode = -1
 
-    ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + idx_refine_sts]
+    ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + IDX_REFINE_STS]
     ! array we want to hold, so that all CPU can read from the same file simultaneously
     ! (note zero-based offset):
     lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
@@ -150,11 +150,11 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         ! copy treecode
         lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level
-        lgt_block(lgt_id, params%max_treelevel+idx_mesh_lvl) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+        lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
-        lgt_block(lgt_id, params%max_treelevel+idx_refine_sts) = 0
+        lgt_block(lgt_id, params%max_treelevel+IDX_REFINE_STS) = 0
         ! set number of the tree
-        lgt_block(lgt_id, params%max_treelevel+idx_tree_id) = tree_id
+        lgt_block(lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_id
     end do
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.

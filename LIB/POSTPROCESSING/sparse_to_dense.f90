@@ -158,7 +158,7 @@ subroutine sparse_to_dense(params)
         ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
         do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
-                lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = -1
+                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = -1
         end do
         ! this might not be necessary since we start from an admissible grid
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
@@ -176,7 +176,7 @@ subroutine sparse_to_dense(params)
         ! check where refinement is actually needed
         do k = 1, lgt_n
             if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = 1
+                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = 1
         end do
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )

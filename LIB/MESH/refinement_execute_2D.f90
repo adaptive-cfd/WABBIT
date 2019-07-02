@@ -104,8 +104,8 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! extract treecode and mesh level
             treecode = lgt_block( lgt_id, 1:params%max_treelevel )
-            level    = lgt_block( lgt_id, params%max_treelevel + idx_mesh_lvl )
-            tree_id  = lgt_block( lgt_id, params%max_treelevel + idx_tree_id )
+            level    = lgt_block( lgt_id, params%max_treelevel + IDX_MESH_LVL )
+            tree_id  = lgt_block( lgt_id, params%max_treelevel + IDX_TREE_ID )
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
             ! loop over all data fields
@@ -132,11 +132,11 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "0" block
             lgt_block( lgt_free_id, level+1 )                = 0
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
             ! reset refinement status
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
             ! the tree_id is the same as the one of the mother block 
-            lgt_block( lgt_free_id, params%max_treelevel + idx_tree_id ) = tree_id
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_id
 
 
             ! save interpolated data, loop over all datafields
@@ -156,11 +156,11 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "1" block
             lgt_block( lgt_free_id, level+1 )                = 1
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
             ! reset refinement status
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
             ! the tree_id is the same as the one of the mother block 
-            lgt_block( lgt_free_id, params%max_treelevel + idx_tree_id ) = tree_id
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_id
 
 
             ! save interpolated data, loop over all datafields
@@ -180,11 +180,11 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "1" block
             lgt_block( lgt_free_id, level+1 )                = 2
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
             ! reset refinement status
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
             ! the tree_id is the same as the one of the mother block 
-            lgt_block( lgt_free_id, params%max_treelevel + idx_tree_id ) = tree_id
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_id
 
 
             ! save interpolated data, loop over all datafields
@@ -204,11 +204,11 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! new treecode one level up - "1" block
             lgt_block( lgt_free_id, level+1 )                = 3
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + idx_mesh_lvl ) = level+1
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
             ! reset refinement status
             lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
             ! the tree_id is the same as the one of the mother block 
-            lgt_block( lgt_free_id, params%max_treelevel + idx_tree_id ) = tree_id
+            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_id
 
 
             ! save interpolated data, loop over all datafields

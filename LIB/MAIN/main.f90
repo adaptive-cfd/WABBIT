@@ -65,8 +65,8 @@ program main
     ! light data array (the grid metadata, block treecodes etc)
     ! line number = ( 1 + proc_rank ) * heavy_data_line_number
     ! column(1:max_treelevel): block treecode, treecode -1 => block is inactive
-    ! column(max_treelevel + idx_mesh_lvl): treecode length = mesh level
-    ! column(max_treelevel + idx_refine_sts):   refinement status (-1..coarsen / 0...no change / +1...refine)
+    ! column(max_treelevel + IDX_MESH_LVL): treecode length = mesh level
+    ! column(max_treelevel + IDX_REFINE_STS):   refinement status (-1..coarsen / 0...no change / +1...refine)
     integer(kind=ik), allocatable       :: lgt_block(:, :)
 
     ! heavy data array (the actual state vector). Is synchronized.

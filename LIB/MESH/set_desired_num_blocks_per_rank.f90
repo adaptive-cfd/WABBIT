@@ -13,14 +13,33 @@
 !> \date 13/03/18 \n
 !> \author engels
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
-subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_rank_optimal, lgt_n, hvy_n)
+subroutine set_desired_num_blocks_per_rank1(params, blocks_per_rank_optimal, lgt_n)
+    implicit none
 
-!---------------------------------------------------------------------------------------------
-! modules
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    !> block distribution lists. Note 1-based indexing.
+    integer(kind=ik), intent(out)       :: blocks_per_rank_optimal(0:)
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
 
-!---------------------------------------------------------------------------------------------
-! variables
+    blocks_per_rank_optimal(:) = lgt_n / params%number_procs
 
+    ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
+    if (mod(lgt_n, params%number_procs) > 0) then
+        blocks_per_rank_optimal(0:mod(lgt_n, params%number_procs)-1) = &
+        blocks_per_rank_optimal(0:mod(lgt_n, params%number_procs)-1) + 1
+    end if
+
+    ! some error control -> did we loose blocks? should never happen.
+    if ( sum(blocks_per_rank_optimal) /= lgt_n) then
+        call abort(1028,"ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
+    end if
+
+end subroutine
+
+
+subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_rank_optimal, lgt_n, hvy_n)
     implicit none
 
     !> user defined parameter structure
@@ -30,9 +49,9 @@ subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_r
     integer(kind=ik), intent(out)       :: blocks_per_rank(:), blocks_per_rank_optimal(:)
 
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
+    integer(kind=ik), intent(in) :: lgt_n
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in) :: hvy_n
 
     ! loop variables
     integer                             :: num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks
@@ -43,11 +62,6 @@ subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_r
     ! MPI error variable
     integer(kind=ik)                    :: ierr
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! determinate process rank
     rank = params%rank
@@ -59,9 +73,6 @@ subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_r
     my_dist_list = 0
     blocks_per_rank_optimal = 0
 
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! save my number of active blocks
     my_dist_list(rank+1) = hvy_n
@@ -79,6 +90,7 @@ subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_r
 
     ! some blocks are missing due to the integer division
     excess_blocks = num_blocks - sum(blocks_per_rank_optimal)
+
 
     ! distribute remaining blocks (the excess blocks, if we have some)
     do while ( excess_blocks>0 )
@@ -123,8 +135,8 @@ subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_r
                 if (excess_blocks==0) exit
             end if
         end do
-
     end do ! end of excess block distribution
+
 
     if (rank==0) then
         ! error checking. the sum of newly distributed blocks must of course be
@@ -137,4 +149,4 @@ subroutine set_desired_num_blocks_per_rank(params, blocks_per_rank, blocks_per_r
         end if
     end if
 
-end subroutine set_desired_num_blocks_per_rank
+end subroutine

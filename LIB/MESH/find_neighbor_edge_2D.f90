@@ -9,10 +9,10 @@
 !
 !> \brief find neighbor on block edge
 !> \details valid cases for edge neighbors:
-!!           1. same level: allways exact one neighbor
+!!           1. same level: always exact one neighbor
 !!           2. one level down: one neighbor, two possible
 !! neighbor relations
-!!           3. one level up: allways two neighbors
+!!           3. one level up: always two neighbors
 !!
 !! input:
 !!           - heavy and light data id
@@ -81,8 +81,8 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
 ! variables initialization
 
     my_treecode= lgt_block( light_id, 1:max_treelevel )
-    level      = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
-    tree_id    = lgt_block( light_id, max_treelevel + idx_tree_id )
+    level      = lgt_block( light_id, max_treelevel + IDX_MESH_LVL )
+    tree_id    = lgt_block( light_id, max_treelevel + IDX_TREE_ID )
     neighborID_sameLevel    = -1
     virt_code1              = -1
     neighborID_finerLevel1  = -1

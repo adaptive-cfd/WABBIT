@@ -75,7 +75,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   ! be on the highest level)
   all_treecodes = -1
 
-  my_level = lgt_block( lgt_my_id, params%max_treelevel + idx_mesh_lvl )
+  my_level = lgt_block( lgt_my_id, params%max_treelevel + IDX_MESH_LVL )
 
   lgt_sisters_id = -1
 
@@ -97,7 +97,7 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
           all_treecodes(i,1:mother_level) = lgt_block(lgt_my_id, 1:mother_level)
           ! the last index is (0..3) or (0..7)
           all_treecodes(i,mother_level+1) = i-1
-          tree_id = lgt_block(lgt_my_id, params%max_treelevel + idx_tree_id)
+          tree_id = lgt_block(lgt_my_id, params%max_treelevel + IDX_TREE_ID)
           ! look for the sisters in the list of blocks (light data), store their ID if found
           ! (-1 otherwise)
           call does_block_exist(all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n, tree_id)

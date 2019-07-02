@@ -32,6 +32,12 @@ module module_indicators
     ! we now have an indicator which computes the vorticity, so include the operator module
     use module_operators
 
+    ! some operators may depend on the actual data (that is, heavy data), for example
+    ! for shock or mask detection. These criteria are computed mpi-locally (because of course
+    ! each block is associated to one CPU), afterwards, a lgt_data synchronization step is
+    ! required, therefore use module_MPI.
+    use module_MPI
+
 !---------------------------------------------------------------------------------------------
 ! variables
 

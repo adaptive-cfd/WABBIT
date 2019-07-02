@@ -156,9 +156,9 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, 
 
               ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
               lgt_block( lgt_id, 1:params%max_treelevel ) = treecode
-              lgt_block( lgt_id, params%max_treelevel+idx_mesh_lvl ) = Jmin
-              lgt_block( lgt_id, params%max_treelevel+idx_refine_sts ) = 0
-              lgt_block( lgt_id, params%max_treelevel+idx_tree_id ) = 1
+              lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL ) = Jmin
+              lgt_block( lgt_id, params%max_treelevel+IDX_REFINE_STS ) = 0
+              lgt_block( lgt_id, params%max_treelevel+IDX_TREE_ID ) = 1
 
               ! reset block data to zero
               hvy_block(:,:,:,:,heavy_id) = real(params%rank, kind=rk)

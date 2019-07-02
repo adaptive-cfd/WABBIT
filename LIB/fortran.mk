@@ -5,7 +5,8 @@ FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 \
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
 startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
-compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90
+compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
+post_stl2dist.f90 post_add_two_masks.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -19,7 +20,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 module_forest.f90 \
-	module_MOR.f90 module_sparse_operators.f90
+	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -144,6 +145,9 @@ $(OBJDIR)/module_precision.o: module_precision.f90
 
 # compile module containing all globals
 $(OBJDIR)/module_globals.o: module_globals.f90 $(OBJDIR)/module_precision.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_stl_file_reader.o: module_stl_file_reader.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_bridge.o: module_bridge.f90

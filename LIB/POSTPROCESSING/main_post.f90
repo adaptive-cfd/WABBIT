@@ -51,7 +51,8 @@ program main_post
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
     WABBIT_COMM         = MPI_COMM_WORLD
-    elapsed_time = MPI_wtime()
+    elapsed_time        = MPI_wtime()
+
     ! output MPI status
     if (rank==0) then
         write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
@@ -71,6 +72,12 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
+    case ("--add-two-masks")
+        call post_add_two_masks(params)
+
+    case ("--stl2dist")
+        call post_stl2dist(params)
+
     case("--compute-rhs")
         call post_rhs(params)
 
@@ -108,7 +115,7 @@ program main_post
 
   case ("--POD-reconstruct")
     call post_reconstruct(params)
-  
+
     case default
 
         if (params%rank==0) then
@@ -125,6 +132,9 @@ program main_post
             write(*,*) "--flusi-to-wabbit"
             write(*,*) "--POD"
             write(*,*) "--POD-reconstruct"
+            write(*,*) "--stl2dist"
+            write(*,*) "--add-two-masks"
+
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
             else

@@ -9,10 +9,10 @@
 !
 !> \brief find neighbor on block corner
 !> \details  valid cases for corner neighbors:
-!!    1. same level: allways exact one neighbor
+!!    1. same level: always exact one neighbor
 !!    2. one level down: one neighbor, if this neighbor
 !! only on block corner (not additional on block side)
-!!    3. one level up: allways exact one neighbor
+!!    3. one level up: always exact one neighbor
 !!
 !! input:
 !!           - heavy and light data id
@@ -83,9 +83,9 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
 !---------------------------------------------------------------------------------------------
 ! variables initialization
 
-    my_treecode     = lgt_block( light_id, 1:max_treelevel )
-    level           = lgt_block( light_id, max_treelevel + idx_mesh_lvl )
-    tree_id    = lgt_block( light_id, max_treelevel + idx_tree_id )
+    my_treecode = lgt_block( light_id, 1:max_treelevel )
+    level       = lgt_block( light_id, max_treelevel + IDX_MESH_LVL )
+    tree_id     = lgt_block( light_id, max_treelevel + IDX_TREE_ID )
 
     lvl_down_neighbor = .false.
 

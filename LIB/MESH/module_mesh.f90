@@ -31,15 +31,20 @@ module module_mesh
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
     ! hence we require the metamodule to be used.
     use module_physics_metamodule
-    
+
     implicit none
 
     logical, private, save ::  mesh_has_changed=.false.
 
     ! interface generalising the mono-tree to multi-trees
-    interface create_active_and_sorted_lists 
+    interface create_active_and_sorted_lists
         module procedure create_active_and_sorted_lists_tree, &
                          create_active_and_sorted_lists_forest
+    end interface
+
+    interface set_desired_num_blocks_per_rank
+        module procedure set_desired_num_blocks_per_rank1, &
+                         set_desired_num_blocks_per_rank2
     end interface
 
 contains

@@ -50,7 +50,7 @@ contains
 
    surface      =0
    my_treecode  =lgt_block(lgt_id,1:max_treelevel)
-   my_level     =lgt_block(lgt_id,max_treelevel+idx_mesh_lvl)
+   my_level     =lgt_block(lgt_id,max_treelevel+IDX_MESH_LVL)
 
    ! reset surface normal
    surface=0

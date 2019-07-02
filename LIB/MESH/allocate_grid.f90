@@ -136,18 +136,45 @@ subroutine allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
               if (params%dim==3) then
                 mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_gridQ
-                + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_tmp
-                + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_work
                 + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
                 + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+
+                ! hvy_gridQ
+                if ( present(hvy_gridQ) ) then
+                    mem_per_block = mem_per_block + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                endif
+
+                ! hvy_tmp
+                if ( present(hvy_tmp) ) then
+                    mem_per_block = mem_per_block + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                endif
+
+                ! hvy_work
+                if ( present(hvy_work) ) then
+                    mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                endif
+
+
               else
                 mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_gridQ
-                + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_tmp
-                + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_work
                 + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
                 + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+
+                ! hvy_gridQ
+                if ( present(hvy_gridQ) ) then
+                    mem_per_block = mem_per_block + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                endif
+
+                ! hvy_tmp
+                if ( present(hvy_tmp) ) then
+                    mem_per_block = mem_per_block + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                endif
+
+                ! hvy_work
+                if ( present(hvy_work) ) then
+                    mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                endif
+
               endif
 
               ! in GB:

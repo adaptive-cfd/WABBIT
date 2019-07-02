@@ -27,9 +27,10 @@ module module_forest
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: read_field2tree,  write_tree_field, &
-            add_tree, count_tree_hvy_n, allocate_hvy_lgt_data, &
-            copy_tree, multiply_tree, scalar_multiplication_tree, &
-            adapt_tree_mesh, compute_tree_L2norm
+            add_two_trees, count_tree_hvy_n, allocate_hvy_lgt_data, &
+            copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
+            adapt_tree_mesh, compute_tree_L2norm, &
+            read_tree, same_block_distribution
   !**********************************************************************************************
 contains
 
@@ -64,18 +65,33 @@ contains
                            rank, level, Bs(3), fsize, number_dense_blocks
       real(kind=rk)     :: time, domain(3)
 
-      !N =jparams%number_blocks
       ! set MPI parameter
       rank  = params%rank
       fsize = params%forest_size
-      ! grid parameter
+
+      if (tree_id <= tree_n) then
+          ! the tree altready exists: to overwrite it, we first delete the existing one
+          call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id)
+
+!!!!!!!! TODO WHY IS TRUE NOT ALLOWED (SORT EMPTY TREE??)
+          call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .false., tree_n)
+      endif
+
+      ! From any file (here: 1st in list), we read the essential parameters of the tree:
+      ! most importantly Bs, dim, length of treecodes. NOTE: all trees in the forest must
+      ! have the same Bs.
       call read_attributes(fnames(1), lgt_n_tmp, time, iteration, domain, Bs, tc_length, dim)
+
       ! Check if one tree already exists in the forest:
-      ! If it doesnt initialice some improtant parameters like the Block size Bs
+      ! If it doesnt initialize some important parameters like the Block size Bs
       ! and the spatial dimension of the data.
-      ! If it does check if the parameters are suitable for the forest
+      ! If it does chFeck if the parameters are suitable for the forest
       if (allocated(hvy_block)) then
-          if ( any(params%Bs.ne.Bs )) call abort(100119,"Block size should not change);!")
+          if ( any(params%Bs /= Bs) ) then
+              ! NOTE: all trees in the forest must have the same Bs.
+              call abort(100119, "ERROR: Trying to read a tree (grid) with Bs different from existing trees in forest!")
+          endif
           if ( params%max_treelevel < tc_length) call abort(10119,"maximal treelevel incompatible")
       else
           params%max_treelevel = tc_length
@@ -84,18 +100,24 @@ contains
           params%N_fields_saved = N_files
           params%Bs = Bs
           params%domain_size = domain
+
           ! we have to allocate grid if this routine is called for the first time
           call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
                         lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+
           call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
                             params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
+
           hvy_neighbor = -1
-          lgt_n = 0 ! reset number of acitve light blocks
-          tree_n= 0 ! reset number of trees in forest
+          lgt_n = 0 ! reset number of active light blocks
+          tree_n = 0 ! reset number of trees in forest
       endif
+
+
+
       ! read treecode from first input file
-      call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, &
-                        hvy_block, hvy_tmp, tree_id)
+      call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, hvy_block, hvy_tmp, tree_id)
+
       ! * We save the number of all active lgt_ids in lgt_n_tmp, which is actually
       ! not needed here, since
       ! create_active_and_sorted_lists is calculating sum(lgt_n) again.
@@ -108,35 +130,34 @@ contains
       ! check the calculation of create_active and sorted list
       if (lgt_n_tmp .ne. lgt_n( fsize + 1 )) call abort(132191,"There is something wrong with the light data")
 
-      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
-                            lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize +1) , hvy_n(fsize +1) )
+      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
+                            lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
 
-      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,fsize+1), hvy_n(fsize+1) )
-      
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id), hvy_n(tree_id) )
+
   end subroutine read_field2tree
   !##############################################################
 
 
   !##############################################################
-  !> deletes the lgt_block data of tree with given tree_id 
+  !> deletes the lgt_block data of tree with given tree_id
   !> CAUTION: active lists will be outdated!!!
   subroutine delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)!< light data array
+    type (type_params), intent(in)   :: params    !< user defined parameter structure
+    integer(kind=ik), intent(inout)  :: lgt_block(:, :)!< light data array
     integer(kind=ik), intent(in)     :: lgt_active(:,:)!< list of active blocks (light data)
     integer(kind=ik), intent(in)     :: lgt_n(:)!< number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: tree_id!< highest tree id
+    integer(kind=ik), intent(in)     :: tree_id!< highest tree id
     !-----------------------------------------------------------------
-    integer(kind=ik)                    :: k, lgt_id
+    integer(kind=ik)                 :: k, lgt_id
 
     ! loop over active list of tree
     do k = 1, lgt_n(tree_id)
-        ! block is active
         lgt_id = lgt_active(k, tree_id)
-        lgt_block(lgt_id,:) = -1_ik
+        lgt_block(lgt_id, :) = -1_ik
     end do
 
 
@@ -146,7 +167,7 @@ contains
 
 
   !##############################################################
-  !> copy hvy and lgt data of tree_id2 to tree_id1
+  !> copy hvy and lgt data of tree_id_source to tree_id_dest
   !> after copy the active and sorted lists are updated, as well
   !> as neighbors and ghost nodes
   subroutine copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
@@ -159,7 +180,7 @@ contains
       integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
       integer(kind=ik), intent(in)      :: tree_id_dest, tree_id_source !< all data from tree_id_source gets copied to destination_tree_id
       integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
-      integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
+      integer(kind=ik), intent(inout)   :: lgt_block(:, :)  !< light data array
       real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
       integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
@@ -174,81 +195,86 @@ contains
       rank = params%rank
       N = params%number_blocks
 
-      if (tree_id_dest > fsize) call abort(0403191,"tree_id you are asking for does not exist!")
+      if (tree_id_dest > fsize) call abort(0403191,"tree-copy: destination treeID ou of valid range")
 
-      ! first we delete tree_id_dest if it is allocated
-      if (tree_id_dest <= tree_n)then ! tree_id_dest only exists if it is in the list of active trees
-        ! Caution: active lists will be outdated
-        call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id_dest)
+      ! first we delete tree_id_dest if it is already allocated.
+      ! tree_id_dest only exists if it is in the list of active trees, i.e. tree_id_dest <= tree_n
+      if (tree_id_dest <= tree_n) then
+          ! Caution: active lists will be outdated
+          call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id_dest)
       end if
+
+
       ! Loop over the active hvy_data
       t_elapse = MPI_WTIME()
       do k = 1, hvy_n(tree_id_source)
-        hvy_id_source = hvy_active(k, tree_id_source)
-        call hvy_id_to_lgt_id(lgt_id_source, hvy_id_source, rank, N )
-        ! first we have to find out if the hvy data belongs to the tree we want to copy
-        call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
-        call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
-        !--------------------
-        ! Light DATA
-        !--------------------
-        lgt_block(lgt_id_dest, :) = lgt_block(lgt_id_source, :)  ! copy light data
-        lgt_block(lgt_id_dest, Jmax + idx_tree_id) = tree_id_dest  ! asign new tree_id
-        !--------------------
-        ! Heavy DATA
-        !--------------------
-        hvy_block( :, :, :, :, hvy_id_dest) = hvy_block( :, :, :, :, hvy_id_source)
+          hvy_id_source = hvy_active(k, tree_id_source)
+          call hvy_id_to_lgt_id( lgt_id_source, hvy_id_source, rank, N )
+          ! first we have to find out if the hvy data belongs to the tree we want to copy
+          call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
+          call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
+          !--------------------
+          ! Light DATA
+          !--------------------
+          lgt_block(lgt_id_dest, :) = lgt_block(lgt_id_source, :)  ! copy light data
+          lgt_block(lgt_id_dest, Jmax + IDX_TREE_ID) = tree_id_dest  ! asign new tree_id
+          !--------------------
+          ! Heavy DATA
+          !--------------------
+          hvy_block( :, :, :, :, hvy_id_dest) = hvy_block( :, :, :, :, hvy_id_source)
       end do ! loop over source tree
       call toc( "copy_tree (copy heavy_data)", MPI_Wtime()-t_elapse )
-      t_elapse = MPI_WTIME()
 
-      ! always synchronice lgt_data when you have changed lgt_block locally
+
+      ! always synchronize lgt_data when you have changed lgt_block locally
       ! (i.e. when looping over lgt_ids which originate from a hvy_id)
+      t_elapse = MPI_WTIME()
       call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
-      call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
-      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
-           lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize+1), hvy_n(fsize+1) )
-      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-           hvy_active(:,tree_id_dest), hvy_n(tree_id_dest))
 
-      call toc( "copy_tree (copy synchronice hvy and lgt)", MPI_Wtime()-t_elapse )
+      call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+
+      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id_dest),&
+          lgt_n(tree_id_dest), lgt_sortednumlist(:,:,tree_id_dest), hvy_active(:,tree_id_dest), hvy_n(tree_id_dest) )
+
+      call toc( "copy_tree (copy synchronize hvy and lgt)", MPI_Wtime()-t_elapse )
 
   end subroutine
   !##############################################################
 
   !##############################################################
-  !> multiply every element of the tree with a given value alpha
-  subroutine scalar_multiplication_tree(params, hvy_block, hvy_active, hvy_n, tree_id, &
+  !> multiply every block of a tree with a given value alpha
+  subroutine multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, tree_id, &
                                         alpha, verbosity)
 
       implicit none
       !-----------------------------------------------------------------
       type (type_params), intent(in) :: params   !< params structure
       integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
-      integer(kind=ik), intent(in)      :: tree_id !< all data from tree_id2 gets copied to tree_id1
-      real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+      integer(kind=ik), intent(in)   :: tree_id !< all data from tree_id2 gets copied to tree_id1
+      real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :) !< heavy data array - block data
       real(kind=rk), intent(in)      :: alpha !< heavy data array - block data
       integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
-      logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
+      logical, intent(in),optional   :: verbosity !< if true aditional stdout is printed
       !-----------------------------------------------------------------
-      integer(kind=ik)    :: Jmax,  hvy_id, k
-      logical :: verbose=.false.
+      integer(kind=ik)    :: hvy_id, k
+      logical :: verbose = .false.
+
       if (present(verbosity)) verbose=verbosity
       if (params%rank == 0 .and. verbose ) write(*,'("scalar multiplication tree: ",i3)') tree_id
 
-      ! Loop over the active hvy_data
+      ! Loop over the active hvy_data, multiply block data by alpha
       do k = 1, hvy_n(tree_id)
-        hvy_id = hvy_active(k, tree_id)
-        hvy_block( :, :, :, :, hvy_id) = alpha * hvy_block( :, :, :, :, hvy_id)
-      end do 
+          hvy_id = hvy_active(k, tree_id)
+          hvy_block( :, :, :, :, hvy_id) = alpha * hvy_block( :, :, :, :, hvy_id)
+      end do
 
 
   end subroutine
   !##############################################################
 
   !##############################################################
-  !> L2 norm of all components in the statevector: 
+  !> L2 norm of all components in the statevector:
   !             norm(q_f) = sqrt( sum_ijk q_f^2 * dx_i dx_j dz_k )
   function compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt, &
                               tree_id_opt, verbosity) result(L2norm)
@@ -285,7 +311,7 @@ contains
       ! Loop over the active hvy_data
       do k = 1,hvy_n(tree_id)
           hvy_id = hvy_active(k, tree_id)
-          call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N) 
+          call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N)
           call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
           ! ----------------------------
           ! integrate squared quantity
@@ -332,9 +358,9 @@ contains
     !> grid-dependend qtys (mask, geometry factors..)
     real(kind=rk), intent(in), optional :: hvy_gridQ(:, :, :, :, :)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:, :)
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
@@ -402,7 +428,7 @@ contains
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         t0 = MPI_Wtime()
-        
+
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id), hvy_n(tree_id))
         call toc( "adapt_mesh (sync_ghosts)", MPI_Wtime()-t0 )
 
@@ -426,7 +452,7 @@ contains
         call respect_min_max_treelevel( params, lgt_block, lgt_active(:,tree_id), lgt_n(tree_id) )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
-    
+
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id), &
@@ -469,10 +495,11 @@ contains
     ! To correct that, you need to know which of the blocks results from interpolation and
     ! which one has previously been at Jmax. This latter one gets the 11 status.
     do k = 1, lgt_n(tree_id)
-        if ( lgt_block( lgt_active(k,tree_id), params%max_treelevel+ idx_mesh_lvl) == params%max_treelevel ) then
-            lgt_block( lgt_active(k,tree_id), params%max_treelevel + idx_refine_sts ) = 11
+        if ( lgt_block( lgt_active(k,tree_id), params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
+            lgt_block( lgt_active(k,tree_id), params%max_treelevel + IDX_REFINE_STS ) = 11
         end if
     end do
+
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
@@ -512,7 +539,7 @@ contains
   !##############################################################
 
   !##############################################################
-  !> This function takes to trees and refines their treestructures
+  !> This function takes two trees and refines their treestructures
   !> until they are refined to the same max level.
   !> The resulting trees are identical in treestructure. Hence
   !> they have the same treecodes and number of blocks.
@@ -536,101 +563,133 @@ contains
       logical, intent(in),optional      :: verbosity
       !-----------------------------------------------------------------
       integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize
-      integer(kind=ik)    :: k1, k2, Nblocks_refined, level_min
+      integer(kind=ik)    :: k1, k2, Nblocks_2refine, level_min
       integer(kind=tsize) :: treecode1, treecode2
-      logical :: verbose=.false.
+      logical :: verbose = .true.
 
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
 
       if (present(verbosity)) verbose=verbosity
-      if (params%rank == 0 .and. verbose ) write(*,'("Refining trees to same level: ",i9,",",i9)') tree_id1, tree_id2
+      if ( params%rank == 0 .and. verbose ) write(*,'("Refining trees to same level: ",i9,",",i9)') tree_id1, tree_id2
+
       ! The Trees can only be added when their grids are identical. At present we
       ! try to keep the finest levels of all trees. This means we refine
       ! all blocks which are not on the same level.
-      do while( .true. ) ! loop until both trees have the same grid structure
-                         ! meaning that no block has to be refined anymore
-          Nblocks_refined = 0
+
+      ! Operations (addition, multiplication, etc) using two trees (=grids) require both trees (=grids)
+      ! to be identical. Therefore, this routine modifies both trees such that for any position x in space
+      ! the resolution is the higher
+
+
+      ! loop until both trees have the same grid structure, meaning that no block has to be refined anymore
+      do while( .true. )
+          Nblocks_2refine = 0
+
           ! Loop over the active light data of both trees and compare the meshlevels
           do k1 = 1, lgt_n(tree_id1)
-             !--------
-             ! TREE 1
-             !--------
-             lgt_id1  = lgt_active(k1, tree_id1)
-             level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
+              !--------
+              ! TREE 1
+              !--------
+              lgt_id1 = lgt_active(k1, tree_id1)
+              level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
 
-             do k2 = 1, lgt_n(tree_id2)
-             !--------
-             ! TREE 2
-             !--------
-                lgt_id2  = lgt_active(k2, tree_id2)
-                ! Take this block only if it is not already marked for refinement
-                if ( lgt_block(lgt_id2, Jmax + idx_refine_sts) .eq. -1 .or. &
-                  lgt_block(lgt_id2, Jmax + idx_refine_sts) .eq. +1 ) cycle
-                level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
+              do k2 = 1, lgt_n(tree_id2)
+                  !--------
+                  ! TREE 2
+                  !--------
+                  lgt_id2  = lgt_active(k2, tree_id2)
+                  ! Skip this block if it is already tagged for refinement.
+                  if ( lgt_block(lgt_id2, Jmax+IDX_REFINE_STS) == +1 ) then
+                      cycle
+                  endif
+                  level2 = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
 
-                ! The treecodes can only be compared if they have the same size
-                ! (i.e. treecode length). Therefore we have to find the minimum of both
-                ! max levels.
-                level_min= min(level1, level2)
-                treecode1= treecode2int( lgt_block(lgt_id1, 1 : level_min))
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level_min))
-                !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-                ! Comparison of the trees:
-                !     * check if treecodes on the trees are identical up to level1 (level of tree1)
-                !     * yes:
-                !             - if they are not on the same level
-                !               refine the coarser block on the corresponding tree
-                !     * no: move to next treecode and compare again
-                if (treecode1 == treecode2 .and. level1 .ne. level2 )then
-                    Nblocks_refined = Nblocks_refined + 1
-                    if (level1 > level2) then
-                         ! mark the block on tree 2 for refinement
-                         lgt_block(lgt_id2, Jmax + idx_refine_sts) = +1
-                    else
-                         ! mark the block on tree 1 for refinement
-                         lgt_block(lgt_id1, Jmax + idx_refine_sts) = +1
-                    end if
-                    !###########################
-                    exit  ! exit the inner loop
-                    !###########################
-                end if
-                !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-             end do ! loop over tree2
+                  ! The treecodes can only be compared if they have the same size
+                  ! (i.e. treecode length). Therefore we have to find the minimum of both
+                  ! levels.
+                  level_min = min(level1, level2)
+                  treecode1 = treecode2int( lgt_block(lgt_id1, 1:level_min) )
+                  treecode2 = treecode2int( lgt_block(lgt_id2, 1:level_min) )
+
+                  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                  ! Comparison of the trees:
+                  ! - Compare the treecodes up to the smallest level both blocks share (level_min)
+                  ! - check if they are already on the same level. in this case, they are identical
+                  !   and nothing needs to be done (the block exists in both trees already)
+                  ! - If the treecodes agree and they are not on both the same level, mark the coarser
+                  !   block for refinement. As there may well be more than one level difference between
+                  !   both blocks, this process potentially has to be repeated afterwards.
+                  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+                  if ((treecode1 == treecode2) .and. (level1 == level2)) then
+                      ! treecode comparison okay and both blocks on same level: they're the same block
+                      exit  ! exit the inner loop (TREE2)
+                  endif
+
+                  if ((treecode1 == treecode2) .and. (level1 /= level2)) then
+                      Nblocks_2refine = Nblocks_2refine + 1
+                      ! now tag the coarser block to be refined
+                      if (level1 > level2) then
+                          ! mark the block on tree 2 for refinement
+                          lgt_block(lgt_id2, Jmax + IDX_REFINE_STS) = +1
+                      else
+                          ! mark the block on tree 1 for refinement
+                          lgt_block(lgt_id1, Jmax + IDX_REFINE_STS) = +1
+                      end if
+
+                      exit  ! exit the inner loop (TREE2)
+
+                  end if
+                  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+              end do ! loop over tree2
           end do ! loop over tree1
 
           ! Decide if trees have the same treestructure or not (i.e. exit loop or refine)
-          if (Nblocks_refined == 0) then
-              exit   ! EXIT the loop when nothing has to be refined anymore
+          if (Nblocks_2refine == 0) then
+              exit   ! EXIT the (while true) loop when nothing has to be refined anymore
           else
               !----------------------------
-              ! refine the marked blocks
+              ! refine the tagged blocks
               !----------------------------
-              if (params%rank == 0 .and. verbose ) &
-                write(*,'("Number of blocks marked for refinement: ",i9)') Nblocks_refined
-              ! 1) check gradedness of the grid (meshlevel of ajacent blocks should not differe by more than 1
-              call ensure_gradedness( params, lgt_block, hvy_neighbor, &
-              lgt_active(:, fsize+1), lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize+1), hvy_n(fsize+1) )
+              if (params%rank == 0 .and. verbose) write(*,'("Number of blocks marked for refinement: ",i9)') Nblocks_2refine
+
+              ! 1) check gradedness of the grid (meshlevel of adjacent blocks should not differe by more than 1
+              call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), lgt_n(tree_id1), &
+              lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
+
+              call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id2), lgt_n(tree_id2), &
+              lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
+
+
               ! 2) refine blocks
               if ( params%dim==3 ) then
-                ! 3D:
-                call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1) )
-                call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2) )
+                  ! 3D:
+                  call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1) )
+                  call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2) )
               else
-                ! 2D:
-                call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_active(:,tree_id1), hvy_n(tree_id1) )
-                call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_active(:,tree_id2), hvy_n(tree_id2) )
+                  ! 2D:
+                  call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
+                  hvy_active(:,tree_id1), hvy_n(tree_id1) )
+
+                  call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
+                  hvy_active(:,tree_id2), hvy_n(tree_id2) )
               end if
+
               ! since lgt_block was synced we have to create the active lists again
               call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
               lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n )
+
               ! update neighbor relations
-              call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, fsize+1), &
-              lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:, fsize+1), hvy_n(fsize+1) )
-              ! synchronice
-              call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, fsize+1), hvy_n(fsize+1))
+              call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
+              lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:, tree_id1), hvy_n(tree_id1) )
+
+              call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id2), &
+              lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:, tree_id2), hvy_n(tree_id2) )
+
+              ! synchronize ghosts
+              call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
+              call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id2), hvy_n(tree_id2))
           endif
       end do
   end subroutine
@@ -699,7 +758,7 @@ contains
       N    = params%number_blocks ! number of blocks per rank
       my_rank = params%rank       ! proc rank
       g = params%n_ghosts         ! number of ghost nodes
-      Bs= params%Bs               ! number of grid points per block 
+      Bs= params%Bs               ! number of grid points per block
 
       !=============================================
       ! Prepare the trees for pointwise arithmentic
@@ -712,33 +771,36 @@ contains
       call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
              hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
       call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
-      t_elapse = MPI_WTIME()
 
       ! because all trees have the same treestructrue thier hilbertcurve is identical
       ! and therefore balance the load will try to distribute blocks with the same
-      ! treecode (but different trees) at the same rank.
-      call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-          lgt_active(:, fsize + 1), lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), &
-          hvy_active(:, fsize+1), hvy_n(fsize+1), hvy_tmp )
-      call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+      ! treecode (but on different trees) at the same rank.
       t_elapse = MPI_WTIME()
+      call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+          lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+          hvy_active(:, tree_id1), hvy_n(tree_id1), hvy_tmp )
 
-      ! after balance_load the active and sorted lists have to be allways updated.
+      call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+          lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+          hvy_active(:, tree_id2), hvy_n(tree_id2), hvy_tmp )
+
+      call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+
+      ! after balance_load the active and sorted lists have always to be updated
+      t_elapse = MPI_WTIME()
       call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .false. , tree_n)
       call toc( "pointwise_tree_arithmetic (create_active)", MPI_Wtime()-t_elapse )
+
       t_elapse = MPI_WTIME()
-      ! because it may happen that after balance_load blocks with the same treecode
-      ! are not on the same rank, we have to make sure that they are
-      ! before we can add them!
-      call same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                                hvy_block, hvy_active, hvy_n, hvy_tmp, tree_n, tree_id1, tree_id2)
-      call toc( "pointwise_tree_arithmetic (same_block_distribution)", MPI_Wtime()-t_elapse )
-      t_elapse = MPI_WTIME()
-      ! because we have send blocks arround we have to make sure that the hvy_neighbors 
+      ! because we have send blocks arround we have to make sure that the hvy_neighbors
       ! stay updated
-      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
-           lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize +1) , hvy_n(fsize +1) )
+      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1),&
+           lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1) , hvy_n(tree_id1) )
+
+      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
+           lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2) , hvy_n(tree_id2) )
+
       call toc( "pointwise_tree_arithmetic (update_neighbors)", MPI_Wtime()-t_elapse )
       t_elapse = MPI_WTIME()
 
@@ -761,12 +823,12 @@ contains
              do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
-                level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
+                level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
+                    level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
                         cycle
@@ -795,7 +857,7 @@ contains
                             end do
                            end do
                           end do
-                        end do            
+                        end do
                       !##########################################
                       endif
                       exit
@@ -813,12 +875,12 @@ contains
                 hvy_id1 = hvy_active(k1, tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
                 ! we want to add everything to tree1
-                level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
+                level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
+                    level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
                         cycle
@@ -840,12 +902,12 @@ contains
                 hvy_id1 = hvy_active(k1, tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
                 ! we want to add everything to tree1
-                level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
+                level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2, tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
+                    level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
                         cycle
@@ -860,19 +922,19 @@ contains
          case("*")
              !        # #
              !         #
-             !     #########        Multiply
+             !     #########        Multiplication
              !         #
              !        # #
              do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, my_rank, N )
                 ! we want to add everything to tree1
-                level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
+                level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
                     call hvy_id_to_lgt_id(lgt_id2, hvy_id2, my_rank, N )
-                    level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
+                    level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
                         cycle
@@ -901,7 +963,7 @@ contains
                             end do
                            end do
                           end do
-                        end do            
+                        end do
                       !##########################################
                       endif
                       exit
@@ -919,7 +981,7 @@ contains
 
 
 !##############################################################
-subroutine add_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+subroutine add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
              hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
 
     implicit none
@@ -950,7 +1012,7 @@ end subroutine
 
 
 !##############################################################
-subroutine multiply_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+subroutine multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
              hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
 
     implicit none
@@ -1022,14 +1084,14 @@ end subroutine
              ! TREE 1
              !--------
              lgt_id1  = lgt_active(k1, tree_id1)
-             level1   = lgt_block(lgt_id1, Jmax + idx_mesh_lvl)
+             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
 
              do k2 = 1, lgt_n(tree_id2)
              !--------
              ! TREE 2
              !--------
                 lgt_id2  = lgt_active(k2, tree_id2)
-                level2   = lgt_block(lgt_id2, Jmax + idx_mesh_lvl)
+                level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                 level_min= min(level1,level2)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level_min))
                 treecode2= treecode2int(lgt_block(lgt_id2, 1 : level_min))
@@ -1043,6 +1105,7 @@ end subroutine
                    call lgt_id_to_proc_rank( rank2, lgt_id2, N)
                    if (rank1 .ne. rank2) then
                      n_comm = n_comm + 1
+                     write(*,*) "===============> not identical", n_comm
                      comm_list(n_comm, 1) = rank1   ! sender mpirank
                      comm_list(n_comm, 2) = rank2   ! receiver mpirank
                      comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
@@ -1062,137 +1125,139 @@ end subroutine
 
 
 
-  !##############################################################
-  subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, &
-                        hvy_block, hvy_tmp, tree_id_optional)
+!-------------------------------------------------------------------------------
+! Read a tree (=grid) in the forest. A tree can consist of several datafields (think
+! of the state vector) that all live on the same grid.
+!
+!
+!-------------------------------------------------------------------------------
+subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_tmp, tree_id_optional)
+  implicit none
 
-    implicit none
+  !-------------------------------- ---------------------------------
+  integer(kind=ik), intent(in)   :: N_files         !< number of files to read in this tree (=grid)
+  character(len=*), intent(in)   :: fnames(N_files) !< list of files to be read
+  type (type_params), intent(in) :: params          !< user defined parameter structure
+  ! NOTE: we pass the routine lgt_n, which must be previously read from one of the files.
+  ! This is done using the read_attributes subroutine. NOTE: This can possibly be merged here
+  ! and mustnt neccessarily be done in the caller
+  integer(kind=ik), intent(inout) :: lgt_n !< number of active blocks (heavy and light data)
+  integer(kind=ik), intent(inout) :: lgt_block(:,:) !< light data array
 
-      !-------------------------------- ---------------------------------
-      integer(kind=ik), intent(in)   :: N_files!< number of files
-      character(len=*), intent(in)      :: fnames(N_files) !< name of file
-      type (type_params), intent(in)    :: params !< user defined parameter structure
-       ! NOTE: we pass the routine lgt_n, which must be previsouly read from the
-       ! file. This is done using read_attributes. This can possibly be merged here
-       ! and mustnt be done in the caller
-      integer(kind=ik), intent(inout)   :: lgt_n !< number of active blocks (heavy and light data)
-      integer(kind=ik), intent(inout)   :: lgt_block(:,:) !< light data array
-      integer(kind=ik), optional, intent(in)   :: tree_id_optional !< index of the tree you want to save the field in
-      real(kind=rk), intent(inout):: hvy_block(:, :, :, :, :) !< heavy data array - block data
-      real(kind=rk), intent(inout):: hvy_tmp(:, :, :, :, :) !< heavy data array - block data
-      !-------------------------------- ---------------------------------
-      integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, tree_id, Bs(3), g, dF
-      integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
-      integer(kind=ik) :: free_hvy_id, free_lgt_id, free_hvy_n
-      integer(hsize_t)      :: dims_treecode(2)
-      integer(kind=ik), dimension(:,:), allocatable :: block_treecode
-      integer(hid_t)        :: file_id
-      character(len = 80) :: fname
-      if (present(tree_id_optional)) then
-        tree_id=tree_id_optional
-      else
-        tree_id=1
-      endif
-      ! set MPI parameters
-      rank         = params%rank
-      number_procs = params%number_procs
-      N            = params%number_blocks
-      fname        = fnames(1) ! take the first of the N_files to read the lgt_data from
-      Bs = params%Bs
-      g  = params%n_ghosts
+  integer(kind=ik), optional, intent(in) :: tree_id_optional !< index of the tree you want to save the data in
+  real(kind=rk), intent(inout) :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+  real(kind=rk), intent(inout) :: hvy_tmp(:, :, :, :, :) !< heavy data array - block data
+  !-------------------------------- ---------------------------------
+  integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, tree_id, Bs(3), g, dF
+  integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
+  integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n
+  integer(hsize_t) :: dims_treecode(2)
+  integer(kind=ik), dimension(:,:), allocatable :: block_treecode
+  integer(hid_t)        :: file_id
+  character(len = 80) :: fname
 
-      ! open the file
-      call check_file_exists(fname)
-      call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
+  if (present(tree_id_optional)) then
+      tree_id = tree_id_optional
+  else
+      tree_id = 1
+  endif
+  ! set MPI parameters
+  rank         = params%rank
+  number_procs = params%number_procs
+  N            = params%number_blocks
+  fname        = fnames(1) ! take the first of the N_files to read the lgt_data from
+  Bs           = params%Bs
+  g            = params%n_ghosts
+
+  ! open the file
+  call check_file_exists(fname)
+  call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
+
+  !-----------------------------------------------------------------------------
+  ! Step 0: define how many blocks per CPU
+  !-----------------------------------------------------------------------------
+  call set_desired_num_blocks_per_rank(params, blocks_per_rank_list, lgt_n)
+
+  ! number of active blocks on my process
+  my_hvy_n = blocks_per_rank_list(rank)
 
 
-      ! Nblocks per CPU
-      ! this list contains (on each mpirank) the number of blocks for each mpirank. note
-      ! zero indexing as required by MPI
-      ! set list to the average value
-      blocks_per_rank_list(:) = lgt_n / number_procs
+  !-----------------------------------------------------------------------------
+  ! Step 1: read light data (treecodes)
+  !-----------------------------------------------------------------------------
+  ! check what Jmax was saved in file (check length of treecode in file)
+  call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
 
-      ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
-      if (mod(lgt_n, number_procs) > 0) then
-        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = &
-        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
-      end if
-      ! some error control -> did we loose blocks? should never happen.
-      if ( sum(blocks_per_rank_list) /= lgt_n) then
-        call abort(1028,"ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
-      end if
+  ! compare treecode lengths
+  if (dims_treecode(1)>params%max_treelevel) then
+      ! treecode in input file is greater than the new one, abort and output on screen
+      ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
+      ! but active level=4). On the other hand, that appears to be rare.
+      call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
+  end if
 
-      ! number of active blocks on my process
-      free_hvy_n = blocks_per_rank_list(rank)
+  allocate( block_treecode(1:dims_treecode(1), 1:my_hvy_n) )
+  block_treecode = -1
 
-      ! check what Jmax was saved in file (check dimensions of treecode in file)
-      call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
+  ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + IDX_REFINE_STS]
+  ! array we want to hold, so that all CPU can read from the same file simultaneously
+  ! (note zero-based offset):
+  lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
+  ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + my_hvy_n - 1/)
+  call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
 
-      ! compare dimensions
-      if (dims_treecode(1)>params%max_treelevel) then
-        ! treecode in input file is greater than the new one, abort and output on screen
-        ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
-        ! but active level=4). On the other han11219d, that appears to be rare.
-        call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
-      end if
+  ! close file and HDF5 library
+  call close_file_hdf5(file_id)
 
-      allocate(block_treecode(1:dims_treecode(1), 1:free_hvy_n))
-      block_treecode = -1
+  !-----------------------------------------------------------------------------
+  ! Step 2: read heavy data from files into hvy_tmp
+  !-----------------------------------------------------------------------------
+  do dF = 1, N_files
+      ! read data from file
+      call check_file_exists(trim(fnames(dF)))
+      call read_field(fnames(dF), dF, params, hvy_tmp, my_hvy_n )
+  end do
 
-      ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + idx_refine_sts]
-      ! array we want to hold, so that all CPU can read from the same file simultaneously
-      ! (note zero-based offset):
-      lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
-      ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + free_hvy_n - 1/)
-      call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
+  !-----------------------------------------------------------------------------
+  ! Step 3: assemble both hvy and lgt data in tree
+  !-----------------------------------------------------------------------------
+  do k = 1, my_hvy_n
+      call get_free_local_light_id( params, rank, lgt_block, free_lgt_id)
 
-      ! close file and HDF5 library
-      call close_file_hdf5(file_id)
-
-      ! read datafields from files into hvy_tmp
-      do dF = 1, N_files
-        ! read data from file
-        call check_file_exists(trim(fnames(dF)))
-        call read_field(fnames(dF), dF, params, hvy_tmp, free_hvy_n )
+      call lgt_id_to_hvy_id( free_hvy_id, free_lgt_id, rank, N )
+      ! copy treecode
+      lgt_block(free_lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
+      ! set mesh level
+      lgt_block(free_lgt_id, params%max_treelevel+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+      ! set refinement status
+      lgt_block(free_lgt_id, params%max_treelevel+IDX_REFINE_STS) = 0
+      ! set number of the tree
+      lgt_block(free_lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_id
+      ! copy actual data
+      do dF = 1, params%n_eqn
+          hvy_block( :, :, :, df, free_hvy_id ) = hvy_tmp(:, :, :, df, k)
       end do
+  end do
 
-      do k = 1, free_hvy_n
-        call get_free_local_light_id( params, rank, lgt_block, free_lgt_id)
+  if ( rank == 0 ) then
+      write(*,'("Stored in Tree_id: ",i3)') tree_id
+      write(*,'("Nblocks=",i6," (on all cpus)")') lgt_n
+  end if
 
-        call lgt_id_to_hvy_id( free_hvy_id, free_lgt_id, rank, N )
-        ! copy treecode
-        lgt_block(free_lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
-        ! set mesh level
-        lgt_block(free_lgt_id, params%max_treelevel+idx_mesh_lvl) = treecode_size(block_treecode(:,k), size(block_treecode,1))
-        ! set refinement status
-        lgt_block(free_lgt_id, params%max_treelevel+idx_refine_sts) = 0
-        ! set number of the tree
-        lgt_block(free_lgt_id, params%max_treelevel+idx_tree_id) = tree_id
-        do dF = 1, params%n_eqn
-             hvy_block( :, :, :, df, free_hvy_id ) = hvy_tmp(:, :, :, df, k)
-        end do
-     end do
-     if ( rank == 0 ) then
-       write(*,'("Stored in Tree_id: ",i3)') tree_id
-       write(*,'("Nblocks=",i6," (on all cpus)")') lgt_n
-     end if
-    ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
-    ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
-    ! be synced. However, the light data has to.
-    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+  ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
+  ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
+  ! be synced. However, the light data has to.
+  call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
-    deallocate(block_treecode)
+  deallocate(block_treecode)
 
-    ! it is useful to print out the information on active levels in the file
-    ! to get an idea how it looks like and if the desired dense level is larger
-    ! or smaller
-    if (params%rank==0) then
-        write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
-        max_active_level( lgt_block )
-    endif
-
-    ! add the amount of hvy_n to the new data
-    !hvy_n = hvy_n + free_hvy_n
+  ! it is useful to print out the information on active levels in the file
+  ! to get an idea how it looks like and if the desired dense level is larger
+  ! or smaller
+  if (params%rank==0) then
+      write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
+      max_active_level( lgt_block )
+  endif
 
 end subroutine read_tree
 !##############################################
@@ -1476,7 +1541,7 @@ end subroutine read_tree
 
     N = params%number_blocks
     rank = params%rank
-    idxtree = params%max_treelevel + idx_tree_id
+    idxtree = params%max_treelevel + IDX_TREE_ID
     tree_hvy_n = 0
 
     do k = 1, hvy_n
@@ -1512,7 +1577,7 @@ end subroutine read_tree
     integer(kind=ik), optional, intent(in) :: tree_id !< id of the tree (default: 1)
     real(kind=rk), optional, intent(in)    :: time !< time loop parameters (default: 0.0)
     integer(kind=ik), optional, intent(in) :: iteration !< iteration of the solver (default: 1)
-    integer(kind=ik), optional,intent(in)  :: dF !< datafield number (default: 0)
+    integer(kind=ik), optional,intent(in)  :: dF !< datafield number (default: 1)
     !-----------------------------------------------------------------
     integer (kind=ik) ::tree_hvy_n, treeid, it, dataField
     real (kind=rk) :: t

@@ -93,13 +93,13 @@ subroutine reset_lgt_data(lgt_block, lgt_active,max_treelevel, lgt_n, lgt_sorted
 
     ! reset data:
     ! all blocks are inactive, reset treecode
-    lgt_block(:,1:max_treelevel)   = -1
+    lgt_block(:,1:max_treelevel) = -1
     ! reset tree_id
-    lgt_block(:, max_treelevel+idx_tree_id) = -1
+    lgt_block(:, max_treelevel+IDX_TREE_ID) = -1
     ! all blocks are inactive, reset mesh level
-    lgt_block(:, max_treelevel+idx_mesh_lvl) = -1
+    lgt_block(:, max_treelevel+IDX_MESH_LVL) = -1
     ! set refinement to 0
-    lgt_block(:, max_treelevel+idx_refine_sts) = 0
+    lgt_block(:, max_treelevel+IDX_REFINE_STS) = 0
 
     ! reset sorted list of numerical treecodes
     if ( present(lgt_sortednumlist) ) then

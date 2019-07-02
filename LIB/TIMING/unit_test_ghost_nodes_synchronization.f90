@@ -116,7 +116,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     if (params%rank == 0) then
         write(*,'(80("-"))')
         write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
-        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel + idx_mesh_lvl))
+        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel + IDX_MESH_LVL))
         write(*,'(" ready for testing.")')
     endif
 

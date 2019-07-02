@@ -63,19 +63,19 @@ subroutine ensure_completeness( params, lgt_block, lgt_id, sisters )
         ! only if all sisters agree to coarsen, they can all be merged into their mother block.
         status = -1
         do l = 1, N_sisters
-            status = max( status, lgt_block(sisters(l), Jmax+idx_refine_sts) )
+            status = max( status, lgt_block(sisters(l), Jmax+IDX_REFINE_STS) )
         end do
 
         ! if all agree and share the status -1, then we can indeed coarsen, keep -1 status
         if ( status == -1 ) then
             do l = 1, N_sisters
-                lgt_block( sisters(l), Jmax+idx_refine_sts )  = -1
+                lgt_block( sisters(l), Jmax+IDX_REFINE_STS )  = -1
             end do
         else
             ! We found all sister blocks, but they do not all share the -1 status: none
             ! of them can be coarsened, remove the status.
             do l = 1, N_sisters
-                lgt_block( sisters(l), Jmax+idx_refine_sts )  = 0
+                lgt_block( sisters(l), Jmax+IDX_REFINE_STS )  = 0
             end do
         end if
     else
@@ -85,7 +85,7 @@ subroutine ensure_completeness( params, lgt_block, lgt_id, sisters )
         do l = 1, N_sisters
             ! change status only for the existing sisters
             if (sisters(l)>0) then
-                lgt_block( sisters(l), Jmax+idx_refine_sts )  = 0
+                lgt_block( sisters(l), Jmax+IDX_REFINE_STS )  = 0
             endif
         end do
     end if

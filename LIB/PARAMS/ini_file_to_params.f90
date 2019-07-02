@@ -248,7 +248,7 @@ end subroutine ini_file_to_params
     if ( params%max_treelevel < params%min_treelevel ) then
         call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
     end if
-    
+
     if ( params%max_treelevel > 18 ) then
         ! as we internally convert the treecode to a single integer number, the number of digits is
         ! limited by that type. The largest 64-bit integer is 9 223 372 036 854 775 807

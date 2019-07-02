@@ -27,7 +27,7 @@ subroutine get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
   Bs = params%Bs
 
   ! fetch this blocks level:
-  level = lgt_block( lgt_id, params%max_treelevel + idx_mesh_lvl )
+  level = lgt_block( lgt_id, params%max_treelevel + IDX_MESH_LVL )
 
   ! compute its coordinates in ijk space
   call decoding( lgt_block( lgt_id, 1:level ), ix,iy,iz, level)

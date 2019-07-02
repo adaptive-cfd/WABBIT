@@ -211,7 +211,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     if (params%force_maxlevel_dealiasing) then
         do k = 1, lgt_n
-            if (lgt_block(lgt_active(k), Jmax + idx_mesh_lvl) == params%max_treelevel) then
+            if (lgt_block(lgt_active(k), Jmax + IDX_MESH_LVL) == params%max_treelevel) then
                 ! force blocks on maxlevel to coarsen
                 lgt_block(lgt_active(k), Jmax + idx_refine_sts) = -1
             endif

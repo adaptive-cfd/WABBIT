@@ -16,7 +16,7 @@ contains
   function treecode2int(treearray, tree_id)
     implicit none
     integer(kind=ik), intent(in) :: treearray(:)
-    integer(kind=ik),optional, intent(in) :: tree_id
+    integer(kind=ik), optional, intent(in) :: tree_id
     integer(kind=tsize) :: N, i, potency
     integer(kind=tsize) :: treecode2int
     N = size(treearray,1)
@@ -39,7 +39,7 @@ contains
             treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
         endif
     enddo
-    
+
 end function
 
   !===============================================================================

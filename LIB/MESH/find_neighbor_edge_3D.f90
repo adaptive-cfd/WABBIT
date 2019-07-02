@@ -115,8 +115,8 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
 ! variables initialization
 
     my_treecode= lgt_block( lgt_id, 1:max_treelevel )
-    level      = lgt_block( lgt_id, max_treelevel + idx_mesh_lvl )
-    tree_id    = lgt_block( lgt_id, max_treelevel + idx_tree_id )
+    level      = lgt_block( lgt_id, max_treelevel + IDX_MESH_LVL )
+    tree_id    = lgt_block( lgt_id, max_treelevel + IDX_TREE_ID )
     neighborID_sameLevel    = -1
     neighborID_coarserLevel = -1
     virt_code               = -1

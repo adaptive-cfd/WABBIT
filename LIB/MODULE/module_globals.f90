@@ -3,7 +3,7 @@
 !> \brief
 !! Module of global parameters and functions
 !> \details
-!!    * index positions of lgt_data (idx_tree_number,idx_mesh_lvl,idx_refine_sts etc)
+!!    * index positions of lgt_data (idx_tree_number,IDX_MESH_LVL,IDX_REFINE_STS etc)
 !!    * functions abort
 !!    * global prints (todo)
 !!    * global MPI communicator
@@ -24,9 +24,9 @@ module module_globals
   ! index of light data quantities lgt_data(block_index,max_treeleve+idx_<quantity>)
   ! we define the global indices idx_<quantity> here, because it enables us to choose the order of indexing
   ! if necessary
-  integer, parameter, public  :: idx_refine_sts      = 2 ! refinement status
-  integer, parameter, public  :: idx_tree_id         = 3 ! number of the tree in the forest
-  integer, parameter, public  :: idx_mesh_lvl        = 1 ! current mesh level of the block
+  integer, parameter, public  :: IDX_REFINE_STS      = 2 ! refinement status
+  integer, parameter, public  :: IDX_TREE_ID         = 3 ! number of the tree in the forest
+  integer, parameter, public  :: IDX_MESH_LVL        = 1 ! current mesh level of the block
   integer, parameter, public  :: extra_lgt_fields    = 3 ! number of data fields additionaly to treecode
   !subroutines of this module
   interface abort

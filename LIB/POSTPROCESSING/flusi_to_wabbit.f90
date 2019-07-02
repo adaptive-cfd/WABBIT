@@ -200,7 +200,7 @@ subroutine flusi_to_wabbit(params)
         else
             start_z = 0_ik
         end if
-        lgt_block(lgt_active(k), params%max_treelevel + idx_refine_sts) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
+        lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
     end do
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )

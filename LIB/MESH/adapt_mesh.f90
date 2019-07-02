@@ -172,8 +172,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! To corrent that, you need to know which of the blocks results from interpolation and
     ! which one has previously been at Jmax. This latter one gets the 11 status.
     do k = 1, lgt_n
-        if ( lgt_block( lgt_active(k), params%max_treelevel+ idx_mesh_lvl) == params%max_treelevel ) then
-            lgt_block( lgt_active(k), params%max_treelevel + idx_refine_sts ) = 11
+        if ( lgt_block( lgt_active(k), params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
+            lgt_block( lgt_active(k), params%max_treelevel + IDX_REFINE_STS ) = 11
         end if
     end do
 

@@ -88,7 +88,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
 
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
-    call refinement_indicator( params, lgt_block, lgt_active, lgt_n, indicator )
+    call refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, indicator )
     call toc( "refine_mesh (refinement_indicator)", MPI_Wtime()-t1 )
 
 

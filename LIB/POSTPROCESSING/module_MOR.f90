@@ -281,7 +281,9 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80)      :: file_in, file_out, args
+    character(len=80)      :: file_out, args
+    character(len=80),dimension(:), allocatable :: fname_list
+    character(len=80),dimension(:,:), allocatable :: file_in
     real(kind=rk)   , allocatable :: time(:)
     integer(kind=ik), allocatable :: iteration(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
@@ -296,17 +298,22 @@ contains
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
+    integer(kind=ik) :: j, n_components=1, io_error
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
     character(len=80) :: tmp_name
     character(len=2)  :: order
     logical :: verbosity = .false., save_all = .true.
 
-    call get_command_argument(2, file_in)
-    if (file_in == '--help' .or. file_in == '--h') then
+    call get_command_argument(2, args)
+    if ( args== '--help' .or. args == '--h') then
         if ( params%rank==0 ) then
-            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD [--save_all --order=[2|4] --nmodes=3 --error=1e-9 --adapt=0.1] sources_*.h5"
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list filelist.txt [list_uy.txt] [list_uz.txt]"
+            write(*,*) "[--save_all --order=[2|4] --nmodes=3 --error=1e-9 --adapt=0.1]"
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,*) " Wavelet adaptive Snapshot POD "
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
         return
     end if
@@ -354,9 +361,36 @@ contains
         save_all = .true.
         n_opt_args = n_opt_args + 1
       end if
-
+      !-------------------------------
+      ! Number of components in statevector
+      if ( index(args,"--components=")==1 ) then
+        read(args(14:len_trim(args)),* ) n_components
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! List of files
+      if ( index(args,"--list")==1 ) then
+        allocate(fname_list(n_components))
+        do j = 1, n_components
+          call get_command_argument(i+j, fname_list(j))
+          n_opt_args = n_opt_args + 1
+        end do
+      end if
     end do
 
+
+    !-------------------------------
+    ! Set some wabbit specific params
+    !-------------------------------
+    ! block distirbution:
+    params%block_distribution="sfc_hilbert"
+    ! no time stepping:
+    params%time_step_method="no"
+    params%min_treelevel=1
+    ! coarsening indicator
+    params%coarsening_indicator="threshold-state-vector"
+    params%threshold_mask=.False.
+    
     if (order == "2") then
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
@@ -372,47 +406,73 @@ contains
       params%adapt_mesh = .False.
       params%eps = 0.0_rk
     endif
+
+
+    !-------------------------------
+    ! set defaults for POD truncation
+    !-------------------------------
     if (truncation_rank_in /=-1) truncation_rank = truncation_rank_in
     if (truncation_error_in >1e-16_rk ) truncation_error = truncation_error_in
 
-    !----------------------------------
-    ! set addtitional params
-    !----------------------------------
-    ! block distirbution:
-    params%block_distribution="sfc_hilbert"
-    ! no time stepping:
-    params%time_step_method="no"
-    params%min_treelevel=1
-    ! coarsening indicator
-    params%coarsening_indicator="threshold-state-vector"
-    params%threshold_mask=.False.
-    ! read ini-file and save parameters in struct
-    N_snapshots = command_argument_count()
-    N_snapshots = N_snapshots - n_opt_args ! because of the first nargs arguments which are not files
-    allocate(params%input_files(N_snapshots))
+
+    !-------------------------------
+    ! check if files exists:
+    !-------------------------------
+    ! fname_list is the name of the file which contains a list of files you want to 
+    ! read in (i.e. rho_000000000.h5 rho_000000001.h5 ... etc)
+    if (.not. allocated(fname_list)) call abort(207191,"you must pass at least one file list! Use: --list my_filelist.txt")
+    do j = 1, n_components
+       call check_file_exists ( fname_list(j) )
+       if (params%rank==0) write(*,*) "Reading list of files from "//fname_list(j)
+    enddo
+
+
+    !-----------------------------------------------------------------------------
+    ! read in the file, loop over lines
+    !-----------------------------------------------------------------------------
+    call count_lines_in_ascii_file_mpi(fname_list(1), N_snapshots, n_header=0)
+
+
+    allocate(params%input_files(n_components))
+    allocate(file_in(N_snapshots,n_components))
     allocate(time(N_snapshots))
     allocate(iteration(N_snapshots))
     !-------------------------------------------
     ! check and find common params in all h5-files
     !-------------------------------------------
-    call get_command_argument(n_opt_args+1, params%input_files(1))
-    call read_attributes(params%input_files(1), lgt_n_tmp, time(1), iteration(1), params%domain_size, &
+    ! open all files 
+    do j = 1, n_components
+       open( unit=10+j, file=fname_list(j), action='read', status='old' )
+    enddo
+                                
+    io_error = 0
+    i = 1
+    do while(i <= N_snapshots)
+      do j = 1, n_components
+        read (10+j, '(A)', iostat=io_error) file_in(i,j)
+
+        call check_file_exists ( file_in(i,j) )
+
+        if ( i == 1 .and. j == 1 ) then
+          ! read all geometric parameters of grid
+          call read_attributes(file_in(i,j), lgt_n_tmp, time(1), iteration(1), params%domain_size, &
                          params%Bs, params%max_treelevel, params%dim)
-    do i = 2, N_snapshots
-      call get_command_argument(n_opt_args+i, file_in)
-      params%input_files(i) = file_in
-      call read_attributes(file_in, lgt_n_tmp, time(i), iteration(i), domain, bs, level, dim)
-      params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
-      if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
-      if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
-      if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
+        endif
+        call read_attributes(file_in(i,j), lgt_n_tmp, time(i), iteration(i), domain, bs, level, dim)
+        params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+        if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
+        if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
+        if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
+      end do
+      i = i + 1
     end do
+    ! now we have all information to allocate the grid and set up the forest: 
     fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
-    params%n_eqn = 1
+    params%n_eqn = n_components
     allocate(params%threshold_state_vector_component(params%n_eqn))
-    params%threshold_state_vector_component(1)=.True.
+    params%threshold_state_vector_component(1:params%n_eqn)=.True.
     if (maxmem < 0.0_rk) then
       params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
     endif
@@ -431,7 +491,7 @@ contains
     ! READ ALL SNAPSHOTS
     !----------------------------------
     do tree_id = 1, N_snapshots
-      call read_field2tree(params, params%input_files(tree_id), params%n_eqn, tree_id, &
+      call read_field2tree(params,file_in(tree_id,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
       !----------------------------------
@@ -460,12 +520,16 @@ contains
         write(*,*) "WABBIT POD."
         write(*,*) "Snapshot matrix X build from:"
         do i = 1, N_snapshots
-          write(*, '("Snapshot=",i3 ," File=", A, " it=",i7,1x," time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
-          i, trim(params%input_files(i)), iteration(i), time(i), lgt_n(i), &
+          write(*, '("Snapshot=",i3 , " it=",i7,1x," time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
+          i, iteration(i), time(i), lgt_n(i), &
           100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
           min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+          write(*, '("Files:")')
+          do j = 1, n_components
+            write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
+          end do
         end do
         write(*,'(80("-"))')
         write(*,'("L2 norm ||X||_2^2/N_snapshots/Volume: ",g18.8)') L2norm**2/dble(N_snapshots)/Volume

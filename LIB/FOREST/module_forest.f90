@@ -632,7 +632,7 @@ end subroutine
       integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize
       integer(kind=ik)    :: k1, k2, Nblocks_2refine, level_min
       integer(kind=tsize) :: treecode1, treecode2
-      logical :: verbose = .true.
+      logical :: verbose = .false.
 
       Jmax = params%max_treelevel ! max treelevel
       fsize= params%forest_size   ! maximal number of trees in forest
@@ -856,7 +856,7 @@ end subroutine
       ! after balance_load the active and sorted lists have always to be updated
       t_elapse = MPI_WTIME()
       call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .false. , tree_n)
+           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .True. , tree_n)
       call toc( "pointwise_tree_arithmetic (create_active)", MPI_Wtime()-t_elapse )
 
       t_elapse = MPI_WTIME()

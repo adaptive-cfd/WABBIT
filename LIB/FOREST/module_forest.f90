@@ -1229,32 +1229,15 @@ contains
         logical, intent(in),optional      :: verbosity !< if true: additional information of processing
         !-----------------------------------------------------------------
         logical :: verbose=.false.
+        
+        if (present(verbosity)) verbose=verbosity
+        if (params%rank == 0 .and. verbose) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
 
-<<<<<<< HEAD
-    implicit none
-    !-----------------------------------------------------------------
-    type (type_params), intent(in) :: params   !< params structure
-    integer(kind=ik), intent(inout)   :: hvy_n(:) !< number of active heavy blocks
-    integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
-    integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
-    integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
-    integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
-    real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-    integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-    integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
-    integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
-    real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
-    logical, intent(in),optional      :: verbosity !< if true: additional information of processing
-    !-----------------------------------------------------------------
-    logical :: verbose=.false.
+        call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
 
-    if (present(verbosity)) verbose=verbosity
-    if (params%rank == 0 .and. verbose ) write(*,'("Multiply trees: ",i4,",",i4)') tree_id1, tree_id2
-    call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"*")
-
-end subroutine
-!##############################################################
+    end subroutine
+    !##############################################################
 
 
 
@@ -1383,63 +1366,10 @@ function scalar_product_two_trees( params, tree_n, &
 end function
 !##############################################################
 
-  !##############################################################
-  !> This function compares the tree structure and block distribution of two trees.
-  !> If treecodes are identical but the processor ranks not, then we redistribute
-  !> one of the corresponding blocks, such that blocks with same treecode are on the
-  !> same rank.
-  subroutine same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                                hvy_block, hvy_active, hvy_n, hvy_tmp, &
-                                tree_n, tree_id1, tree_id2)
 
-      implicit none
-      !-----------------------------------------------------------------
-      type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
-      integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
-      integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
-      integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
-      integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
-      real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-      integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:, :) !< active lists
-      integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
-      real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
-      !-----------------------------------------------------------------
-      integer(kind=ik)    :: level1, level2, lgt_id1, lgt_id2, N, fsize
-      integer(kind=ik)    :: k1, k2, rank1, rank2, level_min, n_comm, Jmax
-      integer(kind=tsize) :: treecode1, treecode2
-      integer(kind=ik), allocatable, save :: comm_list(:,:)
 
-      N = params%number_blocks
-      fsize = params%forest_size
-      Jmax = params%max_treelevel
-      if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
 
-      !! Loop over all treecodes of both trees and check if they are identical.
-      !! If the treecodes are the same but the blocks are not on the same rank,
-      !! we have to send a block.
-      !! The comm_list is created to save all of the block transfers.
-      n_comm = 0 ! number of communications
-      do k1 = 1, lgt_n(tree_id1)
-             !--------
-             ! TREE 1
-             !--------
-             lgt_id1  = lgt_active(k1, tree_id1)
-             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
 
-             do k2 = 1, lgt_n(tree_id2)
-             !--------
-             ! TREE 2
-             !--------
-=======
-        if (present(verbosity)) verbose=verbosity
-        if (params%rank == 0 .and. verbose) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
-
-        call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
-
-    end subroutine
-    !##############################################################
 
 
 
@@ -1520,7 +1450,6 @@ end function
                 !--------
                 ! TREE 2
                 !--------
->>>>>>> 84fc0b6ec56a6f9f647bc3e31ddb48ea0f12a452
                 lgt_id2  = lgt_active(k2, tree_id2)
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                 level_min= min(level1,level2)

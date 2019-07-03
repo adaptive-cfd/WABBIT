@@ -320,7 +320,7 @@ contains
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
-    integer(kind=ik) :: j, n_components=1, io_error
+    integer(kind=ik) :: j, n_components=1, io_error, split_index
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
     character(len=80) :: tmp_name
@@ -579,12 +579,11 @@ contains
     !----------------------------------
     do tree_id = N_snapshots+1, N_snapshots + truncation_rank
       i = tree_id - N_snapshots
-      tmp_name = "PODmode"
-      write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), i
-
-      call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , 0.0_rk , i )
-
+      do j = 1, n_components 
+        write( file_out, '("mode",i1,"_", i12.12, ".h5")') j, i
+        call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, j, tree_id , 0.0_rk , i )
+      end do
     end do
 
   end subroutine
@@ -844,7 +843,7 @@ contains
       if ( index(args,"--POD-reconstruct")==1 ) then
         call get_command_argument(i+1, fname_acoefs)
         if (rank==0) write(*,*) "Temporal coefficients are read from", fname_acoefs
-        n_opt_args = n_opt_args + 1
+        n_opt_args = n_opt_args + 2
       end if
       !-------------------------------
       ! TIMESTEP

@@ -504,9 +504,11 @@ contains
     !----------------------------------
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
               lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
-    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
-    hvy_neighbor = -1
+    !>\todo as soon as WABBIT has new lgt structure reset lgt for all trees!
+    do tree_id = 1, fsize
+    call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
+              params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
+    end do
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
     !----------------------------------
@@ -562,7 +564,7 @@ contains
         write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
         write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
         write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
-        write(*,'("Nblocks used (sparse)=",i6)') lgt_n(fsize+1)
+        write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
@@ -691,7 +693,6 @@ contains
         ! note: this routine deletes lgt_data of the "free_tree_id" before copying
         !       the tree
         t_inc(1) = MPI_wtime()
-
         call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id1)
         t_inc(1) = MPI_wtime()-t_inc(1)
@@ -778,30 +779,30 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80)      :: file_in, file_out, args
+    character(len=80), allocatable :: file_in(:,:), fname_list(:)
+    character(len=80) :: fname_acoefs, tmp_name, file_out, args
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :)
+    integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :), mode_number(:)
     integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
     integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: iteration, N_modes_used=1_ik, max_nr_modes, N_modes_given
+    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, N_modes_given, iteration, n_components
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
-    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank
+    integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
-    character(len=80) :: fname_acoefs, tmp_name
     character(len=2)  :: order
     logical :: verbosity = .false., save_all = .true.
 
-    call get_command_argument(2, file_in)
-    if (file_in == '--help' .or. file_in == '--h') then
+    call get_command_argument(2, args)
+    if (args == '--help' .or. args == '--h') then
         if ( params%rank==0 ) then
             write(*,*) "postprocessing subroutine to reconstruct field from POD modes"
-            write(*,*) "./wabbit-post --POD-reconstruct a_coef.txt --components=3 "//
+            write(*,*) "./wabbit-post --POD-reconstruct a_coef.txt --components=3 "// &
               "--list POD_mode.txt [list_uy.txt] [list_uz.txt]" // &
               "[--save_all --order=[2|4] --nmodes=3 --adapt=0.1] "
         end if
@@ -860,6 +861,22 @@ contains
         read(args(10:len_trim(args)),* ) N_modes_used
         n_opt_args = n_opt_args + 1
       end if
+      !-------------------------------
+      ! Number of components in statevector
+      if ( index(args,"--components=")==1 ) then
+        read(args(14:len_trim(args)),* ) n_components
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
+      ! List of files
+      if ( index(args,"--list")==1 ) then
+        n_opt_args = n_opt_args + 1
+        allocate(fname_list(n_components))
+        do j = 1, n_components
+          call get_command_argument(i+j, fname_list(j))
+          n_opt_args = n_opt_args + 1
+        end do
+      end if
 
     end do
 
@@ -871,7 +888,8 @@ contains
     call count_cols_in_ascii_file_mpi(fname_acoefs, max_nr_modes, n_header=0_ik)
     if (N_modes_used>max_nr_modes) call abort(270419,"Try to use more modes then available")
     if (N_modes_used< 0) N_modes_used = max_nr_modes
-    allocate( a_coefs(1:N_snapshots, 1:max_nr_modes))
+    allocate( a_coefs(1:N_snapshots, 1:N_modes_used))
+    allocate(file_in(1:max_nr_modes,1:n_components))
     call read_array_from_ascii_file_mpi(fname_acoefs, a_coefs, n_header=0_ik)
     if (rank==0) then
         write(*,*) "~~~~v      ", fname_acoefs
@@ -904,6 +922,9 @@ contains
     !----------------------------------
     ! set addtitional params
     !----------------------------------
+    ! number of components is the number of quantities saved in the 
+    ! statevector. Therefore we set:
+    params%n_eqn = n_components
     ! block distirbution:
     params%block_distribution="sfc_hilbert"
     ! no time stepping:
@@ -917,28 +938,56 @@ contains
     N_modes_given = N_modes_given - n_opt_args ! because of the first nargs arguments which are not files
     if (N_modes_given /= max_nr_modes) write(*,*) "Warning!!! Given number of modes not consistent with file:"//fname_acoefs
     if (N_modes_given < N_modes_used) call abort(280419,"Error! You try to use more modes then available")
-    allocate(params%input_files(N_modes_used))
+    allocate(params%input_files(params%n_eqn))
+    allocate(mode_number(N_modes_used))
 
 
-    !-------------------------------------------
-    ! check and find common params in all h5-files
-    !-------------------------------------------
-    call get_command_argument(n_opt_args+1, params%input_files(1))
-    call read_attributes(params%input_files(1), lgt_n_tmp, tmp_time, iter, params%domain_size, &
+    !--------------------------------
+    ! open all the given txt-files
+    !--------------------------------
+    do j = 1, n_components
+            open( unit=10+j, file=fname_list(j), action='read', status='old' )
+    enddo
+
+    !--------------------------------
+    ! in every txt-file there is a list
+    ! of h5-files which contain the
+    ! statevector components of the 
+    ! POD modes
+    !--------------------------------
+    do i = 1, N_modes_used
+      do j = 1, n_components
+        read (10+j, '(A)', iostat=io_error) file_in(i,j)
+
+        call check_file_exists ( file_in(i,j) )
+
+        !-------------------------------------------
+        ! check and find common params in all h5-files
+        !-------------------------------------------
+        if ( i == 1 .and. j == 1 ) then
+          ! read all geometric parameters of grid
+          call read_attributes(file_in(i,j), lgt_n_tmp, tmp_time, mode_number(1), params%domain_size, &
                          params%Bs, params%max_treelevel, params%dim)
-    do i = 2, N_modes_used
-      call get_command_argument(n_opt_args+i, file_in)
-      params%input_files(i) = file_in
-      call read_attributes(file_in, lgt_n_tmp, tmp_time, iter, domain, bs, level, dim)
-      params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
-      if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
-      if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
-      if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
-    end do
+        endif
+        call read_attributes(file_in(i,j), lgt_n_tmp, tmp_time, mode_number(i), domain, bs, level, dim)
+        params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+        if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
+        if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
+        if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
+
+      enddo
+    enddo
+
+    !--------------------------------
+    ! close the list of files 
+    !--------------------------------
+    do j = 1, n_components
+      close(10+j)
+    enddo
+    
     fsize = N_modes_used + N_snapshots + 1 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
-    params%n_eqn = 1
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component=.True.
     if (maxmem < 0.0_rk) then
@@ -950,8 +999,10 @@ contains
     !----------------------------------
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
               lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
-    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
+    do tree_id = 1, fsize
+    call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
+              params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
+    enddo
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
@@ -959,7 +1010,7 @@ contains
     ! READ ALL Modes needed
     !----------------------------------
     do tree_id = 1, N_modes_used
-      call read_field2tree(params, params%input_files(tree_id), params%n_eqn, tree_id, &
+      call read_field2tree(params, file_in(tree_id,:), params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
       !----------------------------------
@@ -981,13 +1032,17 @@ contains
         write(*,'(80("-"))')
         write(*,*) "WABBIT POD-reconstruction."
         write(*,*) "POD modes for reconstruction:"
-        do i = 1, N_Modes_used
-          write(*, '("Mode=",i3 ," File=", A ," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
-          i, trim(params%input_files(i)), lgt_n(i), &
+        do i = 1, N_Modes_used 
+          write(*, '("Mode=",i3, " Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
+          mode_number(i), lgt_n(i), &
           100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
           min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+          write(*, '("Files:")')
+          do j = 1, n_components
+            write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
+          end do
         end do
         write(*,'(80("-"))')
         write(*,'("Temporal coefficients from:",A)') fname_acoefs
@@ -999,7 +1054,7 @@ contains
         write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
         write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
         write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
-        write(*,'("Nblocks used (sparse)=",i6)') lgt_n(fsize+1)
+        write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')

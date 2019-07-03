@@ -26,10 +26,10 @@ module module_forest
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: read_field2tree,  write_tree_field, &
+  PUBLIC :: read_field2tree,  write_tree_field, delete_tree, &
             add_two_trees, count_tree_hvy_n, allocate_hvy_lgt_data, &
             copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
-            adapt_tree_mesh, compute_tree_L2norm, &
+            adapt_tree_mesh, compute_tree_L2norm, scalar_product_two_trees, &
             read_tree, same_block_distribution, prune_tree
   !**********************************************************************************************
 contains
@@ -1108,6 +1108,131 @@ end subroutine
 !##############################################################
 
 
+
+!##############################################################
+! This function returns an scalar computed from the L2 scalar 
+! prodcut for 2 different trees
+!  <f(x),g(x)> = int f(x) * g(x) dx
+function scalar_product_two_trees( params, tree_n, &
+                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,& 
+                       tree_id1, tree_id2, buffer_tree_id)  result(sprod)
+    implicit none
+
+    !-----------------------------------------------------------------
+    !> user defined parameter structure
+    type (type_params), intent(in)  :: params
+    integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
+    !> for the multiplication we need an additional tree as a buffer. If 
+    !> no tree is passed as additional argument we will create a new tree
+    !> and delete it afterwards.
+    !> If buffer_tree_id is passed, we use it as a buffer and do not have
+    !> to create or delete any additional tree
+    integer(kind=ik) , optional, intent(in) :: buffer_tree_id
+    !> light data array
+    integer(kind=ik),  intent(inout):: lgt_block(:, :)
+    !> size of active lists
+    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
+    !> heavy data array - block data
+    real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
+    !> heavy temp data: needed in blockxfer which is called in add_two_trees
+    real(kind=rk),   intent(inout)  :: hvy_tmp(:, :, :, :, :)
+    !> neighbor array (heavy data)
+    integer(kind=ik), intent(inout) :: hvy_neighbor(:,:)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout) :: lgt_active(:, :)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout) :: hvy_active(:, :)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    !---------------------------------------------------------------
+    integer(kind=ik) :: free_tree_id, Jmax, Bs(3), g, &
+                        N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
+    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(3)
+    real(kind=rk) :: x0(3), dx(3)
+
+    if ( present(buffer_tree_id)) then
+      free_tree_id = buffer_tree_id
+    else
+      free_tree_id = tree_n + 1
+    endif
+
+    N = params%number_blocks
+    rank = params%rank
+    Jmax = params%max_treelevel
+    g = params%n_ghosts
+    Bs= params%Bs
+    Volume = product(params%domain_size(1:params%dim))
+    if (params%forest_size < N_snapshots + 1 ) call abort(030319,"Forest is to small")
+
+    !----------------------------------------------
+    ! sprod = <X_i, X_j>
+    t_elapse = MPI_wtime()
+    !---------------------------
+    ! copy tree_id1 -> free_tree_id
+    !----------------------------
+    ! copy tree with tree_id1 to tree with free_tree_id
+    ! note: this routine deletes lgt_data of the "free_tree_id" before copying
+    !       the tree
+    t_inc(1) = MPI_wtime()
+
+    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id1)
+    t_inc(1) = MPI_wtime()-t_inc(1)
+
+    !---------------------------------------------------
+    ! multiply tree_id2 * free_tree_id -> free_tree_id
+    !---------------------------------------------------
+    t_inc(2) = MPI_wtime()
+    call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, free_tree_id, tree_id2)
+    !call write_tree_field("field1_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
+    !lgt_n, hvy_n, hvy_active, 1, free_tree_id )
+    !call write_tree_field("field2_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
+    !lgt_n, hvy_n, hvy_active, 1, tree_id2 )
+    !call abort(134)
+
+
+    t_inc(2) = MPI_wtime()-t_inc(2)
+    !---------------------------------------------------
+    ! adapt the mesh before summing it up
+    !---------------------------------------------------
+    if ( params%adapt_mesh ) then
+            !call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            !lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
+            !free_tree_id, tree_n )
+    endif
+
+    !----------------------------------------------------
+    ! sum over all elements of the tree with free_tree_id
+    !-----------------------------------------------------
+    t_inc(3) = MPI_wtime()
+    sprod = 0.0_rk
+    do k = 1, hvy_n(free_tree_id)
+      hvy_id = hvy_active(k, free_tree_id)
+      call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
+      ! calculate the lattice spacing.
+      ! It is needed to perform the L2 inner product
+      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+      if ( params%dim == 3 ) then
+        sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, :, hvy_id))
+      else
+        sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
+      endif
+    end do
+    t_inc(3) = MPI_wtime()-t_inc(3)
+    t_elapse = MPI_WTIME() - t_elapse
+    !----------------------------------------------------
+    ! sum over all Procs
+    !----------------------------------------------------
+    call MPI_ALLREDUCE(MPI_IN_PLACE, sprod, 1, MPI_DOUBLE_PRECISION, &
+                       MPI_SUM,WABBIT_COMM, mpierr)
+
+    if (.not. present(buffer_tree_id)) then
+       call delete_tree(params, lgt_block, lgt_active, lgt_n, free_tree_id)
+    endif
+end function
+!##############################################################
 
   !##############################################################
   !> This function compares the tree structure and block distribution of two trees.

@@ -36,7 +36,7 @@ contains
   !> Implementation of the multiresolution snapshot POD
   !> Input:
   !>  1.) All Snapshots needed for the POD in the first N_snapshots trees.
-  !>  2.) The maximal forest size needs to be at least 2*N_snapshots.
+  !>  2.) The maximal forest size needs to be at least 2*N_snapshots+1.
   !>  3.) Truncation Rank (optional) is the number of POD MODES computed in the algorithm (maxium is N_snapshots)
   !>      (default is N_snapshots)
   !>  4.) Truncation Error (default: 1e-9) is the smallest squared singularvalue used
@@ -81,9 +81,9 @@ contains
     logical, optional, intent(in)     :: save_all
     !---------------------------------------------------------------
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
-                    eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse
+                    eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse, Volume
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
-                      free_tree_id, tree_id, N_modes, max_nr_pod_modes
+                      free_tree_id, tree_id, N_modes, max_nr_pod_modes, it
     character(len=80):: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
@@ -217,6 +217,28 @@ contains
   ! when the singular values are smaller as the desired presicion! Therefore we update
   ! the truncation rank here.
   truncation_rank = N_modes
+  
+  !---------------------------------------------------------------------------
+  ! temporal coefficients
+  !---------------------------------------------------------------------------
+  if (rank ==0) write(*,*) "Computing temporal coefficients a"
+
+  free_tree_id = tree_n + 1
+  do it = 1, N_snapshots
+    do i = 1, N_modes
+       ! scalar product (inner product)
+       pod_mode_tree_id = N_snapshots + i
+       V(it,i) = scalar_product_two_trees( params, tree_n, &
+                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,& 
+                       it, pod_mode_tree_id, free_tree_id)
+    enddo
+  enddo
+  !! we do not need the free_tree_id any more. So we delete it
+  call delete_tree(params, lgt_block, lgt_active, lgt_n, free_tree_id)
+  Volume = product(params%domain_size(1:params%dim))
+  V = V / Volume
+
 
   if (rank==0 .and. save_all) then
     write(*,*)
@@ -467,7 +489,7 @@ contains
       i = i + 1
     end do
     ! now we have all information to allocate the grid and set up the forest: 
-    fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
+    fsize = 2*N_snapshots + 2 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     params%n_eqn = n_components

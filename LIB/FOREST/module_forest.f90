@@ -247,7 +247,6 @@ contains
             ! the tree altready exists: to overwrite it, we first delete the existing one
             call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id)
 
-            !!!!!!!! TODO WHY IS TRUE NOT ALLOWED (SORT EMPTY TREE??)
             call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
             lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
         endif
@@ -279,10 +278,8 @@ contains
             call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
             lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
-            call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-            params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
-
             hvy_neighbor = -1
+            hvy_n = 0
             lgt_n = 0 ! reset number of active light blocks
             tree_n = 0 ! reset number of trees in forest
         endif
@@ -292,17 +289,8 @@ contains
         ! read treecode from first input file
         call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, hvy_block, hvy_tmp, tree_id)
 
-        ! * We save the number of all active lgt_ids in lgt_n_tmp, which is actually
-        ! not needed here, since
-        ! create_active_and_sorted_lists is calculating sum(lgt_n) again.
-        ! However lgt_n_tmp is used to double check the calculation of the lgt_n's!
-        lgt_n_tmp = lgt_n( fsize + 1) + lgt_n_tmp
-
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-
-        ! check the calculation of create_active and sorted list
-        if (lgt_n_tmp .ne. lgt_n( fsize + 1 )) call abort(132191,"There is something wrong with the light data")
 
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
         lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
@@ -647,15 +635,8 @@ contains
             ! update lists of active blocks (light and heavy data)
             ! update list of sorted nunmerical treecodes, used for finding blocks
             t0 = MPI_Wtime()
-            call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-            hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-            t_misc = t_misc + (MPI_Wtime() - t0)
-
-
-            t0 = MPI_Wtime()
-            ! update neighbor relations
-            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize+1),&
-            lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize+1), hvy_n(fsize+1) )
+            call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active(:,tree_id), lgt_n(tree_id), &
+                lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id))
             ! CPU timing (only in debug mode)
             call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
@@ -682,28 +663,11 @@ contains
             t0 = MPI_Wtime()
 
             call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-            lgt_active(:, fsize + 1), lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), &
-            hvy_active(:, fsize+1), hvy_n(fsize+1) )
+            lgt_active(:, tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), &
+            hvy_active(:, tree_id), hvy_n(tree_id) )
 
             call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
             never_balanced_load = .false.
-
-            !> load balancing destroys the lists again, so we have to create them one last time to
-            !! end on a valid mesh
-            !! update lists of active blocks (light and heavy data)
-            ! update list of sorted nunmerical treecodes, used for finding blocks
-            t0 = MPI_wtime()
-            call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-            hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-            t_misc = t_misc + (MPI_Wtime() - t0)
-
-
-            ! update neighbor relations
-            t0 = MPI_Wtime()
-            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,fsize + 1),&
-            lgt_n(fsize + 1), lgt_sortednumlist(:,:,fsize+1), hvy_active(:,fsize +1) , hvy_n(fsize +1) )
-            ! CPU timing (only in debug mode)
-            call toc( "adapt_mesh (update neighbors) ", MPI_Wtime()-t0 )
         endif
 
         ! time remaining parts of this routine.
@@ -1012,26 +976,8 @@ contains
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
         hvy_active(:, tree_id2), hvy_n(tree_id2) )
+        call toc( "pointwise_tree_arithmetic (balancing)", MPI_Wtime()-t_elapse )
 
-        call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
-
-        ! after balance_load the active and sorted lists have always to be updated
-        t_elapse = MPI_WTIME()
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-        call toc( "pointwise_tree_arithmetic (create_active)", MPI_Wtime()-t_elapse )
-
-        t_elapse = MPI_WTIME()
-        ! because we have send blocks arround we have to make sure that the hvy_neighbors
-        ! stay updated
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1),&
-        lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1) , hvy_n(tree_id1) )
-
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
-        lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2) , hvy_n(tree_id2) )
-
-        call toc( "pointwise_tree_arithmetic (update_neighbors)", MPI_Wtime()-t_elapse )
-        t_elapse = MPI_WTIME()
 
         !=================================================
         ! Decide which pointwice arithmetic shell be used
@@ -1396,9 +1342,12 @@ contains
         Bs           = params%Bs
         g            = params%n_ghosts
 
+        if (params%rank==0) write(*,*) "read_tree tries to read lgt_n=", lgt_n, "from file ", trim(adjustl(fname))
+
         ! open the file
         call check_file_exists(fname)
         call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
+
 
         !-----------------------------------------------------------------------------
         ! Step 0: define how many blocks per CPU
@@ -1681,14 +1630,14 @@ contains
 
         !---------------------------------------------------------------------------
         ! note: 5th dimension in heavy data is block id
-        allocate( hvy_active( size(hvy_block, 5) , params%forest_size + 1) )
+        allocate( hvy_active( size(hvy_block, 5) , params%forest_size) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_active", product(real(shape(hvy_active)))*4.0e-9, shape(hvy_active)
         endif
 
         !---------------------------------------------------------------------------
-        allocate( hvy_n( params%forest_size + 1 ) )
+        allocate( hvy_n( params%forest_size ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_n", product(real(shape(hvy_n)))*4.0e-9, shape(hvy_n)
@@ -1703,26 +1652,31 @@ contains
         endif
 
         !---------------------------------------------------------------------------
-        allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size+1) )
+        allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
         endif
 
         !---------------------------------------------------------------------------
-        allocate( lgt_active( size(lgt_block, 1), params%forest_size + 1 ) )
+        allocate( lgt_active( size(lgt_block, 1), params%forest_size) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
         endif
 
         !---------------------------------------------------------------------------
-        allocate( lgt_n( params%forest_size + 1 ) )
+        allocate( lgt_n( params%forest_size) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "lgt_n", product(real(shape(lgt_n)))*4.0e-9, shape(lgt_n)
         endif
 
+        lgt_n = 0
+        hvy_n = 0
+        ! setting -1 is required to avoid "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU"
+        ! because it looks for a -1 block.
+        lgt_block(:,1) = -1
 
 
         if (rank == 0) then

@@ -146,8 +146,6 @@ end subroutine create_active_and_sorted_lists_tree
 !> -------------------------------------------------------------
 !> lgt_active(:,tree_id)       | active block list of tree
 !> lgt_n(:,tree_id)            | number of active blocks in tree
-!> lgt_active(:,fsize+1 )      | list of all active blocks
-!> lgt_n(:,fsize+1)            | total number of active blocks
 !> -------------------------------------------------------------
 !> \author PKrah
 subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
@@ -177,15 +175,16 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
 
     rank = params%rank
     N    = params%number_blocks
-    fsize= params%forest_size
+    fsize = params%forest_size
     TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
+
     ! =======================================================
     ! Reset active lists of all trees
     ! =======================================================
     ! note: this seems to be a complicated way of reseting the
     !       active lists, but it is very crucial for performance!
     !       NEVER RESET the full array without reasons!!!
-    do tree_id = 1, fsize + 1
+    do tree_id = 1, fsize
       ! check if lgt_n or hvy_n of tree is valid (not too small or too large)
       if (lgt_n(tree_id)>size(lgt_active(:,tree_id)) .or. lgt_n(tree_id) <=0) &
         lgt_n(tree_id) = size(lgt_active(:,tree_id))
@@ -200,11 +199,9 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
 
 
     ! reset active block numbers
-    lgt_n_sum = 0 ! lgt_n_sum = sum(lgt_n(1:tree_n))
-    hvy_n_sum = 0 ! hvy_n_sum = sum(hvy_n(1:tree_n))
     lgt_n = 0
     hvy_n = 0
-    tree_n= 0
+    tree_n = 0
 
     ! =======================================================
     ! loop over all light data
@@ -215,7 +212,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
 
             ! which tree id has the current block k?
             tree_id = lgt_block(k, TREE_ID_IDX)
-            ! find the highest tree number. this is should be the same then
+            ! find the highest tree number. this is should be the same as
             ! the number of active trees: tree_n
             tree_n = max(tree_id, tree_n)
 
@@ -224,9 +221,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
             ! ---------------------------
             ! save lgt id as active block
             lgt_n(tree_id) = lgt_n(tree_id) + 1
-            lgt_n_sum      = lgt_n_sum + 1
             lgt_active( lgt_n(tree_id), tree_id) = k
-            lgt_active( lgt_n_sum, fsize+1) = k
 
             ! ---------------------------
             ! update hvy active
@@ -237,38 +232,26 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
                 ! convert light data id into heavy data id
                 call lgt_id_to_hvy_id( heavy_id, k, rank, N)
                 hvy_n(tree_id) = hvy_n(tree_id) + 1
-                hvy_n_sum      = hvy_n_sum + 1
                 hvy_active( hvy_n(tree_id) , tree_id ) = heavy_id
-                hvy_active( hvy_n_sum, fsize + 1) = heavy_id
             end if
 
             ! sorted list
             treecode_int = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_id )
             ! first index stores the light id of the block
-            lgt_sortednumlist(lgt_n_sum, 1,fsize+1) = k
+            lgt_sortednumlist(lgt_n(tree_id), 1, tree_id) = k
             ! second index stores the numerical treecode
-            lgt_sortednumlist(lgt_n_sum, 2,fsize+1) = treecode_int
-            ! first index stores the light id of the block
-            lgt_sortednumlist(lgt_n(tree_id), 1,tree_id) = k
-            ! second index stores the numerical treecode
-            lgt_sortednumlist(lgt_n(tree_id), 2,tree_id) = treecode_int
+            lgt_sortednumlist(lgt_n(tree_id), 2, tree_id) = treecode_int
 
         end if
     end do
 
     ! =======================================================
-
-    lgt_n(fsize + 1) = lgt_n_sum
-    hvy_n(fsize + 1) = hvy_n_sum
-
     ! sort list of every single tree
     do tree_id = 1, tree_n
-      if (lgt_n(tree_id) > 1) then
-          call quicksort(lgt_sortednumlist(:,:,tree_id), 1, lgt_n(tree_id), 2)
-      end if
+        if (lgt_n(tree_id) > 1) then
+            call quicksort(lgt_sortednumlist(:,:,tree_id), 1, lgt_n(tree_id), 2)
+        end if
     end do
-    ! sort the list for all active lgt ids in all trees
-    call quicksort(lgt_sortednumlist(:,:,fsize+1), 1, lgt_n(fsize+1), 2)
 
     ! check if the number of trees is not bigger then the size of the forest
     ! The forest size is defined as the maximum number of trees in the forest.

@@ -390,7 +390,7 @@ contains
     ! coarsening indicator
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
-    
+
     if (order == "2") then
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
@@ -418,7 +418,7 @@ contains
     !-------------------------------
     ! check if files exists:
     !-------------------------------
-    ! fname_list is the name of the file which contains a list of files you want to 
+    ! fname_list is the name of the file which contains a list of files you want to
     ! read in (i.e. rho_000000000.h5 rho_000000001.h5 ... etc)
     if (.not. allocated(fname_list)) call abort(207191,"you must pass at least one file list! Use: --list my_filelist.txt")
     do j = 1, n_components
@@ -440,11 +440,11 @@ contains
     !-------------------------------------------
     ! check and find common params in all h5-files
     !-------------------------------------------
-    ! open all files 
+    ! open all files
     do j = 1, n_components
        open( unit=10+j, file=fname_list(j), action='read', status='old' )
     enddo
-                                
+
     io_error = 0
     i = 1
     do while(i <= N_snapshots)
@@ -466,7 +466,7 @@ contains
       end do
       i = i + 1
     end do
-    ! now we have all information to allocate the grid and set up the forest: 
+    ! now we have all information to allocate the grid and set up the forest:
     fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
@@ -482,8 +482,7 @@ contains
     !----------------------------------
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
               lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
-    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
+              
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
@@ -540,7 +539,7 @@ contains
         write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
         write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
         write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
-        write(*,'("Nblocks used (sparse)=",i6)') lgt_n(fsize+1)
+        write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
@@ -928,8 +927,7 @@ contains
     !----------------------------------
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
               lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
-    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-              params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
+
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
@@ -977,7 +975,7 @@ contains
         write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
         write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
         write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
-        write(*,'("Nblocks used (sparse)=",i6)') lgt_n(fsize+1)
+        write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')

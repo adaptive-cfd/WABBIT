@@ -74,14 +74,9 @@ subroutine post_prune_tree(params)
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
     lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
-    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-    params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
-
-
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of active light blocks
     tree_n = 0 ! reset number of trees in forest
-
 
     call read_field2tree(params, (/fname1/), 1, 1, tree_n, &
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &

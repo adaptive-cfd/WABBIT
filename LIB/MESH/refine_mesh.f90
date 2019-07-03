@@ -145,7 +145,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     if (params%force_maxlevel_dealiasing .eqv. .false.) then
         t1 = MPI_Wtime()
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, hvy_tmp )
+        hvy_active, hvy_n )
         call toc( "refine_mesh (balance_load)", MPI_Wtime()-t1 )
 
         t2 = MPI_wtime()

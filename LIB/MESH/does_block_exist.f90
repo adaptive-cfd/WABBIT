@@ -16,11 +16,6 @@
 ! ********************************************************************************************
 
 subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n, tree_id)
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> block treecode we are looking for, array representation
@@ -34,7 +29,7 @@ subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n
     !> it helps to know how many active light blocks we have in total
     integer(kind=ik), intent(in)        :: lgt_n
     !> index of the tree we are looking at
-    integer(kind=ik), intent(in):: tree_id
+    integer(kind=ik), intent(in)        :: tree_id
     ! loop variables
     integer(kind=ik)                    :: k, i1, i2, imid
     ! numerical treecode
@@ -42,7 +37,6 @@ subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n
 
     exists   = .false.
     light_id = -1
-
 
     !> 1st: given the array treecode, compute the numerical value of the treecode we're
     !! looking for. note these values are stored for easier finding in lgt_sortednumlist

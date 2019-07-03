@@ -99,8 +99,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     enddo
 
     ! actual xfer
-    call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_tmp )
+    call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block )
 
     ! the active lists are outdates after the transfer: we need to create
     ! them or find_sisters will not be able to do its job

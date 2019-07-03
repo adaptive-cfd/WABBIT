@@ -27,8 +27,7 @@ module module_globals
   integer, parameter, public  :: IDX_MESH_LVL        = 1 ! current mesh level of the block
   integer, parameter, public  :: IDX_REFINE_STS      = 2 ! refinement status
   integer, parameter, public  :: IDX_TREE_ID         = 3 ! number of the tree in the forest
-  integer, parameter, public  :: IDX_PRUNED          = 4 ! is the tree pruned (dt.: gestutzt) or not
-  integer, parameter, public  :: EXTRA_LGT_FIELDS    = 4 ! number of data fields additionaly to treecode
+  integer, parameter, public  :: EXTRA_LGT_FIELDS    = 3 ! number of data fields additionaly to treecode
   !subroutines of this module
   interface abort
       module procedure abort1, abort2, abort3

@@ -133,22 +133,12 @@ subroutine sparse_to_dense(params)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, &
-        lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n)
 
     ! balance the load
     call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
-
-    ! create lists of active blocks (light and heavy data) after load balancing (have changed)
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active,&
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -163,13 +153,12 @@ subroutine sparse_to_dense(params)
         ! this might not be necessary since we start from an admissible grid
         call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n )
+
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_active, hvy_n, hvy_tmp)
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-            hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n,&
-            lgt_sortednumlist, hvy_active, hvy_n )
+
+        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n)
     end do
     ! refine
     do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
@@ -188,18 +177,16 @@ subroutine sparse_to_dense(params)
             call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
                 hvy_active, hvy_n )
         end if
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n)
+
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
         hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
         hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
 

@@ -74,14 +74,9 @@ subroutine post_prune_tree(params)
     call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
     lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
-    call reset_lgt_data(lgt_block, lgt_active(:, fsize+1), &
-    params%max_treelevel, lgt_n(fsize+1), lgt_sortednumlist(:,:,fsize+1))
-
-
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of active light blocks
     tree_n = 0 ! reset number of trees in forest
-
 
     call read_field2tree(params, (/fname1/), 1, 1, tree_n, &
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
@@ -91,13 +86,13 @@ subroutine post_prune_tree(params)
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
     lgt_n, hvy_n, hvy_active, dF=1, tree_id=2, time=time, iteration=iteration )

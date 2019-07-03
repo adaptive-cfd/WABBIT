@@ -126,12 +126,8 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     !! and do not have to ensure that the active list is up-to-date
     ! update list of sorted nunmerical treecodes, used for finding blocks
     t2 = MPI_wtime()
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-         hvy_active, hvy_n, lgt_sortednumlist, .true. )
-
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-         lgt_sortednumlist, hvy_active, hvy_n )
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n)
     t_misc = MPI_wtime() - t2
 
 
@@ -147,15 +143,6 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_active, hvy_n )
         call toc( "refine_mesh (balance_load)", MPI_Wtime()-t1 )
-
-        t2 = MPI_wtime()
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-             hvy_active, hvy_n, lgt_sortednumlist, .true. )
-
-        ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-             lgt_sortednumlist, hvy_active, hvy_n )
-        t_misc = t_misc + MPI_wtime() - t2
     endif
 
 

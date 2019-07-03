@@ -320,7 +320,7 @@ contains
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
-    integer(kind=ik) :: j, n_components=1, io_error, split_index
+    integer(kind=ik) :: j, n_components=1, io_error
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
     character(len=80) :: tmp_name
@@ -801,8 +801,9 @@ contains
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
             write(*,*) "postprocessing subroutine to reconstruct field from POD modes"
-            write(*,*) "./wabbit-post --POD-reconstruct a_coef.txt " // &
-              "[--save_all --order=[2|4] --nmodes=3 --adapt=0.1] POD_modes_*.h5"
+            write(*,*) "./wabbit-post --POD-reconstruct a_coef.txt --components=3 "//
+              "--list POD_mode.txt [list_uy.txt] [list_uz.txt]" // &
+              "[--save_all --order=[2|4] --nmodes=3 --adapt=0.1] "
         end if
         return
     end if

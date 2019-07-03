@@ -6,7 +6,7 @@ proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_t
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
 startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
-post_stl2dist.f90 post_add_two_masks.f90
+post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -52,7 +52,6 @@ SB_INCL = #-I../../sblas/SOFTWARE
 # NOHDF5 : if set, all dependency of HDF5 is removed. The code can not save output anymore.
 #          useful for developmend on some machines only. use only if absolutely necessary
 #          NOT IMPLEMENTED YET
-# BLOCKINGSENDRECV
 
 #-------------------------------------------------------------------------------
 # COMPILER-DEPENDEND PART
@@ -77,7 +76,7 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -l
 FFLAGS += -I$(HDF_INC) $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
-PRAGMAS = #-DSBLAS#-DBLOCKINGSENDRECV
+PRAGMAS = #-DSBLAS
 endif
 
 #-------------------------------------------------------------------------------
@@ -99,7 +98,7 @@ LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -
 FFLAGS += -I$(HDF_INC)
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
 # different pragmas are space-separated
-PRAGMAS = # -DBLOCKINGSENDRECV
+PRAGMAS = #
 endif
 
 #-------------------------------------------------------------------------------
@@ -118,7 +117,7 @@ PPFLAG=-qsuffix=cpp=f90  #preprocessor flag
 # for IBMXLF95 PRAGMAS=-WF,-DIFORT will turn #ifdef IFORT to true in the code
 # here different PRAGMAS are comma separated (NO SPACES!!!)
 # NOTE first pragma (if any is used) MUST be -WF,
-PRAGMAS = -WF,-DBLOCKINGSENDRECV
+PRAGMAS = #-WF,-DTEST
 endif
 
 # add the PRAGMAS to FFLAGS: (for all compilers)
@@ -268,7 +267,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
     refinement_execute_3D.f90 get_block_spacing_origin.f90 update_neighbors.f90 check_lgt_block_synchronization.f90 \
 	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 \
 	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 grid_coarsening_indicator.f90 \
-	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90 block_xfer_nonblocking.f90 block_xfer_blocking.f90
+	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90 block_xfer_nonblocking.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

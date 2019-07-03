@@ -52,11 +52,7 @@ contains
     ! create all active (lgt/hvy) lists, create also sorted lgt data list
     include "create_active_and_sorted_lists.f90"
 
-#ifdef BLOCKINGSENDRECV
-    include "block_xfer_blocking.f90"
-#else
     include "block_xfer_nonblocking.f90"
-#endif
 
     ! update neighbors, 2D/3D
     include "update_neighbors.f90"

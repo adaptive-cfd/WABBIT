@@ -103,7 +103,7 @@ subroutine keyvalues(fname, params)
         tree = 0_ik
         params%block_distribution=trim(curves(i))
         call balance_load(params, lgt_block, hvy_block, hvy_neighbor, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp)
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
         call create_active_and_sorted_lists( params, lgt_block, &
         lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &

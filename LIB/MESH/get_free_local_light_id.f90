@@ -76,6 +76,7 @@ subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt
                 do i = 1, lgt_n
                     if ( lgt_active(i) == k) then
                         valid = .false.
+                        exit
                     endif
                 enddo
                 if (valid) then

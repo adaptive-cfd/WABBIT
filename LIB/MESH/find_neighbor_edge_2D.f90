@@ -211,7 +211,7 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
             else
                 ! error case
                 print*, "for this block:", my_treecode
-                print*, "I cannot find:", neighbor
+                print*, "I cannot find: ", neighbor
                 call abort(363791, 'ERROR: can not find edge neighbor')
             end if
 

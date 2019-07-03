@@ -184,7 +184,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         t0 = MPI_Wtime()
 
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_tmp )
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
         call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
         never_balanced_load = .false.

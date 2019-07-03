@@ -56,12 +56,8 @@ program main_post
     ! output MPI status
     if (rank==0) then
         write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
-        write(*, '("MPI: using ", i5, " processes")') params%number_procs
-#ifdef BLOCKINGSENDRECV
-        write(*,'("MPI: code build with blocking send/recv in transfer (block_xfer_blocking.f90)")')
-#else
+        write(*,'("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
-#endif
     end if
 
     !---------------------------------------------------------------------------
@@ -72,6 +68,9 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
+    case ("--prune-tree")
+        call post_prune_tree(params)
+
     case ("--add-two-masks")
         call post_add_two_masks(params)
 

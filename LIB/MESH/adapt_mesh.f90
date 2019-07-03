@@ -147,18 +147,10 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         call toc( "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
 
-        ! the following calls are indeed required
-        ! update lists of active blocks (light and heavy data)
-        ! update list of sorted nunmerical treecodes, used for finding blocks
+        ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        t_misc = t_misc + (MPI_Wtime() - t0)
-
-
-        t0 = MPI_Wtime()
-        ! update neighbor relations
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        ! CPU timing (only in debug mode)
+        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n)
         call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
         iteration = iteration + 1
@@ -188,21 +180,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
         call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
         never_balanced_load = .false.
-
-        !> load balancing destroys the lists again, so we have to create them one last time to
-        !! end on a valid mesh
-        !! update lists of active blocks (light and heavy data)
-        ! update list of sorted nunmerical treecodes, used for finding blocks
-        t0 = MPI_wtime()
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        t_misc = t_misc + (MPI_Wtime() - t0)
-
-
-        ! update neighbor relations
-        t0 = MPI_Wtime()
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-        ! CPU timing (only in debug mode)
-        call toc( "adapt_mesh (update neighbors) ", MPI_Wtime()-t0 )
     endif
 
     ! time remaining parts of this routine.

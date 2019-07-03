@@ -104,7 +104,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! the active lists are outdates after the transfer: we need to create
     ! them or find_sisters will not be able to do its job
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
-    hvy_n, lgt_sortednumlist, .true. )
+    hvy_n, lgt_sortednumlist )
 
     ! actual merging
     do k = 1, lgt_n

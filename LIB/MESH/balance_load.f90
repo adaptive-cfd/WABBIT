@@ -50,9 +50,9 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(inout)     :: hvy_n
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -236,6 +236,13 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             call abort(2009182147, "[balance_load.f90] ERROR: block distribution scheme is unknown")
 
     end select
+
+    ! the block xfer changes the light data, and afterwards active lists are outdated.
+    ! NOTE: an idea would be to also xfer the neighboring information (to save the update_neighbors
+    ! call) but that is tricky: the neighbor list contains light ID of the neighbors, and those
+    ! also change with the xfer.
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n)
 
     ! timing
     call toc( "balance_load (TOTAL)", MPI_wtime()-t0 )

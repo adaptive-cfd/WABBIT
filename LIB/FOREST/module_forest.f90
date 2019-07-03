@@ -104,7 +104,7 @@ contains
         if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-        hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+        hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
         ! a pruned tree has fewer entries: loop over it instead of the other one?
         ! if you find a block in the full tree -> well then that's good, copy.
@@ -146,7 +146,7 @@ contains
         call block_xfer( params, comm_list, n_comm, lgt_block, hvy_block )
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
 
         ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
@@ -249,7 +249,7 @@ contains
 
             !!!!!!!! TODO WHY IS TRUE NOT ALLOWED (SORT EMPTY TREE??)
             call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .false., tree_n)
+            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
         endif
 
         ! From any file (here: 1st in list), we read the essential parameters of the tree:
@@ -299,7 +299,7 @@ contains
         lgt_n_tmp = lgt_n( fsize + 1) + lgt_n_tmp
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
         ! check the calculation of create_active and sorted list
         if (lgt_n_tmp .ne. lgt_n( fsize + 1 )) call abort(132191,"There is something wrong with the light data")
@@ -384,7 +384,7 @@ contains
         do k = 1, hvy_n(tree_id_source)
             hvy_id_source = hvy_active(k, tree_id_source)
             call hvy_id_to_lgt_id( lgt_id_source, hvy_id_source, rank, N )
-            
+
             ! first we have to find out if the hvy data belongs to the tree we want to copy
             call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
             call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
@@ -407,7 +407,7 @@ contains
         call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id_dest),&
         lgt_n(tree_id_dest), lgt_sortednumlist(:,:,tree_id_dest), hvy_active(:,tree_id_dest), hvy_n(tree_id_dest) )
@@ -648,7 +648,7 @@ contains
             ! update list of sorted nunmerical treecodes, used for finding blocks
             t0 = MPI_Wtime()
             call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-            hvy_active, hvy_n, lgt_sortednumlist, .true. ,tree_n)
+            hvy_active, hvy_n, lgt_sortednumlist, tree_n)
             t_misc = t_misc + (MPI_Wtime() - t0)
 
 
@@ -694,7 +694,7 @@ contains
             ! update list of sorted nunmerical treecodes, used for finding blocks
             t0 = MPI_wtime()
             call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
-            hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+            hvy_active, hvy_n, lgt_sortednumlist, tree_n)
             t_misc = t_misc + (MPI_Wtime() - t0)
 
 
@@ -853,7 +853,7 @@ contains
 
                 ! since lgt_block was synced we have to create the active lists again
                 call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n )
+                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
 
                 ! update neighbor relations
                 call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
@@ -913,7 +913,7 @@ contains
 
         ! since lgt_block was synced we have to create the active lists again
         call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n )
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
 
         ! update neighbor relations
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id), &
@@ -1018,7 +1018,7 @@ contains
         ! after balance_load the active and sorted lists have always to be updated
         t_elapse = MPI_WTIME()
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .True. , tree_n)
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
         call toc( "pointwise_tree_arithmetic (create_active)", MPI_Wtime()-t_elapse )
 
         t_elapse = MPI_WTIME()
@@ -1346,7 +1346,7 @@ contains
         call block_xfer( params, comm_list, n_comm, lgt_block, hvy_block )
         ! after block transfer we have to create new lists
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. , tree_n)
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
     end subroutine
     !##############################################################
 

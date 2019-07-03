@@ -9,9 +9,6 @@
 
 module module_mesh
 
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     ! global parameters
     use module_params
@@ -126,6 +123,7 @@ contains
     include "min_active_level.f90"
     include "get_free_local_light_id.f90"
     include "quicksort.f90"
+    include "update_grid_metadata.f90"
 
     ! routines for creation of an initial grid
     include "create_equidistant_grid.f90"

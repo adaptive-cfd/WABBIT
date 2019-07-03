@@ -86,10 +86,9 @@ subroutine keyvalues(fname, params)
     call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call read_field(fname, 1, params, hvy_block, hvy_n )
 
-    call create_active_and_sorted_lists( params, lgt_block, &
-    lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n)
+        
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
     if (dim==2) Bs(3)=1
@@ -102,18 +101,19 @@ subroutine keyvalues(fname, params)
     do i=1,size(curves)
         tree = 0_ik
         params%block_distribution=trim(curves(i))
+
         call balance_load(params, lgt_block, hvy_block, hvy_neighbor, &
         lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
-        call create_active_and_sorted_lists( params, lgt_block, &
-        lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+
         call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &
         WABBIT_COMM,mpicode)
+
         do k=1,hvy_n
             call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
             tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
         end do
+
         call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
         MPI_SUM,0,WABBIT_COMM,mpicode)
         sum_curve(i) = sum(sum_tree)

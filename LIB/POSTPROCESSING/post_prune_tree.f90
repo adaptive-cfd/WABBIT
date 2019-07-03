@@ -91,13 +91,13 @@ subroutine post_prune_tree(params)
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
     lgt_n, hvy_n, hvy_active, dF=1, tree_id=2, time=time, iteration=iteration )

@@ -98,19 +98,19 @@ subroutine post_add_two_masks(params)
 
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     tree_id = 1
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
@@ -125,20 +125,20 @@ N1 =  max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
         N2= max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
 write(*,*) N1, n2
     ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     ! j = 2
     ! call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
     ! lgt_active(:, j), lgt_n(j), lgt_sortednumlist(:,:,j), hvy_active(:, j), hvy_n(j), hvy_tmp )
     !
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 !
     call add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned=2, tree_id_full=1)
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
 call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
 lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
@@ -170,7 +170,7 @@ lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
 !
 ! !!!!!!!! tommy check that: it should not be requried??????
 !         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-!         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+!         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 !     enddo
 !
 !     call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
@@ -178,7 +178,7 @@ lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
 !         hvy_active(:, fsize+1), hvy_n(fsize+1), hvy_tmp )
 !
 !     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-!     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_n)
+!     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 !
 !     call same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
 !                                   hvy_block, hvy_active, hvy_n,  &

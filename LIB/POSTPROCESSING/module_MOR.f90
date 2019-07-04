@@ -487,7 +487,7 @@ contains
       i = i + 1
     end do
     ! now we have all information to allocate the grid and set up the forest:
-    fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
+    fsize = 2*N_snapshots + 2 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     params%n_eqn = n_components

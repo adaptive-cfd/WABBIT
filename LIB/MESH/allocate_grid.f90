@@ -62,6 +62,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         nrhs_slots = size(params%butcher_tableau,1)
     elseif (params%time_step_method == "Krylov") then
         nrhs_slots = params%M_krylov +3
+    elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
+        nrhs_slots = 0
     else
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
@@ -331,6 +333,8 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         nrhs_slots = size(params%butcher_tableau,1)
     elseif (params%time_step_method == "Krylov") then
         nrhs_slots = params%M_krylov +3
+    elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
+        nrhs_slots = 0
     else
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
@@ -432,7 +436,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
 
-    if (rank == 0) then
+    if (rank==0) then
         write(*,'("INIT: mpisize=",i6)') params%number_procs
         write(*,'("INIT: nwork=",i6)') nwork
         write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') &
@@ -513,7 +517,6 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "hvy_n", product(real(shape(hvy_n)))*4.0e-9, shape(hvy_n)
     endif
-
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
     allocate( hvy_active( size(hvy_block, 5), params%forest_size ) )
@@ -527,7 +530,6 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     ! setting -1 is required to avoid "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU"
     ! because it looks for a -1 block.
     lgt_block(:,1) = -1
-
     if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') params%number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*params%number_blocks

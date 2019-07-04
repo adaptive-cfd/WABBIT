@@ -640,6 +640,12 @@ contains
             ! CPU timing (only in debug mode)
             call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
+            call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
+            lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
+
             iteration = iteration + 1
         end do
 
@@ -665,6 +671,12 @@ contains
             call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
             lgt_active(:, tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), &
             hvy_active(:, tree_id), hvy_n(tree_id) )
+
+            call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
+            lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
 
             call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
             never_balanced_load = .false.
@@ -973,11 +985,18 @@ contains
         lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
         hvy_active(:, tree_id1), hvy_n(tree_id1) )
 
+        ! since lgt_block was synced we have to create the active lists again
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
+
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
         hvy_active(:, tree_id2), hvy_n(tree_id2) )
         call toc( "pointwise_tree_arithmetic (balancing)", MPI_Wtime()-t_elapse )
 
+        ! since lgt_block was synced we have to create the active lists again
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
 
         !=================================================
         ! Decide which pointwice arithmetic shell be used
@@ -1150,6 +1169,15 @@ contains
         end select
         call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
 
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1),&
+        lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
+
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
+        lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
+
     end subroutine
     !##############################################################
 
@@ -1175,7 +1203,7 @@ contains
         logical, intent(in),optional      :: verbosity !< if true: additional information of processing
         !-----------------------------------------------------------------
         logical :: verbose=.false.
-        
+
         if (present(verbosity)) verbose=verbosity
         if (params%rank == 0 .and. verbose) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
 
@@ -1188,12 +1216,12 @@ contains
 
 
 !##############################################################
-! This function returns an scalar computed from the L2 scalar 
+! This function returns an scalar computed from the L2 scalar
 ! prodcut for 2 different trees
 !  <f(x),g(x)> = int f(x) * g(x) dx
 function scalar_product_two_trees( params, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
-                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,& 
+                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
                        tree_id1, tree_id2, buffer_tree_id)  result(sprod)
     implicit none
 
@@ -1201,7 +1229,7 @@ function scalar_product_two_trees( params, tree_n, &
     !> user defined parameter structure
     type (type_params), intent(in)  :: params
     integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
-    !> for the multiplication we need an additional tree as a buffer. If 
+    !> for the multiplication we need an additional tree as a buffer. If
     !> no tree is passed as additional argument we will create a new tree
     !> and delete it afterwards.
     !> If buffer_tree_id is passed, we use it as a buffer and do not have
@@ -1325,7 +1353,7 @@ end function
 
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(in)    :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:) !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
@@ -1342,8 +1370,9 @@ end function
 
         if (present(verbosity)) verbose=verbosity
         if (params%rank == 0 .and. verbose ) write(*,'("Multiply trees: ",i4,",",i4)') tree_id1, tree_id2
+
         call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"*")
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, "*")
 
     end subroutine
     !##############################################################

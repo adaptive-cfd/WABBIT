@@ -60,11 +60,10 @@ subroutine post_add_two_masks(params)
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim)
     call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim)
 
-    ! just to get some memory:
-    params%number_blocks = 12*max(N1,N2)
 
+    params%number_blocks = 2*max(N1,N2) ! just to get some memory:
     params%domain_size = domain
-    params%max_treelevel = 13!max( tc_length2, tc_length1 )
+    params%max_treelevel = max( tc_length2, tc_length1 )
     params%min_treelevel = 1
     params%n_eqn = 1
     params%n_ghosts = 4
@@ -72,16 +71,16 @@ subroutine post_add_two_masks(params)
     fsize = params%forest_size
     params%order_predictor = "multiresolution_4th"
     params%block_distribution = "sfc_hilbert"
+    params%time_step_method = 'none'
 
-    write(*,*) params%max_treelevel
-
-    ! The ghost nodes will call their own setup on the first call, but for cleaner output
-    ! we can also just do it now.
-    call init_ghost_nodes( params )
 
     ! we have to allocate grid if this routine is called for the first time
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+
+    ! The ghost nodes will call their own setup on the first call, but for cleaner output
+    ! we can also just do it now.
+    call init_ghost_nodes( params )
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of active light blocks
@@ -92,19 +91,52 @@ subroutine post_add_two_masks(params)
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
+    call read_field2tree(params, (/fname2/), 1, 2, tree_n, &
+    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
+
+
+    ! call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    ! hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
+    !
+    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    !
+    ! call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    ! hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
-    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
-    call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
+
+    !     tree_id = 1
+    ! N1 =  max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
+    !     call refine_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    !         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id)
+    !
+    !         N2= max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
+    ! write(*,*) N1, n2
+    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+    ! j = 2
+    ! call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+    ! lgt_active(:, j), lgt_n(j), lgt_sortednumlist(:,:,j), hvy_active(:, j), hvy_n(j), hvy_tmp )
+    !
+    !     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    !     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    ! !
+    !     call add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    !     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned=2, tree_id_full=1)
+    !
+    !         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    !         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+    call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
@@ -113,34 +145,16 @@ subroutine post_add_two_masks(params)
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
     lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id) )
 
+    tree_id = 2
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
+    lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id) )
 
-    tree_id = 1
-N1 =  max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
-    call refine_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id)
-
-        N2= max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
-write(*,*) N1, n2
-    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-
-    ! j = 2
-    ! call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-    ! lgt_active(:, j), lgt_n(j), lgt_sortednumlist(:,:,j), hvy_active(:, j), hvy_n(j), hvy_tmp )
-    !
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-!
-    call add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned=2, tree_id_full=1)
-
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-
-call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
+    call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
+    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
 
 
+    call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
+    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_n, lgt_n )
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout

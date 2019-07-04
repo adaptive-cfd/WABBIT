@@ -74,7 +74,7 @@ program main
     ! dim 4: components ( 1:number_equations)
     ! dim 5: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
-    ! grid-depenendent (and not explicitly time dependent) quantities: no synchronization
+    ! grid-dependent (and not explicitly time dependent) quantities: no synchronization
     ! of these qtys is performed
     real(kind=rk), allocatable          :: hvy_gridQ(:, :, :, :, :)
     !!!!!! => renaming: hvy_block -> hvy_state
@@ -108,15 +108,15 @@ program main
     ! in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,
     ! a treecode is an array and this is handy. for finding a block however, this is not true,
     ! here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
-    integer(kind=tsize), allocatable    :: lgt_sortednumlist(:,:)
-    ! list of active blocks (light data)
-    integer(kind=ik), allocatable       :: lgt_active(:)
-    ! number of active blocks (light data)
-    integer(kind=ik)                    :: lgt_n
-    ! list of active blocks (heavy data)
-    integer(kind=ik), allocatable       :: hvy_active(:)
-    ! number of active blocks (heavy data)
-    integer(kind=ik)                    :: hvy_n
+    integer(kind=tsize), allocatable    :: lgt_sortednumlist(:, :, :)
+    ! list of active blocks (light data) for each tree
+    integer(kind=ik), allocatable       :: lgt_active(:, :)
+    ! number of active blocks (light data) for each tree
+    integer(kind=ik), allocatable       :: lgt_n(:)
+    ! list of active blocks (heavy data) for each tree
+    integer(kind=ik), allocatable       :: hvy_active(:, :)
+    ! number of active blocks (heavy data) for each tree
+    integer(kind=ik), allocatable       :: hvy_n(:)
     ! time loop variables
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
@@ -128,6 +128,7 @@ program main
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
+    integer, parameter :: tree_ID_flow = 1
 
     ! init time loop
     time          = 0.0_rk
@@ -175,10 +176,10 @@ program main
     call init_physics_modules( params, filename, params%n_gridQ )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ)
-    ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
-         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ, hvy_n, lgt_n)
+    !  the grid: all blocks are inactive and empty
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+         lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), .true. )
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
@@ -193,31 +194,31 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_tmp, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+        hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), hvy_active(:,tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow) )
     endif
 
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), .true. )
 
 
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
-    call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_tmp )
+    call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+    lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), params%adapt_inicond, time, iteration, hvy_tmp )
 
     if (.not. params%read_from_files .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
-        hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
+        lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
 
     end if
 
@@ -299,11 +300,12 @@ program main
         t4 = MPI_wtime()
         if (params%check_redundant_nodes) then
             ! run the internal test for the ghost nodes.
-            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, test_failed)
+            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), &
+            hvy_n(tree_ID_flow), test_failed)
 
             if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, &
-                hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
+                lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -314,9 +316,10 @@ program main
         ! MPI bridge (used e.g. for particle-fluid coupling)
         !***********************************************************************
         if (params%bridge_exists) then
-            call send_lgt_data (lgt_block,lgt_active,lgt_n,params)
-            call serve_data_request(lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active, &
-                                    lgt_active, lgt_n, hvy_n,params)
+            call send_lgt_data (lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow),params)
+            call serve_data_request(lgt_block, hvy_block, hvy_tmp, &
+            hvy_neighbor, hvy_active(:,tree_ID_flow), lgt_active(:,tree_ID_flow), &
+            lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), params)
         endif
 
 
@@ -329,15 +332,15 @@ program main
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
             ! Snych'ing becomes much mor expensive one the grid is refined.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
             ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
             ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere" )
         endif
         call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
-        Nblocks_rhs = lgt_n
+        Nblocks_rhs = lgt_n(tree_ID_flow)
 
         !***********************************************************************
         ! update grid quantities
@@ -356,7 +359,7 @@ program main
         ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
         ! so it is available only during the
         t4 = MPI_wtime()
-        call update_grid_qyts( time, params, lgt_block, hvy_gridQ, hvy_active, hvy_n )
+        call update_grid_qyts( time, params, lgt_block, hvy_gridQ, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
         call toc( "TOPLEVEL: update_grid_qyts", MPI_wtime()-t4)
 
 
@@ -374,7 +377,7 @@ program main
             !*******************************************************************
             t4 = MPI_wtime()
             call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gridQ, hvy_neighbor, &
-            hvy_active, lgt_active, lgt_n, hvy_n )
+            hvy_active(:,tree_ID_flow), lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow) )
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1
 
@@ -391,9 +394,9 @@ program main
             t4 = MPI_wtime()
             if (params%filter_type /= "no_filter") then
                 if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
-                    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+                    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
-                    call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+                    call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
                 end if
             end if
             call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
@@ -403,9 +406,10 @@ program main
             !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
-                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n, hvy_gridQ)
+                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active(:,tree_ID_flow), &
+                hvy_n(tree_ID_flow), hvy_gridQ)
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
         enddo
@@ -416,24 +420,25 @@ program main
         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_gridQ )
+            call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+            lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+            hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp, hvy_gridQ )
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
-        Nblocks = lgt_n
+        Nblocks = lgt_n(tree_ID_flow)
 
         !***********************************************************************
         ! Write fields to HDF5 file
         !***********************************************************************
         if (it_is_time_to_save_data) then
             ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
             ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
-            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-            lgt_n, hvy_n, hvy_tmp, hvy_active, hvy_gridQ )
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
+            lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
 
             output_time = time
             params%next_write_time = params%next_write_time + params%write_time
@@ -443,15 +448,17 @@ program main
         ! output on screen
         if (rank==0) then
             write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=(",i6,"/",i6,") Jmin=",i2," Jmax=",i2)') &
-             iteration, time, t2, Nblocks_rhs, Nblocks, min_active_level( lgt_block, lgt_active, lgt_n ), &
-             max_active_level( lgt_block, lgt_active, lgt_n )
+             iteration, time, t2, Nblocks_rhs, Nblocks, &
+             min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
+             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
              ! information, so I renamed it when adding those (since post-scripts would no longer be compatible
              ! it made sense to me to change the name)
              open(14,file='performance.t',status='unknown',position='append')
              write (14,'(g15.8,1x,i9,1x,g15.8,1x,i6,1x,i6,1x,i2,1x,i2,1x,i6)') time, iteration, t2, Nblocks_rhs, Nblocks, &
-             min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n ), &
+             min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
+             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
              params%number_procs
              close(14)
         end if
@@ -489,18 +496,19 @@ program main
     ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
         ! filter before write out
         if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
+            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
         end if
 
         ! Note new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, &
-        hvy_tmp, hvy_active, hvy_gridQ )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
+        lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), &
+        hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
     end if
 
     ! MPI Barrier before program ends
@@ -511,7 +519,7 @@ program main
     call summarize_profiling( WABBIT_COMM )
 
     call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp )
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_n, lgt_n )
 
     ! computing time output on screen
     call cpu_time(t1)

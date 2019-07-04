@@ -44,6 +44,14 @@ module module_mesh
                          set_desired_num_blocks_per_rank2
     end interface
 
+    interface allocate_grid
+        module procedure allocate_forest, allocate_tree
+    end interface
+
+    interface deallocate_grid
+        module procedure deallocate_forest, deallocate_tree
+    end interface
+
 contains
 
     ! create all active (lgt/hvy) lists, create also sorted lgt data list

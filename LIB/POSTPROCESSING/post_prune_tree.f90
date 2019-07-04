@@ -71,8 +71,8 @@ subroutine post_prune_tree(params)
     call init_ghost_nodes( params )
 
     ! we have to allocate grid if this routine is called for the first time
-    call allocate_hvy_lgt_data(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of active light blocks

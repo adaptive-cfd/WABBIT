@@ -408,6 +408,8 @@ contains
     params%time_step_method="no"
     params%min_treelevel=1
     ! coarsening indicator
+    params%physics_type="POD"
+    params%eps_normalized=.True. ! normalize the statevector before thresholding
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
 
@@ -939,6 +941,9 @@ contains
     params%time_step_method="no"
     params%min_treelevel=1
     ! coarsening indicator
+    params%physics_type="POD"
+    params%eps_normalized=.True. ! normalize the statevector before thresholding
+    params%coarsening_indicator="threshold-state-vector"
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
     ! read ini-file and save parameters in struct

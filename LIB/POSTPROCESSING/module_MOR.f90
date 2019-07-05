@@ -794,13 +794,14 @@ contains
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, N_modes_given, iteration, n_components
+    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
     character(len=2)  :: order
     logical :: verbosity = .false., save_all = .true.
 
+    rank = params%rank
     call get_command_argument(2, args)
     if (args == '--help' .or. args == '--h') then
         if ( params%rank==0 ) then
@@ -855,7 +856,6 @@ contains
       if ( index(args,"--timestep=")==1 ) then
         N_snapshots = 1
         read(args(12:len_trim(args)),* ) iteration
-        if (rank==0) write(*,*) "Iteration reconstructed: " ,iteration
         n_opt_args = n_opt_args + 1
       end if
       !-------------------------------
@@ -883,6 +883,11 @@ contains
 
     end do
 
+    if ( iteration>0 ) then
+      if ( rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
+    else
+      call abort(508191,"You must pass iteration which you want to reconstruct")
+    endif
     !----------------------------------
     ! READ a_coefficient from file
     !----------------------------------
@@ -901,7 +906,6 @@ contains
         enddo
         write(*,*) "~~~~^      ", fname_acoefs
     endif
-
     !----------------------------------
     ! some wabbit params
     !----------------------------------
@@ -937,10 +941,6 @@ contains
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
     ! read ini-file and save parameters in struct
-    N_modes_given = command_argument_count()
-    N_modes_given = N_modes_given - n_opt_args ! because of the first nargs arguments which are not files
-    if (N_modes_given /= max_nr_modes) write(*,*) "Warning!!! Given number of modes not consistent with file:"//fname_acoefs
-    if (N_modes_given < N_modes_used) call abort(280419,"Error! You try to use more modes then available")
     allocate(params%input_files(params%n_eqn))
     allocate(mode_number(N_modes_used))
 
@@ -948,9 +948,8 @@ contains
     ! open all the given txt-files
     !--------------------------------
     do j = 1, n_components
-            open( unit=10+j, file=fname_list(j), action='read', status='old' )
+            open( unit=15+j, file=fname_list(j), action='read', status='old' )
     enddo
-
     !--------------------------------
     ! in every txt-file there is a list
     ! of h5-files which contain the
@@ -959,7 +958,8 @@ contains
     !--------------------------------
     do i = 1, N_modes_used
       do j = 1, n_components
-        read (10+j, '(A)', iostat=io_error) file_in(i,j)
+        ! here we read in each line of file fname_list(j)
+        read (15+j, '(A)', iostat=io_error) file_in(i,j)
 
         call check_file_exists ( file_in(i,j) )
 
@@ -988,7 +988,6 @@ contains
     fsize = N_modes_used + N_snapshots + 1 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
-    params%n_eqn = 1
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component=.True.
     if (maxmem < 0.0_rk) then
@@ -1042,7 +1041,6 @@ contains
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
           min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
-          write(*, '("Files:")')
           do j = 1, n_components
             write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
           end do
@@ -1073,10 +1071,11 @@ contains
     !----------------------------------
     ! Save Reconstructed Snapshots
     !----------------------------------
-    tmp_name = "Reconstruct"
-    write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), iteration
-    call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, params%n_eqn, reconst_tree_id , 0.0_rk , iteration )
+      do j = 1, n_components 
+        write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
+        call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, j, reconst_tree_id , 0.0_rk , iteration )
+      end do
 
 
   end subroutine

@@ -408,6 +408,8 @@ contains
     params%time_step_method="no"
     params%min_treelevel=1
     ! coarsening indicator
+    params%physics_type="POD"
+    params%eps_normalized=.True. ! normalize the statevector before thresholding
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
 
@@ -487,7 +489,7 @@ contains
       i = i + 1
     end do
     ! now we have all information to allocate the grid and set up the forest:
-    fsize = 2*N_snapshots + 1 !we need some extra fields for storing etc
+    fsize = 2*N_snapshots + 2 !we need some extra fields for storing etc
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     params%n_eqn = n_components
@@ -794,13 +796,14 @@ contains
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, N_modes_given, iteration, n_components
+    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
     character(len=2)  :: order
-    logical :: verbosity = .false., save_all = .true.
+    logical :: verbosity = .false., save_all = .false.
 
+    rank = params%rank
     call get_command_argument(2, args)
     if (args == '--help' .or. args == '--h') then
         if ( params%rank==0 ) then
@@ -855,7 +858,6 @@ contains
       if ( index(args,"--timestep=")==1 ) then
         N_snapshots = 1
         read(args(12:len_trim(args)),* ) iteration
-        if (rank==0) write(*,*) "Iteration reconstructed: " ,iteration
         n_opt_args = n_opt_args + 1
       end if
       !-------------------------------
@@ -883,6 +885,12 @@ contains
 
     end do
 
+    if ( iteration>0 ) then
+      if ( rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
+    else
+      save_all = .True.
+      if ( rank == 0 ) write(*,*) "Reconstructing all snapshots!"
+    endif
     !----------------------------------
     ! READ a_coefficient from file
     !----------------------------------
@@ -901,7 +909,6 @@ contains
         enddo
         write(*,*) "~~~~^      ", fname_acoefs
     endif
-
     !----------------------------------
     ! some wabbit params
     !----------------------------------
@@ -934,13 +941,12 @@ contains
     params%time_step_method="no"
     params%min_treelevel=1
     ! coarsening indicator
+    params%physics_type="POD"
+    params%eps_normalized=.True. ! normalize the statevector before thresholding
+    params%coarsening_indicator="threshold-state-vector"
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
     ! read ini-file and save parameters in struct
-    N_modes_given = command_argument_count()
-    N_modes_given = N_modes_given - n_opt_args ! because of the first nargs arguments which are not files
-    if (N_modes_given /= max_nr_modes) write(*,*) "Warning!!! Given number of modes not consistent with file:"//fname_acoefs
-    if (N_modes_given < N_modes_used) call abort(280419,"Error! You try to use more modes then available")
     allocate(params%input_files(params%n_eqn))
     allocate(mode_number(N_modes_used))
 
@@ -948,9 +954,8 @@ contains
     ! open all the given txt-files
     !--------------------------------
     do j = 1, n_components
-            open( unit=10+j, file=fname_list(j), action='read', status='old' )
+            open( unit=15+j, file=fname_list(j), action='read', status='old' )
     enddo
-
     !--------------------------------
     ! in every txt-file there is a list
     ! of h5-files which contain the
@@ -959,7 +964,8 @@ contains
     !--------------------------------
     do i = 1, N_modes_used
       do j = 1, n_components
-        read (10+j, '(A)', iostat=io_error) file_in(i,j)
+        ! here we read in each line of file fname_list(j)
+        read (15+j, '(A)', iostat=io_error) file_in(i,j)
 
         call check_file_exists ( file_in(i,j) )
 
@@ -985,10 +991,9 @@ contains
     do j = 1, n_components
       close(10+j)
     enddo
-    fsize = N_modes_used + N_snapshots + 1 !we need some extra fields for storing etc
+    fsize = N_modes_used +  2 !we need one more additional field for the reconstructed field
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
-    params%n_eqn = 1
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component=.True.
     if (maxmem < 0.0_rk) then
@@ -1042,7 +1047,6 @@ contains
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
           min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
-          write(*, '("Files:")')
           do j = 1, n_components
             write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
           end do
@@ -1067,16 +1071,37 @@ contains
     ! COMPUTE POD Modes
     !----------------------------------
     reconst_tree_id = tree_n + 1
-    call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+    if (save_all) then
+      do iteration = 1, N_snapshots
+        call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
-    !----------------------------------
-    ! Save Reconstructed Snapshots
-    !----------------------------------
-    tmp_name = "Reconstruct"
-    write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), iteration
-    call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, params%n_eqn, reconst_tree_id , 0.0_rk , iteration )
+        !----------------------------------
+        ! Save components of reconstructed 
+        ! Snapshot
+        !----------------------------------
+        do j = 1, n_components 
+          write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
+          call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+            lgt_n, hvy_n, hvy_active, j, reconst_tree_id , real(iteration,kind=rk) , iteration )
+        end do
+      end do
+    else
+      !! reconstruct only single snapshot
+      call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                     hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                     a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
+      !----------------------------------
+      ! Save components of reconstructed 
+      ! Snapshot
+      !----------------------------------
+      do j = 1, n_components 
+        write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
+        call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, j, reconst_tree_id ,real(iteration,kind=rk) , iteration )
+      end do
+    endif
+
 
 
   end subroutine
@@ -1140,7 +1165,7 @@ contains
 
     ! in this algorithm we need at least N_mode trees plus 2 additional fields for
     ! saving the reconstructed field and a temporary field
-    if ( params%forest_size <= N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
+    if ( params%forest_size < N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
     if ( dest_tree_id<= N_modes) call abort(200419,"Error! Destination tree id overwrites POD Modes!")
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, 1_ik)
@@ -1175,7 +1200,7 @@ contains
 
   t_elapse = MPI_WTIME() - t_elapse
   if (rank == 0) then
-          write(*,'("Snapshot ", i4,"reconstructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
+          write(*,'("Snapshot ", i4," reconstructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
           iteration, t_elapse, &
           min_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) ), &
           max_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) )

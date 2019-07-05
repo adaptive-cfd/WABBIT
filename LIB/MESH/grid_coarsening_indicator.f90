@@ -126,7 +126,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! is an absolute value.
     norm = 1.0_rk
 
-    if (params%eps_normalized .and. params%physics_type=="ACM-new") then
+    if (params%eps_normalized .and. ( params%physics_type=="ACM-new" .or. params%physics_type=="POD")) then
         norm = 0.0_rk
         if (params%coarsening_indicator=="threshold-vorticity") then
             ! loop over my active hvy data

@@ -1,6 +1,6 @@
-./TESTING/wabbit_post/pod/ux_000000000000.h5
-./TESTING/wabbit_post/pod/ux_000000010000.h5
-./TESTING/wabbit_post/pod/ux_000000020000.h5
-./TESTING/wabbit_post/pod/ux_000000030000.h5
-./TESTING/wabbit_post/pod/ux_000000040000.h5
-./TESTING/wabbit_post/pod/ux_000000050000.h5
+ux_000000000000.h5
+ux_000000010000.h5
+ux_000000020000.h5
+ux_000000030000.h5
+ux_000000040000.h5
+ux_000000050000.h5

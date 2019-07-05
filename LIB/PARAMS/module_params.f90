@@ -93,7 +93,7 @@ module module_params
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
         integer(kind=ik) :: n_eqn = 0_ik
-        integer(kind=ik) :: n_gridQ = 0_ik
+        integer(kind=ik) :: N_mask_components = 0_ik
 
         ! block distribution for load balancing (also used for start distribution)
         character(len=80)                            :: block_distribution=""

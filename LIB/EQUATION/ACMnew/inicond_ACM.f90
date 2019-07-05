@@ -1,7 +1,7 @@
 !-----------------------------------------------------------------------------
 ! main level wrapper for setting the initial condition on a block
 !-----------------------------------------------------------------------------
-subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
+subroutine INICOND_ACM( time, u, g, x0, dx, mask, adapting )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -12,9 +12,12 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-    ! work data, for mask, vorticity etc. In general a 4D field (3 dims+components)
-    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On entry, the mask is correctly set outside this function.
+    real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
@@ -28,13 +31,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     ! if the initial grid is adapted we set our initial condition without penalization (impulsive start).
     logical, intent(in) :: adapting
 
-    real(kind=rk)    :: x,y,z
-    integer(kind=ik) :: ix, iy, iz, idir
-    integer(kind=ik), dimension(3) :: Bs
-    ! we have quite some of these work arrays in the code, but they are very small,
-    ! only one block. They're ngeligible in front of the lgt_block array.
-    real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
+    real(kind=rk)    :: x, y, z
+    integer(kind=ik) :: ix, iy, iz, idir, Bs(3)
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -154,27 +152,9 @@ subroutine INICOND_ACM( time, u, g, x0, dx, work, adapting )
     ! if we use volume penalization, the mask is first used for refinement of the grid.
     ! In a second stage, the initial condition without penalization is then applied to the refined grid.
     if (adapting .and. params_acm%penalization) then
-
-        if (params_acm%dim==3) then
-            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-            if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-            if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
-        else
-            if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-            if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-            if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
-        endif
-
-
-        if (params_acm%dim == 2) then
-            call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2))
-        else
-            call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us)
-        endif
-
         do idir = 1, params_acm%dim
-            u(:,:,:,idir) = mask
+            u(:,:,:,idir) = mask(:,:,:,1)
         enddo
-    end if
+    endif
 
 end subroutine INICOND_ACM

@@ -20,7 +20,7 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp, hvy_gridQ )
+    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp, hvy_mask )
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -35,8 +35,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> grid-dependend qtys (mask, geometry factors..)
-    real(kind=rk), intent(in), optional :: hvy_gridQ(:, :, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! Optional: if the grid is not adapted to the mask, passing hvy_mask is not required.
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -114,14 +118,14 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
         !! acts on a single block only
         t0 = MPI_Wtime()
-        if (present(hvy_gridQ) .and. iteration==0) then
-            ! note: the grid changes here, so we can use the hvy_grid (which contains masks that do not
-            ! explicitly depend on time) only once
+        if (present(hvy_mask)) then
+            ! if present, the mask can also be used for thresholding (and not only the state vector). However,
+            ! as the grid changes within this routine, the mask will have to be constructed in grid_coarsening_indicator
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_gridQ)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
         else
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
         endif
         call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 

@@ -9,7 +9,7 @@
 ! NOTE that as we have way more work arrays than actual state variables (typically
 ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
 !-----------------------------------------------------------------------------
-subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
+subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -29,14 +29,17 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
 
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
-    real(kind=rk), intent(inout) :: grid_qty(1:,1:,1:,1:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
     ! local variables
     integer(kind=ik)  :: neqn, nwork, k
     integer(kind=ik), dimension(3) :: Bs
     character(len=80) :: name
-    real(kind=rk), allocatable, save :: mask(:,:,:), us(:,:,:,:)
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
 
     ! number of state variables
     neqn = size(u,4)
@@ -47,23 +50,10 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    if (params_acm%geometry == "Insect" .and. Insect%time /= time) then 
+    if (params_acm%geometry == "Insect" .and. Insect%time /= time) then
         call Update_Insect(time, Insect)
     endif
 
-    ! this routine saves the mask function, and most of the time the grid_qtys should already be available
-    ! but for security (and because this routine is called seldom) we update them here.
-    call update_grid_qtys_ACM( time, grid_qty, g, x0, dx, "main_stage" )
-
-    if (params_acm%dim==3) then
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-        if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-        if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
-    else
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-        if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-        if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:2))
-    endif
 
 
     do k = 1, size(params_acm%names,1)
@@ -105,42 +95,22 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, grid_qty )
 
         case('div')
             ! div(u)
-            call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, &
-            g, params_acm%discretization, work(:,:,:,k))
+            call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
 
         case('mask')
-            ! mask
-            if (params_acm%dim==2) then
-                call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
-            else
-                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
-            endif
-            work(:,:,:,k) = mask
+            work(:,:,:,k) = mask(:,:,:,1)
 
         case('usx')
-            if (params_acm%dim==2) then
-                call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
-            else
-                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
-            endif
-            work(:,:,:,k) = us(:,:,:,1)
+            work(:,:,:,k) = mask(:,:,:,2)
 
         case('usy')
-            if (params_acm%dim==2) then
-                call create_mask_2D(time, x0, dx, Bs, g, mask(:,:,1), us(:,:,1,1:2) )
-            else
-                call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
-            endif
-            work(:,:,:,k) = us(:,:,:,2)
+            work(:,:,:,k) = mask(:,:,:,3)
 
         case('usz')
-            call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty )
-            work(:,:,:,k) = us(:,:,:,3)
+            work(:,:,:,k) = mask(:,:,:,4)
 
         case('sponge')
-            ! mask for sponge. it is a part of the grid_qtys because the sponge mask generally
-            ! does not depend on time: just save it to disk
-            work(:,:,:,k) = grid_qty(:,:,:,IDX_SPONGE)
+            work(:,:,:,k) = mask(:,:,:,6)
 
         end select
     end do

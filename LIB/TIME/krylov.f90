@@ -1,5 +1,5 @@
 subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
-    hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
+    hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
     ! use module_blas
     implicit none
 
@@ -26,6 +26,8 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     integer(kind=ik), intent(in)        :: hvy_n
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
     !---------------------------------------------------------------------------
     integer :: M_max ! M is M_krylov number of subspace
     real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:), H_tmp(:,:)
@@ -66,7 +68,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
 
     ! the very last slot (M+3) is the "reference right hand side"
     call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), hvy_tmp, lgt_block, &
-    hvy_active, hvy_n )
+    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
     ! NSF: this guy is called normuu
@@ -94,7 +96,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
         call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active, hvy_n )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
-        hvy_tmp, lgt_block, hvy_active, hvy_n)
+        hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 
         ! linearization of RHS slot (M_max+1)
         do k = 1, hvy_n

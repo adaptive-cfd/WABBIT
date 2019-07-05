@@ -21,7 +21,7 @@ subroutine post_rhs(params)
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
-    real(kind=rk), allocatable         :: hvy_gridQ(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -55,7 +55,7 @@ subroutine post_rhs(params)
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, fname_ini )
     ! have the pysics module read their own parameters
-    call init_physics_modules( params, fname_ini, params%n_gridQ  )
+    call init_physics_modules( params, fname_ini, params%N_mask_components  )
 
 
     ! get some parameters from one of the files (they should be the same in all of them)
@@ -82,7 +82,7 @@ subroutine post_rhs(params)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ)
+    lgt_active, hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask)
 
     ! read mesh and field
     call read_mesh(fname_input, params, lgt_n, hvy_n, lgt_block)
@@ -107,13 +107,13 @@ subroutine post_rhs(params)
 
     if ( adaptive ) then
         call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_gridQ )
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_mask )
     endif
 
     ! compute right hand side
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_gridQ, lgt_block, &
-    hvy_active, hvy_n )
+    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, lgt_block, &
+    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 
     ! if (params%filter_type /= "no_filter") then
     !     call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active, hvy_n )

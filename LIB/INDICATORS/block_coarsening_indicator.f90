@@ -26,13 +26,20 @@
 ! ********************************************************************************************
 
 subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, indicator, &
-    iteration, refinement_status, norm)
+    iteration, refinement_status, norm, block_mask)
 
     implicit none
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! NOTE: Here, the mask is required only if grid adaptation is also done on the mask.
+    real(kind=rk), intent(inout)        :: block_mask(:, :, :, :)
     !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
     !> block spacing and origin
@@ -116,7 +123,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 
     end select
 
-    
+
     ! mask thresholding on top of regular thresholding?
     ! it can be useful to also use the mask function (if penalization is used) for grid adaptation.
     ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
@@ -125,7 +132,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     if (params%threshold_mask) then
         ! assuming block_work holds mask function
         nnorm = 1.0_rk
-        call threshold_block( params, block_work(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )
+        call threshold_block( params, block_mask(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )
 
         ! refinement_status_state: -1 refinemet_status_mask: -1 ==>  -1
         ! refinement_status_state: 0  refinemet_status_mask: -1 ==>   0

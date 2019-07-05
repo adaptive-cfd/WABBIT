@@ -28,6 +28,7 @@ module module_globals
   integer, parameter, public  :: IDX_REFINE_STS      = 2 ! refinement status
   integer, parameter, public  :: IDX_TREE_ID         = 3 ! number of the tree in the forest
   integer, parameter, public  :: EXTRA_LGT_FIELDS    = 3 ! number of data fields additionaly to treecode
+  integer, parameter, public  :: tree_ID_flow = 1, tree_ID_mask = 2
   !subroutines of this module
   interface abort
       module procedure abort1, abort2, abort3

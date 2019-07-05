@@ -50,11 +50,8 @@
 !! (up to RK of order 4)
 ! ********************************************************************************************
 
-subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gridQ, &
-    hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
-!---------------------------------------------------------------------------------------------
-! variables
-
+subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, &
+    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
     implicit none
 
     !> time varible
@@ -67,8 +64,8 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gr
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
-    !> hvy_gridQ are qty that depend on the grid and not explicitly on time
-    real(kind=rk), intent(inout)        :: hvy_gridQ(:, :, :, :, :)
+
+    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
     !> list of active blocks (heavy data)
@@ -79,6 +76,8 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gr
     integer(kind=ik), intent(in)        :: hvy_n
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! loop variables
     integer(kind=ik)                    :: k, j, Neqn, g, z1, z2
@@ -128,7 +127,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gr
         !-----------------------------------------------------------------------
         ! use krylov time stepping
         call krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
-            hvy_gridQ, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n)
+            hvy_mask, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
 
     elseif (params%time_step_method=="RungeKuttaGeneric") then
@@ -146,7 +145,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gr
         ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
         ! slot after the copy of the state vector (hence 2)
         call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), &
-        hvy_gridQ, lgt_block, hvy_active, hvy_n )
+        hvy_mask, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 
         ! save data at time t to heavy work array
         ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
@@ -170,7 +169,8 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gr
             ! note substeps are at different times, use temporary time "t"
             t = time + dt*rk_coeffs(j,1)
 
-            call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_gridQ, lgt_block, hvy_active, hvy_n)
+            call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, lgt_block, &
+            lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
         end do
 
         ! final stage

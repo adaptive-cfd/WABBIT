@@ -22,8 +22,8 @@
 !! \n
 !! 29/05/2018 create
 ! ********************************************************************************************
-subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-  hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_gridQ)
+subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
   !---------------------------------------------------------------------------------------------
   ! modules
     use module_indicators
@@ -38,8 +38,11 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> grid-dependend qtys (mask, geometry factors..)
-    real(kind=rk), intent(in), optional :: hvy_gridQ(:, :, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
@@ -56,6 +59,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=ik), intent(in)        :: iteration
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! local variables
     integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr
@@ -77,7 +82,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n
-        lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
+        lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = 0
     enddo
 
     !---------------------------------------------------------------------------
@@ -162,18 +167,12 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !> evaluate coarsing criterion on all blocks
     !---------------------------------------------------------------------------
     if (params%threshold_mask) then
-        ! allocate work blocks (this is not the full grid and very little memory)
-        if (.not. allocated(mask_color)) allocate(mask_color(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3)))
-        if (.not. allocated(us)) allocate(us(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3), 1:params%dim))
-
-        ! if additional mask thresholding is used, we have to create the mask
-        ! function here. First: initializations of routines. (right now, this is only useful for insects)
-        if (present(hvy_gridQ)) then
-            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
-            mask_color, us, "init_stage", hvy_gridQ(:,:,:,:,hvy_active(1)) )
+        if (present(hvy_mask)) then
+            ! create mask function at current time
+            call create_mask_tree(params, time, lgt_block, hvy_mask, &
+            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
         else
-            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
-            mask_color, us, "init_stage" )
+            call abort(0507191,"mask thresholding but no mask passed")
         endif
     endif
 
@@ -188,22 +187,10 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         ! here, this can actually be omitted.)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        if (params%threshold_mask) then
-            ! if additional mask thresholding is used, we have to create the mask
-            ! function here (in hvy_tmp)
-            if (present(hvy_gridQ)) then
-                call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(k)), &
-                mask_color, us, "main_stage", hvy_gridQ(:,:,:,:,hvy_active(k)) )
-            else
-                call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(k)), &
-                mask_color, us, "main_stage" )
-            endif
-        endif
-
         ! evaluate the criterion on this block.
         call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_active(k)), &
-        hvy_tmp(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
-        lgt_block(lgt_id, Jmax + idx_refine_sts), norm )
+        hvy_tmp(:,:,:,:,hvy_active(k)), dx, x0, indicator, iteration, &
+        lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_active(k)))
     enddo
 
     !---------------------------------------------------------------------------
@@ -213,7 +200,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         do k = 1, lgt_n
             if (lgt_block(lgt_active(k), Jmax + IDX_MESH_LVL) == params%max_treelevel) then
                 ! force blocks on maxlevel to coarsen
-                lgt_block(lgt_active(k), Jmax + idx_refine_sts) = -1
+                lgt_block(lgt_active(k), Jmax + IDX_REFINE_STS) = -1
             endif
         enddo
     endif

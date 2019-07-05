@@ -74,6 +74,7 @@ contains
 
     ! neighbor search, face
     include "find_neighbor_face_3D.f90"
+    include "create_mask_tree.f90"
 
     ! search routine to find light data id corresponding to treecode
     include "does_block_exist.f90"

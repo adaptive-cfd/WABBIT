@@ -41,7 +41,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, update_grid_qtys_ACM, create_mask_2D, create_mask_3D
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D, create_mask_3D
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -91,10 +91,6 @@ module module_acm
   ! all parameters for insects go here:
   type(diptera), save :: insect
 
-  ! two things can be stored in the grid_qtys: the sponge and the mask.
-  ! we therefore need to know where to store what (fixed indices do not work)
-  integer(kind=ik) :: IDX_MASK=-1, IDX_USX=-1, IDX_USY=-1, IDX_USZ=-1 , IDX_COLOR=-1, IDX_SPONGE=-1
-
 contains
 
   include "rhs.f90"
@@ -104,13 +100,12 @@ contains
   include "save_data_ACM.f90"
   include "statistics_ACM.f90"
   include "filter_ACM.f90"
-  include "update_grid_qtys_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
   ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   ! the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_ACM( filename, n_gridQ )
+  subroutine READ_PARAMETERS_ACM( filename, N_mask_components )
     implicit none
 
     character(len=*), intent(in) :: filename
@@ -119,13 +114,13 @@ contains
     character(len=80) :: Bs_str, Bs_conc
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: Bs_real
-    integer(kind=ik), intent(out) :: n_gridQ
+    integer(kind=ik), intent(out) :: N_mask_components
 
     ! inifile structure
     type(inifile) :: FILE
     integer :: g
 
-    n_gridQ = 0
+    N_mask_components = 0
 
     ! we still need to know about mpirank and mpisize, occasionally
     call MPI_COMM_SIZE (WABBIT_COMM, params_acm%mpisize, mpicode)
@@ -232,22 +227,9 @@ contains
     nx_max = (params_acm%Bs(1)-1) * 2**(params_acm%Jmax)
     dt_min = params_acm%CFL*dx_min/params_acm%c_0
 
-    ! two things can be stored in the grid_qtys: the sponge and the mask.
-    ! we therefore need to know where to store what (fixed indices do not work)
-    if (params_acm%penalization .and. (params_acm%geometry=="Insect" .or. params_acm%geometry=="fractal_tree")) then
-        n_gridQ = n_gridQ + 5
-        IDX_MASK  = n_gridQ - 4
-        IDX_USX   = n_gridQ - 3
-        IDX_USY   = n_gridQ - 2
-        IDX_USZ   = n_gridQ - 1
-        IDX_COLOR = n_gridQ
-    endif
-
-    if (params_acm%use_sponge) then
-        n_gridQ = n_gridQ + 1
-        IDX_SPONGE = n_gridQ
-    endif
-
+    ! at most, we need 6 components: mask, usx, usy, usz, color, sponge
+    ! in 2d, less arrays could be used, but its easier to just go ahead and use all of them.
+    N_mask_components = 6
 
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
@@ -256,9 +238,7 @@ contains
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
-      write(*,'("n_gridQ=",i1)') n_gridQ
-      write(*,'("IDX_MASK=",i1," IDX_COLOR=",i1," IDX_USX=",i1," IDX_USY=",i1," IDX_USZ=",i1)')  &
-      IDX_MASK, IDX_COLOR, IDX_USX, IDX_USY, IDX_USZ
+      write(*,'("N_mask_components=",i1)') N_mask_components
       write(*,'(80("<"))')
     endif
 

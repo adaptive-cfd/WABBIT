@@ -1,9 +1,102 @@
+! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+! mask functions separately. This makes the mask routines tree-level routines (and no longer
+! block level) so the physics modules have to provide an interface to create the mask at a tree
+! level. All parts of the mask shall be included: chi, boundary values, sponges.
+! This is a block-level wrapper to fill the mask.
+subroutine create_mask_3D( time, x0, dx, Bs, g, mask, stage )
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: Bs(3), g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
+    !     stage == "time-dependent-part"
+    !     stage == "time-independent-part"
+    !     stage == "all-parts"
+    character(len=*), intent(in) :: stage
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+
+    integer(kind=2), allocatable, save :: mask_color(:,:,:)
+
+
+    ! usually, the routine should not be called with no penalization, but if it still
+    ! happens, do nothing.
+    if ( params_acm%penalization .eqv. .false.) then
+        mask = 0.0_rk
+        return
+    endif
+
+    ! check if the array has the right dimension, if not, put money in swear jar.
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
+        write(*,*) shape(mask)
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    if (size(mask,4) < 5 ) then
+        write(*,*) shape(mask)
+        call abort(777108, "mask: wrong number of components (5), there's pirates, captain!")
+    endif
+
+
+    if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+
+
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ! mask function and boundary values
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    select case (params_acm%geometry)
+    case ('fractal_tree')
+        !-----------------------------------------------------------------------
+        ! FRACTAL_TREE
+        !-----------------------------------------------------------------------
+        call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+
+        ! store the mask color array as double
+        mask(:,:,:,5) = real(mask_color, kind=rk)
+
+    case ('Insect')
+        !-----------------------------------------------------------------------
+        ! INSECT MODULE
+        !-----------------------------------------------------------------------
+
+        ! the insects require us to determine their state vector before they can be drawn
+        ! as this is to do only once, not for all blocks
+        if ( abs(time-Insect%time) >= 1.0e-13_rk) then
+            call Update_Insect(time, Insect)
+        endif
+
+        ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+        call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
+
+        ! store the mask color array as double
+        mask(:,:,:,5) = real(mask_color, kind=rk)
+
+    case ('none')
+        mask = 0.0_rk
+
+    case default
+        call abort(120001,"ERROR: geometry for 3d VPM is unknown "//params_acm%geometry)
+
+    end select
+
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ! sponge
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    if (params_acm%use_sponge) then
+        call sponge_3D( mask(:,:,:,6), x0, dx, Bs, g)
+    endif
+
+end subroutine create_mask_3D
+
 !-------------------------------------------------------------------------------
-! 2 possibilities:
-!   - grid_qty is given: we possibly use a part of grid_qty as time-independent mask function
-!   - grid_qty is not given: all masks are created, incl non-moving parts
 !-------------------------------------------------------------------------------
-subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, grid_qty )
+! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+! mask functions separately. This makes the mask routines tree-level routines (and no longer
+! block level) so the physics modules have to provide an interface to create the mask at a tree
+! level. All parts of the mask shall be included: chi, boundary values, sponges.
+! This is a block-level wrapper to fill the mask.
+subroutine create_mask_2D( time, x0, dx, Bs, g, mask, stage )
     implicit none
 
     ! grid
@@ -11,127 +104,33 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, mask_color, us, stage, gri
     integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:), intent(inout) :: mask
-    integer(kind=2), dimension(:,:,:), intent(inout) :: mask_color
-    real(kind=rk), dimension(:,:,:,:), intent(inout) :: us
-    ! sometimes one has to do preparatory work for the mask function => staging idea.
-    character(len=*), optional, intent(in) :: stage
-    real(kind=rk), dimension(:,:,:,:), optional, intent(in) :: grid_qty
-    !> spacing and origin of block
-    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
-
-
-    ! usually, the routine should not be called with no penalization, but if it still
-    ! happens, do nothing.
-    if ( params_acm%penalization .eqv. .false.) return
-
-    ! the insects require us to determine their state vector before they can be drawn
-    ! as this is to do only once, not for all blocks, we have this stage here
-    if (present(stage)) then
-        if (stage == "init_stage") then
-            call Update_Insect(time, Insect)
-            ! that's all
-            return
-        endif
-    endif
-
-
-    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
-        call abort(777107, "mask: wrong array size, there's pirates, captain!")
-    endif
-
-    if (size(us,4) /= 3 ) then
-        write(*,*) shape(us)
-        call abort(777108, "us: wrong array size, there's pirates, captain!")
-    endif
-
-
-
-    select case (params_acm%geometry)
-    case ('fractal_tree')
-        if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
-            mask = grid_qty(:,:,:,IDX_MASK)
-!            us   = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
-            mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
-        else
-            call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask, mask_color, us)
-        endif
-
-    case ('Insect')
-        !-----------------------------------------------------------------------
-        ! INSECT MODULE
-        !-----------------------------------------------------------------------
-        ! case I: the body is fixed and alread created on "grid_qty"
-        if ( Insect%body_moves == "no" .and. present(grid_qty) ) then
-            ! the grid_qty already contains the body mask + fixed obstacles. Note that the insect
-            ! module needs to add the wings to this existing data, not the other way around (i.e. not
-            ! adding the body afterwards)
-            mask = grid_qty(:,:,:,IDX_MASK)
-            us   = grid_qty(:,:,:,IDX_USX:IDX_USZ) ! as the velocity is zero one could skip it
-            mask_color = int( grid_qty(:,:,:,IDX_COLOR), kind=2 )
-
-            ! add the wings to the existing mask. note: the "old" wings from the previous
-            ! time step are already deleted in grid_qty (in update_grid_qtys_ACM, the mask is deleted)
-            ! Hence, here, you do not have to delete again.
-            ! Note: insect module is ghost-nodes aware, but requires origin shift.
-            call draw_insect_wings( time, x0-dble(g)*dx, dx, mask, mask_color, us, Insect, delete=.false.)
-
-        ! case II: the body moves OR the grid qty is not available: delete & create everything
-        else
-            ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
-            call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask, mask_color, us )
-        endif
-    case ('none')
-        mask = 0.0_rk
-        us   =  0.0_rk
-
-    case default
-        call abort(120001,"ERROR: geometry for 3d VPM is unknown "//params_acm%geometry)
-
-    end select
-
-end subroutine create_mask_3D
-
-!-------------------------------------------------------------------------------
-!-------------------------------------------------------------------------------
-
-subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us, stage )
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in) :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(inout) :: mask
-    real(kind=rk), dimension(:,:,:), intent(inout) :: us
     !> spacing and origin of block
     real(kind=rk), intent(in) :: x0(1:2), dx(1:2), time
     ! sometimes one has to do preparatory work for the mask function => staging idea.
-    character(len=*), optional, intent(in) :: stage
-
-    if (present(stage)) then
-        if (stage /= "main_stage") return
-    endif
+    character(len=*), intent(in) :: stage
 
     ! some cheap checks
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
-        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+        call abort(634840, "mask: wrong array size, there's pirates, captain!")
     endif
-    if (size(us,3) /= 2) call abort(777209,"wrong array size, there's pirates, captain!")
 
     mask = 0.0_rk
-    us = 0.0_rk
 
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
-    if ( params_acm%penalization .eqv. .false.) return
+    if ( params_acm%penalization .eqv. .false.) then
+        return
+    endif
 
-
+    !---------------------------------------------------------------------------
+    ! Mask function and forcing values
+    !---------------------------------------------------------------------------
     select case (params_acm%geometry)
     case ('cylinder')
-        call draw_cylinder( mask, x0, dx, Bs, g )
+        call draw_cylinder( mask(:,:,1), x0, dx, Bs, g )
 
     case ('two-cylinders')
-        call draw_two_cylinders( mask, x0, dx, Bs, g )
+        call draw_two_cylinders( mask(:,:,1), x0, dx, Bs, g )
 
     case ('none')
         mask = 0.0_rk
@@ -140,6 +139,13 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, us, stage )
         call abort(120002,"ERROR: geometry for 2d VPM is unknown"//params_acm%geometry)
 
     end select
+
+    !---------------------------------------------------------------------------
+    ! sponge
+    !---------------------------------------------------------------------------
+    if (params_acm%use_sponge) then
+        call sponge_2D( mask(:,:,6), x0, dx, Bs, g)
+    endif
 
 end subroutine create_mask_2D
 

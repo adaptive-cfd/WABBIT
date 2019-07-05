@@ -31,7 +31,7 @@
 ! ********************************************************************************************
 
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_tmp)
+    hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_mask)
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -45,7 +45,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
   !> heavy data array - block data
   real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
   !> heavy work data array - block data.
-  real(kind=rk), intent(inout)         :: hvy_tmp(:, :, :, :, :)
+  real(kind=rk), intent(inout)         :: hvy_mask(:, :, :, :, :)
   !> neighbor array (heavy data)
   integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
   !> list of active blocks light data)
@@ -105,7 +105,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_mask )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -119,7 +119,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! the statevector saved to file (rho,u,v,p)
         ! we therefore convert it once here
         if (params%physics_type == 'navier_stokes') then
-          call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
+          call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+          lgt_active, lgt_n, lgt_sortednumlist, hvy_mask, .true., hvy_neighbor)
         end if
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
@@ -132,7 +133,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
         !---------------------------------------------------------------------------
-        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
+        call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_mask, .true., hvy_neighbor)
 
         !---------------------------------------------------------------------------
         ! grid adaptation
@@ -149,19 +151,20 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             !! go up one level where a refinement indicator tells us to do so, but in the current code
             !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
             !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_mask, hvy_neighbor, lgt_active, &
             lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "everywhere"  )
 
             ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
             ! not, the detail coefficients for all blocks are zero. In the time stepper, this
             ! corresponds to advancing the solution in time, it's just that here we know the exact
             ! solution (the inicond)
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+            lgt_active, lgt_n, lgt_sortednumlist, hvy_mask, .true., hvy_neighbor)
 
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp )
+            lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_mask )
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -177,10 +180,11 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         if (params%inicond_refinements > 0) then
           do k = 1, params%inicond_refinements
             ! refine entire mesh.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
+            call refine_mesh( params, lgt_block, hvy_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
                 lgt_sortednumlist, hvy_active, hvy_n, "everywhere" )
             ! set initial condition
-            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .true.)
+            call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+            lgt_active, lgt_n, lgt_sortednumlist, hvy_mask, .true., hvy_neighbor)
 
             if (params%rank == 0) then
              write(*,'(" did ",i2," refinement stage (beyond what is required for the &
@@ -196,8 +200,9 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! start from an initial condition without a mask (impulsive start).
         ! This is done here (after the refinements).
         if (params%physics_type == 'ACM-new') then
-           ! apply inicond for one laste time
-           call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, .false.)
+           ! apply inicond for one last time
+           call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n, &
+           lgt_active, lgt_n, lgt_sortednumlist, hvy_mask, .false., hvy_neighbor)
         end if
     end if
 

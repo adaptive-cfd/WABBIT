@@ -23,9 +23,6 @@
 
 program main
 
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     use module_helpers
     use module_MPI
@@ -45,9 +42,6 @@ program main
     use module_unit_test
     ! bridge implementation of wabbit
     use module_bridge_interface
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
@@ -74,9 +68,11 @@ program main
     ! dim 4: components ( 1:number_equations)
     ! dim 5: block id  ( 1:number_blocks )
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
-    ! grid-dependent (and not explicitly time dependent) quantities: no synchronization
-    ! of these qtys is performed
-    real(kind=rk), allocatable          :: hvy_gridQ(:, :, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
     !!!!!! => renaming: hvy_block -> hvy_state
 
     ! hvy work array: the slots for RHS evaluation (e.g. 5 for a RK4)
@@ -128,7 +124,7 @@ program main
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
-    integer, parameter :: tree_ID_flow = 1
+
 
     ! init time loop
     time          = 0.0_rk
@@ -173,10 +169,10 @@ program main
     call initialize_communicator(params)
     ! have the pysics module read their own parameters. They also decide how many grid-qtys
     ! they want
-    call init_physics_modules( params, filename, params%n_gridQ )
+    call init_physics_modules( params, filename, params%N_mask_components )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ, hvy_n, lgt_n)
+        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n)
     !  the grid: all blocks are inactive and empty
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
          lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), .true. )
@@ -206,7 +202,7 @@ program main
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-    lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), params%adapt_inicond, time, iteration, hvy_tmp )
+    lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), params%adapt_inicond, time, iteration, hvy_mask )
 
     if (.not. params%read_from_files .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
@@ -218,7 +214,8 @@ program main
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-        lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
+        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_mask,&
+        hvy_neighbor )
 
     end if
 
@@ -285,6 +282,15 @@ program main
     ! timing
     call toc( "init_data", MPI_wtime()-sub_t0 )
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !! mask
+    ! call read_field2tree(params, (/"chi_00.h5"/), 1, 2, tree_n, &
+    ! lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    ! hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    !
+    ! call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    !     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
+
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
@@ -305,7 +311,8 @@ program main
 
             if (test_failed) then
                 call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-                lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
+                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, &
+                hvy_active(:,tree_ID_flow), hvy_mask, hvy_neighbor )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -342,32 +349,12 @@ program main
         call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
 
-        !***********************************************************************
-        ! update grid quantities
-        !***********************************************************************
-        ! While the state vector and many work variables (such as the mask function for penalization)
-        ! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
-        ! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
-        ! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
-        ! time step.
-        ! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
-        ! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
-        ! generated at every time t. This example generalizes to any combination of stationary and moving
-        ! obstacle, i.e. insect behind fractal tree.
-        ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
-        ! if they require such qantities. In many cases, the grid_qtys are probably not used.
-        ! Please note that in the current implementation, hvy_tmp also plays the role of a work array
-        ! so it is available only during the
-        t4 = MPI_wtime()
-        call update_grid_qyts( time, params, lgt_block, hvy_gridQ, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-        call toc( "TOPLEVEL: update_grid_qyts", MPI_wtime()-t4)
-
 
         !***********************************************************************
         ! evolve solution in time
         !***********************************************************************
         ! internal loop over time steps: if desired, we perform more than one time step
-        ! before adapting the grid again. this can further reduce the overhead of adaptivity
+        ! before adapting the grid again. this can further reduce the overhead of adaptivity.
         ! Note: the non-linear terms can create finer scales than resolved on the grid. they
         ! are usually filtered by the coarsening/refinement round trip. So if you do more than one time step
         ! on the grid, consider using a filter.
@@ -376,8 +363,9 @@ program main
             ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_gridQ, hvy_neighbor, &
-            hvy_active(:,tree_ID_flow), lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow) )
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_neighbor, &
+            hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_active(:,tree_ID_flow), &
+            lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow) )
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1
 
@@ -408,8 +396,10 @@ program main
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
-                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active(:,tree_ID_flow), &
-                hvy_n(tree_ID_flow), hvy_gridQ)
+                call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
+                lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), &
+                hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_neighbor)
+
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
         enddo
@@ -422,7 +412,7 @@ program main
         if ( params%adapt_mesh ) then
             call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
             lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-            hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp, hvy_gridQ )
+            hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp, hvy_mask )
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)
@@ -438,7 +428,8 @@ program main
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
             call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-            lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
+            lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),  hvy_n(tree_ID_flow), hvy_tmp, &
+            hvy_active(:,tree_ID_flow), hvy_mask, hvy_neighbor )
 
             output_time = time
             params%next_write_time = params%next_write_time + params%write_time
@@ -507,8 +498,8 @@ program main
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-        lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), &
-        hvy_tmp, hvy_active(:,tree_ID_flow), hvy_gridQ )
+        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), &
+        hvy_tmp, hvy_active(:,tree_ID_flow), hvy_mask, hvy_neighbor )
     end if
 
     ! MPI Barrier before program ends

@@ -27,13 +27,8 @@
 !
 !**********************************************************************************************
 
-subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n, hvy_gridQ)
-
-!----------------------------------------------------------------------------------------------
-! modules
-
-!----------------------------------------------------------------------------------------------
-! variables
+subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
+    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
 
    implicit none
 
@@ -47,13 +42,20 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, h
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> hvy_gridQ are qty that depend on the grid and not explicitly on time
-    real(kind=rk), intent(inout)        :: hvy_gridQ(:, :, :, :, :)
+    !> hvy_mask are qty that depend on the grid and not explicitly on time
+    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
-
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_active(:)
+    !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0
@@ -64,21 +66,19 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, h
     integer(kind=ik), dimension(3) :: Bs
 
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     ! grid parameter
     Bs    = params%Bs
     g     = params%n_ghosts
-!---------------------------------------------------------------------------------------------
-! main body
+
+    call create_mask_tree(params, time, lgt_block, hvy_mask, &
+    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
 
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx,&
-        hvy_tmp(:,:,:,:,hvy_active(1)), "init_stage", hvy_gridQ(:,:,:,:, hvy_active(1)))
+        hvy_tmp(:,:,:,:,hvy_active(1)), "init_stage", hvy_mask(:,:,:,:, hvy_active(1)))
 
     !-------------------------------------------------------------------------
     ! 2nd stage: integral_stage. (called for all blocks)
@@ -95,16 +95,16 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, lgt_block, h
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
       call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
-          hvy_tmp(:,:,:,:,hvy_active(k)), "integral_stage", hvy_gridQ(:,:,:,:, hvy_active(k)))
+          hvy_tmp(:,:,:,:,hvy_active(k)), "integral_stage", hvy_mask(:,:,:,:, hvy_active(k)))
     enddo
 
 
     !-------------------------------------------------------------------------
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
-    ! in rhs module, used ror example for MPI_REDUCES
+    ! in rhs module, used for example for MPI_REDUCES
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx,&
-        hvy_tmp(:,:,:,:,hvy_active(1)), "post_stage", hvy_gridQ(:,:,:,:, hvy_active(1)))
+        hvy_tmp(:,:,:,:,hvy_active(1)), "post_stage", hvy_mask(:,:,:,:, hvy_active(1)))
 
 
 end subroutine statistics_wrapper

@@ -50,9 +50,8 @@ contains
         integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
         integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
 
-        integer(kind=ik)                 :: k, lgt_id, Jmax, hvy_id, rank, N
+        integer(kind=ik) :: k, lgt_id, hvy_id, rank, N
 
-        Jmax = params%max_treelevel ! max treelevel
         rank = params%rank
         N = params%number_blocks
 
@@ -63,7 +62,6 @@ contains
 
             ! pruning condition: all entries of the block are small
             if ( all( (hvy_block(:,:,:,1,hvy_id)<=1.0e-6)) ) then
-
                 ! pruning: delete the block from the tree
                 lgt_block(lgt_id, :) = -1_ik
             endif
@@ -72,6 +70,8 @@ contains
 
         call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
+        hvy_active, hvy_n, lgt_sortednumlist, tree_n)
     end subroutine
 
     subroutine add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
@@ -178,7 +178,7 @@ contains
                     call lgt_id_to_hvy_id( hvy_id1, lgt_id1, rank_pruned, N )
                     call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full  , N )
                     ! actual addition
-                    hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id2) + hvy_block(:,:,:,:,hvy_id1)
+                    hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + hvy_block(:,:,:,1,hvy_id1)
                 endif
             else
                 ! we did not find it. The grid has changed in the interior of the
@@ -203,7 +203,7 @@ contains
                         call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
                         if (params%rank == rank_full) then
                             call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full, N)
-                            hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id2) + 1.0_rk
+                            hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
                         endif
                     endif
                 enddo
@@ -501,7 +501,7 @@ contains
 
     !##############################################################
     subroutine adapt_tree_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp, tree_id, tree_n, hvy_gridQ )
+        lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp, tree_id, tree_n)
 
         !---------------------------------------------------------------------------------------------
         ! variables
@@ -518,8 +518,6 @@ contains
         real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
         !> heavy work data array - block data.
         real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-        !> grid-dependend qtys (mask, geometry factors..)
-        real(kind=rk), intent(in), optional :: hvy_gridQ(:, :, :, :, :)
         !> heavy data array - neighbor data
         integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
         !> list of active blocks (light data)
@@ -598,16 +596,9 @@ contains
             !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
             !! acts on a single block only
             t0 = MPI_Wtime()
-            if (present(hvy_gridQ) .and. iteration==0) then
-                ! note: the grid changes here, so we can use the hvy_grid (which contains masks that do not
-                ! explicitly depend on time) only once
-                call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active(:,tree_id), lgt_n(tree_id), &
-                hvy_active(:, tree_id), hvy_n(tree_id), indicator, iteration, hvy_neighbor, hvy_gridQ)
-            else
-                call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp,&
-                lgt_active(:,tree_id), lgt_n(tree_id), hvy_active(:, tree_id), hvy_n(tree_id), &
-                indicator, iteration, hvy_neighbor)
-            endif
+            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp,&
+            lgt_active(:,tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:, tree_id), hvy_n(tree_id), &
+            indicator, iteration, hvy_neighbor)
             call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
             !> (b) check if block has reached maximal level, if so, remove refinement flags

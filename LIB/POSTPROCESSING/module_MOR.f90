@@ -799,7 +799,7 @@ contains
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
     character(len=2)  :: order
-    logical :: verbosity = .false., save_all = .true.
+    logical :: verbosity = .false., save_all = .false.
 
     rank = params%rank
     call get_command_argument(2, args)
@@ -886,7 +886,8 @@ contains
     if ( iteration>0 ) then
       if ( rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
     else
-      call abort(508191,"You must pass iteration which you want to reconstruct")
+      save_all = .True.
+      if ( rank == 0 ) write(*,*) "Reconstructing all snapshots!"
     endif
     !----------------------------------
     ! READ a_coefficient from file
@@ -985,7 +986,7 @@ contains
     do j = 1, n_components
       close(10+j)
     enddo
-    fsize = N_modes_used + N_snapshots + 1 !we need some extra fields for storing etc
+    fsize = N_modes_used +  2 !we need one more additional field for the reconstructed field
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     allocate(params%threshold_state_vector_component(params%n_eqn))
@@ -1065,17 +1066,37 @@ contains
     ! COMPUTE POD Modes
     !----------------------------------
     reconst_tree_id = tree_n + 1
-    call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+    if (save_all) then
+      do iteration = 1, N_snapshots
+        call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
-    !----------------------------------
-    ! Save Reconstructed Snapshots
-    !----------------------------------
+        !----------------------------------
+        ! Save components of reconstructed 
+        ! Snapshot
+        !----------------------------------
+        do j = 1, n_components 
+          write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
+          call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+            lgt_n, hvy_n, hvy_active, j, reconst_tree_id , real(iteration,kind=rk) , iteration )
+        end do
+      end do
+    else
+      !! reconstruct only single snapshot
+      call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                     hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                     a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
+      !----------------------------------
+      ! Save components of reconstructed 
+      ! Snapshot
+      !----------------------------------
       do j = 1, n_components 
         write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
         call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, j, reconst_tree_id , 0.0_rk , iteration )
+          lgt_n, hvy_n, hvy_active, j, reconst_tree_id ,real(iteration,kind=rk) , iteration )
       end do
+    endif
+
 
 
   end subroutine
@@ -1139,7 +1160,7 @@ contains
 
     ! in this algorithm we need at least N_mode trees plus 2 additional fields for
     ! saving the reconstructed field and a temporary field
-    if ( params%forest_size <= N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
+    if ( params%forest_size < N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
     if ( dest_tree_id<= N_modes) call abort(200419,"Error! Destination tree id overwrites POD Modes!")
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, 1_ik)
@@ -1174,7 +1195,7 @@ contains
 
   t_elapse = MPI_WTIME() - t_elapse
   if (rank == 0) then
-          write(*,'("Snapshot ", i4,"reconstructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
+          write(*,'("Snapshot ", i4," reconstructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
           iteration, t_elapse, &
           min_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) ), &
           max_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) )

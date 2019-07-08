@@ -27,7 +27,7 @@ module module_forest
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
     PUBLIC :: read_field2tree,  write_tree_field, &
-    add_two_trees, count_tree_hvy_n, &
+    add_two_trees, count_tree_hvy_n, average_trees, &
     copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
     adapt_tree_mesh, compute_tree_L2norm, delete_tree, scalar_product_two_trees, &
     read_tree, same_block_distribution, prune_tree, add_pruned_to_full_tree, refine_tree
@@ -1487,6 +1487,7 @@ contains
     !> This routine computes the average of all trees in treeid_list and
     !> saves the result in dest_tree_id
     !> result = sum(trees) / number_trees
+    !> to construct a tree_id list use for example: tree_id_list= (/(id, id= 1, N)/)
     subroutine average_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list, dest_tree_id, verbosity)
 

@@ -405,7 +405,7 @@ contains
     ! block distirbution:
     params%block_distribution="sfc_hilbert"
     ! no time stepping:
-    params%time_step_method="no"
+    params%time_step_method="none"
     params%min_treelevel=1
     ! coarsening indicator
     params%physics_type="POD"

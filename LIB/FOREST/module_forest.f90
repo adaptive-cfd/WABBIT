@@ -1483,7 +1483,50 @@ contains
     end subroutine
     !##############################################################
 
+    !##############################################################
+    !> This routine computes the average of all trees in treeid_list and
+    !> saves the result in dest_tree_id
+    !> result = sum(trees) / number_trees
+    subroutine average_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list, dest_tree_id, verbosity)
 
+        implicit none
+        !-----------------------------------------------------------------
+        type (type_params), intent(inout) :: params   !< params structure
+        integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+        integer(kind=ik), intent(inout)   :: tree_n   !< number of active trees in forest
+        integer(kind=ik), intent(in)      :: treeid_list(:) !< List of tree ids you want to average
+        integer(kind=ik), intent(in)      :: dest_tree_id !< tree id of the averaged tree
+        integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
+        integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
+        real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+        integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
+        integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:, :) !< active lists
+        integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
+        real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
+        logical, intent(in),optional      :: verbosity !< if true: additional information of processing
+        !-----------------------------------------------------------------
+        integer(kind=ik):: N
+        logical :: verbose=.false.
+
+        if (present(verbosity)) verbose=verbosity
+        if (params%rank == 0 .and. verbose) write(*,'("Averaging trees: ",i4)') treeid_list
+
+        N = size(treeid_list)
+
+        ! first sum up all trees from the given list
+        call sum_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list, dest_tree_id, verbosity)
+
+        ! devide the sum by the numbers of elements
+        call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, dest_tree_id, &
+        1.0_rk/N, verbosity)
+
+
+    end subroutine
+    !##############################################################
+
+    
     !##############################################################
     subroutine add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)

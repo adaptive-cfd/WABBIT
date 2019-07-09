@@ -1,7 +1,7 @@
 !-----------------------------------------------------------------------------
 ! main level wrapper for setting the initial condition on a block
 !-----------------------------------------------------------------------------
-subroutine INICOND_ACM( time, u, g, x0, dx, mask, adapting )
+subroutine INICOND_ACM( time, u, g, x0, dx )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -12,13 +12,6 @@ subroutine INICOND_ACM( time, u, g, x0, dx, mask, adapting )
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On entry, the mask is correctly set outside this function.
-    real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
-
     ! as you are allowed to compute the RHS only in the interior of the field
     ! you also need to know where 'interior' starts: so we pass the number of ghost points
     integer, intent(in) :: g
@@ -26,10 +19,6 @@ subroutine INICOND_ACM( time, u, g, x0, dx, mask, adapting )
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-    ! if we are still adapting the initial condition, we may use penalization for refinement.
-    ! if the initial grid is adapted we set our initial condition without penalization (impulsive start).
-    logical, intent(in) :: adapting
 
     real(kind=rk)    :: x, y, z
     integer(kind=ik) :: ix, iy, iz, idir, Bs(3)
@@ -148,13 +137,5 @@ subroutine INICOND_ACM( time, u, g, x0, dx, mask, adapting )
         call abort(428764, "ACM inicond: "//trim(adjustl(params_acm%inicond))//" is unkown.")
 
     end select
-
-    ! if we use volume penalization, the mask is first used for refinement of the grid.
-    ! In a second stage, the initial condition without penalization is then applied to the refined grid.
-    if (adapting .and. params_acm%penalization) then
-        do idir = 1, params_acm%dim
-            u(:,:,:,idir) = mask(:,:,:,1)
-        enddo
-    endif
 
 end subroutine INICOND_ACM

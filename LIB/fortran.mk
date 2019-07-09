@@ -20,7 +20,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 module_forest.f90 \
-	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90
+	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90 #create_mask_tree.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -295,6 +295,10 @@ $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/modul
 $(OBJDIR)/module_forest.o: module_forest.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_IO.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+# $(OBJDIR)/create_mask_tree.o: create_mask_tree.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_physics_metamodule.o \
+# 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_forest.o $(OBJDIR)/module_globals.o
+# 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MOR.o: module_MOR.f90 $(OBJDIR)/module_forest.o $(OBJDIR)/module_IO.o \
 	$(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o

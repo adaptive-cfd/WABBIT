@@ -42,6 +42,7 @@ program main
     use module_unit_test
     ! bridge implementation of wabbit
     use module_bridge_interface
+    use module_forest
 
     implicit none
 
@@ -119,7 +120,7 @@ program main
     ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
     ! loop variable
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
@@ -190,7 +191,7 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), hvy_active(:,tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow) )
+        hvy_tmp, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_n, lgt_n )
     endif
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
@@ -201,8 +202,8 @@ program main
     ! Initial condition
     !---------------------------------------------------------------------------
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
-    call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-    lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), params%adapt_inicond, time, iteration, hvy_mask )
+    call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
+    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
 
     if (.not. params%read_from_files .or. params%adapt_inicond) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
@@ -213,9 +214,8 @@ program main
         ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, hvy_active(:,tree_ID_flow), hvy_mask,&
-        hvy_neighbor )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
 
     end if
 
@@ -282,15 +282,6 @@ program main
     ! timing
     call toc( "init_data", MPI_wtime()-sub_t0 )
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !! mask
-    ! call read_field2tree(params, (/"chi_00.h5"/), 1, 2, tree_n, &
-    ! lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    ! hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    !
-    ! call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    !     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
-
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
@@ -310,9 +301,8 @@ program main
             hvy_n(tree_ID_flow), test_failed)
 
             if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_tmp, &
-                hvy_active(:,tree_ID_flow), hvy_mask, hvy_neighbor )
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+                lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
                 call abort(111111,"Same origin of ghost nodes check failed - stopping.")
             endif
         endif
@@ -363,9 +353,8 @@ program main
             ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_neighbor, &
-            hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_active(:,tree_ID_flow), &
-            lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow) )
+            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, hvy_neighbor, &
+            hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
             iteration = iteration + 1
 
@@ -397,8 +386,7 @@ program main
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
-                lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), &
-                hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_neighbor)
+                lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
 
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
@@ -410,9 +398,8 @@ program main
         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-            lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-            hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp, hvy_mask )
+            call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_mask )
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)
@@ -427,9 +414,8 @@ program main
             ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
-            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-            lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),  hvy_n(tree_ID_flow), hvy_tmp, &
-            hvy_active(:,tree_ID_flow), hvy_mask, hvy_neighbor )
+            call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+            lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
 
             output_time = time
             params%next_write_time = params%next_write_time + params%write_time
@@ -497,9 +483,8 @@ program main
         ! Note new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
-        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), &
-        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), &
-        hvy_tmp, hvy_active(:,tree_ID_flow), hvy_mask, hvy_neighbor )
+        call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
     end if
 
     ! MPI Barrier before program ends

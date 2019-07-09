@@ -62,6 +62,10 @@ subroutine ini_file_to_params( params, filename )
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
+    ! which physics module is used? (note that the initialization of different parameters takes
+    ! place in those modules, i.e., they are not read here.)
+    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
+
     call ini_domain(params, FILE )
     call ini_blocks(params,FILE)
     call ini_time(params,FILE)

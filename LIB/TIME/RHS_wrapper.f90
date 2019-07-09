@@ -27,7 +27,7 @@
 !
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
+subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_block, &
     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
    implicit none
 
@@ -41,18 +41,19 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> hvy_mask are qtys that depend on grid and not explicitly on time
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
+    integer(kind=ik), intent(in)        :: hvy_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)        :: hvy_n(:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)     :: lgt_active(:)
+    integer(kind=ik), intent(in)        :: lgt_active(:,:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)     :: lgt_n
+    integer(kind=ik), intent(in)        :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)  :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
@@ -61,7 +62,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0
     ! loop variables
-    integer(kind=ik)                    :: k, dF, neqn, lgt_id
+    integer(kind=ik)                    :: k, dF, neqn, lgt_id, hvy_id
     ! grid parameter, error variable
     integer(kind=ik)                    :: g
     integer(kind=ik), dimension(3)      :: Bs
@@ -71,12 +72,10 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     Bs = params%Bs
     g  = params%n_ghosts
 
-
-
     !-------------------------------------------------------------------------
     ! create mask function at current time
     !-------------------------------------------------------------------------
-    call create_mask_tree(params, time, lgt_block, hvy_mask, &
+    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
         hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
 
 
@@ -84,8 +83,9 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
-    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_active(1)), g, x0, dx, &
-         hvy_rhs(:,:,:,:,hvy_active(1)), hvy_mask(:,:,:,:,hvy_active(1)), "init_stage" )
+    hvy_id = hvy_active(1, tree_ID_flow) ! for this stage, just pass any block (result does not depend on block)
+    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
+         hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "init_stage" )
 
     !-------------------------------------------------------------------------
     ! 2nd stage: integral_stage. (called for all blocks)
@@ -95,14 +95,15 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     ! global forcing term (e.g. in FSI the forces on bodies). As the physics
     ! modules cannot see the grid, (they only see blocks), in order to encapsulate
     ! them nicer, two RHS stages have to be defined: integral / local stage.
-    do k = 1, hvy_n
-      ! convert given hvy_id to lgt_id for block spacing routine
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-      ! get block spacing for RHS
-      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+    do k = 1, hvy_n(tree_ID_flow)
+        hvy_id = hvy_active(k, tree_ID_flow)
+        ! convert given hvy_id to lgt_id for block spacing routine
+        call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+        ! get block spacing for RHS
+        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
-           hvy_rhs(:,:,:,:,hvy_active(k)), hvy_mask(:,:,:,:,hvy_active(k)), "integral_stage" )
+        call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
+        hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "integral_stage" )
     enddo
 
 
@@ -110,8 +111,9 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
-    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_active(1)), g, x0, dx, &
-    hvy_rhs(:,:,:,:,hvy_active(1)), hvy_mask(:,:,:,:,hvy_active(1)), "post_stage" )
+    hvy_id = hvy_active(1, tree_ID_flow) ! for this stage, just pass any block (result does not depend on block)
+    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx, &
+    hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "post_stage" )
 
 
     !-------------------------------------------------------------------------
@@ -123,13 +125,10 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
     ! I think the idea would be to add mask generation here; take it out of
     ! physics modules rhs.f90
 
-    ! create moving part of mask on hvy_mask (flow tree)
-    ! then add pruned tree to this tree.
-    ! array size prblemproblem: adding only on 1st component
-
-    do k = 1, hvy_n
+    do k = 1, hvy_n(tree_ID_flow)
+        hvy_id = hvy_active(k, tree_ID_flow)
         ! convert given hvy_id to lgt_id for block spacing routine
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+        call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
@@ -138,9 +137,8 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, lgt_block, &
             call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
         endif
 
-
-        call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, &
-        x0, dx, hvy_rhs(:,:,:,:, hvy_active(k)), hvy_mask(:,:,:,:, hvy_active(k)), "local_stage", &
+        call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, &
+        x0, dx, hvy_rhs(:,:,:,:, hvy_id), hvy_mask(:,:,:,:, hvy_id), "local_stage", &
         boundary_flag=surface )
     enddo
 

@@ -1,5 +1,5 @@
 subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
-    hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
+    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
     ! use module_blas
     implicit none
 
@@ -16,18 +16,19 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
+    integer(kind=ik), intent(in)        :: hvy_active(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
+    integer(kind=ik), intent(in)        :: lgt_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)        :: hvy_n(:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
+    integer(kind=ik), intent(in)        :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------------------
     integer :: M_max ! M is M_krylov number of subspace
     real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:), H_tmp(:,:)
@@ -54,30 +55,30 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     endif
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
     ! calculate time step
-    call calculate_time_step(params, time, hvy_block, hvy_active, hvy_n, lgt_block, &
-        lgt_active, lgt_n, dt)
+    call calculate_time_step(params, time, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
+        lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), dt)
 
     ! compute norm "normv" of input state vector ("hvy_block")
-    call wabbit_norm( params, hvy_block, hvy_active, hvy_n, normv )
+    call wabbit_norm( params, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), normv )
     if (normv < epsilon(1.0_rk)) normv = 1.0_rk
     eps = normv * sqrt(epsilon(1.0_rk))
 
 
     ! the very last slot (M+3) is the "reference right hand side"
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), hvy_tmp, lgt_block, &
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), hvy_mask, hvy_tmp, lgt_block, &
     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
     ! NSF: this guy is called normuu
-    call wabbit_norm( params, hvy_work(:,:,:,:,:,M_max+3), hvy_active, hvy_n, beta )
+    call wabbit_norm( params, hvy_work(:,:,:,:,:,M_max+3), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), beta )
     if (beta < epsilon(1.0_rk)) beta = 1.0_rk
 
     ! start iteration, fill first slot
-    do k = 1, hvy_n
-        hvy_work(:,:,:,:,hvy_active(k),1) = hvy_work(:,:,:,:,hvy_active(k),M_max+3) / beta
+    do k = 1, hvy_n(tree_ID_flow)
+        hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),1) = hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+3) / beta
     enddo
 
     !**************************************!
@@ -88,38 +89,38 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     do M_iter = 1, M_max
 
         ! perturbed right hand side is first-to-last (M+2) slot
-        do k = 1, hvy_n
-            hvy_work(:,:,:,:,hvy_active(k),M_max+2) = hvy_block(:,:,:,:,hvy_active(k)) &
-            + eps * hvy_work(:,:,:,:,hvy_active(k),M_iter)
+        do k = 1, hvy_n(tree_ID_flow)
+            hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+2) = hvy_block(:,:,:,:,hvy_active(k,tree_ID_flow)) &
+            + eps * hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_iter)
         enddo
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
-        hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
+        hvy_mask, hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 
         ! linearization of RHS slot (M_max+1)
-        do k = 1, hvy_n
-            hvy_work(:,:,:,:,hvy_active(k),M_max+1) = ( hvy_work(:,:,:,:,hvy_active(k),M_max+1) &
-            -hvy_work(:,:,:,:,hvy_active(k),M_max+3) ) / eps
+        do k = 1, hvy_n(tree_ID_flow)
+            hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+1) = ( hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+1) &
+            -hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+3) ) / eps
         enddo
 
         ! --- inner loop ----
         ! --- ARNOLDI ---
         do iter = 1, M_iter
             call scalarproduct(params, hvy_work(:,:,:,:,:,iter), hvy_work(:,:,:,:,:,M_max+1),&
-             hvy_active, hvy_n, H(iter, M_iter) )
+             hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), H(iter, M_iter) )
 
-             do k = 1, hvy_n
-                 hvy_work(:,:,:,:,hvy_active(k),M_max+1) = hvy_work(:,:,:,:,hvy_active(k),M_max+1) &
-                 - H(iter,M_iter) * hvy_work(:,:,:,:,hvy_active(k),iter)
+             do k = 1, hvy_n(tree_ID_flow)
+                 hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+1) = hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+1) &
+                 - H(iter,M_iter) * hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),iter)
              enddo
         enddo
         ! end of inner i =1:j loop
-        call wabbit_norm(params, hvy_work(:,:,:,:,:,M_max+1), hvy_active, hvy_n, H(M_iter+1,M_iter) )
+        call wabbit_norm(params, hvy_work(:,:,:,:,:,M_max+1), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), H(M_iter+1,M_iter) )
 
-        do k = 1, hvy_n
-            hvy_work(:,:,:,:,hvy_active(k),M_iter+1) = hvy_work(:,:,:,:,hvy_active(k),M_max+1) / H(M_iter+1,M_iter)
+        do k = 1, hvy_n(tree_ID_flow)
+            hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_iter+1) = hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),M_max+1) / H(M_iter+1,M_iter)
         enddo
 
 
@@ -176,9 +177,9 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     ! compute final value of new state vector at new time level
     ! result will be in hvy_block again (inout)
     do iter = 1, M_iter+1
-        do k = 1, hvy_n
-            hvy_block(:,:,:,:,hvy_active(k)) = hvy_block(:,:,:,:,hvy_active(k)) &
-            + beta * hvy_work(:,:,:,:,hvy_active(k),iter) * phiMat(iter,M_iter+1)
+        do k = 1, hvy_n(tree_ID_flow)
+            hvy_block(:,:,:,:,hvy_active(k,tree_ID_flow)) = hvy_block(:,:,:,:,hvy_active(k,tree_ID_flow)) &
+            + beta * hvy_work(:,:,:,:,hvy_active(k,tree_ID_flow),iter) * phiMat(iter,M_iter+1)
         enddo
     enddo
 

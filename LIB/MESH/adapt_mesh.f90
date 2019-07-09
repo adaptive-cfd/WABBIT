@@ -44,28 +44,26 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
+    integer(kind=ik), intent(inout)     :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
+    integer(kind=ik), intent(inout)     :: hvy_n(:)
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
     ! loop variables
-    integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors
+    integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors, lgt_id
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1, t_misc
     ! MPI error variable
-    integer(kind=ik)                    :: ierr, k1
+    integer(kind=ik)                    :: ierr, k1, hvy_id
     integer(kind=ik), save              :: counter=0
     logical, save                       :: never_balanced_load=.true.
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! start time
     t0 = MPI_Wtime()
@@ -103,16 +101,16 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> we iterate until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
-    do while ( lgt_n_old /= lgt_n )
+    do while ( lgt_n_old /= lgt_n(tree_ID_flow) )
 
-        lgt_n_old = lgt_n
+        lgt_n_old = lgt_n(tree_ID_flow)
 
         !> (a) check where coarsening is possible
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         t0 = MPI_Wtime()
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
         call toc( "adapt_mesh (sync_ghosts)", MPI_Wtime()-t0 )
 
         !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
@@ -122,7 +120,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in grid_coarsening_indicator
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask) ! KKK
         else
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
@@ -132,29 +130,29 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         t0 = MPI_Wtime()
-        call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        call respect_min_max_treelevel( params, lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
+        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+        lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (ensure_gradedness)", MPI_Wtime()-t0 )
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, hvy_tmp )
+        call coarse_mesh( params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow),&
+        lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
         ! CPU timing (only in debug mode)
         call toc( "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
 
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n)
+        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+        lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
         call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
         iteration = iteration + 1
@@ -167,9 +165,10 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! (by defintion of Jmax), then the redundant layer in both blocks is different.
     ! To corrent that, you need to know which of the blocks results from interpolation and
     ! which one has previously been at Jmax. This latter one gets the 11 status.
-    do k = 1, lgt_n
-        if ( lgt_block( lgt_active(k), params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
-            lgt_block( lgt_active(k), params%max_treelevel + IDX_REFINE_STS ) = 11
+    do k = 1, lgt_n(tree_ID_flow)
+        lgt_id = lgt_active(k,tree_ID_flow)
+        if ( lgt_block( lgt_id, params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
+            lgt_block( lgt_id, params%max_treelevel + IDX_REFINE_STS ) = 11
         end if
     end do
 
@@ -179,8 +178,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load .or. time<1.0e-10_rk) then
         t0 = MPI_Wtime()
 
-        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
         call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
         never_balanced_load = .false.

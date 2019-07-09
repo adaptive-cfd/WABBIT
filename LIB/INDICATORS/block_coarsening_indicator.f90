@@ -39,7 +39,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     ! NOTE: Here, the mask is required only if grid adaptation is also done on the mask.
-    real(kind=rk), intent(inout)        :: block_mask(:, :, :, :)
+    real(kind=rk), intent(inout), optional :: block_mask(:, :, :, :)
     !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
     !> block spacing and origin
@@ -129,7 +129,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
     ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
     ! not available, the option is useless but can cause errors.
-    if (params%threshold_mask) then
+    if (params%threshold_mask .and. present(block_mask)) then
         ! assuming block_work holds mask function
         nnorm = 1.0_rk
         call threshold_block( params, block_mask(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )

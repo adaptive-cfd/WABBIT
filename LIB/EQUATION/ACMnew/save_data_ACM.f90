@@ -29,6 +29,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
 
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+
     ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
     ! mask functions separately. This makes the mask routines tree-level routines (and no longer
     ! block level) so the physics modules have to provide an interface to create the mask at a tree
@@ -108,6 +109,9 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
 
         case('usz')
             work(:,:,:,k) = mask(:,:,:,4)
+
+        case('color')
+            work(:,:,:,k) = mask(:,:,:,5)
 
         case('sponge')
             work(:,:,:,k) = mask(:,:,:,6)

@@ -1,27 +1,35 @@
-subroutine create_mask_tree(params, time, lgt_block, hvy_mask, &
+subroutine create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
     hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+
+    ! use module_physics_metamodule
+    ! use module_mesh
+    ! use module_forest
+    ! use module_params
+    ! use module_precision
+    ! use module_globals
     implicit none
 
     !> user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in)   :: params
     real(kind=rk), intent(in)           :: time
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
+    integer(kind=ik), intent(in)        :: hvy_active(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
+    integer(kind=ik), intent(in)        :: lgt_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)        :: hvy_n(:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
+    integer(kind=ik), intent(in)        :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)  :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)
 
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id
     real(kind=rk) :: x0(1:3), dx(1:3)
 
     Bs    = params%Bs
@@ -30,14 +38,25 @@ subroutine create_mask_tree(params, time, lgt_block, hvy_mask, &
     ! create "time-dependent-part" here, add the existing "time-independent-part"
     ! if it is available, return the complete mask incl. all parts
 
-    do k = 1, hvy_n
+    ! read in time-indepent
+    ! call read_field2tree(params, (/"chi_00.h5"/), 1, 2, tree_n, &
+    ! lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    ! hvy_mask, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    !
+    ! call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    !     hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
+
+    do k = 1, hvy_n(tree_ID_flow)
+        hvy_id = hvy_active(k, tree_ID_flow)
+
         ! convert given hvy_id to lgt_id for block spacing routine
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+        call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_mask(:,:,:,:,hvy_active(k)), &
-        "all-parts" )
+        call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
+        hvy_mask(:,:,:,:,hvy_id), "time-dependent-part" )
     enddo
 
 

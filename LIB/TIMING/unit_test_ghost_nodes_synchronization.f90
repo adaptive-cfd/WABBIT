@@ -12,7 +12,7 @@
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_tmp, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_n, lgt_n )
 
 
     implicit none
@@ -29,16 +29,16 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !> neighbor array (heavy data)
     integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: lgt_active(:)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: hvy_active(:)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:,:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:,:)
 
     ! number of active blocks (heavy data)
-    integer(kind=ik)                        :: hvy_n
+    integer(kind=ik), intent(inout)         :: hvy_n(:)
     ! number of active blocks (light data)
-    integer(kind=ik)                        :: lgt_n
+    integer(kind=ik), intent(inout)         :: lgt_n(:)
     ! loop variables
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
     ! process rank
@@ -136,9 +136,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! Fill the above constructed grid with the exact solution values
         !-----------------------------------------------------------------------
         ! loop over all active blocks
-        do k = 1, hvy_n
+        do k = 1, hvy_n(tree_ID_flow)
           ! hvy_id of the block we're looking at
-          hvy_id = hvy_active(k)
+          hvy_id = hvy_active(k,tree_ID_flow)
           ! light id of this block
           call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params%number_blocks )
           ! compute block spacing and origin from treecode
@@ -158,10 +158,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
           ! calculate f(x,y,z) for first datafield
           if ( params%dim == 3 ) then
             ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_id), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
           else
             ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
+            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_id), Bs, g, Lx, Ly, frequ(ifrequ)  )
           end if
 
         end do
@@ -174,7 +174,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)
@@ -184,9 +184,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         my_norm = 0.0_rk
 
         ! loop over all active blocks and compute their error
-        do k = 1, hvy_n
-          my_error = my_error + sqrt(sum((hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k),1))**2 ))
-          my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k),1))**2 ))
+        do k = 1, hvy_n(tree_ID_flow)
+          my_error = my_error + sqrt(sum((hvy_block(:,:,:,1,hvy_active(k,tree_ID_flow))-hvy_work(:,:,:,1,hvy_active(k,tree_ID_flow),1))**2 ))
+          my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k,tree_ID_flow),1))**2 ))
         end do
 
         ! synchronize errors

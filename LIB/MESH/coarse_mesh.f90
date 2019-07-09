@@ -10,7 +10,7 @@
 !!            subroutines
 ! ********************************************************************************************
 subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_active, hvy_n, hvy_tmp )
+    hvy_active, hvy_n )
     implicit none
 
     !> user defined parameter structure
@@ -29,8 +29,6 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_n
-    !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
 
     ! loop variables
     integer(kind=ik)                    :: k, maxtl, N, j

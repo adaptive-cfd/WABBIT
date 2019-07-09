@@ -55,6 +55,8 @@ contains
         rank = params%rank
         N = params%number_blocks
 
+        if (rank==0) write(*,'("Tree-pruning, before Nb=",i7)') lgt_n(tree_id)
+
         do k = 1, hvy_n(tree_id)
 
             hvy_id = hvy_active(k, tree_id)
@@ -72,6 +74,9 @@ contains
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
         hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+        if (rank==0) write(*,'("Tree-pruning, pruned to Nb=",i7)') lgt_n(tree_id)
+        ! do not call update_neighbors on the pruned tree..
     end subroutine
 
     subroutine add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
@@ -597,7 +602,7 @@ contains
             !! acts on a single block only
             t0 = MPI_Wtime()
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp,&
-            lgt_active(:,tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:, tree_id), hvy_n(tree_id), &
+            lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
             indicator, iteration, hvy_neighbor)
             call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
@@ -617,7 +622,7 @@ contains
             !> (d) adapt the mesh, i.e. actually merge blocks
             t0 = MPI_Wtime()
             call coarse_mesh( params, lgt_block, hvy_block, lgt_active(:,tree_id), lgt_n(tree_id), &
-            lgt_sortednumlist(:,:,tree_id),  hvy_active(:, tree_id), hvy_n(tree_id), hvy_tmp )
+            lgt_sortednumlist(:,:,tree_id),  hvy_active(:, tree_id), hvy_n(tree_id) )
             ! CPU timing (only in debug mode)
             call toc( "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 

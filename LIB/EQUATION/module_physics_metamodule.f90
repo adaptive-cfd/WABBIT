@@ -380,7 +380,7 @@ contains
     !-----------------------------------------------------------------------------
     ! main level wrapper for setting the initial condition on a block
     !-----------------------------------------------------------------------------
-    subroutine INICOND_meta( physics, time, u, g, x0, dx, mask, adapting)
+    subroutine INICOND_meta( physics, time, u, g, x0, dx)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -392,15 +392,6 @@ contains
         ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
-        !
-        ! Why do you need that here? to be able to adapt the initial grid to the mask.
-        real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
-
         ! as you are allowed to compute the RHS only in the interior of the field
         ! you also need to know where 'interior' starts: so we pass the number of ghost points
         integer, intent(in) :: g
@@ -409,12 +400,10 @@ contains
         ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
         real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-        ! are we still adapting the initial grid? (for ACM with VPM)
-        logical, intent(in) :: adapting
 
         select case (physics)
         case ("ACM-new")
-            call INICOND_ACM( time, u, g, x0, dx, mask, adapting)
+            call INICOND_ACM( time, u, g, x0, dx)
 
         case ("ConvDiff-new")
             call INICOND_ConvDiff( time, u, g, x0, dx )

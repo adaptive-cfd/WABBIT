@@ -42,20 +42,48 @@ subroutine sparse_to_dense(params)
 !-----------------------------------------------------------------------------------------------------
 
     call get_command_argument(2, file_in)
+    call get_command_argument(3, file_out)
+
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
-            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post 2D --sparse-to-dense source.h5 target.h5 target_treelevel order-predictor(2 or 4)"
+            write(*,*) "--------------------------------------------------------------"
+            write(*,*) "                SPARSE to DENSE "
+            write(*,*) "--------------------------------------------------------------"
+            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform"
+            write(*,*) "grid (up and downsampling ensured)."
+            write(*,*) "Command:"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --sparse-to-dense "
+            write(*,*) "source.h5 target.h5 [target_treelevel order-predictor(2 or 4)]"
+            write(*,*) "-------------------------------------------------------------"
+            write(*,*) "Optional Inputs: "
+            write(*,*) "  1. target_treelevel = number specifying the desired treelevel"
+            write(*,*) "  (default is the max treelevel of the source file) " 
+            write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
+            write(*,*) "  (default is preditor order 4) " 
+            write(*,*)
+            write(*,*)
         end if
         return
     end if
 
     ! get values from command line (filename and level for interpolation)
     call check_file_exists(trim(file_in))
-    call get_command_argument(3, file_out)
-    call get_command_argument(4, level_in)
-    read(level_in,*) level
-    call get_command_argument(5, order)
+    call read_attributes(file_in, lgt_n, time, iteration, &
+                         domain, Bs,tc_length, params%dim)
+
+    if (len_trim(file_out)==0) then
+      call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
+    endif
+    if (command_argument_count()<4) then
+      ! set defaults
+      order = "4"
+      level = tc_length
+    else
+      call get_command_argument(4, level_in)
+      read(level_in,*) level
+      call get_command_argument(5, order)
+    endif
+
     if (order == "4") then
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
@@ -75,11 +103,7 @@ subroutine sparse_to_dense(params)
     params%n_eqn  = 1
     params%block_distribution="sfc_hilbert"
 
-    ! read attributes from file. This is especially important for the number of
-    ! blocks the file contains: this will be the number of active blocks right
-    ! after reading.
-    call read_attributes(file_in, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
-    if (params%dim==3) then
+     if (params%dim==3) then
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
         max_neighbors = 74

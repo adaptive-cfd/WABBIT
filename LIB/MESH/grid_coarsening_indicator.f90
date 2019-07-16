@@ -44,13 +44,13 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
+    integer(kind=ik), intent(inout)     :: lgt_n
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
+    integer(kind=ik), intent(inout)     :: hvy_n
     !> how to choose blocks for refinement
     character(len=*), intent(in)        :: indicator
     !> coarsening iteration index. coarsening is done until the grid has reached
@@ -60,7 +60,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! local variables
     integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id
@@ -81,9 +81,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
 
     !> reset refinement status to "stay" on all blocks
-    !!!!!!!!!!!!!!!1 TODO: looop over hvy_n insteady of lgt_n ??
-    do k = 1, lgt_n(tree_ID_flow)
-        lgt_id = lgt_active(k, tree_ID_flow)
+    do k = 1, lgt_n
+        lgt_id = lgt_active(k)
         lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0
     enddo
 
@@ -98,8 +97,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         if (params%threshold_mask) call abort(2801191,"the combination threshold-vorticity & threshold-mask cannot work.")
 
         ! loop over my active hvy data
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k, tree_ID_flow)
+        do k = 1, hvy_n
+            hvy_id = hvy_active(k)
             ! get lgt id of block
             call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
@@ -113,7 +112,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         enddo
 
         ! note here we synch hvy_tmp (=vorticity) and not hvy_block
-        call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:3,:), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+        call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:3,:), hvy_neighbor, hvy_active, hvy_n )
     endif
 
     !---------------------------------------------------------------------------
@@ -133,19 +132,19 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         norm = 0.0_rk
         if (params%coarsening_indicator=="threshold-vorticity") then
             ! loop over my active hvy data
-            do k = 1, hvy_n(tree_ID_flow)
-                norm(1) = max(norm(1),  maxval(abs(hvy_tmp(:, :, :, 1, hvy_active(k,tree_ID_flow)))) )
+            do k = 1, hvy_n
+                norm(1) = max(norm(1),  maxval(abs(hvy_tmp(:, :, :, 1, hvy_active(k)))) )
             enddo
         else
-            do k = 1, hvy_n(tree_ID_flow)
+            do k = 1, hvy_n
                 ! call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
                 ! call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                 ! norm(1) = norm(1) + sum(hvy_block(:,:,:,1,hvy_active(k))**2)*dx(1)*dx(2)
 
                 ! max over velocities
-                norm(1) = max( norm(1), maxval(abs(hvy_block(:,:,:,1:neq-1,hvy_active(k,tree_ID_flow)))) )
+                norm(1) = max( norm(1), maxval(abs(hvy_block(:,:,:,1:neq-1,hvy_active(k)))) )
                 ! pressure
-                norm(neq) = max( norm(neq), maxval(abs(hvy_block(:,:,:,neq,hvy_active(k,tree_ID_flow)))) )
+                norm(neq) = max( norm(neq), maxval(abs(hvy_block(:,:,:,neq,hvy_active(k)))) )
             enddo
             ! isotropy: uz=uy=ux
             ! (last entry is pressure)
@@ -170,15 +169,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !> evaluate coarsing criterion on all blocks
     !---------------------------------------------------------------------------
     if (params%threshold_mask .and. present(hvy_mask)) then
-
-        ! create mask function at current time
-        call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
-
-
         ! loop over all my blocks
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k, tree_ID_flow)
+        do k = 1, hvy_n
+            hvy_id = hvy_active(k)
             ! get lgt id of block
             call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
@@ -192,11 +185,10 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
             hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
             lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_id))
         enddo
-
     else
         ! loop over all my blocks
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k, tree_ID_flow)
+        do k = 1, hvy_n
+            hvy_id = hvy_active(k)
             ! get lgt id of block
             call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
@@ -217,10 +209,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> force blocks on maximum refinement level to coarsen, if parameter is set
     !---------------------------------------------------------------------------
-    !!!!!!!!!!!!!!!1 TODO: looop over hvy_n insteady of lgt_n
     if (params%force_maxlevel_dealiasing) then
-        do k = 1, lgt_n(tree_ID_flow)
-            lgt_id = lgt_active(k,tree_ID_flow)
+        do k = 1, lgt_n
+            lgt_id = lgt_active(k)
             if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%max_treelevel) then
                 ! force blocks on maxlevel to coarsen
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1

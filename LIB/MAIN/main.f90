@@ -43,6 +43,7 @@ program main
     ! bridge implementation of wabbit
     use module_bridge_interface
     use module_forest
+    use module_mask
 
     implicit none
 
@@ -191,7 +192,8 @@ program main
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
         call unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, &
-        hvy_tmp, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_n, lgt_n )
+        hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+        lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_n(tree_ID_flow) )
     endif
 
     call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
@@ -398,8 +400,25 @@ program main
         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_mesh ) then
-            call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_mask )
+            ! some coarsening indicators require us to know the mask function (if
+            ! it is considered as secondary criterion, e.g.). Creating the mask is a high-level
+            ! routine that relies on forests and pruned trees, which are not available in the module_mesh.
+            ! Hence the mask is created here.
+            if (params%threshold_mask) then
+                ! create mask function at current time
+                call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
+                hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
+
+                ! actual coarsening (including the mask function)
+                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+                hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp, hvy_mask )
+            else
+                ! actual coarsening (no mask function is required)
+                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+                hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp )
+            endif
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)

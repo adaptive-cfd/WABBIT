@@ -229,7 +229,7 @@ contains
        pod_mode_tree_id = N_snapshots + i
        V(it,i) = scalar_product_two_trees( params, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
-                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,& 
+                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
                        it, pod_mode_tree_id, free_tree_id)
     enddo
   enddo
@@ -510,7 +510,7 @@ contains
     call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
               params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
     end do
-      
+
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
     !----------------------------------
@@ -583,7 +583,7 @@ contains
     !----------------------------------
     do tree_id = N_snapshots+1, N_snapshots + truncation_rank
       i = tree_id - N_snapshots
-      do j = 1, n_components 
+      do j = 1, n_components
         write( file_out, '("mode",i1,"_", i12.12, ".h5")') j, i
 
       call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
@@ -932,7 +932,7 @@ contains
     !----------------------------------
     ! set addtitional params
     !----------------------------------
-    ! number of components is the number of quantities saved in the 
+    ! number of components is the number of quantities saved in the
     ! statevector. Therefore we set:
     params%n_eqn = n_components
     ! block distirbution:
@@ -959,7 +959,7 @@ contains
     !--------------------------------
     ! in every txt-file there is a list
     ! of h5-files which contain the
-    ! statevector components of the 
+    ! statevector components of the
     ! POD modes
     !--------------------------------
     do i = 1, N_modes_used
@@ -986,7 +986,7 @@ contains
     enddo
 
     !--------------------------------
-    ! close the list of files 
+    ! close the list of files
     !--------------------------------
     do j = 1, n_components
       close(10+j)
@@ -1077,10 +1077,10 @@ contains
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
         !----------------------------------
-        ! Save components of reconstructed 
+        ! Save components of reconstructed
         ! Snapshot
         !----------------------------------
-        do j = 1, n_components 
+        do j = 1, n_components
           write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
           call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
             lgt_n, hvy_n, hvy_active, j, reconst_tree_id , real(iteration,kind=rk) , iteration )
@@ -1092,10 +1092,10 @@ contains
                      hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                      a_coefs, iteration , N_modes_used, reconst_tree_id, save_all)
       !----------------------------------
-      ! Save components of reconstructed 
+      ! Save components of reconstructed
       ! Snapshot
       !----------------------------------
-      do j = 1, n_components 
+      do j = 1, n_components
         write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
         call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
           lgt_n, hvy_n, hvy_active, j, reconst_tree_id ,real(iteration,kind=rk) , iteration )

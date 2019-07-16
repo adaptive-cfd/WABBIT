@@ -130,7 +130,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
     ! not available, the option is useless but can cause errors.
     if (params%threshold_mask .and. present(block_mask)) then
-        ! assuming block_work holds mask function
+        ! assuming block_mask holds mask function
         nnorm = 1.0_rk
         call threshold_block( params, block_mask(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )
 

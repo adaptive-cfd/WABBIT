@@ -10,7 +10,7 @@
 !!            subroutines
 ! ********************************************************************************************
 subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_active, hvy_n )
+    hvy_active, hvy_n, hvy_mask )
     implicit none
 
     !> user defined parameter structure
@@ -19,6 +19,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
@@ -97,7 +98,11 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     enddo
 
     ! actual xfer
-    call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block )
+    if (present(hvy_mask)) then
+        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask )
+    else
+        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block )
+    endif
 
     ! the active lists are outdates after the transfer: we need to create
     ! them or find_sisters will not be able to do its job

@@ -40,6 +40,7 @@ module module_IO
     use module_ini_files_parser_mpi
 
     use module_helpers, only : check_file_exists, block_contains_NaN
+    use module_mask
 
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -69,5 +70,6 @@ contains
     include "read_attributes.f90"
 
     include "read_file_flusi.f90"
+    include "forest_IO.f90"
 
 end module module_IO

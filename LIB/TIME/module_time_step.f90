@@ -35,6 +35,7 @@ module module_time_step
 
     use module_boundary_conditions, only: get_adjacent_boundary_surface_normal
 
+    use module_mask
 !---------------------------------------------------------------------------------------------
 ! variables
 

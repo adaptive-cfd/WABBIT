@@ -66,7 +66,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     logical, intent(in) :: adapt
 
     logical :: tmp
-    integer(kind=ik) :: lgt_n_old, k, iter
+    integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
@@ -80,8 +80,12 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
     endif
-    tmp = params%threshold_mask
-    params%threshold_mask =.true.
+
+    ! this is a HACK
+    if (params%physics_type == 'ACM-new') then
+        tmp = params%threshold_mask
+        params%threshold_mask =.true.
+    endif
 
     ! choose between reading from files and creating datafields analytically
     if (params%read_from_files) then
@@ -109,11 +113,25 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
-                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
+                lgt_n_tmp = -99
+                ! what happens on very coarse grids is that the first coarsening interation removes
+                ! the mask completely...
+                ! we therefore outsource the iteration loop here. (argument external_loop to
+                ! adapt_mesh)
+                do while ( lgt_n_tmp /= lgt_n(tree_ID_flow) )
+                    lgt_n_tmp = lgt_n(tree_ID_flow)
+
+                    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
+                    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
+
+                    call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+                    lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+                    params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
+                enddo
             else
-                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp)
+                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+                lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+                params%coarsening_indicator, hvy_tmp )
             endif
 
             iter = iter + 1
@@ -125,6 +143,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
             endif
         endif
 
+        ! HACK
         ! Navier stokes has different statevector (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) then
         ! the statevector saved to file (rho,u,v,p)
         ! we therefore convert it once here
@@ -173,11 +192,25 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                 ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                 ! interface is on the finest level).
                 if (present(hvy_mask) .and. params%threshold_mask) then
-                    call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                    lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_mask )
+                    lgt_n_tmp = -99
+                    ! what happens on very coarse grids is that the first coarsening interation removes
+                    ! the mask completely...
+                    ! we therefore outsource the iteration loop here. (argument external_loop to
+                    ! adapt_mesh)
+                    do while ( lgt_n_tmp /= lgt_n(tree_ID_flow) )
+                        lgt_n_tmp = lgt_n(tree_ID_flow)
+
+                        call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
+                        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
+
+                        call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+                        lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+                        params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
+                    enddo
                 else
-                    call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                    lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp)
+                    call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+                    lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+                    params%coarsening_indicator, hvy_tmp )
                 endif
 
                 iter = iter + 1
@@ -244,5 +277,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         write(*,'("Initial grid and initial condition terminated.")')
     endif
 
-    params%threshold_mask = tmp
+    ! HACK
+    if (params%physics_type == 'ACM-new') then
+        params%threshold_mask = tmp
+    endif
 end subroutine set_initial_grid

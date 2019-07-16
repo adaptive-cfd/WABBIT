@@ -18,7 +18,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! MPI parameter
     integer(kind=ik)   :: myrank, mpisize
     ! grid parameter
-    integer(kind=ik)   :: g, NdF, ii0, ii1
+    integer(kind=ik)   :: g, ii0, ii1
     integer(kind=ik), dimension(3) :: Bs
     ! loop variables
     integer(kind=ik)   :: N, k, neighborhood, level_diff
@@ -42,9 +42,12 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
+    if (size(hvy_block,4)>N_max_components) then
+        call abort(160720191,"You try to ghost-sync a vector with too many components.")
+    endif
+
     Bs    = params%Bs
     g     = params%n_ghosts
-    NdF   = params%n_eqn
     N     = params%number_blocks
     myrank  = params%rank
     mpisize = params%number_procs
@@ -84,7 +87,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         ! buffer at any time.
         call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
              recv_counter(:, istage), send_counter(:, istage), &
-             int_recv_counter(:, istage), int_send_counter(:, istage), INCLUDE_REDUNDANT, .false.)
+             int_recv_counter(:, istage), int_send_counter(:, istage), INCLUDE_REDUNDANT, .false., size(hvy_block,4))
 
         ! reset int_send_buffer, but only the parts that will actually be treated.
         do k = 1, params%number_procs
@@ -347,7 +350,9 @@ subroutine send_prepare_external_neighbor( params, neighbor_rank, istage, hvy_bl
 
     ! merged information of level diff and an indicator that we have a historic finer sender
     integer(kind=ik)   :: level_diff_indicator, buffer_size
-    integer(kind=ik)   :: ijk1(2,3)
+    integer(kind=ik)   :: ijk1(2,3), nc
+
+    nc = size(hvy_block,4)
 
     ! count the number of communications with this mpirank. from that number, the
     ! integer buffer length can be computed while MPI exchanging data
@@ -382,7 +387,7 @@ subroutine send_prepare_external_neighbor( params, neighbor_rank, istage, hvy_bl
         ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RESPRE)
 
         call GhostLayer2Line( params, line_buffer, buffer_size, &
-        res_pre_data( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) )
+        res_pre_data( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc) )
     end if
 
     ! the chunk of data is added to the MPI buffers (preparation for sending)
@@ -408,7 +413,9 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, neighb
 
     integer(kind=ik) :: l, hvy_id_receiver, neighborhood, level_diff_indicator, entrySortInRound
     integer(kind=ik) :: level_diff, bounds_type, buffer_position, buffer_size
-    integer(kind=ik) :: ijk1(2,3), i0
+    integer(kind=ik) :: ijk1(2,3), i0, nc
+
+    nc = size(hvy_block,4)
 
     ! did I recv something from this rank?
     if ( (communication_counter(neighbor_rank, istage_buffer) /= 0) ) then
@@ -449,22 +456,24 @@ subroutine unpack_all_ghostlayers_currentRound_external_neighbor( params, neighb
             if ( bounds_type == EXCLUDE_REDUNDANT ) then
 
                 ! extract INCLUDE_REDUNDANT in tmp block
-                call Line2GhostLayer2( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER), tmp_block )
+                call Line2GhostLayer2( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, &
+                INCLUDE_REDUNDANT, RECVER), tmp_block(:,:,:,1:nc) )
                 ! COPY ONLY_REDUNDANT from block
                 ijk1 = ijkGhosts( :, :, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
-                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) = &
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver)
+                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc) = &
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver)
 
                 ! copy everything to the block, INCLUDE_REDUNDANT
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc)
 
             else
                 ! for INCLUDE_REDUNDANT, just copy
-                call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RECVER), hvy_block, hvy_id_receiver )
+                call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RECVER), &
+                hvy_block, hvy_id_receiver )
             endif
 
 
@@ -491,12 +500,13 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
 
     integer(kind=ik) :: l, hvy_id_receiver, neighborhood, level_diff_indicator, entrySortInRound
     integer(kind=ik) :: sender_hvy_id, level_diff, bounds_type
-    integer(kind=ik) :: ijk1(2,3), ijk2(2,3)
+    integer(kind=ik) :: ijk1(2,3), ijk2(2,3), nc
 
 
     ! start index of this mpirank in the int_buffer
     l = sum(int_recv_counter(0:neighbor_rank-1-1, istage_buffer)) + 1
 
+    nc = size(hvy_block,4)
 
     do while ( int_send_buffer(l, istage_buffer) > -99 )
         ! unpack the description of the next data chunk
@@ -536,29 +546,29 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
                 ! ------- step (a) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
-                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) = &
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2),ijk1(1,3):ijk1(2,3), :, hvy_id_receiver)
+                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc) = &
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2),ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver)
 
                 ! ------- step (b) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
                 ijk2 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, SENDER)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :, sender_hvy_id)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), 1:nc, sender_hvy_id)
 
                 ! ------- step (c) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc)
 
             else
                 ! for INCLUDE_REDUNDANT, just copy the patch and be happy
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, RECVER)
                 ijk2 = ijkGhosts(:,:, neighborhood, level_diff, bounds_type, SENDER)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :, sender_hvy_id)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), 1:nc, sender_hvy_id)
             endif
 
         else  ! interpolation or restriction before inserting
@@ -577,33 +587,33 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
                 ! ------- step (a) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
-                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :) = &
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver)
+                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc) = &
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver)
 
                 ! ------- step (b) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
                 ijk2 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RESPRE)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                res_pre_data( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                res_pre_data( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), 1:nc)
 
                 ! ------- step (c) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc)
 
             else
                 ijk1 = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
                 ijk2 = ijkGhosts(:, :, neighborhood, level_diff, INCLUDE_REDUNDANT, RESPRE)
 
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), :, hvy_id_receiver ) = &
-                res_pre_data( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), :)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver ) = &
+                res_pre_data( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), 1:nc)
 
             endif
         end if
 
-        ! increase buffer postion marker
+        ! increase buffer position marker
         l = l + 5
     end do
 
@@ -835,7 +845,7 @@ subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
     buffer_counter = 0
 
     ! loop over all data fields
-    do dF = 1, params%n_eqn
+    do dF = 1, size(hvy_data,4)
         do k = 1, size(hvy_data, 3) ! third dimension, note: for 2D cases k is always 1
             do j = 1, size(hvy_data, 2)
                 do i = 1, size(hvy_data, 1)
@@ -871,7 +881,7 @@ subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id 
 
     buffer_i = 1
     ! loop over all data fields
-    do dF = 1, params%n_eqn
+    do dF = 1, size(hvy_block,4)
         do k = data_bounds(1,3), data_bounds(2,3) ! third dimension, note: for 2D cases k is always 1
             do j = data_bounds(1,2), data_bounds(2,2)
                 do i = data_bounds(1,1), data_bounds(2,1)
@@ -902,7 +912,7 @@ subroutine Line2GhostLayer2( params, line_buffer, data_bounds, hvy_block )
 
     buffer_i = 1
     ! loop over all data fields
-    do dF = 1, params%n_eqn
+    do dF = 1, size(hvy_block,4)
         do k = data_bounds(1,3), data_bounds(2,3) ! third dimension, note: for 2D cases k is always 1
             do j = data_bounds(1,2), data_bounds(2,2)
                 do i = data_bounds(1,1), data_bounds(2,1)
@@ -972,12 +982,6 @@ end subroutine AppendLineToBuffer
 
 subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_recv_buffer, new_recv_buffer, &
     communication_counter, istage )
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
 
     implicit none
 
@@ -1087,7 +1091,7 @@ end subroutine isend_irecv_data_2
 ! returns two lists with numbers of points I send to all other procs and how much I
 ! receive from each proc. note: strictly locally computed, NO MPI comm involved here
 subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active,&
-     hvy_n, recv_list, send_list, int_recv_list, int_send_list, bounds_type, count_internal)
+     hvy_n, recv_list, send_list, int_recv_list, int_send_list, bounds_type, count_internal, ncomponents)
 
     implicit none
 
@@ -1100,7 +1104,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n, bounds_type
+    integer(kind=ik), intent(in)        :: hvy_n, bounds_type, ncomponents
     integer(kind=ik), intent(inout)     :: recv_list(0:), send_list(0:)
     integer(kind=ik), intent(inout)     :: int_recv_list(0:), int_send_list(0:)
     logical, intent(in)                 :: count_internal
@@ -1177,6 +1181,6 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
 
 
     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
-    recv_list(:) = recv_list(:) * params%n_eqn
-    send_list(:) = send_list(:) * params%n_eqn
+    recv_list(:) = recv_list(:) * ncomponents
+    send_list(:) = send_list(:) * ncomponents
 end subroutine get_my_sendrecv_amount_with_ranks

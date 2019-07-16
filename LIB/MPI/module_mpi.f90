@@ -45,6 +45,8 @@ module module_MPI
     ! In order not to send ALL data in both stages, we allocate one buffer for each stage.
     integer(kind=ik) :: Nstages = 2
 
+    integer(kind=ik) :: N_max_components
+
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
@@ -140,7 +142,8 @@ subroutine init_ghost_nodes( params )
         number_blocks   = params%number_blocks
         Bs              = params%Bs
         g               = params%n_ghosts
-        Neqn            = params%n_eqn
+        Neqn            = params%n_eqn+2
+        N_max_components = Neqn
         rank            = params%rank
         Ncpu            = params%number_procs
 

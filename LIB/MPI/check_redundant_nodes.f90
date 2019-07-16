@@ -71,7 +71,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     ! but this routine is meant for testing, not production.
     call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
     recv_counter(:, stage), send_counter(:, stage), &
-    int_recv_counter(:, stage), int_send_counter(:, stage), INCLUDE_REDUNDANT, .true.)
+    int_recv_counter(:, stage), int_send_counter(:, stage), INCLUDE_REDUNDANT, .true., size(hvy_block,4))
 
 
     ! reset int_send_buffer, but only the parts that will actually be treated.
@@ -240,7 +240,7 @@ subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_s
 !---------------------------------------------------------------------------------------------
 ! main body
     ! loop over all data fields
-    do dF = 1, params%n_eqn
+    do dF = 1, size(hvy_block,4)
         ! third dimension, note: for 2D cases k is always 1
         do k = ijk(1,3), ijk(2,3)
             ! second dimension

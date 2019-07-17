@@ -74,6 +74,8 @@ subroutine sparse_to_dense(params)
     if (len_trim(file_out)==0) then
       call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
+    
+    ! check if optional arguments are specified
     if (command_argument_count()<4) then
       ! set defaults
       order = "4"

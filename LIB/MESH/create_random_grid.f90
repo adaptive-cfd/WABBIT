@@ -58,14 +58,16 @@ subroutine create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, 
     do l = 1, iterations
         if (params%rank==0 .and. verbosity) then
             write(*,'("RANDOM GRID GENERATION: iteration ",i1," active=",i4," Jmin=",i2," Jmax=",i2)') &
-            l, lgt_n, min_active_level( lgt_block, lgt_active, lgt_n ), max_active_level( lgt_block, lgt_active, lgt_n )
+            l, lgt_n, &
+            min_active_level( lgt_block, lgt_active, lgt_n ), &
+            max_active_level( lgt_block, lgt_active, lgt_n )
         endif
 
-        ! refine some blocks
+        ! randomly refine some blocks
         call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
              lgt_sortednumlist, hvy_active, hvy_n, "random" )
 
-        ! random adapt some blocks
+        ! randomly coarsen some blocks
         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
              lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "random", hvy_tmp )
     end do

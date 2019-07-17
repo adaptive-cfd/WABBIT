@@ -12,7 +12,7 @@
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_tmp, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist )
+    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_n, lgt_n )
 
 
     implicit none
@@ -36,9 +36,9 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
 
     ! number of active blocks (heavy data)
-    integer(kind=ik)                        :: hvy_n
+    integer(kind=ik), intent(inout)         :: hvy_n
     ! number of active blocks (light data)
-    integer(kind=ik)                        :: lgt_n
+    integer(kind=ik), intent(inout)         :: lgt_n
     ! loop variables
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
     ! process rank
@@ -158,10 +158,10 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
           ! calculate f(x,y,z) for first datafield
           if ( params%dim == 3 ) then
             ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_active(k)), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
+            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_id), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
           else
             ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_active(k)), Bs, g, Lx, Ly, frequ(ifrequ)  )
+            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_id), Bs, g, Lx, Ly, frequ(ifrequ)  )
           end if
 
         end do

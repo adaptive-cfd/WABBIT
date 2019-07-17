@@ -82,9 +82,14 @@ program main_post
 
     case("--mult-mask")
         call mult_mask(params)
-
+        
+    !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
     case("--mean")
-        call post_mean(params)
+        call post_mean(params) 
+
+    ! average of multiple snapshots the result is the averaged snapshot
+    case("--average")
+        call post_average_snapshots(params) 
 
     case("--sparse-to-dense")
         call sparse_to_dense(params)
@@ -133,6 +138,8 @@ program main_post
             write(*,*) "--POD-reconstruct"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
+            write(*,*) "--post_rhs"
+            write(*,*) "--average"
 
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"

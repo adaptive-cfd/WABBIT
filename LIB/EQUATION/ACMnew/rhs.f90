@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
+subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -32,18 +32,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
-    ! While the state vector and many work variables (such as the mask function for penalization)
-    ! are explicitly time dependent, some other quantities are not. They are rather grid-dependent
-    ! but need not to be updated in every RK or krylov substep. Hence, those quantities are updated
-    ! after the mesh is changed (i.e. after refine_mesh) and then kept constant during the evolution
-    ! time step.
-    ! An example for such a quantity would be geometry factors on non-cartesian grids, but also the
-    ! body of an insect in tethered (=fixed) flight. In the latter example, only the wings need to be
-    ! generated at every time t. This example generalizes to any combination of stationary and moving
-    ! obstacle, i.e. insect behind fractal tree.
-    ! Updating those grid-depend quantities is a task for the physics modules: they should provide interfaces,
-    ! if they require such qantities. In many cases, the grid_qtys are probably not used.
-    real(kind=rk), intent(in) :: grid_qty(1:,1:,1:,1:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
 
 
     ! local variables
@@ -149,11 +143,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, grid_qty, stage )
         if (params_acm%dim == 2) then
             ! this is a 2d case (ux,uy,p)
             call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
-                 time, rhs(:,:,1,:), grid_qty(:,:,1,:))
+                 time, rhs(:,:,1,:), mask(:,:,1,:))
 
         else
             ! this is a 3d case (ux,uy,uz,p)
-            call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, grid_qty)
+            call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
 
         endif
 
@@ -170,27 +164,7 @@ end subroutine RHS_ACM
 
 
 
-
-
-
-!> \file
-!> \brief Right hand side for 2D artificial compressibility equations
-!>        ---------------------------------------------
-!> The right hand side for the artificial compressibility equations reads:
-!>\f{eqnarray*}{
-!! \partial_t u &=& -u \nabla \cdot u - \nu \nabla^2 u +  \frac{1}{\rho} \nabla p - \chi \frac{1}{C_\eta} (u-u_s)  \\
-!! \partial_t p &=& -c_0^2 \nabla \cdot u - \gamma p
-!!\f}
-!> \version 0.5
-!> \version  27/06/17 - create
-!!
-!> \author sm, engels
-!--------------------------------------------------------------------------------------------
-
-subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_qty)
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
+subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
     implicit none
 
@@ -202,16 +176,17 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:)
-    real(kind=rk), intent(in)               :: grid_qty(:,:,:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(in)               :: mask(:,:,:)
     !> discretization order
     character(len=80), intent(in)           :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 
-    !> mask term for every grid point in this block
-    real(kind=rk), allocatable, save :: mask(:, :), sponge(:, :)
-    !> velocity of the solid
-    real(kind=rk), allocatable, save :: us(:, :, :)
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
     !>
@@ -224,11 +199,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     real(kind=rk) :: a(-3:3)
     real(kind=rk) :: b(-2:2)
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
-    if (.not. allocated(sponge)) allocate(sponge(1:Bs(1)+2*g, 1:Bs(2)+2*g))
-    if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g))
-    if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:2))
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -257,16 +227,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
         call abort(887, "ACM: meanflow out of bounds")
     endif
 
-!---------------------------------------------------------------------------------------------
-! main body
 
-    if (params_acm%penalization) then
-        ! create mask term for every grid point in this block
-        call create_mask_2D(time, x0, dx, Bs, g, mask, us)
-    else
-        mask   = 0.0_rk
-        us     = 0.0_rk
-    end if
 
 
     if (order_discretization == "FD_2nd_central" ) then
@@ -291,8 +252,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
                 div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy) * eps_inv * (phi(ix,iy,1) -us(ix,iy,1))
-                penaly = -mask(ix,iy) * eps_inv * (phi(ix,iy,2) -us(ix,iy,2))
+                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                 ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
                 rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
@@ -337,8 +298,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
                 div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy)*eps_inv*(phi(ix,iy,1)-us(ix,iy,1))
-                penaly = -mask(ix,iy)*eps_inv*(phi(ix,iy,2)-us(ix,iy,2))
+                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                 rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                 rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -413,8 +374,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
-        ! create the mask for the sponge on this block
-!        call sponge_2D(sponge, x0, dx, Bs, g)
+       !  ! create the mask for the sponge on this block
+       ! call sponge_2D(sponge, x0, dx, Bs, g)
 
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
@@ -423,7 +384,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
             do ix = g+1, Bs(1)+g
                 ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                 ! which is different from the penalization term, which acts only on ux,uy and not p
-                spo = grid_qty(ix,iy,IDX_SPONGE) * eps_inv
+                spo = mask(ix,iy,6) * eps_inv
 
                 rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
                 rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
@@ -438,7 +399,7 @@ end subroutine RHS_2D_acm
 
 
 
-subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_qty)
+subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     implicit none
 
     !> grid parameter
@@ -449,19 +410,18 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:,:)
-    real(kind=rk), intent(in)               :: grid_qty(:,:,:,:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
     character(len=80), intent(in)           :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 
-    !> temporary, persistent arrays
-    !> mask term for every grid point in this block
-    real(kind=rk), allocatable, save :: mask(:, :, :), sponge(:, :, :)
-    !> velocity of the solid
-    real(kind=rk), allocatable, save :: us(:, :, :, :)
 
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
 
@@ -472,7 +432,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     real(kind=rk) :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
-                     p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p
+                     p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi
     !> loop variables
     integer(kind=rk) :: ix, iy, iz
     !> coefficients for Tam&Webb
@@ -480,15 +440,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     ! 4th order coefficients for second derivative
     real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-    if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-    if (.not. allocated(sponge)) allocate(sponge(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-    if (.not. allocated(mask)) allocate(mask(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-    if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -509,16 +460,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
 
 !---------------------------------------------------------------------------------------------
 ! main body
-
-    if (params_acm%penalization) then
-        ! create mask term for every grid point in this block
-        call create_mask_3D(time, x0, dx, Bs, g, mask, mask_color, us, grid_qty=grid_qty)
-        mask = mask * eps_inv
-    else
-        ! note setting zero is required if params_acm%penalization = .false.
-        mask = 0.0_rk
-        us   = 0.0_rk
-    end if
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -564,9 +505,10 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
                     w = phi(ix, iy, iz, 3)
                     p = phi(ix, iy, iz, 4)
 
-                    penalx = -mask(ix,iy,iz) * (u - us(ix,iy,iz,1))
-                    penaly = -mask(ix,iy,iz) * (v - us(ix,iy,iz,2))
-                    penalz = -mask(ix,iy,iz) * (w - us(ix,iy,iz,3))
+                    chi = mask(ix,iy,iz,1) * eps_inv
+                    penalx = -chi * (u - mask(ix,iy,iz,2))
+                    penaly = -chi * (v - mask(ix,iy,iz,3))
+                    penalz = -chi * (w - mask(ix,iy,iz,4))
 
                     rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
                     rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
@@ -642,9 +584,10 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
                     w = phi(ix, iy, iz, 3)
                     p = phi(ix, iy, iz, 4)
 
-                    penalx = -mask(ix,iy,iz) * (u - us(ix,iy,iz,1))
-                    penaly = -mask(ix,iy,iz) * (v - us(ix,iy,iz,2))
-                    penalz = -mask(ix,iy,iz) * (w - us(ix,iy,iz,3))
+                    chi = mask(ix,iy,iz,1) * eps_inv
+                    penalx = -chi * (u - mask(ix,iy,iz,2))
+                    penaly = -chi * (v - mask(ix,iy,iz,3))
+                    penalz = -chi * (w - mask(ix,iy,iz,4))
 
                     rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
                     rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
@@ -676,10 +619,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
         ! create the mask for the sponge on this block
-!        call sponge_3D(sponge, x0, dx, Bs, g)
-
-        ! NOTE: as of 14/12/2018 the sponge mask is generated in the grid qtys
-        ! because it is generally time-independent.
+       ! call sponge_3D(sponge, x0, dx, Bs, g)
 
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
@@ -690,7 +630,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, grid_
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
                     ! NOTE: sponge mask set in grid_qty
-                    spo = grid_qty(ix,iy,iz,IDX_SPONGE) * eps_inv
+                    spo = mask(ix,iy,iz,6) * eps_inv
 
                     rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * spo
                     rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * spo

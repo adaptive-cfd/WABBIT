@@ -37,7 +37,6 @@ subroutine post_mean(params)
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
 
-
     real(kind=rk)    :: x,y,z
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
@@ -120,7 +119,7 @@ subroutine post_mean(params)
         write(*,*) "Computed mean value is: ", meani
         write(*,*) "Computed integral value is: ", meani*product(domain)
 
-	! write volume integral to disk
+        ! write volume integral to disk
         call get_command_argument(3,fname_out)
         open(14,file=fname_out, status='replace')
         write(14,*) meani*product(domain)

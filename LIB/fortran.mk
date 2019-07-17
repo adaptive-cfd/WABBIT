@@ -6,7 +6,7 @@ proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_t
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
 startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
-post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90
+post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -20,7 +20,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 module_forest.f90 \
-	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90
+	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90 module_mask.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -192,6 +192,10 @@ $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJD
 $(OBJDIR)/module_pipe_flow.o: module_pipe_flow.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_mask.o: module_mask.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_physics_metamodule.o \
+	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_forest.o $(OBJDIR)/module_params.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -209,7 +213,7 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR
 		$(OBJDIR)/module_navier_stokes_params.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 update_grid_qtys_ACM.f90 \
+$(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -235,7 +239,7 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o \
+	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mask.o \
 	set_initial_grid.f90 set_inicond_blocks.f90 get_inicond_from_file.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -247,7 +251,7 @@ $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_mpi.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	calculate_time_step.f90 time_stepper.f90 set_RK_input.f90 RHS_wrapper.f90 final_stage_RK.f90 \
-	statistics_wrapper.f90 filter_wrapper.f90 krylov.f90 update_grid_qtys.f90 $(OBJDIR)/module_boundary_conditions.o
+	statistics_wrapper.f90 filter_wrapper.f90 krylov.f90 $(OBJDIR)/module_boundary_conditions.o $(OBJDIR)/module_mask.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
@@ -280,8 +284,8 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o get_nei
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
-	save_data.f90 write_field.f90 read_field.f90 \
-	read_mesh.f90 read_attributes.f90 read_file_flusi.f90
+	save_data.f90 write_field.f90 read_field.f90 forest_IO.f90 \
+	read_mesh.f90 read_attributes.f90 read_file_flusi.f90 $(OBJDIR)/module_mask.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
@@ -292,9 +296,13 @@ $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/modul
 	$(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_forest.o: module_forest.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_IO.o \
+$(OBJDIR)/module_forest.o: module_forest.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+# $(OBJDIR)/create_mask_tree.o: create_mask_tree.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_physics_metamodule.o \
+# 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_forest.o $(OBJDIR)/module_globals.o
+# 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MOR.o: module_MOR.f90 $(OBJDIR)/module_forest.o $(OBJDIR)/module_IO.o \
 	$(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o

@@ -22,8 +22,8 @@
 !! \n
 !! 29/05/2018 create
 ! ********************************************************************************************
-subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-  hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_gridQ)
+subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
   !---------------------------------------------------------------------------------------------
   ! modules
     use module_indicators
@@ -38,8 +38,11 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> grid-dependend qtys (mask, geometry factors..)
-    real(kind=rk), intent(in), optional :: hvy_gridQ(:, :, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
     !> number of active blocks (light data)
@@ -56,9 +59,11 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=ik), intent(in)        :: iteration
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), tmp(1:params%n_eqn)
@@ -77,7 +82,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n
-        lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
+        lgt_id = lgt_active(k)
+        lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0
     enddo
 
     !---------------------------------------------------------------------------
@@ -92,16 +98,17 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
         ! loop over my active hvy data
         do k = 1, hvy_n
+            hvy_id = hvy_active(k)
             ! get lgt id of block
-            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
             ! some indicators may depend on the grid (e.g. to compute the vorticity), hence
             ! we pass the spacing and origin of the block
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
             ! actual computation of vorticity on the block
-            call compute_vorticity( hvy_block(:,:,:,1,hvy_active(k)), hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)), &
-            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_active(k)) )
+            call compute_vorticity( hvy_block(:,:,:,1,hvy_id), hvy_block(:,:,:,2,hvy_id), hvy_block(:,:,:,3,hvy_id), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_id) )
         enddo
 
         ! note here we synch hvy_tmp (=vorticity) and not hvy_block
@@ -161,59 +168,53 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> evaluate coarsing criterion on all blocks
     !---------------------------------------------------------------------------
-    if (params%threshold_mask) then
-        ! allocate work blocks (this is not the full grid and very little memory)
-        if (.not. allocated(mask_color)) allocate(mask_color(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3)))
-        if (.not. allocated(us)) allocate(us(size(hvy_block,1),size(hvy_block,2),size(hvy_block,3), 1:params%dim))
+    if (params%threshold_mask .and. present(hvy_mask)) then
+        ! loop over all my blocks
+        do k = 1, hvy_n
+            hvy_id = hvy_active(k)
+            ! get lgt id of block
+            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-        ! if additional mask thresholding is used, we have to create the mask
-        ! function here. First: initializations of routines. (right now, this is only useful for insects)
-        if (present(hvy_gridQ)) then
-            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
-            mask_color, us, "init_stage", hvy_gridQ(:,:,:,:,hvy_active(1)) )
-        else
-            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(1)), &
-            mask_color, us, "init_stage" )
-        endif
+            ! some indicators may depend on the grid, hence
+            ! we pass the spacing and origin of the block (as we have to compute vorticity
+            ! here, this can actually be omitted.)
+            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+            ! evaluate the criterion on this block.
+            call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
+            hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
+            lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_id))
+        enddo
+    else
+        ! loop over all my blocks
+        do k = 1, hvy_n
+            hvy_id = hvy_active(k)
+            ! get lgt id of block
+            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+            ! some indicators may depend on the grid, hence
+            ! we pass the spacing and origin of the block (as we have to compute vorticity
+            ! here, this can actually be omitted.)
+            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+            ! evaluate the criterion on this block.
+            call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
+            hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
+            lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm)
+        enddo
     endif
 
 
-    ! loop over all my blocks
-    do k = 1, hvy_n
-        ! get lgt id of block
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-
-        ! some indicators may depend on the grid, hence
-        ! we pass the spacing and origin of the block (as we have to compute vorticity
-        ! here, this can actually be omitted.)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-        if (params%threshold_mask) then
-            ! if additional mask thresholding is used, we have to create the mask
-            ! function here (in hvy_tmp)
-            if (present(hvy_gridQ)) then
-                call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(k)), &
-                mask_color, us, "main_stage", hvy_gridQ(:,:,:,:,hvy_active(k)) )
-            else
-                call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_tmp(:,:,:,1,hvy_active(k)), &
-                mask_color, us, "main_stage" )
-            endif
-        endif
-
-        ! evaluate the criterion on this block.
-        call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_active(k)), &
-        hvy_tmp(:,:,:,1:neq,hvy_active(k)), dx, x0, indicator, iteration, &
-        lgt_block(lgt_id, Jmax + idx_refine_sts), norm )
-    enddo
 
     !---------------------------------------------------------------------------
     !> force blocks on maximum refinement level to coarsen, if parameter is set
     !---------------------------------------------------------------------------
     if (params%force_maxlevel_dealiasing) then
         do k = 1, lgt_n
-            if (lgt_block(lgt_active(k), Jmax + IDX_MESH_LVL) == params%max_treelevel) then
+            lgt_id = lgt_active(k)
+            if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%max_treelevel) then
                 ! force blocks on maxlevel to coarsen
-                lgt_block(lgt_active(k), Jmax + idx_refine_sts) = -1
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
             endif
         enddo
     endif

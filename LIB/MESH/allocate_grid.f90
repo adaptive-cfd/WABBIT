@@ -1,5 +1,5 @@
 subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ)
+    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask)
 
     implicit none
 
@@ -11,8 +11,11 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering etc (work array)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_tmp(:, :, :, :, :)
-    !> grid qtys (qtys that do depend only on the grid, i.e. mask funciton and geometry factors)
-    real(kind=rk), allocatable, optional, intent(out)   :: hvy_gridQ(:, :, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
     !> neighbor array (heavy data)
@@ -107,9 +110,9 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
-                    ! hvy_gridQ
-                    if ( present(hvy_gridQ) ) then
-                        mem_per_block = mem_per_block + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                    ! hvy_mask
+                    if ( present(hvy_mask) ) then
+                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
                     ! hvy_tmp
@@ -128,9 +131,9 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
-                    ! hvy_gridQ
-                    if ( present(hvy_gridQ) ) then
-                        mem_per_block = mem_per_block + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                    ! hvy_mask
+                    if ( present(hvy_mask) ) then
+                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 
                     ! hvy_tmp
@@ -199,11 +202,11 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         endif
     endif
 
-    if ( present(hvy_gridQ) .and. params%n_gridQ > 0 ) then
-        allocate( hvy_gridQ( nx, ny, nz, params%n_gridQ, params%number_blocks )  )
+    if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
+        allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_gridQ", product(real(shape(hvy_gridQ)))*8.0e-9, shape(hvy_gridQ)
+            "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
         endif
     endif
 
@@ -273,7 +276,7 @@ end subroutine allocate_tree
 !-------------------------------------------------------------------------------
 
 subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_gridQ, hvy_n, lgt_n)
+    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n)
     implicit none
 
     !> user defined parameter structure
@@ -284,8 +287,12 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering etc (work array)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_tmp(:, :, :, :, :)
-    !> grid qtys (qtys that do depend only on the grid, i.e. mask funciton and geometry factors)
-    real(kind=rk), allocatable, optional, intent(out)   :: hvy_gridQ(:, :, :, :, :)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
     !> neighbor array (heavy data)
@@ -378,9 +385,9 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
                     + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
-                    ! hvy_gridQ
-                    if ( present(hvy_gridQ) ) then
-                        mem_per_block = mem_per_block + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                    ! hvy_mask
+                    if ( present(hvy_mask) ) then
+                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
                     ! hvy_tmp
@@ -399,9 +406,9 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
                     + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
-                    ! hvy_gridQ
-                    if ( present(hvy_gridQ) ) then
-                        mem_per_block = mem_per_block + real(params%n_gridQ) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                    ! hvy_mask
+                    if ( present(hvy_mask) ) then
+                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 
                     ! hvy_tmp
@@ -470,11 +477,11 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         endif
     endif
 
-    if ( present(hvy_gridQ) .and. params%n_gridQ > 0 ) then
-        allocate( hvy_gridQ( nx, ny, nz, params%n_gridQ, params%number_blocks )  )
+    if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
+        allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_gridQ", product(real(shape(hvy_gridQ)))*8.0e-9, shape(hvy_gridQ)
+            "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
         endif
     endif
 

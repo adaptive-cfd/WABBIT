@@ -48,19 +48,13 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neigh
 
     call reset_lgt_data(lgt_block, lgt_active, params%max_treelevel, lgt_n, lgt_sortednumlist)
 
-
-    ! reset data
-    ! hvy_block = 9.99e99_rk ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
-    ! hvy_work = 9.99e99_rk
-    ! hvy_tmp =  9.99e99_rk
-
-    hvy_neighbor = -1
     ! as the grid has changed (we deleted it here), we now update the heavy and light
     ! active lists
     ! update list of sorted nunmerical treecodes, used for finding blocks
     ! set number of active blocks to maximum number, to reset everything
     lgt_n = size(lgt_active,1)
     hvy_n = size(hvy_active,1)
+
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
          hvy_n, lgt_sortednumlist )
 
@@ -72,7 +66,7 @@ end subroutine reset_grid
 !> Resets the light data. After calling this function
 !> only one tree is left in the forest, and all blocks are inactive with
 !> refinement status 0
-subroutine reset_lgt_data(lgt_block, lgt_active,max_treelevel, lgt_n, lgt_sortednumlist)
+subroutine reset_lgt_data(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sortednumlist)
 
     implicit none
 

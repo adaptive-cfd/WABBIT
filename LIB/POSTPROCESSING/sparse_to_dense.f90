@@ -181,7 +181,7 @@ subroutine sparse_to_dense(params)
         lgt_sortednumlist, hvy_active, hvy_n )
 
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, hvy_tmp)
+        hvy_active, hvy_n)
 
         call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n)

@@ -62,6 +62,10 @@ subroutine ini_file_to_params( params, filename )
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
+    ! which physics module is used? (note that the initialization of different parameters takes
+    ! place in those modules, i.e., they are not read here.)
+    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
+
     call ini_domain(params, FILE )
     call ini_blocks(params,FILE)
     call ini_time(params,FILE)
@@ -236,7 +240,7 @@ end subroutine ini_file_to_params
     ! read number_block_nodes
     params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
 
-    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 2 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )

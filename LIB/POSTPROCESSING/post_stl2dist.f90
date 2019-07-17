@@ -25,7 +25,6 @@ subroutine post_stl2dist(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
-    real(kind=rk), allocatable         :: hvy_gridQ(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
@@ -91,7 +90,7 @@ subroutine post_stl2dist(params)
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, fname_ini )
     ! have the pysics module read their own parameters
-    call init_physics_modules( params, fname_ini, params%n_gridQ  )
+    call init_physics_modules( params, fname_ini, params%N_mask_components  )
 
     !
     params%n_eqn = 1

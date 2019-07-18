@@ -181,9 +181,9 @@ subroutine flusi_to_wabbit(params)
     hvy_active, lgt_sortednumlist)
 
     ! create an equidistant grid (order of light id is important!)
-    call create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor,&
+    call create_equidistant_grid( params, lgt_block, hvy_neighbor,&
     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
-    params%max_treelevel, .true.)
+    params%max_treelevel, .true., tree_ID=1)
 
     ! read the field from flusi file and organize it in WABBITs blocks
     call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&

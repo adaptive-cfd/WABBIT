@@ -9,7 +9,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
@@ -18,15 +18,15 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:, :)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:,:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n(:)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n(:)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------------------

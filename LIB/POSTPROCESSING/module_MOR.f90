@@ -507,7 +507,7 @@ contains
 
     !>\todo as soon as WABBIT has new lgt structure reset lgt for all trees!
     do tree_id = 1, fsize
-    call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
+    call reset_forest(lgt_block, lgt_active(:, tree_id), &
               params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
     end do
 
@@ -1008,7 +1008,7 @@ contains
 
 
     do tree_id = 1, fsize
-    call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
+    call reset_forest(lgt_block, lgt_active(:, tree_id), &
               params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
     enddo
     hvy_neighbor = -1

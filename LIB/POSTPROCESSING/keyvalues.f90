@@ -87,8 +87,8 @@ subroutine keyvalues(fname, params)
     call read_field(fname, 1, params, hvy_block, hvy_n )
 
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n)
-        
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
     if (dim==2) Bs(3)=1
@@ -103,7 +103,7 @@ subroutine keyvalues(fname, params)
         params%block_distribution=trim(curves(i))
 
         call balance_load(params, lgt_block, hvy_block, hvy_neighbor, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
 
 
         call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &

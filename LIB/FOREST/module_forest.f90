@@ -49,25 +49,49 @@ contains
         integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
         integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
 
-        integer(kind=ik) :: k, lgt_id, hvy_id, rank, N
+        integer(kind=ik) :: k, lgt_id, hvy_id, rank, N, g ,Bs(3)
 
         rank = params%rank
         N = params%number_blocks
+        g = params%n_ghosts
+        Bs = params%Bs
+
 
         if (rank==0) write(*,'("Tree-pruning, before Nb=",i7)') lgt_n(tree_id)
 
-        do k = 1, hvy_n(tree_id)
+        if (params%dim == 3) then
+            do k = 1, hvy_n(tree_id)
+                hvy_id = hvy_active(k, tree_id)
+                call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
 
-            hvy_id = hvy_active(k, tree_id)
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
+                ! pruning condition: all entries of the block are small
+                if (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk) ) then
+                    ! pruning: delete the block from the tree
+                    lgt_block(lgt_id, :) = -1_ik
+                endif
+                ! if ( (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk)) .and. &
+                ! (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6, hvy_id) > 0.0_rk))) then
+                !     ! pruning: delete the block from the tree
+                !     lgt_block(lgt_id, :) = -1_ik
+                ! endif
+            end do
+        else
+            do k = 1, hvy_n(tree_id)
+                hvy_id = hvy_active(k, tree_id)
+                call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
 
-            ! pruning condition: all entries of the block are small
-            if ( all( (hvy_block(:,:,:,1,hvy_id)<=1.0e-6)) ) then
-                ! pruning: delete the block from the tree
-                lgt_block(lgt_id, :) = -1_ik
-            endif
-
-        end do
+                ! pruning condition: all entries of the block are small
+                if ( .not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk) ) then
+                    ! pruning: delete the block from the tree
+                    lgt_block(lgt_id, :) = -1_ik
+                endif
+                ! if ( (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk)) .and. &
+                ! (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6, hvy_id) > 0.0_rk)) ) then
+                !     ! pruning: delete the block from the tree
+                !     lgt_block(lgt_id, :) = -1_ik
+                ! endif
+            end do
+        endif
 
         call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
@@ -78,6 +102,163 @@ contains
         ! do not call update_neighbors on the pruned tree..
     end subroutine
 
+!---------------------------------------------------------------------------------
+
+    ! subroutine add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    !     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned, tree_id_full)
+    !     implicit none
+    !     !-----------------------------------------------------------------
+    !     type (type_params), intent(in) :: params   !< params structure
+    !     integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+    !     integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
+    !     integer(kind=ik), intent(in)      :: tree_id_pruned, tree_id_full
+    !     integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
+    !     integer(kind=ik), intent(inout)   :: lgt_block(:, :)  !< light data array
+    !     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    !     integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
+    !     integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
+    !     integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
+    !
+    !     integer(kind=ik) :: k, lgt_id, Jmax, hvy_id, rank, N, fsize, i
+    !     integer(kind=ik) :: lgt_id1, lgt_id2, hvy_id1, hvy_id2
+    !     integer(kind=ik) :: level1, level2, rank_pruned, rank_full, n_comm
+    !     logical :: exists
+    !     integer(kind=ik), allocatable, save :: comm_list(:,:)
+    !     integer(kind=tsize) :: treecode1, treecode2
+    !
+    !     fsize = params%forest_size
+    !     Jmax = params%max_treelevel ! max treelevel
+    !     rank = params%rank
+    !     N = params%number_blocks
+    !
+    !     ! NOTES:
+    !     !   We assume that the pruned tree is on JMAX (rhs level) and we assume that
+    !     !   the full one is not finer, only coarser.
+    !
+    !     if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
+    !
+    !     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, &
+    !     hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    !
+    !     ! a pruned tree has fewer entries: loop over it instead of the other one?
+    !     ! if you find a block in the full tree -> well then that's good, copy.
+    !     ! else: the target grid is either refined or coarsened at this position.
+    !
+    !     ! Step 1: XFER. we look for blocks that exist in both pruned and full tree and
+    !     ! if they are on different mpiranks, we xfer the pruned trees block to the rank
+    !     ! holding the corresponding full trees block.
+    !
+    !     ! Step 1a: prepare for xfer, gather all required xfers
+    !     n_comm = 0
+    !     do k = 1, lgt_n(tree_id_pruned)
+    !
+    !         lgt_id1 = lgt_active(k, tree_id_pruned)
+    !         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+    !
+    !         ! does the block from the pruned tree exist in the full one?
+    !         call does_block_exist( lgt_block(lgt_id1, 1:level1), exists, lgt_id2, &
+    !         lgt_sortednumlist(:,:,tree_id_full), lgt_n(tree_id_full), tree_id_full)
+    !
+    !         if (exists) then
+    !             ! we found the pruned trees block in the full tree : we happily copy
+    !             ! its heavy data
+    !
+    !             ! now check on which CPU this block is currently
+    !             call lgt_id_to_proc_rank( rank_pruned, lgt_id1, N)
+    !             call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+    !
+    !             if (rank_full /= rank_pruned) then
+    !                 n_comm = n_comm + 1
+    !                 comm_list(n_comm, 1) = rank_pruned   ! sender mpirank
+    !                 comm_list(n_comm, 2) = rank_full   ! receiver mpirank
+    !                 comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
+    !                 write(*,*) "found on different rank", n_comm, rank_pruned, rank_full
+    !             endif
+    !         else
+    !             ! it does not exist, but maybe it is coarsened by one level?
+    !             ! NOTE: code will not detect if coarsened by more than one level
+    !             call does_block_exist( lgt_block(lgt_id1, 1:level1-1), exists, lgt_id2, &
+    !             lgt_sortednumlist(:,:,tree_id_full), lgt_n(tree_id_full), tree_id_full)
+    !
+    !             if (exists) then
+    !
+    !             else
+    !                 ! nothing...the pruned tree block is not there, not even on a coarser level
+    !             endif
+    !
+    !         endif
+    !     enddo
+    !
+    !     ! Step 1b: actual xfer.
+    !     call block_xfer( params, comm_list, n_comm, lgt_block, hvy_block )
+    !
+    !     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    !     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    !
+    !
+    !     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
+    !     ! same mpirank. therefore, the responsible rank can just add them together.
+    !     do k = 1, hvy_n(tree_id_pruned)
+    !
+    !         hvy_id1  = hvy_active(k, tree_id_pruned)
+    !         call hvy_id_to_lgt_id(lgt_id1, hvy_id1, params%rank, params%number_blocks)
+    !         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+    !
+    !         call does_block_exist(lgt_block(lgt_id1, 1:level1), exists, lgt_id2, &
+    !         lgt_sortednumlist(:,:,tree_id_full), lgt_n(tree_id_full), tree_id_full)
+    !
+    !         ! we found the pruned trees block in the full tree : we happily copy
+    !         ! its heavy data
+    !         if (exists) then
+    !             ! now check on which CPU this block is currently
+    !             call lgt_id_to_proc_rank( rank_pruned, lgt_id1, N)
+    !             call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+    !
+    !             if (rank_full /= rank_pruned) then
+    !                 ! This is an erorr one should never see: the block xfer is done, and coexisting blocks should
+    !                 ! be on the same mpirank now.
+    !                 call abort(030719,"pruned_to_full_tree: although we xferred, we found a coexisting block on a different rank.")
+    !             endif
+    !
+    !             ! only responsible mpirank can perform the addition
+    !             if (params%rank==rank_full) then
+    !                 ! get both heavy ids
+    !                 call lgt_id_to_hvy_id( hvy_id1, lgt_id1, rank_pruned, N )
+    !                 call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full  , N )
+    !                 ! actual addition
+    !                 hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + hvy_block(:,:,:,1,hvy_id1)
+    !             endif
+    !         else
+    !             ! we did not find it. The grid has changed in the interior of the
+    !             ! obstacle, and we can set those interior blocks to constant 1. But
+    !             ! we need to figure out which blocks to set to 1.
+    !
+    !             ! we can further assume that all blocks in the pruned tree are the minimum:
+    !             ! only the interface is very important, interior blocks are dictated by
+    !             ! gradedness. Hence: assuming that the fluid/solid interface is always
+    !             ! on the finest level, only a refinement in the interior is possible (and
+    !             ! not a coarsening) => look for sister blocks on higher levels
+    !
+    !             ! find all sister blocks and add 1 to them. no xfer required.
+    !             treecode1 = treecode2int( lgt_block(lgt_id1, 1:level1) )
+    !
+    !             do i = 1, lgt_n(tree_id_full)
+    !                 lgt_id2 = lgt_active(i, tree_id_full)
+    !                 treecode2 = treecode2int( lgt_block(lgt_id2, 1:level1) )
+    !
+    !                 if (treecode1 == treecode2) then
+    !                     ! this is one of the sisters
+    !                     call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+    !                     if (params%rank == rank_full) then
+    !                         call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full, N)
+    !                         hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
+    !                     endif
+    !                 endif
+    !             enddo
+    !         endif
+    !     enddo
+    !
+    ! end subroutine
     subroutine add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned, tree_id_full)
         implicit none
@@ -104,6 +285,10 @@ contains
         Jmax = params%max_treelevel ! max treelevel
         rank = params%rank
         N = params%number_blocks
+
+        ! NOTES:
+        !   We assume that the pruned tree is on JMAX (rhs level) and we assume that
+        !   the full one is finer, never coarser.
 
         if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
 
@@ -141,7 +326,7 @@ contains
                     comm_list(n_comm, 1) = rank_pruned   ! sender mpirank
                     comm_list(n_comm, 2) = rank_full   ! receiver mpirank
                     comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
-                    write(*,*) "found on different rank", n_comm, rank_pruned, rank_full
+                    ! write(*,*) "found on different rank", n_comm, rank_pruned, rank_full
                 endif
             endif
         enddo
@@ -155,9 +340,10 @@ contains
 
         ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
         ! same mpirank. therefore, the responsible rank can just add them together.
-        do k = 1, lgt_n(tree_id_pruned)
+        do k = 1, hvy_n(tree_id_pruned)
 
-            lgt_id1 = lgt_active(k, tree_id_pruned)
+            hvy_id1  = hvy_active(k, tree_id_pruned)
+            call hvy_id_to_lgt_id(lgt_id1, hvy_id1, params%rank, params%number_blocks)
             level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
 
             call does_block_exist(lgt_block(lgt_id1, 1:level1), exists, lgt_id2, &
@@ -181,9 +367,22 @@ contains
                     ! get both heavy ids
                     call lgt_id_to_hvy_id( hvy_id1, lgt_id1, rank_pruned, N )
                     call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full  , N )
+
                     ! actual addition
-                    hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + hvy_block(:,:,:,1,hvy_id1)
+                    ! hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id2) + hvy_block(:,:,:,:,hvy_id1)
+                    ! hvy_block(:,:,:,:,hvy_id2) = max(hvy_block(:,:,:,:,hvy_id2),hvy_block(:,:,:,:,hvy_id1))
+
+                    where ( hvy_block(:,:,:,1,hvy_id2)<hvy_block(:,:,:,1,hvy_id1) )
+
+                        hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id1)
+                        hvy_block(:,:,:,2,hvy_id2) = hvy_block(:,:,:,2,hvy_id1)
+                        hvy_block(:,:,:,3,hvy_id2) = hvy_block(:,:,:,3,hvy_id1)
+                        hvy_block(:,:,:,4,hvy_id2) = hvy_block(:,:,:,4,hvy_id1)
+                        hvy_block(:,:,:,5,hvy_id2) = hvy_block(:,:,:,5,hvy_id1)
+                    end where
+
                 endif
+
             else
                 ! we did not find it. The grid has changed in the interior of the
                 ! obstacle, and we can set those interior blocks to constant 1. But
@@ -205,14 +404,17 @@ contains
                     if (treecode1 == treecode2) then
                         ! this is one of the sisters
                         call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+
                         if (params%rank == rank_full) then
                             call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full, N)
-                            hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
+                            ! hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
+                            hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id1)
                         endif
                     endif
                 enddo
             endif
         enddo
+
     end subroutine
 
 
@@ -253,7 +455,7 @@ contains
 
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(in)    :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id_dest, tree_id_source !< all data from tree_id_source gets copied to destination_tree_id
@@ -454,11 +656,6 @@ contains
         real(kind=rk)                       :: t0, t1, t_misc
         ! MPI error variable
         integer(kind=ik)                    :: ierr,  fsize,lgt_id,hvy_id
-        integer(kind=ik), save              :: counter=0
-        logical, save                       :: never_balanced_load=.true.
-
-        !---------------------------------------------------------------------------------------------
-        ! variables initialization
 
         ! start time
         t0 = MPI_Wtime()
@@ -534,7 +731,7 @@ contains
             !> (d) adapt the mesh, i.e. actually merge blocks
             t0 = MPI_Wtime()
             call coarse_mesh( params, lgt_block, hvy_block, lgt_active(:,tree_id), lgt_n(tree_id), &
-            lgt_sortednumlist(:,:,tree_id),  hvy_active(:, tree_id), hvy_n(tree_id) )
+            lgt_sortednumlist(:,:,tree_id),  hvy_active(:, tree_id), hvy_n(tree_id), tree_id )
             ! CPU timing (only in debug mode)
             call toc( "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
@@ -544,7 +741,7 @@ contains
             ! update list of sorted nunmerical treecodes, used for finding blocks
             t0 = MPI_Wtime()
             call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active(:,tree_id), lgt_n(tree_id), &
-                lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id))
+                lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id), tree_id)
             ! CPU timing (only in debug mode)
             call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
@@ -573,27 +770,23 @@ contains
         !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
         !! they may have passed several level also. Now, the distribution of blocks may no longer
         !! be balanced, so we have to balance load now
-        if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load .or. time<1.0e-10_rk) then
-            t0 = MPI_Wtime()
+        t0 = MPI_Wtime()
 
-            call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-            lgt_active(:, tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), &
-            hvy_active(:, tree_id), hvy_n(tree_id) )
+        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+        lgt_active(:, tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), &
+        hvy_active(:, tree_id), hvy_n(tree_id), tree_id )
 
-            call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
-            call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
-            lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
+        lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
 
-            call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
-            never_balanced_load = .false.
-        endif
+        call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
 
         ! time remaining parts of this routine.
         call toc( "adapt_mesh (lists)", t_misc )
         call toc( "adapt_mesh (TOTAL)", MPI_wtime()-t1)
-        counter = counter + 1
     end subroutine adapt_tree_mesh
     !##############################################################
 
@@ -753,7 +946,7 @@ contains
         end do
     end subroutine
     !##############################################################
-    subroutine refine_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+     subroutine refine_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id)
 
         implicit none
@@ -906,7 +1099,7 @@ contains
         t_elapse = MPI_WTIME()
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
-        hvy_active(:, tree_id1), hvy_n(tree_id1) )
+        hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1 )
 
         ! since lgt_block was synced we have to create the active lists again
         call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
@@ -914,7 +1107,7 @@ contains
 
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-        hvy_active(:, tree_id2), hvy_n(tree_id2) )
+        hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2 )
         call toc( "pointwise_tree_arithmetic (balancing)", MPI_Wtime()-t_elapse )
 
         ! since lgt_block was synced we have to create the active lists again
@@ -1098,9 +1291,9 @@ contains
             end do
             case("/out")
             !         #
-            !         
+            !
             !    ###########           Division out of place
-            !         
+            !
             !         #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
@@ -1157,11 +1350,11 @@ contains
                 end do
             end do
             case("-out")
-            !         
-            !         
+            !
+            !
             !    ###########           Substraction out of place
-            !         
-            !         
+            !
+            !
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
                 call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
@@ -1270,7 +1463,7 @@ contains
         case("*out")
             !        # #
             !         #
-            !     #########        Multiplication out of place 
+            !     #########        Multiplication out of place
             !         #
             !        # #
             do k1 = 1, hvy_n(tree_id1)
@@ -1335,7 +1528,7 @@ contains
         if (present(dest_tree_id)) then
           ! we have to synchronize lgt data since we were updating it locally
           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
-          
+
           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
         endif
@@ -1344,7 +1537,7 @@ contains
         lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
 
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id1), hvy_n(tree_id1) )
-        
+
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
         lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
 
@@ -1353,7 +1546,7 @@ contains
     !##############################################################
 
     !##############################################################
-    ! This routine sums up all trees in treeid_list and saves the sum 
+    ! This routine sums up all trees in treeid_list and saves the sum
     ! in dest_tree_id
     subroutine sum_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list, dest_tree_id, verbosity)
@@ -1381,7 +1574,7 @@ contains
 
         call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, treeid_list(1))
-          
+
         do i = 1, size(treeid_list)
           call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list(i), dest_tree_id)

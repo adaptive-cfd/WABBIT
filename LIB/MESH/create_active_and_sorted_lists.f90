@@ -31,7 +31,7 @@
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE
 !> \author PKrah
 subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist)
+           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
@@ -41,13 +41,14 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     integer(kind=ik), intent(inout)     :: lgt_n        !< number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: hvy_active(:)!< list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: hvy_n        !< number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)!< sorted light data with numerical treecodes
     !-----------------------------------------------------------------
 
     ! loop variables
     integer(kind=ik)                    :: k, N, heavy_id, block_rank
     ! process rank
-    integer(kind=ik)                    :: rank, tree_id, TREE_ID_IDX
+    integer(kind=ik)                    :: rank, TREE_ID_IDX
 
     ! reset old lists, use old numbers of active blocks. If the old numbers are
     ! invalid (too small too large), then we delete everything in the lists
@@ -67,7 +68,6 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     lgt_n = 0
     hvy_n = 0
 
-
     rank = params%rank
     N    = params%number_blocks
     TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
@@ -77,10 +77,7 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     ! =======================================================
     do k = 1, size(lgt_block, 1)
         ! block is active
-        if ( lgt_block(k, 1) /= -1 ) then
-
-            ! which tree id has the current block k?
-            tree_id = lgt_block(k,TREE_ID_IDX)
+        if ( lgt_block(k, 1) /= -1 .and. lgt_block(k,TREE_ID_IDX)==tree_ID) then
             ! ---------------------------
             ! update light active
             ! ---------------------------
@@ -105,8 +102,7 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
             lgt_sortednumlist(lgt_n, 1) = k
             ! second index stores the numerical treecode
             ! + the tree index
-            lgt_sortednumlist(lgt_n, 2) = treecode2int( &
-            lgt_block(k, 1:params%max_treelevel), tree_id )
+            lgt_sortednumlist(lgt_n, 2) = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_id )
 
         end if
     end do

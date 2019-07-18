@@ -49,7 +49,7 @@ module module_params
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
         integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1
         ! data writing frequency
-        integer(kind=ik)                             :: write_freq=0, loadbalancing_freq=1
+        integer(kind=ik)                             :: write_freq=0
         ! data writing frequency
         character(len=80)                            :: write_method="fixed_time"
         ! data writing frequency
@@ -59,6 +59,8 @@ module module_params
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau
+
+        logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false.
 
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk

@@ -11,23 +11,15 @@
 ! ----------------------------------------------------------------------------------------
 
 !> \brief reset grid, set all blocks to empty
-subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, lgt_n,&
-     hvy_active, hvy_n, lgt_sortednumlist, verbosity )
+subroutine reset_tree(params, lgt_block, lgt_active, lgt_n,&
+     hvy_active, hvy_n, lgt_sortednumlist, verbosity, tree_ID )
 
     implicit none
 
     !> user defined parameter structure
-    type (type_params), intent(inout)       :: params
+    type (type_params), intent(in)       :: params
     !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
-    !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
-    real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
-    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
     integer(kind=ik),  intent(inout)        :: lgt_active(:)
     !> number of active blocks (light data)
@@ -36,29 +28,38 @@ subroutine reset_grid(params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neigh
     integer(kind=ik),  intent(inout)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)         :: hvy_n
+    !> which tree to reset?
+    integer(kind=ik), intent(in)            :: tree_ID
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
     !> write output
     logical, intent(in)                     :: verbosity
-! ----------------------------------------------------------------------------------------
+    integer(kind=ik) :: k
 
     if ( (params%rank == 0) .and. verbosity ) then
       write(*,'(A)') "RESET-GRID: resetting grid to empty (deactivate all blocks)."
     endif
 
-    call reset_lgt_data(lgt_block, lgt_active, params%max_treelevel, lgt_n, lgt_sortednumlist)
+    do k = 1, size(lgt_block,1)
+        if (lgt_block(k,params%max_treelevel+IDX_TREE_ID) == tree_ID) then
+            ! this block is a part of this tree -> delete it
+            lgt_block(k,:) = -1
+        endif
+    enddo
+
 
     ! as the grid has changed (we deleted it here), we now update the heavy and light
     ! active lists
     ! update list of sorted nunmerical treecodes, used for finding blocks
+
     ! set number of active blocks to maximum number, to reset everything
     lgt_n = size(lgt_active,1)
     hvy_n = size(hvy_active,1)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
-         hvy_n, lgt_sortednumlist )
+         hvy_n, lgt_sortednumlist, tree_ID )
 
-end subroutine reset_grid
+end subroutine reset_tree
 
 
 
@@ -66,7 +67,7 @@ end subroutine reset_grid
 !> Resets the light data. After calling this function
 !> only one tree is left in the forest, and all blocks are inactive with
 !> refinement status 0
-subroutine reset_lgt_data(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sortednumlist)
+subroutine reset_forest(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sortednumlist)
 
     implicit none
 
@@ -87,7 +88,7 @@ subroutine reset_lgt_data(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sorte
 
     ! reset data:
     ! all blocks are inactive, reset treecode
-    lgt_block(:,1:max_treelevel) = -1
+    lgt_block(:,:) = -1
     ! reset tree_id
     lgt_block(:, max_treelevel+IDX_TREE_ID) = -1
     ! all blocks are inactive, reset mesh level
@@ -103,4 +104,4 @@ subroutine reset_lgt_data(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sorte
       lgt_n = size(lgt_active,1)
     end if
 
-end subroutine reset_lgt_data
+end subroutine reset_forest

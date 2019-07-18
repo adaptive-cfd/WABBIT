@@ -77,6 +77,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     !---------------------------------------------------------------------------------------------
     ! main body
     if (params%rank==0) then
+        write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
     endif
@@ -100,7 +101,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
         ! create lists of active blocks (light and heavy data)
         call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+        hvy_n(tree_ID_flow), tree_ID_flow)
 
         ! synching is required for the adaptation step
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
@@ -122,16 +124,16 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                     lgt_n_tmp = lgt_n(tree_ID_flow)
 
                     call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-                    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
+                    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .true. )
 
                     call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                     lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-                    params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
+                    tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
                 enddo
             else
                 call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                 lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-                params%coarsening_indicator, hvy_tmp )
+                tree_ID_flow, params%coarsening_indicator, hvy_tmp )
             endif
 
             iter = iter + 1
@@ -155,8 +157,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         ! Create the first mesh on the coarsest treelevel
         !---------------------------------------------------------------------------
-        call create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-        lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), params%min_treelevel, .true. )
+        call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+        lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), params%min_treelevel, .true., tree_ID_flow )
 
         !---------------------------------------------------------------------------
         ! on the grid, evaluate the initial condition
@@ -178,8 +180,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                 !! go up one level where a refinement indicator tells us to do so, but in the current code
                 !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
                 !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-                call refine_mesh( params, lgt_block, hvy_block, hvy_mask, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere"  )
+                call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
+                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID_flow  )
 
                 ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
                 ! not, the detail coefficients for all blocks are zero. In the time stepper, this
@@ -201,16 +203,16 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                         lgt_n_tmp = lgt_n(tree_ID_flow)
 
                         call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-                        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
+                        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .true. )
 
                         call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                         lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-                        params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
+                        tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
                     enddo
                 else
                     call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                     lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-                    params%coarsening_indicator, hvy_tmp )
+                    tree_ID_flow, params%coarsening_indicator, hvy_tmp )
                 endif
 
                 iter = iter + 1
@@ -228,8 +230,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         if (params%inicond_refinements > 0) then
             do k = 1, params%inicond_refinements
                 ! refine entire mesh.
-                call refine_mesh( params, lgt_block, hvy_block, hvy_mask, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-                lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere" )
+                call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+                lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID_flow)
 
                 ! set initial condition
                 call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n)
@@ -259,11 +261,11 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-    lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+    lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), tree_ID_flow)
 
     ! balance the load
     call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-    lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+    lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), tree_ID_flow)
 
     ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
     ! it is a safety issue. Better simply keep it.
@@ -275,6 +277,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
         max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
         write(*,'("Initial grid and initial condition terminated.")')
+        write(*,*) "(((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))"
     endif
 
     ! HACK

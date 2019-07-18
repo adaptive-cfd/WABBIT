@@ -121,7 +121,7 @@ program main
     ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
     ! loop variable
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N, lgt_n_tmp
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
@@ -175,9 +175,12 @@ program main
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
         hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n)
-    !  the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-         lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), .true. )
+
+    ! reset the grid: all blocks are inactive and empty
+    call reset_tree( params, lgt_block, lgt_active(:,tree_ID_flow), &
+    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+    lgt_sortednumlist(:,:,tree_ID_flow), .true., tree_ID=tree_ID_flow )
+
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
@@ -196,8 +199,9 @@ program main
         lgt_sortednumlist(:,:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_n(tree_ID_flow) )
     endif
 
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), .true. )
+    call reset_tree( params, lgt_block, lgt_active(:,tree_ID_flow), &
+    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+    lgt_sortednumlist(:,:,tree_ID_flow), .true., tree_ID=tree_ID_flow )
 
 
     !---------------------------------------------------------------------------
@@ -335,8 +339,8 @@ program main
 
             ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
             ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-            call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere" )
+            call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID=tree_ID_flow )
         endif
         call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
@@ -412,12 +416,12 @@ program main
                 ! actual coarsening (including the mask function)
                 call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
                 lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-                hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp, hvy_mask )
+                hvy_n(tree_ID_flow), tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
             else
                 ! actual coarsening (no mask function is required)
                 call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
                 lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-                hvy_n(tree_ID_flow), params%coarsening_indicator, hvy_tmp )
+                hvy_n(tree_ID_flow), tree_ID_flow, params%coarsening_indicator, hvy_tmp )
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)

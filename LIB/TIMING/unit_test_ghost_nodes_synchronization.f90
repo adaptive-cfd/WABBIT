@@ -111,12 +111,12 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !---------------------------------------------------------------------------
     l = 5
     call create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l )
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l, tree_ID_flow )
 
     if (params%rank == 0) then
         write(*,'(80("-"))')
         write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
-        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxval(lgt_block(:,params%max_treelevel + IDX_MESH_LVL))
+        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, max_active_level( lgt_block, lgt_active, lgt_n )
         write(*,'(" ready for testing.")')
     endif
 

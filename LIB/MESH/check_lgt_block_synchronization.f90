@@ -126,10 +126,12 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)     :: hvy_n
     character(len=*), intent(in) :: file
-    integer(kind=ik) :: k, lgt_start, rank, lgt_id
+    integer(kind=ik) :: k, lgt_start, rank, lgt_id, N
 
-    if (.not. allocated(tmp))  allocate(tmp(1:params%number_procs*params%number_blocks,16))
-    if (.not. allocated(tmp2))  allocate(tmp2(1:params%number_procs*params%number_blocks,16))
+    N = size(hvy_neighbor,2)
+
+    if (.not. allocated(tmp))  allocate(tmp(1:params%number_procs*params%number_blocks,N))
+    if (.not. allocated(tmp2))  allocate(tmp2(1:params%number_procs*params%number_blocks,N))
 
     tmp = 0
 
@@ -144,7 +146,7 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
 
     open(14, file=file, status='replace')
     do k = 1, size(tmp2,1)
-        write(14,'(16(i6,1x))') tmp2(k,:)
+        write(14,'(75(i6,1x))') tmp2(k,:)
     enddo
     close(14)
 end subroutine

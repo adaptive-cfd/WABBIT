@@ -41,21 +41,21 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lg
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> hvy_mask are qty that depend on the grid and not explicitly on time
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n(:)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:,:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n(:)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
 
     !> spacing and origin of a block
     real(kind=rk), dimension(3)         :: dx, x0

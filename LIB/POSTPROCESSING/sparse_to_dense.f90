@@ -16,6 +16,7 @@ subroutine sparse_to_dense(params)
     use module_params
     use module_IO
     use module_mpi
+    use module_globals
 
     implicit none
 
@@ -134,11 +135,11 @@ subroutine sparse_to_dense(params)
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n)
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
 
     ! balance the load
     call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -155,10 +156,10 @@ subroutine sparse_to_dense(params)
         lgt_sortednumlist, hvy_active, hvy_n )
 
         call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n)
+        hvy_active, hvy_n, tree_ID=1)
 
         call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n)
+            lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
     end do
     ! refine
     do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
@@ -179,13 +180,13 @@ subroutine sparse_to_dense(params)
         end if
 
         call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n)
+            lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
 
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     end do
 
     call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1 )
 
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
         hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)

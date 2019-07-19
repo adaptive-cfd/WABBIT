@@ -198,9 +198,9 @@ contains
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
 
       if ( params%adapt_mesh) then
-            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-            pod_mode_tree_id, tree_n )
+                call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
+                lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
+                hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
       endif
 
     end do
@@ -526,8 +526,9 @@ contains
       if (params%adapt_mesh) then
           ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
           ! adapt-mesh also performs neighbor and active lists updates
-          call adapt_tree_mesh( time(tree_id), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-          lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+          call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
+          lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
+          hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
       endif
       !tmp_name = "adapted"
       !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
@@ -1027,8 +1028,9 @@ contains
       if (params%adapt_mesh) then
           ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
           ! adapt-mesh also performs neighbor and active lists updates
-          call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-          lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+           call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
+           lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
+           hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
       endif
       !tmp_name = "adapted"
       !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
@@ -1193,9 +1195,9 @@ contains
   ! adapted reconstructed field
   !---------------------------------------------------------------------------
   if ( params%adapt_mesh) then
-      call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-      lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-      dest_tree_id, tree_n )
+     call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
+     lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
+     hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
   endif
 
   t_elapse = MPI_WTIME() - t_elapse

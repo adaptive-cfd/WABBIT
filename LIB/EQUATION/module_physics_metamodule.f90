@@ -50,21 +50,21 @@ contains
         ! On input, the mask array is correctly filled. You cannot create the full mask here.
         real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
 
+        mask = 0.0_rk
+
         select case ( physics )
         case ('ACM-new')
             if (size(mask,3)==1) then
-                call create_mask_2D( time, x0, dx, Bs, g, mask(:,:,1,:), stage )
+                call create_mask_2D_ACM( time, x0, dx, Bs, g, mask(:,:,1,:), stage )
             else
-                call create_mask_3D( time, x0, dx, Bs, g, mask, stage)
+                call create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage)
             endif
 
         case ('ConvDiff-new')
             ! not implemented yet (this module does not use penalization)
-            mask = 0.00_rk
 
         case ('navier_stokes')
             ! not implemented yet
-            mask = 0.00_rk
 
         case default
             call abort(1212,'unknown physics...say whaaat?')

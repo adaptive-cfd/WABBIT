@@ -60,6 +60,8 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, nnorm(1)
     logical :: thresholding_component(1:size(block_data,4))
+    logical :: tmp_threshold(1:20) ! just take a larger one...lazy tommy
+    real(kind=rk) :: nnorm2(1:20) ! just take a larger one...lazy tommy
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization
@@ -76,6 +78,11 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     !! decide where to coarsen, each act on one block. Note due to gradedness and completeness
     !! this status may be revoked later in the computation.
     select case (indicator)
+    case ("everywhere")
+        ! simply coarsen the entire grid. Note that this means that adapt_mesh will coarsen down to Jmin
+        ! if the iteration loop is on (you can bypass that behavior using external_loop=.true.)
+        refinement_status = -1
+
     case ("threshold-vorticity")
         !! use thresholding, but on the vorticity rather than the state vector.
         !! this should allow to consider only the rotational part, not the divergent one.
@@ -131,8 +138,15 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     ! not available, the option is useless but can cause errors.
     if (params%threshold_mask .and. present(block_mask)) then
         ! assuming block_mask holds mask function
-        nnorm = 1.0_rk
-        call threshold_block( params, block_mask(:,:,:,1:1), (/.true./), refinement_status_mask, nnorm )
+        nnorm2 = 1.0_rk
+        tmp_threshold = .false.
+        tmp_threshold(1) = .true.
+
+        ! even if the global eps is very large, we want the mask to be on the finest
+        ! level. hence, here we set a small value (just for this call) to be sure that the
+        ! mask interface is on Jmax
+        call threshold_block( params, block_mask, tmp_threshold(1:size(block_mask,4)), &
+        refinement_status_mask, nnorm2(1:size(block_mask,4)), eps=1.0e-4_rk )
 
         ! refinement_status_state: -1 refinemet_status_mask: -1 ==>  -1
         ! refinement_status_state: 0  refinemet_status_mask: -1 ==>   0

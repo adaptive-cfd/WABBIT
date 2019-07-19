@@ -170,6 +170,15 @@ contains
         call MPI_ALLREDUCE (a_loc,mpisum,1, MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,mpicode)
     end function
 
+    function mpisum_i( a )
+        implicit none
+        integer(kind=ik) :: a_loc, mpisum_i
+        integer(kind=ik),intent(in) :: a
+        integer :: mpicode
+        a_loc=a
+        call MPI_ALLREDUCE (a_loc,mpisum_i,1, MPI_INTEGER4,MPI_SUM,MPI_COMM_WORLD,mpicode)
+    end function
+
     function mpimax( a )
         implicit none
         real(kind=rk) :: a_loc, mpimax

@@ -50,7 +50,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(inout)                    :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)                    :: hvy_active(:,:)
+    integer(kind=ik), intent(inout)                 :: hvy_active(:,:)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)                 :: lgt_active(:,:)
     !> number of active blocks (light/heavy data)
@@ -58,7 +58,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)              :: lgt_sortednumlist(:,:,:)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)                    :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)                 :: hvy_neighbor(:,:)
 
 
     ! loop variable
@@ -67,9 +67,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     character(len=80)                               :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)                                   :: t0, x0(1:3), dx(1:3)
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
-    ! start time
+
     t0 = MPI_Wtime()
     if (params%rank == 0) then
         write(*,'("IO: Saving data triggered, time=",g15.8)')  time

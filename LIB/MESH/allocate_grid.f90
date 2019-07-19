@@ -111,7 +111,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
-                    if ( present(hvy_mask) ) then
+                    if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
                         mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
@@ -132,7 +132,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
-                    if ( present(hvy_mask) ) then
+                    if ( present(hvy_mask) .and. params%N_mask_components>0  ) then
                         mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 

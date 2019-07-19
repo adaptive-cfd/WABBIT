@@ -192,8 +192,9 @@ subroutine dense_to_sparse(params)
         lgt_sortednumlist, hvy_work=hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! reset the grid: all blocks are inactive and empty
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), .true. )
+    call reset_tree( params, lgt_block, lgt_active(:,tree_ID_flow), &
+    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+    lgt_sortednumlist(:,:,tree_ID_flow), .true., tree_ID=1 )
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.

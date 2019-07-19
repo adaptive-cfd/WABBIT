@@ -112,12 +112,20 @@ subroutine ini_file_to_params( params, filename )
 
     !***************************************************************************
     ! read statistics parameters
-    !
-    ! data exchange method
     call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params%nsave_stats, 99999999_ik )
     call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
     !> assume start at time 0.0 /todo change if start with reloaded data
     params%next_stats_time = 0.0_rk + params%tsave_stats
+
+    !***************************************************************************
+    ! WABBIT needs to know about the mask function (if penalization is used): does it contain
+    ! a time-dependent-part (e.g. moving obstacles, time-dependent forcing)? does it contain
+    ! a time-independent part (fixed walls, homogeneous forcing)? or both? WABBIT needs to know
+    ! that since we try to create the time-independent mask function only once, but the time-dependent
+    ! part of course in every time step.
+    call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
+    call read_param_mpi(FILE, 'VPM', 'mask_time_dependent_part', params%mask_time_dependent_part, .true.)
+    call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
 
 
     !***************************************************************************
@@ -240,7 +248,7 @@ end subroutine ini_file_to_params
     ! read number_block_nodes
     params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
 
-    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 2 )
+    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
@@ -266,7 +274,6 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "---" )
-    call read_param_mpi(FILE, 'Blocks', 'loadbalancing_freq', params%loadbalancing_freq, 1 )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )

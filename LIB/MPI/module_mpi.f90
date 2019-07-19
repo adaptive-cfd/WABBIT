@@ -140,7 +140,9 @@ subroutine init_ghost_nodes( params )
         number_blocks   = params%number_blocks
         Bs              = params%Bs
         g               = params%n_ghosts
-        Neqn            = params%n_eqn
+        ! HACK: in the design phase, we thought to always sync neqn commponents
+        ! but in some cases we end up synching more!
+        Neqn            = N_MAX_COMPONENTS
         rank            = params%rank
         Ncpu            = params%number_procs
 

@@ -43,19 +43,19 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n(:)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:,:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n(:)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
 
     !> global integral
     real(kind=rk), dimension(3)         :: volume_int

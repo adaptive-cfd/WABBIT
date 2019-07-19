@@ -198,9 +198,9 @@ contains
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
 
       if ( params%adapt_mesh) then
-            call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-            pod_mode_tree_id, tree_n )
+                call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
+                lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
+                hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
       endif
 
     end do
@@ -235,6 +235,9 @@ contains
   enddo
   !! we do not need the free_tree_id any more. So we delete it
   call delete_tree(params, lgt_block, lgt_active, lgt_n, free_tree_id)
+  call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+  lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
   Volume = product(params%domain_size(1:params%dim))
   V = V / Volume
 
@@ -505,11 +508,8 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-    !>\todo as soon as WABBIT has new lgt structure reset lgt for all trees!
-    do tree_id = 1, fsize
-    call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
-              params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
-    end do
+   call reset_forest(lgt_block, lgt_active(:, 1), &
+   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
 
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
@@ -526,13 +526,15 @@ contains
       if (params%adapt_mesh) then
           ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
           ! adapt-mesh also performs neighbor and active lists updates
-          call adapt_tree_mesh( time(tree_id), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-          lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+          call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
+          lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
+          hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
       endif
       !tmp_name = "adapted"
       !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
       !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
           !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id )
+      !stop
     end do
 
     ! --------------------
@@ -571,13 +573,14 @@ contains
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
-
+    
     !----------------------------------
     ! COMPUTE POD Modes
     !----------------------------------
     call snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        truncation_error, truncation_rank, save_all)
+
     !----------------------------------
     ! Save Modes
     !----------------------------------
@@ -673,7 +676,7 @@ contains
     !---------------------------------------------------------------
     integer(kind=ik) :: tree_id1, tree_id2, free_tree_id, Jmax, Bs(3), g, &
                         N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: C_val, Volume, t_elapse, t_inc(3)
+    real(kind=rk) :: C_val, Volume, t_elapse, t_inc(2)
     real(kind=rk) :: x0(3), dx(3)
 
     N_snapshots = size(C,1)
@@ -690,32 +693,14 @@ contains
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
         t_elapse = MPI_wtime()
-        !---------------------------
-        ! copy tree_id1 -> free_tree_id
-        !----------------------------
-        ! copy tree with tree_id1 to tree with free_tree_id
-        ! note: this routine deletes lgt_data of the "free_tree_id" before copying
-        !       the tree
-        t_inc(1) = MPI_wtime()
-
-        call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id1)
-        t_inc(1) = MPI_wtime()-t_inc(1)
 
         !---------------------------------------------------
         ! multiply tree_id2 * free_tree_id -> free_tree_id
         !---------------------------------------------------
-        t_inc(2) = MPI_wtime()
+        t_inc(1) = MPI_wtime()
         call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, free_tree_id, tree_id2)
-        !call write_tree_field("field1_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
-                    !lgt_n, hvy_n, hvy_active, 1, free_tree_id )
-        !call write_tree_field("field2_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
-                    !lgt_n, hvy_n, hvy_active, 1, tree_id2 )
-                  !call abort(134)
-
-
-        t_inc(2) = MPI_wtime()-t_inc(2)
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, free_tree_id)
+        t_inc(1) = MPI_wtime()-t_inc(1)
 
         !---------------------------------------------------
         ! adapt the mesh before summing it up
@@ -729,7 +714,7 @@ contains
         !----------------------------------------------------
         ! sum over all elements of the tree with free_tree_id
         !-----------------------------------------------------
-        t_inc(3) = MPI_wtime()
+        t_inc(2) = MPI_wtime()
         C_val = 0.0_rk
         do k = 1, hvy_n(free_tree_id)
           hvy_id = hvy_active(k, free_tree_id)
@@ -743,7 +728,7 @@ contains
               C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
           endif
         end do
-        t_inc(3) = MPI_wtime()-t_inc(3)
+        t_inc(2) = MPI_wtime()-t_inc(2)
         ! Construct correlation matrix
         C(tree_id1, tree_id2) = C_val
         C(tree_id2, tree_id1) = C_val
@@ -752,7 +737,7 @@ contains
         if (rank == 0) then
           write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
           tree_id1, tree_id2, t_elapse
-          write(*,'("copy tree: ",es12.4," mult trees: ",es12.4," integrate ",es12.4)') t_inc
+          write(*,'(" mult trees: ",es12.4," integrate ",es12.4)') t_inc
         endif
       end do
     end do
@@ -762,7 +747,11 @@ contains
     ! Normalice C to the Volume of the integrated area (L2 scalar product)
     ! and by the number of snapshots
     C = C / Volume
-    C = C / dble(N_snapshots)
+    C = C / real(N_snapshots,kind=rk)
+
+    !if (rank==0)then
+      !call print_mat(C)
+    !endif
   end subroutine
   !##############################################################
 
@@ -1008,7 +997,7 @@ contains
 
 
     do tree_id = 1, fsize
-    call reset_lgt_data(lgt_block, lgt_active(:, tree_id), &
+    call reset_forest(lgt_block, lgt_active(:, tree_id), &
               params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
     enddo
     hvy_neighbor = -1
@@ -1027,8 +1016,9 @@ contains
       if (params%adapt_mesh) then
           ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
           ! adapt-mesh also performs neighbor and active lists updates
-          call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-          lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+           call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
+           lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
+           hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
       endif
       !tmp_name = "adapted"
       !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
@@ -1193,9 +1183,9 @@ contains
   ! adapted reconstructed field
   !---------------------------------------------------------------------------
   if ( params%adapt_mesh) then
-      call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-      lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-      dest_tree_id, tree_n )
+     call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
+     lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
+     hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
   endif
 
   t_elapse = MPI_WTIME() - t_elapse

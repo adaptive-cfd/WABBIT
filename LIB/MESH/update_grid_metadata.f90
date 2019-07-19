@@ -10,7 +10,7 @@
 !       No synchronization step is required afterwards.
 !
 subroutine update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n)
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
     implicit none
 
     !> user defined parameter structure
@@ -29,13 +29,14 @@ subroutine update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt
     integer(kind=ik), intent(out)       :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(out)       :: hvy_n
+    integer(kind=ik), intent(in)        :: tree_ID
 
     real(kind=rk) :: t0
 
     t0 = MPI_wtime()
 
     call create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist)
+           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n)

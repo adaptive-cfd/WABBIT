@@ -41,7 +41,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D, create_mask_3D
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, create_mask_3D_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants

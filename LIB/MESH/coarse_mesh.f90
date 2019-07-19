@@ -10,7 +10,7 @@
 !!            subroutines
 ! ********************************************************************************************
 subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_active, hvy_n, hvy_mask )
+    hvy_active, hvy_n, tree_ID, hvy_mask )
     implicit none
 
     !> user defined parameter structure
@@ -19,6 +19,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    ! It can be useful to simultaneously coarsen more than one array, in most cases this
+    ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
+    ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_active(:)
@@ -30,6 +33,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_n
+    integer(kind=ik), intent(in)        :: tree_ID
 
     ! loop variables
     integer(kind=ik)                    :: k, maxtl, N, j
@@ -99,6 +103,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
     ! actual xfer
     if (present(hvy_mask)) then
+        ! It can be useful to simultaneously coarsen more than one array, in most cases this
+        ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
+        ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
         call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask )
     else
         call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block )
@@ -107,7 +114,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! the active lists are outdates after the transfer: we need to create
     ! them or find_sisters will not be able to do its job
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
-    hvy_n, lgt_sortednumlist )
+    hvy_n, lgt_sortednumlist, tree_ID )
 
     ! actual merging
     do k = 1, lgt_n
@@ -123,19 +130,16 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)
             ! Then only the responsible rank will perform the heavy data merging.
             call find_sisters( params, lgt_active(k), light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist )
-            call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N) )
             ! note the newly merged block has status 0
 
-            mesh_has_changed = .true.
+            if (present(hvy_mask)) then
+                ! It can be useful to simultaneously coarsen more than one array, in most cases this
+                ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
+                ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
+                call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N), hvy_mask )
+            else
+                call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N) )
+            endif
         endif
     enddo
-
-
 end subroutine coarse_mesh
-
-
-logical function mesh_adapted()
-    implicit none
-
-    mesh_adapted=mesh_has_changed
-end function

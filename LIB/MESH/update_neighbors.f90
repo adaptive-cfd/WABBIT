@@ -63,6 +63,8 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
         call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
         call write_lgt_data(params, lgt_block, 'lgt_block_ERROR.dat')
 
+        call MPI_barrier(WABBIT_COMM, mpierror)
+
         call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
         & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
     endif

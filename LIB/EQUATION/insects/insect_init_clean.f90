@@ -193,7 +193,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
   ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
   ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
-  call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
+  call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"global")
   Insect%smooth = 1.0d0*dx_reference
   Insect%safety = 3.5d0*Insect%smooth
 

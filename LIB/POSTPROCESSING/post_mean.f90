@@ -80,7 +80,7 @@ subroutine post_mean(params)
     call read_field(fname, 1, params, hvy_block, hvy_n )
 
     call create_active_and_sorted_lists( params, lgt_block, &
-    lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist )
+    lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1 )
 
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n )

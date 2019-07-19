@@ -5,7 +5,7 @@ subroutine mask_post(params)
     use module_IO
     use module_mpi
     use module_operators
-    use module_acm, only : create_mask_3D
+    use module_acm, only : create_mask_3D_ACM
 
     implicit none
 
@@ -87,7 +87,7 @@ subroutine mask_post(params)
     do k = 1, hvy_n
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-        call create_mask_3D( time, x0, dx, params%Bs, params%n_ghosts, &
+        call create_mask_3D_ACM( time, x0, dx, params%Bs, params%n_ghosts, &
         hvy_work(:,:,:,1, hvy_active(k)), us )
     end do
 

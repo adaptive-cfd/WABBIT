@@ -25,13 +25,7 @@
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
-subroutine threshold_block( params, block_data, thresholding_component, refinement_status, norm )
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
+subroutine threshold_block( params, block_data, thresholding_component, refinement_status, norm, eps )
 
     implicit none
 
@@ -46,6 +40,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     integer(kind=ik), intent(out)       :: refinement_status
     !
     real(kind=rk), intent(inout)        :: norm( size(block_data,4) )
+    real(kind=rk), intent(in), optional :: eps
 
     ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
@@ -56,10 +51,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     integer(kind=ik), dimension(3)      :: Bs
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0
+    real(kind=rk)                       :: t0, eps2
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
 
     ! start time
     t0 = MPI_Wtime()
@@ -67,6 +60,10 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     Bs = params%Bs
     g  = params%n_ghosts
 
+    ! default threshlding level is the one in the parameter struct
+    eps2 = params%eps
+    ! but if we pass another one, use that.
+    if (present(eps)) eps2 = eps
 
     ! reset detail
     detail = -1.0_rk
@@ -125,7 +122,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1
     ! note gradedness and completeness may prevent it from actually going through with that
-    if ( maxval(detail) < params%eps) then
+    if ( maxval(detail) < eps2) then
         ! coarsen block, -1
         refinement_status = -1
     else

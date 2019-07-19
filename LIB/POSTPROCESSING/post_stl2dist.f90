@@ -108,12 +108,12 @@ subroutine post_stl2dist(params)
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
     lgt_active, hvy_active, lgt_sortednumlist)
 
-    call reset_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true. )
+    call reset_tree( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_ID=1)
 
     ! start with an equidistant grid on coarsest level
-    call create_equidistant_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true. )
+    call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true., tree_ID=1 )
 
     ! read the STL we want to tranform to a signed distance function.
     ! NOTE:
@@ -132,8 +132,8 @@ subroutine post_stl2dist(params)
 
         ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
         ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-        call refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "test" )
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID=1 )
 
         skips = 0
 

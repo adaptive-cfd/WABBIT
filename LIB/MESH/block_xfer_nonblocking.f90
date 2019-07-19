@@ -157,7 +157,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     ! so now, we can safely delete the original blocks
     do k = 1, N_xfers
         ! delete block. it has been moved previously, and now we delete the original
-        lgt_block( xfer_list(k,3), 1 ) = -1
+        lgt_block( xfer_list(k,3), : ) = -1
     enddo
 
     ! it may happen that we cannot execute a xfer because the target ranks has no more memory left

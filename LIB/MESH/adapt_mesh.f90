@@ -20,12 +20,10 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, hvy_tmp, hvy_mask, external_loop )
-
-!---------------------------------------------------------------------------------------------
-! variables
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop)
 
     implicit none
+
     real(kind=rk), intent(in)           :: time
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
@@ -63,14 +61,14 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !! only on one point, which is then completely removed (happens for a mask function, for example.)
     !! if external_loop=.true., only one iteration step is performed.
     logical, intent(in), optional       :: external_loop
+
+    integer(kind=ik), intent(in)        :: tree_ID
     ! loop variables
     integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors, lgt_id
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1
     ! MPI error variable
     integer(kind=ik)                    :: ierr, k1, hvy_id
-    integer(kind=ik), save              :: counter=0
-    logical, save                       :: never_balanced_load=.true.
 
 
     ! start time
@@ -160,10 +158,11 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
             ! There is some overhead involved with keeping both structures the same, in the sense
             ! that MPI-communication is increased, if blocks on different CPU have to merged.
             call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, hvy_mask )
+            lgt_sortednumlist, hvy_active, hvy_n, tree_ID, hvy_mask )
         else
+
             call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n )
+            lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
         endif
         call toc( "adapt_mesh (coarse_mesh)", MPI_Wtime()-t0 )
 
@@ -171,7 +170,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
         call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n)
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
         call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
         iteration = iteration + 1
@@ -200,16 +199,11 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
-    if (modulo(counter, params%loadbalancing_freq)==0 .or. never_balanced_load .or. time<1.0e-10_rk) then
-        t0 = MPI_Wtime()
+    t0 = MPI_Wtime()
+    call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+    call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
 
-        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-
-        call toc( "adapt_mesh (balance_load)", MPI_Wtime()-t0 )
-        never_balanced_load = .false.
-    endif
 
     call toc( "adapt_mesh (TOTAL)", MPI_wtime()-t1)
-    counter = counter + 1
 end subroutine adapt_mesh

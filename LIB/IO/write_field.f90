@@ -130,7 +130,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 ! main body
 
     ! first: check if field contains NaNs
-    do k=1,hvy_n
+    do k = 1, hvy_n
         if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_active(k)))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
     end do
 

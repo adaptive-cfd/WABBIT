@@ -31,8 +31,6 @@ module module_mesh
 
     implicit none
 
-    logical, private, save ::  mesh_has_changed=.false.
-
     ! interface generalising the mono-tree to multi-trees
     interface create_active_and_sorted_lists
         module procedure create_active_and_sorted_lists_tree, &

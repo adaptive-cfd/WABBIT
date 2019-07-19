@@ -29,15 +29,11 @@
 !! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator  )
+subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, indicator, tree_ID  )
 
-!---------------------------------------------------------------------------------------------
-! modules
     use module_indicators
 
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
@@ -45,8 +41,6 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     type (type_params), intent(in)         :: params
     !> light data array
     integer(kind=ik), intent(inout)        :: lgt_block(:, :)
-    !> heavy work data array - block data.
-    real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)
     !> heavy data array - neighbor data
@@ -63,11 +57,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     integer(kind=ik), intent(inout)        :: hvy_n
     !> how to choose blocks for refinement
     character(len=*), intent(in)           :: indicator
+    integer(kind=ik), intent(in)           :: tree_ID
 
     ! cpu time variables for running time calculation
     real(kind=rk)                          :: t0, t1, t2, t_misc
     integer(kind=ik)                       :: k
-
     ! start time
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
@@ -127,7 +121,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     ! update list of sorted nunmerical treecodes, used for finding blocks
     t2 = MPI_wtime()
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n)
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
     t_misc = MPI_wtime() - t2
 
 
@@ -138,10 +132,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt
     !! step is a true "everywhere". Then, there is no need for balancing, as all mpiranks automatically
     !! hold the same number of blocks, if they started with a balanced distribution (which is the
     !! output of adapt_mesh.)
-    if (params%force_maxlevel_dealiasing .eqv. .false.) then
+    !! This of course implies any other indicator than "everywhere" requires balancing here.
+    if ((params%force_maxlevel_dealiasing .eqv. .false.) .or. (indicator/="everywhere")) then
         t1 = MPI_Wtime()
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n )
+        hvy_active, hvy_n, tree_ID )
         call toc( "refine_mesh (balance_load)", MPI_Wtime()-t1 )
     endif
 

@@ -3,15 +3,15 @@
 ! block level) so the physics modules have to provide an interface to create the mask at a tree
 ! level. All parts of the mask shall be included: chi, boundary values, sponges.
 ! This is a block-level wrapper to fill the mask.
-subroutine create_mask_3D( time, x0, dx, Bs, g, mask, stage )
+subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
     implicit none
 
     ! grid
     integer(kind=ik), intent(in) :: Bs(3), g
     !> mask term for every grid point of this block
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
-    !     stage == "time-dependent-part"
     !     stage == "time-independent-part"
+    !     stage == "time-dependent-part"
     !     stage == "all-parts"
     character(len=*), intent(in) :: stage
     !> spacing and origin of block
@@ -48,9 +48,12 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, stage )
     select case (params_acm%geometry)
     case ('fractal_tree')
         !-----------------------------------------------------------------------
-        ! FRACTAL_TREE
+        ! FRACTAL TREE
         !-----------------------------------------------------------------------
-        call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! fractal trees are time-independent (they have no time-dependent part)
+            call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+        endif
 
         ! store the mask color array as double
         mask(:,:,:,5) = real(mask_color, kind=rk)
@@ -59,18 +62,49 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, stage )
         !-----------------------------------------------------------------------
         ! INSECT MODULE
         !-----------------------------------------------------------------------
-
         ! the insects require us to determine their state vector before they can be drawn
         ! as this is to do only once, not for all blocks
         if ( abs(time-Insect%time) >= 1.0e-13_rk) then
             call Update_Insect(time, Insect)
         endif
 
-        ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
-        call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
+        select case(stage)
+        case ("time-independent-part")
+            ! insect body: note non-tethered-flight is a problem
+            if (Insect%body_moves == "no") then
+                call draw_insect_body( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
+                mask_color, mask(:,:,:,2:4), Insect, delete=.true.)
 
-        ! store the mask color array as double
-        mask(:,:,:,5) = real(mask_color, kind=rk)
+                ! store the mask color array as double
+                mask(:,:,:,5) = real(mask_color, kind=rk)
+            endif
+
+        case ("time-dependent-part")
+            if (Insect%body_moves == "no") then
+                ! wings
+                call draw_insect_wings( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
+                mask_color, mask(:,:,:,2:4), Insect, delete=.true.)
+            else
+                ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+                call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
+            endif
+            ! store the mask color array as double
+            mask(:,:,:,5) = real(mask_color, kind=rk)
+
+        case ("all-parts")
+            ! wings and body
+            ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+            call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
+
+            ! store the mask color array as double
+            mask(:,:,:,5) = real(mask_color, kind=rk)
+
+        case default
+            call abort(16072019, "unknown request to create_mask")
+            
+        end select
+
+
 
     case ('none')
         mask = 0.0_rk
@@ -83,11 +117,16 @@ subroutine create_mask_3D( time, x0, dx, Bs, g, mask, stage )
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ! sponge
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    if (params_acm%use_sponge) then
-        call sponge_3D( mask(:,:,:,6), x0, dx, Bs, g)
+    ! Though time-independent, we treat the sponge mask as if it were time-dependent
+    ! because it does not have to be refined to the finest level (unlike the mask
+    ! function.)
+    if (stage == "time-dependent-part" .or. stage == "all-parts") then
+        if (params_acm%use_sponge) then
+            call sponge_3D( mask(:,:,:,6), x0, dx, Bs, g)
+        endif
     endif
 
-end subroutine create_mask_3D
+end subroutine create_mask_3D_ACM
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
@@ -96,7 +135,7 @@ end subroutine create_mask_3D
 ! block level) so the physics modules have to provide an interface to create the mask at a tree
 ! level. All parts of the mask shall be included: chi, boundary values, sponges.
 ! This is a block-level wrapper to fill the mask.
-subroutine create_mask_2D( time, x0, dx, Bs, g, mask, stage )
+subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     implicit none
 
     ! grid
@@ -118,19 +157,21 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, stage )
 
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
-    if ( params_acm%penalization .eqv. .false.) then
-        return
-    endif
+    if (.not. params_acm%penalization) return
 
     !---------------------------------------------------------------------------
     ! Mask function and forcing values
     !---------------------------------------------------------------------------
     select case (params_acm%geometry)
     case ('cylinder')
-        call draw_cylinder( mask(:,:,1), x0, dx, Bs, g )
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_cylinder( mask(:,:,1), x0, dx, Bs, g )
+        endif
 
     case ('two-cylinders')
-        call draw_two_cylinders( mask(:,:,1), x0, dx, Bs, g )
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_two_cylinders( mask(:,:,1), x0, dx, Bs, g )
+        endif
 
     case ('none')
         mask = 0.0_rk
@@ -143,11 +184,16 @@ subroutine create_mask_2D( time, x0, dx, Bs, g, mask, stage )
     !---------------------------------------------------------------------------
     ! sponge
     !---------------------------------------------------------------------------
-    if (params_acm%use_sponge) then
-        call sponge_2D( mask(:,:,6), x0, dx, Bs, g)
+    ! Though time-independent, we treat the sponge mask as if it were time-dependent
+    ! because it does not have to be refined to the finest level (unlike the mask
+    ! function.)
+    if (stage == "time-dependent-part" .or. stage == "all-parts") then
+        if (params_acm%use_sponge) then
+            call sponge_2D( mask(:,:,6), x0, dx, Bs, g)
+        endif
     endif
 
-end subroutine create_mask_2D
+end subroutine create_mask_2D_ACM
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
@@ -168,12 +214,10 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     real(kind=rk), dimension(2), intent(in)                   :: x0, dx
 
     ! auxiliary variables
-    real(kind=rk)                                             :: x, y, r, h
+    real(kind=rk)                                             :: x, y, r, h, dx_min
     ! loop variables
     integer(kind=ik)                                          :: ix, iy
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
@@ -181,12 +225,9 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     ! reset mask array
     mask = 0.0_rk
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
-
-
     ! parameter for smoothing function (width)
-    h = 1.5_rk*max(dx(1), dx(2))
+    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    h = 1.5_rk * dx_min
 
     do iy=1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)

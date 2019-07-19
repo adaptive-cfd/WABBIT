@@ -25,7 +25,7 @@
 ! ********************************************************************************************
 
 subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
 !---------------------------------------------------------------------------------------------
 ! modules
@@ -53,6 +53,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), intent(inout)     :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_n
+    integer(kind=ik), intent(in)        :: tree_ID
 
     ! MPI error variable
     integer(kind=ik)                    :: ierr
@@ -111,6 +112,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! First step: define how many blocks each mpirank should have.
     !---------------------------------------------------------------------------------
     call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
+!    call set_desired_num_blocks_per_rank(params, dist_list, lgt_n)
 !    call write_block_distribution( params, dist_list, "block_dist.dat" )
 
     ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
@@ -242,7 +244,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! call) but that is tricky: the neighbor list contains light ID of the neighbors, and those
     ! also change with the xfer.
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n)
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
     ! timing
     call toc( "balance_load (TOTAL)", MPI_wtime()-t0 )

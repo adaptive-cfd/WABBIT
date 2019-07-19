@@ -112,6 +112,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! First step: define how many blocks each mpirank should have.
     !---------------------------------------------------------------------------------
     call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
+!    call set_desired_num_blocks_per_rank(params, dist_list, lgt_n)
 !    call write_block_distribution( params, dist_list, "block_dist.dat" )
 
     ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"

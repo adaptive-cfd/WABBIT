@@ -881,7 +881,7 @@ contains
         integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:,:) !< active lists
         integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
         real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
-        character (len=*)                 :: operation !< which arithmetical operation (+,-,*,/) which is applied
+        character (len=*), intent(in)  :: operation !< which arithmetical operation (+,-,*,/) which is applied
         integer(kind=ik),optional, intent(in)::dest_tree_id !< optional for saving results to destination tree id
         !-----------------------------------------------------------------
         integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize
@@ -889,6 +889,7 @@ contains
         hvy_id1, hvy_id2, Bs(3), g, lgt_id_dest, hvy_id_dest
         integer(kind=tsize) :: treecode1, treecode2
         real (kind=rk) :: t_elapse
+        character (len=5) :: op !< which arithmetical operation (+,-,*,/) which is applied
 
         Jmax = params%max_treelevel ! max treelevel
         fsize= params%forest_size   ! maximal number of trees in forest
@@ -900,13 +901,17 @@ contains
         ! decide if inplace or out of place operation
         if(present(dest_tree_id))then
             ! operation will be out of place: result saved in dest_id
-            operation = trim(operation)//"out"
+            op = trim(operation)//"out"
             ! delete tree_id_dest if it is already allocated.
             ! tree_id_dest only exists if it is in the list of active trees, i.e. tree_id_dest <= tree_n
             if (dest_tree_id <= tree_n) then
                 ! Caution: active lists will be outdated
                 call delete_tree(params, lgt_block, lgt_active, lgt_n, dest_tree_id)
+                call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
             end if
+        else
+          op = trim(operation)
         endif
         !=============================================
         ! Prepare the trees for pointwise arithmentic
@@ -941,6 +946,9 @@ contains
         call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
 
+        call same_block_distribution(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, tree_n, tree_id1, tree_id2)
+
         !=================================================
         ! Decide which pointwice arithmetic shell be used
         !=================================================
@@ -950,7 +958,7 @@ contains
         !   /     \
         !  /caution\
         ! +--------+
-        select case(operation)
+        select case(op)
         case("+out")
             !         #
             !         #
@@ -1457,7 +1465,7 @@ contains
 
     !##############################################################
     subroutine add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, dest_tree_id, verbosity)
 
         implicit none
         !-----------------------------------------------------------------
@@ -1473,17 +1481,23 @@ contains
         integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
         real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
         logical, intent(in),optional      :: verbosity !< if true: additional information of processing
+        integer(kind=ik), intent(in), optional:: dest_tree_id !< if specified result of addition will be saved here
+                                                                !< otherwise result will overwrite tree_id1
         !-----------------------------------------------------------------
         logical :: verbose=.false.
 
         if (present(verbosity)) verbose=verbosity
         if (params%rank == 0 .and. verbose) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
 
-        call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
-
+        if(present(dest_tree_id))then
+          call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+",dest_tree_id)
+        else
+          call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
+        endif
     end subroutine
-    !##############################################################
+    !########################################################### ###
 
 
 
@@ -1526,7 +1540,7 @@ function scalar_product_two_trees( params, tree_n, &
     !---------------------------------------------------------------
     integer(kind=ik) :: free_tree_id, Jmax, Bs(3), g, &
                         N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(3)
+    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2)
     real(kind=rk) :: x0(3), dx(3)
 
     if ( present(buffer_tree_id)) then
@@ -1546,24 +1560,13 @@ function scalar_product_two_trees( params, tree_n, &
     !----------------------------------------------
     ! sprod = <X_i, X_j>
     t_elapse = MPI_wtime()
-    !---------------------------
-    ! copy tree_id1 -> free_tree_id
-    !----------------------------
-    ! copy tree with tree_id1 to tree with free_tree_id
-    ! note: this routine deletes lgt_data of the "free_tree_id" before copying
-    !       the tree
-    t_inc(1) = MPI_wtime()
-
-    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id1)
-    t_inc(1) = MPI_wtime()-t_inc(1)
 
     !---------------------------------------------------
     ! multiply tree_id2 * free_tree_id -> free_tree_id
     !---------------------------------------------------
-    t_inc(2) = MPI_wtime()
+    t_inc(1) = MPI_wtime()
     call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, free_tree_id, tree_id2)
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, free_tree_id)
     !call write_tree_field("field1_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
     !lgt_n, hvy_n, hvy_active, 1, free_tree_id )
     !call write_tree_field("field2_copy_mult.h5", params, lgt_block, lgt_active, hvy_block, &
@@ -1571,7 +1574,7 @@ function scalar_product_two_trees( params, tree_n, &
     !call abort(134)
 
 
-    t_inc(2) = MPI_wtime()-t_inc(2)
+    t_inc(1) = MPI_wtime()-t_inc(2)
     !---------------------------------------------------
     ! adapt the mesh before summing it up
     !---------------------------------------------------
@@ -1584,7 +1587,7 @@ function scalar_product_two_trees( params, tree_n, &
     !----------------------------------------------------
     ! sum over all elements of the tree with free_tree_id
     !-----------------------------------------------------
-    t_inc(3) = MPI_wtime()
+    t_inc(2) = MPI_wtime()
     sprod = 0.0_rk
     do k = 1, hvy_n(free_tree_id)
       hvy_id = hvy_active(k, free_tree_id)
@@ -1598,7 +1601,7 @@ function scalar_product_two_trees( params, tree_n, &
         sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
       endif
     end do
-    t_inc(3) = MPI_wtime()-t_inc(3)
+    t_inc(2) = MPI_wtime()-t_inc(2)
     t_elapse = MPI_WTIME() - t_elapse
     !----------------------------------------------------
     ! sum over all Procs
@@ -1621,7 +1624,7 @@ end function
 
     !##############################################################
     subroutine multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, verbosity)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, dest_tree_id, verbosity)
 
         implicit none
         !-----------------------------------------------------------------
@@ -1637,14 +1640,20 @@ end function
         integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
         real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
         logical, intent(in),optional      :: verbosity !< if true: additional information of processing
+        integer(kind=ik), intent(in),optional :: dest_tree_id !< number of the tree
         !-----------------------------------------------------------------
         logical :: verbose=.false.
 
         if (present(verbosity)) verbose=verbosity
         if (params%rank == 0 .and. verbose ) write(*,'("Multiply trees: ",i4,",",i4)') tree_id1, tree_id2
 
-        call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, "*")
+        if(present(dest_tree_id))then
+          call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"*",dest_tree_id)
+        else
+          call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, "*")
+        endif
 
     end subroutine
     !##############################################################
@@ -1712,7 +1721,7 @@ end function
                     call lgt_id_to_proc_rank( rank2, lgt_id2, N)
                     if (rank1 .ne. rank2) then
                         n_comm = n_comm + 1
-                        write(*,*) "===============> not identical", n_comm
+        !                write(*,*) "===============> not identical", n_comm
                         comm_list(n_comm, 1) = rank1   ! sender mpirank
                         comm_list(n_comm, 2) = rank2   ! receiver mpirank
                         comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send

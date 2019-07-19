@@ -125,7 +125,6 @@ subroutine post_average_snapshots(params)
                         hvy_n, hvy_tmp, hvy_neighbor, (/(i, i= 1, N_snapshots)/), &
                         average_tree_id, verbosity)
 
-
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
     lgt_n, hvy_n, hvy_active, dF=1, tree_id=average_tree_id, time=0.0_rk, iteration=0 )
 

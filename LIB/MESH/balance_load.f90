@@ -25,16 +25,11 @@
 ! ********************************************************************************************
 
 subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID, predictable_dist)
 
     implicit none
 
+    !=============================================================================
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -54,28 +49,24 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: hvy_n
     integer(kind=ik), intent(in)        :: tree_ID
+    !> if true balance the load will always give the same block distribution
+    !> for the same treestructure (default is False)
+    logical, intent(in),optional        :: predictable_dist
+    !=============================================================================
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank, proc_dist_id, proc_data_id
-    ! number of processes
-    integer(kind=ik)                    :: number_procs
+    integer(kind=ik)  :: rank, proc_dist_id, proc_data_id, ierr, number_procs, &
+                         k, N, l, com_i, com_N, heavy_id, sfc_id, neq, &
+                         lgt_free_id, hvy_free_id, hilbertcode(params%max_treelevel)
     ! block distribution lists
-    integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), affinity(:)
-    ! loop variables
-    integer(kind=ik)                    :: k, N, l, com_i, com_N, heavy_id, sfc_id, neq
-    ! free light/heavy data id
-    integer(kind=ik)                    :: lgt_free_id, hvy_free_id
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1
-    ! space filling curve list
-    integer(kind=ik), allocatable, save :: sfc_com_list(:,:), sfc_sorted_list(:,:)
-    ! hilbert code
-    integer(kind=ik)                    :: hilbertcode(params%max_treelevel)
+    integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), &
+                     affinity(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
+    real(kind=rk) :: t0, t1
+    logical       :: is_predictable=.False.
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    ! check if argument is present or not
+    if (present(predictable_dist)) then
+      is_predictable=predictable_dist
+    endif
 
     if (params%number_procs == 1) then
         ! on only one proc, no balancing is required
@@ -111,8 +102,11 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !---------------------------------------------------------------------------------
     ! First step: define how many blocks each mpirank should have.
     !---------------------------------------------------------------------------------
-    call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
-!    call set_desired_num_blocks_per_rank(params, dist_list, lgt_n)
+    if (is_predictable) then
+       call set_desired_num_blocks_per_rank(params, opt_dist_list, lgt_n)
+    else
+       call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
+    endif
 !    call write_block_distribution( params, dist_list, "block_dist.dat" )
 
     ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"

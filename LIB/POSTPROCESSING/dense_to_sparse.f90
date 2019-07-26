@@ -42,8 +42,23 @@ subroutine dense_to_sparse(params)
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
-            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform grid (up and downsampling ensured). command line:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 target_treelevel order-predictor(2 or 4)"
+            write(*,*) "--------------------------------------------------------------"
+            write(*,*) "                DENSE TO SPARSE "
+            write(*,*) "--------------------------------------------------------------"
+            write(*,*) "postprocessing subroutine sparse a mesh with a given detail treshold"
+            write(*,*) " "
+            write(*,*) "Command:"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 --eps=0.1"
+            write(*,*) "[--indicator=threshold-vorticity|threshold-state-vector --memory==2GB --order=[2|4]]"
+            write(*,*) "-------------------------------------------------------------"
+            write(*,*) "Optional Inputs: "
+            write(*,*) "  1. indicator = which quantity is thresholded"
+            write(*,*) "  (default is the max treelevel of the source file) " 
+            write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
+            write(*,*) "  (default is preditor order 2) " 
+            write(*,*) "  3. memory = maximal memory allocated"
+            write(*,*) "-------------------------------------------------------------"
+            write(*,*)
         end if
         return
     end if

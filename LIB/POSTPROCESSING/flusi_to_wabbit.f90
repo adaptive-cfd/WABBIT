@@ -154,7 +154,7 @@ subroutine flusi_to_wabbit(params)
     endif
 
     ! this would actually now be possible but needs to be implemented:
-    if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
+    !if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
 
     do k = 1, params%dim
         if (mod(nxyz(k),(Bs(k)-1)) /=0 ) then
@@ -187,8 +187,7 @@ subroutine flusi_to_wabbit(params)
 
     ! read the field from flusi file and organize it in WABBITs blocks
     call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
-    hvy_active, params, nxyz(2))
-
+    hvy_active, params, nxyz)
     ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
     ! they will therefore send their redundant points to the last blocks in x,y and z-direction
     do k = 1, lgt_n

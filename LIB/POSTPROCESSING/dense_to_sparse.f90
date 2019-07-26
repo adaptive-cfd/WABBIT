@@ -97,12 +97,12 @@ subroutine dense_to_sparse(params)
     end do
 
     ! Check parameters for correct inputs:
-    if (order == "4") then
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-    else
+    if (order == "2") then
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
+    else
+        params%order_predictor = "multiresolution_4th"
+        params%n_ghosts = 4_ik
     end if
 
     if (eps > 0) then

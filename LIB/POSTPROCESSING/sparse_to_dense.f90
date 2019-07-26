@@ -79,7 +79,7 @@ subroutine sparse_to_dense(params)
     ! check if optional arguments are specified
     if (command_argument_count()<4) then
       ! set defaults
-      order = "2"
+      order = "4"
       level = tc_length
     else
       call get_command_argument(4, level_in)

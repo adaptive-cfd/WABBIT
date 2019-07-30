@@ -756,8 +756,15 @@ contains
                 end if
 
                 ! since lgt_block was synced we have to create the active lists again
-                call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
+                call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id1),&
+                lgt_n(tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1), &
+                lgt_sortednumlist(:,:,tree_id1), tree_id1 )
+
+                call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
+                lgt_n(tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2), &
+                lgt_sortednumlist(:,:,tree_id2), tree_id2 )
+                !call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+                !lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
 
                 ! update neighbor relations
                 call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
@@ -907,8 +914,9 @@ contains
             if (dest_tree_id <= tree_n) then
                 ! Caution: active lists will be outdated
                 call delete_tree(params, lgt_block, lgt_active, lgt_n, dest_tree_id)
-                call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
+
+                !call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
+                !lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
             end if
         else
           op = trim(operation)
@@ -940,7 +948,7 @@ contains
 
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-        hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2 )
+        hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
 
         ! since lgt_block was synced we have to create the active lists again
         call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
@@ -1362,6 +1370,12 @@ contains
         if (present(dest_tree_id)) then
           ! we have to synchronize lgt data since we were updating it locally
           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+
+          ! the updates were only involving dest_tree_id so 
+          ! all other active lists are still updated
+          !call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,dest_tree_id),&
+          !lgt_n(dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id), &
+          !lgt_sortednumlist(:,:,dest_tree_id), dest_tree_id )
 
           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)

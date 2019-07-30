@@ -115,7 +115,6 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     if (lgt_n > 1) then
         call quicksort(lgt_sortednumlist, 1, lgt_n, 2)
     end if
-
     call toc("create_active_and_sorted_lists_tree", MPI_wtime()-t0)
 end subroutine create_active_and_sorted_lists_tree
 
@@ -185,7 +184,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     ! note: this seems to be a complicated way of reseting the
     !       active lists, but it is very crucial for performance!
     !       NEVER RESET the full array without reasons!!!
-    do tree_id = 1, fsize
+    do tree_id = 1, tree_n 
       ! check if lgt_n or hvy_n of tree is valid (not too small or too large)
       if (lgt_n(tree_id)>size(lgt_active(:,tree_id)) .or. lgt_n(tree_id) <=0) &
         lgt_n(tree_id) = size(lgt_active(:,tree_id))

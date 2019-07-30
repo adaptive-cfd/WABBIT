@@ -324,7 +324,6 @@ contains
     integer(kind=ik) :: j, n_components=1, io_error
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
-    character(len=80) :: tmp_name
     character(len=2)  :: order
     logical :: verbosity = .false., save_all = .true.
 
@@ -530,11 +529,6 @@ contains
           lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
           hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
       endif
-      !tmp_name = "adapted"
-      !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
-      !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id )
-      !stop
     end do
 
     ! --------------------

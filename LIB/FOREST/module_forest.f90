@@ -934,18 +934,19 @@ contains
         hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
 
         ! since lgt_block was synced we have to create the active lists again
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id1),&
+        lgt_n(tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1), &
+        lgt_sortednumlist(:,:,tree_id1), tree_id1 )
 
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
         hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2 )
-        call toc( "pointwise_tree_arithmetic (balancing)", MPI_Wtime()-t_elapse )
 
         ! since lgt_block was synced we have to create the active lists again
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
-        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
-
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
+        lgt_n(tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2), &
+        lgt_sortednumlist(:,:,tree_id2), tree_id2 )
+        call toc( "pointwise_tree_arithmetic (balancing + active list)", MPI_Wtime()-t_elapse )
         !=================================================
         ! Decide which pointwice arithmetic shell be used
         !=================================================
@@ -955,6 +956,7 @@ contains
         !   /     \
         !  /caution\
         ! +--------+
+        t_elapse = MPI_WTIME()
         select case(op)
         case("+out")
             !         #

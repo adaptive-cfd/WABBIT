@@ -49,6 +49,10 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     integer(kind=ik)                    :: k, N, heavy_id, block_rank
     ! process rank
     integer(kind=ik)                    :: rank, TREE_ID_IDX
+    real(kind=rk) :: t0
+
+    t0 = MPI_wtime()
+
 
     ! reset old lists, use old numbers of active blocks. If the old numbers are
     ! invalid (too small too large), then we delete everything in the lists
@@ -112,6 +116,7 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
         call quicksort(lgt_sortednumlist, 1, lgt_n, 2)
     end if
 
+    call toc("create_active_and_sorted_lists_tree", MPI_wtime()-t0)
 end subroutine create_active_and_sorted_lists_tree
 
 

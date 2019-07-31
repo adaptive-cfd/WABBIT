@@ -25,6 +25,7 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
+  use module_params, only: read_bs
   use module_helpers, only : startup_conditioner, smoothstep
   use module_params, only: merge_blancs, count_entries
 
@@ -190,36 +191,14 @@ contains
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
-    call read_param_mpi(FILE, 'Blocks', 'number_block_nodes', Bs_str, "empty")
-    call merge_blancs(Bs_str)
-    Bs_short=trim(Bs_str)
-    call count_entries(Bs_short, " ", n_entries)
-    if (Bs_str .eq. "empty") then
-      Bs_conc="17 17 17"
-    elseif (n_entries==1) then
-      if (params_acm%dim==3) then
-        Bs_conc=Bs_short // " " // Bs_short // " " // Bs_short
-      elseif (params_acm%dim==2) then
-        Bs_conc=Bs_short//" "//Bs_short//" 1"
-      endif
-    elseif (n_entries==2) then
-      if (params_acm%dim==3) then
-        call abort(231191739,"ERROR: You only gave two values for Bs, but want three to be read...")
-      elseif (params_acm%dim==2) then
-        Bs_conc=Bs_short//" 1"
-      endif
-    elseif (n_entries==3) then
-      if (params_acm%dim==2) then
-        call abort(231191740,"ERROR: You gave three values for Bs, but only want two to be read...")
-      elseif (params_acm%dim==3) then
-        Bs_conc=trim(adjustl(Bs_str))
-      endif
-    elseif (n_entries .gt. 3) then
-      call abort(231191754,"ERROR: You gave too many arguments for Bs...")
-    endif
-    read(Bs_conc, *) Bs_real
-    params_acm%Bs = int(Bs_real)
 
+    ! set defaults
+    if (params_acm%dim==3) then
+      params_acm%Bs=(/17,17,17/)
+    else
+      params_acm%Bs=(/17,17,1/)
+    endif
+    params_acm%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_acm%Bs, params_acm%dim)
 
     call clean_ini_file_mpi( FILE )
 

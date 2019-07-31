@@ -731,8 +731,9 @@ contains
         if (rank == 0) then
           write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
           tree_id1, tree_id2, t_elapse
-          write(*,'(" mult trees: ",es12.4," integrate ",es12.4)') t_inc
         endif
+        call toc( "compute_covariance_matrix (multiply trees)", t_inc(1) )
+        call toc( "compute_covariance_matrix (integrate over tree)", t_inc(2) )
       end do
     end do
     ! sum over all Procs

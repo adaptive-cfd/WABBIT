@@ -101,9 +101,12 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
         call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
+        if ( .not. All(params%periodic_BC) ) then
+            ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+            call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
+        endif
         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
-        hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "integral_stage" )
+        hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "integral_stage", boundary_flag=surface )
     enddo
 
 

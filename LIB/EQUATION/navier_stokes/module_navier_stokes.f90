@@ -233,6 +233,10 @@ contains
       ! called for each block.
       if (params_ns%case=="funnel") then
         ! since rhs was not computed yet we can use it as a temporary storage
+        if (params_ns%coordinates=="cylindrical") then
+          ! RHS using various boundary conditions
+          call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
+        endif
         rhs=u
         call convert_statevector(rhs(:,:,:,:),'pure_variables')
         call integrate_over_pump_area(rhs(:,:,:,:),g,Bs,x0,dx,integral,area)

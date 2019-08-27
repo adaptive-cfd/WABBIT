@@ -53,9 +53,9 @@ subroutine dense_to_sparse(params)
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. indicator = which quantity is thresholded"
-            write(*,*) "  (default is the max treelevel of the source file) " 
+            write(*,*) "  (default is the max treelevel of the source file) "
             write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
-            write(*,*) "  (default is preditor order 2) " 
+            write(*,*) "  (default is preditor order 2) "
             write(*,*) "  3. memory = maximal memory allocated"
             write(*,*) "-------------------------------------------------------------"
             write(*,*)

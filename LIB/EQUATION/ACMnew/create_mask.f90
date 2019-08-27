@@ -53,10 +53,25 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
         if (stage == "time-independent-part" .or. stage == "all-parts") then
             ! fractal trees are time-independent (they have no time-dependent part)
             call Draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+
+            ! store the mask color array as double
+            mask(:,:,:,5) = real(mask_color, kind=rk)
         endif
 
-        ! store the mask color array as double
-        mask(:,:,:,5) = real(mask_color, kind=rk)
+
+    case ('active_grid')
+        !-----------------------------------------------------------------------
+        ! ACTIVE GRID
+        !-----------------------------------------------------------------------
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            ! active grids are always time-dependent
+            call draw_active_grid_winglets(time, Insect, x0-dble(g)*dx, dx, &
+            mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+
+            ! store the mask color array as double
+            mask(:,:,:,5) = real(mask_color, kind=rk)
+        endif
+
 
     case ('Insect')
         !-----------------------------------------------------------------------
@@ -101,9 +116,8 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
         case default
             call abort(16072019, "unknown request to create_mask")
-            
-        end select
 
+        end select
 
 
     case ('none')
@@ -165,7 +179,7 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     select case (params_acm%geometry)
     case ('cylinder')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
-            call draw_cylinder( mask(:,:,1), x0, dx, Bs, g )
+            call draw_cylinder( mask, x0, dx, Bs, g )
         endif
 
     case ('two-cylinders')
@@ -209,14 +223,14 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     integer(kind=ik), intent(in) :: g
     integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(out)     :: mask
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
 
     ! auxiliary variables
-    real(kind=rk)                                             :: x, y, r, h, dx_min
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp
     ! loop variables
-    integer(kind=ik)                                          :: ix, iy
+    integer(kind=ik) :: ix, iy
 
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
@@ -229,22 +243,21 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
     h = 1.5_rk * dx_min
 
-    do iy=1, Bs(2)+2*g
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-        do ix=1, Bs(1)+2*g
+        do ix = 1, Bs(1)+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
             ! distance from center of cylinder
             r = dsqrt(x*x + y*y)
-            if (params_acm%smooth_mask) then
-                mask(ix,iy) = smoothstep(r, params_acm%R_cyl, h)
-            else
-                ! if point is inside the cylinder, set mask to 1
-                if (r <= params_acm%R_cyl) then
-                    mask(ix,iy) = 1.0_rk
-                else
-                    mask(ix,iy) = 0.0_rk
-                end if
-            end if
+
+            tmp = smoothstep(r, params_acm%R_cyl, h)
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
         end do
     end do
 

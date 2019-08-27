@@ -1,12 +1,6 @@
 subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     level_diff, hvy_block, hvy_id )
 
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -49,13 +43,6 @@ end subroutine restrict_predict_data
 
 
 subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -71,9 +58,6 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
 
     ! local variables
     integer(kind=ik)                                :: ix, iy, iz, dF
-
-    !---------------------------------------------------------------------------------------------
-    ! main body
 
     do dF = 1, size(hvy_block,4)
         do iz = ijk(1,3), ijk(2,3), 2
@@ -93,13 +77,6 @@ end subroutine restrict_data
 
 
 subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -117,8 +94,6 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     integer(kind=ik)                                :: dF, nx, ny, nz
     integer(kind=ik)                                :: NdF
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
 
     NdF = size(hvy_block,4)
 
@@ -127,8 +102,6 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     ny = ijk(2,2) - ijk(1,2) + 1
     nz = ijk(2,3) - ijk(1,3) + 1
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
     ! The neighbor is finer: we have to interpolate the data
 
     if ( params%dim == 3 ) then      ! 3D

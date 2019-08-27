@@ -74,7 +74,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
 
         case('p', 'P')
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
-            work(:,:,:,k) = u(:,:,:,neqn)
+            work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
         case('vor')
             ! vorticity
@@ -97,6 +97,9 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
         case('div')
             ! div(u)
             call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+
+        case('scalar1', 'scalar')
+            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + 1)
 
         case('mask')
             work(:,:,:,k) = mask(:,:,:,1)

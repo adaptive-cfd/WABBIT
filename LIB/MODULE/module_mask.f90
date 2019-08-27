@@ -50,14 +50,17 @@ contains
         ! without penalization, do nothing.
         if ( .not. params%penalization ) return
 
-
         ! HACK
         if (params%physics_type /= "ACM-new") return
 
+
+        if ( params%forest_size < 3) call abort(190719,"Forest size is too small (increase to at least 3 in parameter file)")
+
+        ! default is false
         force_all_parts = .false.
         if (present(all_parts)) force_all_parts = all_parts
 
-        ! The advances pruned-tree technology works only if the mask is sufficiently
+        ! The advanced pruned-tree technology works only if the mask is sufficiently
         ! fine, either on Jmax or Jmax-1. If this condition is not met, generate the
         ! entire mask.
 ! As a hint, we use the flag (params%threshold_mask) which forces the

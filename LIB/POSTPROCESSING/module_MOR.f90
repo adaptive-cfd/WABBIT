@@ -735,6 +735,7 @@ contains
     params%eps_normalized=.True. ! normalize the statevector before thresholding
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
+    params%n_eqn=n_components
 
     if (order == "2") then
         params%order_predictor = "multiresolution_2nd"
@@ -782,7 +783,7 @@ contains
     ! READ a_coefficient from file
     !----------------------------------
     call read_array_from_ascii_file_mpi(fname_acoefs, a_coefs, n_header=0_ik) 
-
+    call count_lines_in_ascii_file_mpi(fsnapshot_list(1), N_snapshots, n_header=0_ik)
     !-------------------------------------------
     ! check and find common params in all h5-files
     ! of all snapshots
@@ -888,8 +889,9 @@ contains
     !----------------------------------
     ! READ ALL MODES
     !----------------------------------
-    do tree_id = N_snapshots+1,N_snapshots+N_modes
-      call read_field2tree(params,mode_in(tree_id,:) , params%n_eqn, tree_id, &
+    do j = 1, N_modes
+      tree_id = N_snapshots+j
+      call read_field2tree(params,mode_in(j,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
     end do
@@ -906,7 +908,7 @@ contains
         write(*,*) "WABBIT POD."
         write(*,*) "Snapshot matrix X build from:"
         do i = 1, N_snapshots
-          write(*, '("Snapshot=",i3 , " it=",i7,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
+          write(*, '("Snapshot=",i3 , " it=",i7,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
           i, iteration(i), lgt_n(i), &
           100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
@@ -914,7 +916,7 @@ contains
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
         end do
         write(*,'(80("-"))')
-        write(*,'("L2 norm ||X||_2^2/N_snapshots/Volume: ",g18.8)') L2norm**2/dble(N_snapshots)/Volume
+        write(*,'("L2 norm ||X||_2^2: ",g18.8)') L2norm_snapshots**2
         write(*,'("Data dimension: ",i1,"D")') params%dim
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("NCPU=",i6)') params%number_procs
@@ -954,12 +956,12 @@ contains
       do j = 1, N_snapshots
         call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       a_coefs, j , r, reconst_tree_id)
+                       a_coefs, j , r, reconst_tree_id, opt_offset_mode_tree_id=N_snapshots)
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_id, j)
         do dF = 1, params%n_eqn
           norm = compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt=dF, &
-                              tree_id_opt=tree_id, verbosity=verbose)
+                              tree_id_opt=reconst_tree_id, verbosity=verbose)
           L2norm = L2norm + norm**2
         end do
       end do
@@ -1506,7 +1508,7 @@ contains
   !##############################################################
   subroutine reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       a_coefs, iteration, N_modes, dest_tree_id)
+                       a_coefs, iteration, N_modes, dest_tree_id, opt_offset_mode_tree_id)
     implicit none
 
     !-----------------------------------------------------------------
@@ -1535,8 +1537,13 @@ contains
     !> Threshold value for truncating POD modes. If the singular value is smaller,
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk),  intent(in)     :: a_coefs(:,:)
+    !> optional argument for the tree_id of the first mode:
+    !> this can be useful if you have some trees which are stored at beginning
+    !>  tree_1 tree_2 tree_3, tree_mode1, tree_mode2 etc.
+    !> default is 0
+    integer(kind=ik), optional, intent(in)       :: opt_offset_mode_tree_id
     !---------------------------------------------------------------
-    integer(kind=ik)::  i, rank, free_tree_id
+    integer(kind=ik)::  i, rank, free_tree_id, offset = 0_ik
     real(kind=rk) :: a, t_elapse
     character(len=80):: filename
     !---------------------------------------------------------------------------
@@ -1544,6 +1551,10 @@ contains
     !---------------------------------------------------------------------------
     rank= params%rank
 
+    if (present(opt_offset_mode_tree_id)) then
+      offset=opt_offset_mode_tree_id
+    endif
+    
     if (rank == 0) then
       write(*, *)
       write(*,'(80("-"))')
@@ -1560,7 +1571,7 @@ contains
     if ( params%forest_size < N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
     if ( dest_tree_id<= N_modes) call abort(200419,"Error! Destination tree id overwrites POD Modes!")
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, 1_ik)
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, offset+1)
     call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
                                     dest_tree_id, a_coefs(iteration,1))
     free_tree_id = dest_tree_id + 1
@@ -1573,7 +1584,7 @@ contains
     a = a_coefs(iteration, i)
     ! calculate pod modes:
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id , i)
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id , offset + i)
     call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
                                     free_tree_id, a)
     call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &

@@ -19,7 +19,7 @@ program main_post
     use mpi
     ! global parameters
     use module_params
-    use module_MOR, only : post_POD, post_reconstruct
+    use module_MOR, only : post_POD, post_reconstruct, post_PODerror
     use module_timing
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -120,6 +120,10 @@ program main_post
   case ("--POD-reconstruct")
     call post_reconstruct(params)
 
+  case ("--POD-error")
+    call post_PODerror(params)
+
+
     case default
 
         if (params%rank==0) then
@@ -136,6 +140,7 @@ program main_post
             write(*,*) "--flusi-to-wabbit"
             write(*,*) "--POD"
             write(*,*) "--POD-reconstruct"
+            write(*,*) "--POD-error"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
             write(*,*) "--post_rhs"

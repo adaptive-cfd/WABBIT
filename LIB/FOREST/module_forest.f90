@@ -482,6 +482,7 @@ contains
         if (tree_id_dest <= tree_n) then
             ! Caution: active lists will be outdated
             call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id_dest)
+
         end if
 
 
@@ -1387,7 +1388,7 @@ contains
                  end do
              end do
         case default
-            call abort(135,"Operation unknown")
+            call abort(135,"Operation:  "//op//"  unknown")
         end select
         call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
 
@@ -1408,12 +1409,14 @@ contains
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1),&
         lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id1), hvy_n(tree_id1) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:,tree_id1), hvy_n(tree_id1) )
 
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
         lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id2), hvy_n(tree_id2) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:,tree_id2), hvy_n(tree_id2) )
     end subroutine
     !##############################################################
 

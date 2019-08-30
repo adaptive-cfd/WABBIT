@@ -27,7 +27,7 @@ module module_MOR
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: snapshot_POD, post_POD, post_reconstruct, post_PODerror
+  PUBLIC :: snapshot_POD, post_POD, post_reconstruct, post_PODerror, compute_tree_L2norm
   !**********************************************************************************************
 contains
 
@@ -198,9 +198,12 @@ contains
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
 
       if ( params%adapt_mesh) then
-                call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
-                lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
-                hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id),&
+        lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), hvy_n(pod_mode_tree_id) )
+
+        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
+        lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
+        hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
       endif
 
     end do

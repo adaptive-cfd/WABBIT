@@ -117,7 +117,7 @@ contains
     ! NOTE that as we have way more work arrays than actual state variables (typically
     ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
     !-----------------------------------------------------------------------------
-    subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, mask )
+    subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, mask ,boundary_flag)
         implicit none
         character(len=*), intent(in) :: physics
 
@@ -145,6 +145,15 @@ contains
         ! level. All parts of the mask shall be included: chi, boundary values, sponges.
         ! On input, the mask array is correctly filled. You cannot create the full mask here.
         real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
+        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+        ! boundary_flag(i) can be either 0, 1, -1,
+        !  0: no boundary in the direction +/-e_i
+        !  1: boundary in the direction +e_i
+        ! -1: boundary in the direction - e_i
+        ! currently only acessible in the local stage
+        integer(kind=2)          , intent(in):: boundary_flag(3)
 
         select case(physics)
         case ('ACM-new')
@@ -154,7 +163,7 @@ contains
             call PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )
 
         case ('navier_stokes')
-            call PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work )
+            call PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work, boundary_flag )
 
         case default
             call abort(88119, "[PREPARE_SAVE_DATA (metamodule)] unknown physics....")

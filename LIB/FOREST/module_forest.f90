@@ -25,7 +25,7 @@ module module_forest
     !**********************************************************************************************
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
-    PUBLIC :: add_two_trees, count_tree_hvy_n, average_trees, &
+    PUBLIC :: add_two_trees, substract_two_trees, count_tree_hvy_n, average_trees, &
     copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
     compute_tree_L2norm, delete_tree, scalar_product_two_trees, &
     same_block_distribution, prune_tree, add_pruned_to_full_tree, refine_tree
@@ -482,6 +482,7 @@ contains
         if (tree_id_dest <= tree_n) then
             ! Caution: active lists will be outdated
             call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id_dest)
+
         end if
 
 
@@ -1097,9 +1098,33 @@ contains
                     if (treecode1 .ne. treecode2 ) then
                         cycle
                     else
-                        !> \todo make this one faster by looping only over inner grid points
-                        hvy_block(:,:,:,:,hvy_id1) = hvy_block(:,:,:,:,hvy_id1) - &
-                        hvy_block(:,:,:,:,hvy_id2)
+                         if (params%dim==2) then
+                            !##########################################
+                            ! 2d
+                            do iq = 1, params%N_eqn
+                                do iy = g+1, Bs(2) + g
+                                    do ix = g+1, Bs(1) + g
+                                        hvy_block(ix,iy,1,iq,hvy_id1) = hvy_block(ix,iy,1,iq,hvy_id1) - &
+                                        hvy_block(ix,iy,1,iq,hvy_id2)
+                                    end do
+                                end do
+                            end do
+                            !##########################################
+                        else
+                            !##########################################
+                            ! 3D
+                            do iq = 1, params%N_eqn
+                                do iz = g+1, Bs(3) + g
+                                    do iy = g+1, Bs(2) + g
+                                        do ix = g+1, Bs(1) + g
+                                            hvy_block(ix,iy,iz,iq,hvy_id1) = hvy_block(ix,iy,iz,iq,hvy_id1) - &
+                                            hvy_block(ix,iy,iz,iq,hvy_id2)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            !##########################################
+                        endif
                         exit
                     end if
                 end do
@@ -1363,7 +1388,7 @@ contains
                  end do
              end do
         case default
-            call abort(135,"Operation unknown")
+            call abort(135,"Operation:  "//op//"  unknown")
         end select
         call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
 
@@ -1384,12 +1409,14 @@ contains
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1),&
         lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id1), hvy_n(tree_id1) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:,tree_id1), hvy_n(tree_id1) )
 
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
         lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id2), hvy_n(tree_id2) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:,tree_id2), hvy_n(tree_id2) )
     end subroutine
     !##############################################################
 
@@ -1508,6 +1535,42 @@ contains
         else
           call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
           hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
+        endif
+    end subroutine
+    !########################################################### ###
+
+!##############################################################
+    subroutine substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, dest_tree_id, verbosity)
+
+        implicit none
+        !-----------------------------------------------------------------
+        type (type_params), intent(inout) :: params   !< params structure
+        integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+        integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
+        integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
+        integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
+        integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
+        real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+        integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
+        integer(kind=ik), intent(inout)   :: lgt_active(:, :), hvy_active(:, :) !< active lists
+        integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
+        real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
+        logical, intent(in),optional      :: verbosity !< if true: additional information of processing
+        integer(kind=ik), intent(in), optional:: dest_tree_id !< if specified result of addition will be saved here
+                                                                !< otherwise result will overwrite tree_id1
+        !-----------------------------------------------------------------
+        logical :: verbose=.false.
+
+        if (present(verbosity)) verbose=verbosity
+        if (params%rank == 0 .and. verbose) write(*,'("Substract trees: ",i4,",",i4)') tree_id1, tree_id2
+
+        if(present(dest_tree_id))then
+          call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"-",dest_tree_id)
+        else
+          call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"-")
         endif
     end subroutine
     !########################################################### ###

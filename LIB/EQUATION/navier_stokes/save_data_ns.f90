@@ -10,7 +10,7 @@
   ! NOTE that as we have way more work arrays than actual state variables (typically
   ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
   !-----------------------------------------------------------------------------
-  subroutine PREPARE_SAVE_DATA_NStokes(time, u, g, x0, dx, work )
+  subroutine PREPARE_SAVE_DATA_NStokes(time, u, g, x0, dx, work, boundary_flag )
     use module_helpers , only: choose, list_contains_name
     use module_navier_stokes_cases, only: get_mask
     implicit none
@@ -28,6 +28,15 @@
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=2)          , intent(in):: boundary_flag(3)
     ! output in work array.
     real(kind=rk), allocatable,save :: tmp_u(:,:,:,:), vort(:,:,:,:), sigma(:,:,:,:), mask(:,:,:)
     ! local variables
@@ -43,9 +52,20 @@
     nvar = params_ns%n_eqn  ! number of variables describing the state of the fluid
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)
+    
     tmp_u  = u(:,:,:,:)
-    call convert_statevector(tmp_u,'pure_variables')
+    work(:,:,:,1:nvar)=u
+    if ( .not. ALL(params_ns%periodic_BC)) then
+      call compute_boundary_2D( time, g, Bs, dx, x0, tmp_u(:,:,1,:), boundary_flag)
+      call compute_boundary_2D( time, g, Bs, dx, x0, work(:,:,1,:), boundary_flag)
+    end if
 
+    !+++++++++++++++++++
+    ! save pure state variables (rho, u, v, w, p)
+    !++++++++++++++++++
+    call convert_statevector(work(:,:,:,1:nvar),'pure_variables')
+    ! save additional variables
+    call convert_statevector(tmp_u,'pure_variables')
 
     ! +++++++++++++++++
     ! compute vorticity
@@ -76,12 +96,6 @@
           call get_mask(params_ns, x0, dx, Bs, g, mask, .true.)   ! the true boolean stands for: make mask colored if possible
     end if
 
-    !+++++++++++++++++++
-    ! save pure state variables (rho, u, v, w, p)
-    !++++++++++++++++++
-    work(:,:,:,1:nvar)=u
-    call convert_statevector(work(:,:,:,1:nvar),'pure_variables')
-    ! save additional variables
     do k = nvar+1, params_ns%N_fields_saved
         name = params_ns%names(k)
         select case(trim(name))

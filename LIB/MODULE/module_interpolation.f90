@@ -19,24 +19,24 @@
 
 module module_interpolation
 
-!---------------------------------------------------------------------------------------------
-! modules
+    !---------------------------------------------------------------------------------------------
+    ! modules
 
     ! global parameters
     use module_params
 
-!---------------------------------------------------------------------------------------------
-! variables
+    !---------------------------------------------------------------------------------------------
+    ! variables
 
     implicit none
 
     PRIVATE
-    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
 
-!---------------------------------------------------------------------------------------------
-! main body
+    !---------------------------------------------------------------------------------------------
+    ! main body
 
 contains
 
@@ -55,12 +55,161 @@ contains
         nfine(2) = size(fine,2)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
-          call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
+            call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 
         coarse(:, :) = fine(1:nfine(1):2,1:nfine(2):2)
 
     end subroutine restriction_2D
+
+    ! coarsen the block by one level
+    subroutine restriction_prefilter_2D(fine, fine_filtered2, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:), intent(in) :: fine
+        real(kind=rk), dimension(1:,1:), intent(out) :: fine_filtered2
+        character(len=80), intent(in) :: wavelet
+        real(kind=rk), dimension(1:size(fine,1),1:size(fine,2)) :: fine_filtered
+        integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
+        real(kind=rk), allocatable, save :: HD(:)
+
+        nx = size(fine,1)
+        ny = size(fine,2)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4")
+                allocate( HD(-6:6) )
+
+                ! H TILDE filter
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
+
+            case default
+                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! note: ghost node layer is returned as original values.
+
+        ! copy (to fill ghost nodes with original data)
+        fine_filtered(:,:) = fine
+        fine_filtered(-a+1:nx-b,-a+1:ny-b) = 0.0_rk
+
+        ! apply the filter (first in x-direction)
+        do ix = -a+1, nx-b
+            do shift = a, b
+                fine_filtered(ix, -a+1:nx-b) = fine_filtered(ix, -a+1:nx-b) + fine(ix+shift, -a+1:nx-b)*HD(shift)
+            enddo
+        enddo
+
+        ! copy (to fill ghost nodes with original data)
+        fine_filtered2(:,:) = fine
+        fine_filtered2(-a+1:nx-b,-a+1:ny-b) = 0.0_rk
+
+        ! then in y-direction
+        do iy = -a+1, ny-b
+            do shift = a, b
+                fine_filtered2(-a+1:nx-b, iy) = fine_filtered2(-a+1:nx-b, iy) + fine_filtered(-a+1:nx-b, iy+shift)*HD(shift)
+            enddo
+        enddo
+    end subroutine
+
+
+    subroutine restriction_prefilter_3D(fine, fine_filtered2, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:,1:), intent(in) :: fine
+        real(kind=rk), dimension(1:,1:,1:), intent(out) :: fine_filtered2
+        character(len=80), intent(in) :: wavelet
+        real(kind=rk), allocatable, save :: fine_filtered(:,:,:)
+        real(kind=rk), allocatable, save :: HD(:)
+        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
+
+        nx = size(fine,1)
+        ny = size(fine,2)
+        nz = size(fine,3)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4")
+                allocate( HD(-6:6) )
+
+                ! H TILDE filter
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
+
+            case default
+                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! note: ghost node layer is returned as original values.
+
+        ! copy (to fill ghost nodes with original data)
+        fine_filtered2(:, :, :) = fine
+        fine_filtered2(-a+1:nx-b, -a+1:ny-b, -a+1:nz-b) = 0.0_rk
+
+        ! apply the filter (first in x-direction)
+        do ix = -a+1, nx-b
+            do shift = a, b
+                fine_filtered2(ix, -a+1:nx-b, -a+1:nz-b) = fine_filtered2(ix, -a+1:nx-b, -a+1:nz-b) + fine(ix+shift, -a+1:nx-b, -a+1:nz-b)*HD(shift)
+            enddo
+        enddo
+
+        ! copy (to fill ghost nodes with original data)
+        fine_filtered(:, :, :) = fine
+        fine_filtered(-a+1:nx-b, -a+1:ny-b, -a+1:nz-b) = 0.0_rk
+
+        ! then in y-direction
+        do iy = -a+1, ny-b
+            do shift = a, b
+                fine_filtered(-a+1:nx-b, iy, -a+1:nz-b) = fine_filtered(-a+1:nx-b, iy, -a+1:nz-b) + fine_filtered2(-a+1:nx-b, iy+shift, -a+1:nz-b)*HD(shift)
+            enddo
+        enddo
+
+        ! copy (to fill ghost nodes with original data)
+        fine_filtered2(:, :, :) = fine
+        fine_filtered2(-a+1:nx-b, -a+1:ny-b, -a+1:nz-b) = 0.0_rk
+
+        ! then in z-direction
+        do iz = -a+1, nz-b
+            do shift = a, b
+                fine_filtered2(-a+1:nx-b, -a+1:ny-b, iz) = fine_filtered2(-a+1:nx-b, -a+1:ny-b, iz) + fine_filtered(-a+1:nx-b, -a+1:ny-b, iz+shift)*HD(shift)
+            enddo
+        enddo
+    end subroutine
+
+
+
+    ! periodic index
+    ! uses one-based indexing
+    integer function perindex(i,n)
+        implicit none
+        integer, intent(in) :: i, n
+        perindex = i
+        do while (perindex<1 .or. perindex>n)
+            if (perindex<1) then
+                perindex = perindex+n
+            elseif (perindex>n) then
+                perindex = perindex-n
+            endif
+        end do
+
+    end function
+
 
     ! coarsen the block by one level
     subroutine restriction_3D(fine, coarse)
@@ -79,7 +228,7 @@ contains
         nfine(3) = size(fine,3)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2) .or. 2*ncoarse(3)-1 /= nfine(3) ) then
-          call abort(888192,"ERROR: restriction_3D: arrays wrongly sized..")
+            call abort(888192,"ERROR: restriction_3D: arrays wrongly sized..")
         endif
 
         coarse(:, :, :) = fine(1:nfine(1):2,1:nfine(2):2,1:nfine(3):2)
@@ -153,22 +302,22 @@ contains
             ! first columns (x: const y: variable )
             ! these points require one-sided interpolation.
             fine( 2, 1:nyfine:2 ) = a(1)*fine( 1, 1:nyfine:2 ) &
-                                  + a(2)*fine( 3, 1:nyfine:2 ) &
-                                  + a(3)*fine( 5, 1:nyfine:2 ) &
-                                  + a(4)*fine( 7, 1:nyfine:2 )
+            + a(2)*fine( 3, 1:nyfine:2 ) &
+            + a(3)*fine( 5, 1:nyfine:2 ) &
+            + a(4)*fine( 7, 1:nyfine:2 )
 
             ! last columns (same as above)
             fine( nxfine-1, 1:nyfine:2 ) = a(4)*fine( nxfine-6, 1:nyfine:2 ) &
-                                  + a(3)*fine( nxfine-4, 1:nyfine:2 ) &
-                                  + a(2)*fine( nxfine-2, 1:nyfine:2 ) &
-                                  + a(1)*fine( nxfine,   1:nyfine:2 )
+            + a(3)*fine( nxfine-4, 1:nyfine:2 ) &
+            + a(2)*fine( nxfine-2, 1:nyfine:2 ) &
+            + a(1)*fine( nxfine,   1:nyfine:2 )
 
             ! interpolate regular columns
             do ixfine =  4, nxfine-3, 2
                 fine( ixfine, 1:nyfine:2 ) = b(2)*fine( ixfine-3, 1:nyfine:2 ) &
-                                           + b(1)*fine( ixfine-1, 1:nyfine:2 ) &
-                                           + b(1)*fine( ixfine+1, 1:nyfine:2 ) &
-                                           + b(2)*fine( ixfine+3, 1:nyfine:2 )
+                + b(1)*fine( ixfine-1, 1:nyfine:2 ) &
+                + b(1)*fine( ixfine+1, 1:nyfine:2 ) &
+                + b(2)*fine( ixfine+3, 1:nyfine:2 )
             enddo
 
 
@@ -178,25 +327,25 @@ contains
             ! first row
             ! these points requie one-sided interpolation.
             fine( 1:nxfine, 2 ) = a(1)*fine( 1:nxfine, 1 ) &
-                                + a(2)*fine( 1:nxfine, 3 ) &
-                                + a(3)*fine( 1:nxfine, 5 ) &
-                                + a(4)*fine( 1:nxfine, 7 )
+            + a(2)*fine( 1:nxfine, 3 ) &
+            + a(3)*fine( 1:nxfine, 5 ) &
+            + a(4)*fine( 1:nxfine, 7 )
             ! last row (same as above)
             fine( 1:nxfine, nyfine-1 ) = a(4)*fine( 1:nxfine, nyfine-6) &
-                                  + a(3)*fine( 1:nxfine, nyfine-4 ) &
-                                  + a(2)*fine( 1:nxfine, nyfine-2 ) &
-                                  + a(1)*fine( 1:nxfine, nyfine )
+            + a(3)*fine( 1:nxfine, nyfine-4 ) &
+            + a(2)*fine( 1:nxfine, nyfine-2 ) &
+            + a(1)*fine( 1:nxfine, nyfine )
             ! remaining interior rows
             do iyfine =  4, nyfine-3, 2
                 fine( 1:nxfine, iyfine ) = b(2)*fine( 1:nxfine, iyfine-3 ) &
-                                         + b(1)*fine( 1:nxfine, iyfine-1 ) &
-                                         + b(1)*fine( 1:nxfine, iyfine+1 ) &
-                                         + b(2)*fine( 1:nxfine, iyfine+3 )
+                + b(1)*fine( 1:nxfine, iyfine-1 ) &
+                + b(1)*fine( 1:nxfine, iyfine+1 ) &
+                + b(2)*fine( 1:nxfine, iyfine+3 )
             enddo
 
         else
-             ! error case
-             call abort(888194,"ERROR: prediction_2D: wrong method..")
+            ! error case
+            call abort(888194,"ERROR: prediction_2D: wrong method..")
         endif
 
     end subroutine prediction_2D
@@ -225,7 +374,7 @@ contains
         nzfine   = size(fine  , 3)
 
         if ( 2*nxcoarse-1 /= nxfine .or. 2*nycoarse-1 /= nyfine .or. 2*nzcoarse-1 /= nzfine ) then
-          call abort(888195,"ERROR: prediction_3D: arrays wrongly sized..")
+            call abort(888195,"ERROR: prediction_3D: arrays wrongly sized..")
         endif
 
         ! fill matching points: the coarse and fine grid share a lot of points (as the
@@ -278,22 +427,22 @@ contains
                 ! first columns (x: const y: variable )
                 ! these points requie one-sided interpolation.
                 fine( 2, 1:nyfine:2, izfine ) = a(1)*fine( 1, 1:nyfine:2, izfine ) &
-                                      + a(2)*fine( 3, 1:nyfine:2, izfine ) &
-                                      + a(3)*fine( 5, 1:nyfine:2, izfine ) &
-                                      + a(4)*fine( 7, 1:nyfine:2, izfine )
+                + a(2)*fine( 3, 1:nyfine:2, izfine ) &
+                + a(3)*fine( 5, 1:nyfine:2, izfine ) &
+                + a(4)*fine( 7, 1:nyfine:2, izfine )
 
                 ! last columns (same as above)
                 fine( nxfine-1, 1:nyfine:2, izfine ) = a(4)*fine( nxfine-6, 1:nyfine:2, izfine ) &
-                                      + a(3)*fine( nxfine-4, 1:nyfine:2, izfine ) &
-                                      + a(2)*fine( nxfine-2, 1:nyfine:2, izfine ) &
-                                      + a(1)*fine( nxfine,   1:nyfine:2, izfine )
+                + a(3)*fine( nxfine-4, 1:nyfine:2, izfine ) &
+                + a(2)*fine( nxfine-2, 1:nyfine:2, izfine ) &
+                + a(1)*fine( nxfine,   1:nyfine:2, izfine )
 
                 ! interpolate regular columns
                 do ixfine =  4, nxfine-3, 2
                     fine( ixfine, 1:nyfine:2, izfine ) = b(2)*fine( ixfine-3, 1:nyfine:2, izfine ) &
-                                               + b(1)*fine( ixfine-1, 1:nyfine:2, izfine ) &
-                                               + b(1)*fine( ixfine+1, 1:nyfine:2, izfine ) &
-                                               + b(2)*fine( ixfine+3, 1:nyfine:2, izfine )
+                    + b(1)*fine( ixfine-1, 1:nyfine:2, izfine ) &
+                    + b(1)*fine( ixfine+1, 1:nyfine:2, izfine ) &
+                    + b(2)*fine( ixfine+3, 1:nyfine:2, izfine )
                 enddo
 
 
@@ -303,40 +452,40 @@ contains
                 ! first row
                 ! these points requie one-sided interpolation.
                 fine( 1:nxfine, 2, izfine ) = a(1)*fine( 1:nxfine, 1, izfine ) &
-                                    + a(2)*fine( 1:nxfine, 3, izfine ) &
-                                    + a(3)*fine( 1:nxfine, 5, izfine ) &
-                                    + a(4)*fine( 1:nxfine, 7, izfine )
+                + a(2)*fine( 1:nxfine, 3, izfine ) &
+                + a(3)*fine( 1:nxfine, 5, izfine ) &
+                + a(4)*fine( 1:nxfine, 7, izfine )
                 ! last row (same as above)
                 fine( 1:nxfine, nyfine-1, izfine ) = a(4)*fine( 1:nxfine, nyfine-6, izfine ) &
-                                      + a(3)*fine( 1:nxfine, nyfine-4, izfine ) &
-                                      + a(2)*fine( 1:nxfine, nyfine-2, izfine ) &
-                                      + a(1)*fine( 1:nxfine, nyfine, izfine )
+                + a(3)*fine( 1:nxfine, nyfine-4, izfine ) &
+                + a(2)*fine( 1:nxfine, nyfine-2, izfine ) &
+                + a(1)*fine( 1:nxfine, nyfine, izfine )
                 ! remaining interior rows
                 do iyfine =  4, nyfine-3, 2
                     fine( 1:nxfine, iyfine, izfine ) = b(2)*fine( 1:nxfine, iyfine-3, izfine ) &
-                                             + b(1)*fine( 1:nxfine, iyfine-1, izfine ) &
-                                             + b(1)*fine( 1:nxfine, iyfine+1, izfine ) &
-                                             + b(2)*fine( 1:nxfine, iyfine+3, izfine )
+                    + b(1)*fine( 1:nxfine, iyfine-1, izfine ) &
+                    + b(1)*fine( 1:nxfine, iyfine+1, izfine ) &
+                    + b(2)*fine( 1:nxfine, iyfine+3, izfine )
                 enddo
             enddo
 
             ! interpolate the z-direction (completely missing planes, no step 2)
             ! first plane
             fine( :, :, 2 ) = a(1)*fine( :, :, 1 ) &
-                            + a(2)*fine( :, :, 3 ) &
-                            + a(3)*fine( :, :, 5 ) &
-                            + a(4)*fine( :, :, 7 )
+            + a(2)*fine( :, :, 3 ) &
+            + a(3)*fine( :, :, 5 ) &
+            + a(4)*fine( :, :, 7 )
             ! last plane
             fine( :, :, nzfine-1 ) = a(4)*fine( :, :, nzfine-6 ) &
-                                   + a(3)*fine( :, :, nzfine-4 ) &
-                                   + a(2)*fine( :, :, nzfine-2 ) &
-                                   + a(1)*fine( :, :, nzfine )
+            + a(3)*fine( :, :, nzfine-4 ) &
+            + a(2)*fine( :, :, nzfine-2 ) &
+            + a(1)*fine( :, :, nzfine )
             ! remaining planes
             do izfine =  4, nzfine-3, 2
                 fine( :, :, izfine ) = b(2)*fine( :, :, izfine-3 ) &
-                                     + b(1)*fine( :, :, izfine-1 ) &
-                                     + b(1)*fine( :, :, izfine+1 ) &
-                                     + b(2)*fine( :, :, izfine+3 )
+                + b(1)*fine( :, :, izfine-1 ) &
+                + b(1)*fine( :, :, izfine+1 ) &
+                + b(2)*fine( :, :, izfine+3 )
             enddo
 
 

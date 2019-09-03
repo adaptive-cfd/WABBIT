@@ -565,8 +565,8 @@ contains
         write(*,'("NCPU=",i6)') params%number_procs
         write(*,'("Number Trees=",1x,i4)') fsize
         write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
-        write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
-        write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
+        write(*,'("Nblocks Available from Memory =",i9)') params%number_blocks
+        write(*,'("Nblocks (if all trees dense)=",i9)') number_dense_blocks
         write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
         write(*,'("block_distribution=",A)') params%block_distribution

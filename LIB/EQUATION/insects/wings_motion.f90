@@ -1,54 +1,61 @@
 !-------------------------------------------------------------------------------
-! WRAPPER Motion protocoll wrapper left wing
+! WRAPPER Motion protocol wrapper
 !-------------------------------------------------------------------------------
-subroutine FlappingMotion_left ( time, Insect )
+subroutine FlappingMotionWrap ( time, Insect, idw )
   implicit none
 
   real(kind=rk),intent(in) :: time
   real(kind=rk),dimension(0:3)::ep
   type(diptera) :: Insect
+  integer(kind=2), intent(in) :: idw
 
-  if (Insect%wing_fsi == "yes") then
-    !**********************************
-    !** Wing fsi model               **
-    !**********************************
-    ! the angles that we return here as postprocessing quantities for better
-    ! interpretation of the output. they are NOT used to compute the wing rotation
-    ! matrix, which is instead computed from the wing quaternion
-    ep = Insect%STATE(14:17)
-    Insect%phi_l   = atan2( 2.d0*ep(2)*ep(3)+2.d0*ep(0)*ep(1), ep(2)**2-ep(3)**2+ep(0)**2-ep(1)**2)
-    Insect%alpha_l = atan2(2.d0*ep(1)*ep(3)+2.d0*ep(0)*ep(2) , ep(1)**2+ep(0)**2-ep(3)**2-ep(2)**2 )
-    Insect%theta_l = -asin(2.d0*(ep(1)*ep(2)-ep(0)*ep(3)))
-    ! the time derivatives are not necessary and set to zero (the angular velocity
-    ! is computed dynamically from the eqns of motion)
-    Insect%phi_dt_l = 0.d0
-    Insect%alpha_dt_l = 0.d0
-    Insect%theta_dt_l = 0.d0
-  else
-    ! conventional model: all angles are prescribed (by fourier/hermite or others)
-    ! and can be evaluated for any time t. here, we return the 3 angles as well
-    ! as their time derivatives
-    call FlappingMotion ( time, Insect, Insect%FlappingMotion_left, &
-    Insect%phi_l, Insect%alpha_l, Insect%theta_l, Insect%phi_dt_l,&
-    Insect%alpha_dt_l, Insect%theta_dt_l, Insect%kine_wing_l )
-  endif
-end subroutine FlappingMotion_left
+  select case ( idw )
+  case (1) !("left")  
+    if (Insect%wing_fsi == "yes") then
+      !**********************************
+      !** Wing fsi model               **
+      !**********************************
+      ! the angles that we return here as postprocessing quantities for better
+      ! interpretation of the output. they are NOT used to compute the wing rotation
+      ! matrix, which is instead computed from the wing quaternion
+      ep = Insect%STATE(14:17)
+      Insect%phi_l   = atan2( 2.d0*ep(2)*ep(3)+2.d0*ep(0)*ep(1), ep(2)**2-ep(3)**2+ep(0)**2-ep(1)**2)
+      Insect%alpha_l = atan2(2.d0*ep(1)*ep(3)+2.d0*ep(0)*ep(2) , ep(1)**2+ep(0)**2-ep(3)**2-ep(2)**2 )
+      Insect%theta_l = -asin(2.d0*(ep(1)*ep(2)-ep(0)*ep(3)))
+      ! the time derivatives are not necessary and set to zero (the angular velocity
+      ! is computed dynamically from the eqns of motion)
+      Insect%phi_dt_l = 0.d0
+      Insect%alpha_dt_l = 0.d0
+      Insect%theta_dt_l = 0.d0
+    else
+      ! conventional model: all angles are prescribed (by fourier/hermite or others)
+      ! and can be evaluated for any time t. here, we return the 3 angles as well
+      ! as their time derivatives
+      call FlappingMotion ( time, Insect, Insect%FlappingMotion_left, &
+      Insect%phi_l, Insect%alpha_l, Insect%theta_l, Insect%phi_dt_l,&
+      Insect%alpha_dt_l, Insect%theta_dt_l, Insect%kine_wing_l )
+    endif
 
+  case (2) !("right")
+      call FlappingMotion ( time, Insect, Insect%FlappingMotion_right, &
+      Insect%phi_r, Insect%alpha_r, Insect%theta_r, Insect%phi_dt_r, &
+      Insect%alpha_dt_r, Insect%theta_dt_r, Insect%kine_wing_r )
 
-!-------------------------------------------------------------------------------
-! WARPPER Motion protocoll wrapper right wing
-!-------------------------------------------------------------------------------
-subroutine FlappingMotion_right ( time, Insect )
-  implicit none
+  case (3) !("left2")  
+      call FlappingMotion ( time, Insect, Insect%FlappingMotion_left2, &
+      Insect%phi_l2, Insect%alpha_l2, Insect%theta_l2, Insect%phi_dt_l2,&
+      Insect%alpha_dt_l2, Insect%theta_dt_l2, Insect%kine_wing_l2 )
 
-  real(kind=rk), intent(in) :: time
-  type(diptera) :: Insect
+  case (4) !("right2")
+      call FlappingMotion ( time, Insect, Insect%FlappingMotion_right2, &
+      Insect%phi_r2, Insect%alpha_r2, Insect%theta_r2, Insect%phi_dt_r2, &
+      Insect%alpha_dt_r2, Insect%theta_dt_r2, Insect%kine_wing_r2 )
 
-  call FlappingMotion ( time, Insect, Insect%FlappingMotion_right, &
-  Insect%phi_r, Insect%alpha_r, Insect%theta_r, Insect%phi_dt_r, &
-  Insect%alpha_dt_r, Insect%theta_dt_r, Insect%kine_wing_r )
-end subroutine FlappingMotion_right
+  case default
+    call abort(77744, "not a valid wing identifier")
+  end select
 
+end subroutine FlappingMotionWrap
 
 
 !-------------------------------------------------------------------------------
@@ -196,7 +203,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       phi_dt = deg2rad(phi_dt)
       alpha_dt = deg2rad(alpha_dt)
       theta_dt = deg2rad(theta_dt)
-    case ("radiant","RADIANT","Radiant")
+    case ("radian","RADIAN","Radian","radiant","RADIANT","Radiant")
       ! if the file is already in radiants, do nothing and be happy!
     case default
       call abort(1718,"kinematics file does not appear to be valid, set units=degree or units=radiant")
@@ -248,14 +255,61 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     ! revolving wing kinematics, pre-defined set. We fix alpha to 45deg and increase
     ! phi linearily with a short startup conditioner as suggested in [1]. The startup
     ! time is fixed to 0.4, which gives phi=31.35deg at the end of that interval
-    ! [3] D. Kolomenskiy, Y. Elimelech and K. Schneider. Leading-edge vortex shedding from rotating wings. Fluid Dyn. Res., 46, 031421, 2014.
+    ! [1] D. Kolomenskiy, Y. Elimelech and K. Schneider. Leading-edge vortex shedding from rotating wings. Fluid Dyn. Res., 46, 031421, 2014.
     ttau = 0.4
-    ! position angle (is directly given in radiant)
+    ! position angle (is directly given in radian)
     ! we use PHI_DOT = 1 as normalization as well (since we have no frequency in this case)
     phi = 1.d0*( ttau*dexp(-time/ttau) + time)
     phi_dt = 1.d0*(1.d0-dexp(-time/ttau))
     ! feathering angle is constant
     alpha = deg2rad(-45.d0)
+    alpha_dt = 0.d0
+    ! elevation angle is always zero
+    theta = 0.d0
+    theta_dt = 0.d0
+
+  case ("revolving-anticlock")
+    ! revolving wing kinematics. Similar to "revolving-set1", but phi(0)=0
+    ttau = 0.4
+    ! position angle (is directly given in radian)
+    ! we use PHI_DOT = 2*pi as normalization
+    phi = 2.d0*pi*( ttau*dexp(-time/ttau) - ttau + time)
+    phi_dt = 2.d0*pi*(1.d0-dexp(-time/ttau))
+    ! feathering angle is constant
+    alpha = deg2rad(-45.d0)
+    alpha_dt = 0.d0
+    ! elevation angle is always zero
+    theta = 0.d0
+    theta_dt = 0.d0
+
+  case ("revolving-clock")
+    ! revolving wing kinematics. Opposite direction to "revolving-anticlock"
+    ttau = 0.4
+    ! position angle (is directly given in radian)
+    ! we use PHI_DOT = 2*pi as normalization
+    phi = -2.d0*pi*( ttau*dexp(-time/ttau) - ttau + time)
+    phi_dt = -2.d0*pi*(1.d0-dexp(-time/ttau))
+    ! feathering angle is constant
+    alpha = deg2rad(45.d0)
+    alpha_dt = 0.d0
+    ! elevation angle is always zero
+    theta = 0.d0
+    theta_dt = 0.d0
+
+  case ("revolving-set2")
+    ! revolving wing kinematics, pre-defined set. We fix alpha and increase
+    ! phi linearily with a quadratic startup transient until phi=pi/8,
+    ! which is reached at time equal to pi/4
+    ! we use PHI_DOT = 1 as normalization
+    if (time < pi/4.0d0) then
+      phi = 2.0d0*time**2/pi
+      phi_dt = 4.0d0*time/pi
+    else
+      phi = time - pi/8.0d0
+      phi_dt = 1.0d0	
+    endif
+    ! feathering angle is constant
+    alpha = - Insect%init_alpha_phi_theta(1) ! Mind the "-" sign
     alpha_dt = 0.d0
     ! elevation angle is always zero
     theta = 0.d0

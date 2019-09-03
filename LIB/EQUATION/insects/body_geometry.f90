@@ -74,6 +74,8 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
         call draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     case ("bumblebee")
         call draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
+    case ("paratuposa_simple")
+        call draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
     case ("mosquito_iams")
         call draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     case ("pyramid")
@@ -162,8 +164,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
                 x_body = matmul(M_body,x_glob)
 
                 ! ------------------------------------
-                ! approximation to mesh from Maeda
-                ! similar to Aono et al.
+                ! approximation to mesh
                 ! ------------------------------------
                 x = x_body(1)
                 y = x_body(2)
@@ -338,7 +339,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
         xb = matmul( transpose(M_body), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
         call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-        ! proscrobis ( to drink )
+        ! proboscis (to drink)
         xa = matmul( transpose(M_body), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
         xb = matmul( transpose(M_body), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
         call draw_cylinder_new( xa, xb, rf, xx0, ddx, mask, mask_color, us, Insect, color_body)
@@ -347,7 +348,97 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
 end subroutine draw_body_bumblebee
 
 !------------------------------------------------------------------------------
+! A very small bug Paratuposa, highly simplified body shape
+subroutine draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
+    implicit none
 
+    type(diptera),intent(inout) :: Insect
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+
+    integer :: ix,iy,iz,j
+    real(kind=rk) :: x,y,z,s,a_body,bodylen,R,R0,R_tmp
+    real(kind=rk) :: x_glob(1:3),x_body(1:3),x_head(1:3),xa(1:3),xb(1:3)
+    real(kind=rk) :: rbc,thbc1,thbc2,x0bc,z0bc,xcs,zcs
+    real(kind=rk) :: xx_head,zz_head,dx_head,dz_head,a_head
+    real(kind=rk) :: xl1(5),yl1(5),zl1(5),rl1(4),xl2(5),yl2(5),zl2(5),rl2(4),&
+    xl3(5),yl3(5),zl3(5),rl3(4),xf(2),yf(2),zf(2),rf,xan(2),yan(2),zan(2),ran,&
+    xmin_bbox,xmax_bbox,ymin_bbox,ymax_bbox,zmin_bbox,zmax_bbox
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    ! Body length relative to the wing length
+    bodylen = 0.84d0
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
+
+    do iz = g, size(mask,3)-1-g
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+        do iy = g, size(mask,2)-1-g
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+            do ix = g, size(mask,1)-1-g
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! x_body is in the body coordinate system
+                x_body = matmul(M_body,x_glob)
+
+                ! ------------------------------------
+                ! approximation to mesh
+                ! ------------------------------------
+                x = x_body(1)/bodylen
+                y = x_body(2)/bodylen
+                z = x_body(3)/bodylen
+
+                ! symmetry plane is xz
+                ! +x direction is forward
+                ! body centerline is an arc with center at x0bc,y0bc
+                ! radius rbc and angles th measured from negative z
+                rbc = 1.27d0
+                thbc1 = 113.0d0 *pi/180.0d0
+                thbc2 = 67.0d0 *pi/180.0d0
+                x0bc = 0.0d0
+                z0bc = -1.17d0
+
+                ! chordwise dimensionless coordinate, from head to abdomen
+                s = (datan2(z-z0bc,-(x-x0bc))-thbc1)/(thbc2-thbc1)
+                ! body center coordinates at s
+                xcs = x0bc + (x-x0bc)*rbc/dsqrt((x-x0bc)**2+(z-z0bc)**2)
+                zcs = z0bc + (z-z0bc)*rbc/dsqrt((x-x0bc)**2+(z-z0bc)**2)
+
+                ! check if inside body bounds (in s-direction)
+!                if ( (s>=-Insect%safety) .and. (s<=1.0d0+Insect%safety) ) then
+                if ( (s>=0.0d0) .and. (s<=1.0d0) ) then
+
+                    ! compute radius as a function of s (counting from the tail on)
+                    if (z >= zcs) then
+                        R0 = 0.22d0/0.5d0*dsqrt(0.5d0**2-(s-0.5d0)**2)
+                        a_body = 0.18d0/0.22d0
+                    else
+                        R0 = 0.07d0/0.5d0*dsqrt(0.5d0**2-(s-0.5d0)**2)
+                        a_body = 0.18d0/0.07d0
+                    endif
+
+                    ! distance to the body center at s
+                    R = dsqrt( (x-xcs)**2 + (y/a_body)**2 + (z-zcs)**2 )
+
+                    ! smoothing
+                    if (( R < R0 + Insect%safety ).and.(R0>0.d0)) then
+                        R_tmp = steps(R, R0, Insect%smooth)
+                        mask(ix,iy,iz)= max( R_tmp , mask(ix,iy,iz) )
+                        mask_color(ix,iy,iz) = color_body
+                    endif
+
+                endif
+            enddo
+        enddo
+    enddo
+
+end subroutine draw_body_paratuposa_simple
+
+!------------------------------------------------------------------------------
 ! Body adapted from Maeda & Liu. It assumes Insect%x_head=0.0
 subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
@@ -536,6 +627,8 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     Insect%R_eye = 0.0625d0
     Insect%x_pivot_r_b =(/ 0.05d0, -0.2165d0, 0.d0 /)
     Insect%x_pivot_l_b =(/ 0.05d0, +0.2165d0, 0.d0 /)
+    Insect%x_pivot_r2_b =(/ 0.d0, -0.d0, 0.d0 /)
+    Insect%x_pivot_l2_b =(/ 0.d0, +0.d0, 0.d0 /)
     Insect%b_body = 0.1d0
     Insect%L_body = 1.0d0
     Insect%x_head = (/0.5d0*Insect%L_body,0.d0,0.d0 /)
@@ -615,7 +708,7 @@ subroutine draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect)
     M_body     = Insect%M_body
 
     x_head = Insect%xc_body_g
-    call drawsphere( x_head, 0.50d0, xx0, ddx, mask, mask_color, us, Insect, color_body )
+    call drawsphere( x_head, Insect%L_body/2.d0, xx0, ddx, mask, mask_color, us, Insect, color_body )
 
 end subroutine draw_body_sphere
 

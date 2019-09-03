@@ -122,6 +122,18 @@ subroutine BodyMotion(time, Insect)
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
 
+    case ("pitch_param")
+        ! Pitch motion for aerodynamic power analysis
+        psi      = Insect%yawpitchroll_0(3) ! roll
+        beta     = Insect%yawpitchroll_0(2) +  15.d0  *pi/180.d0*cos(2.d0*pi*time) ! pitch
+        gamma    = Insect%yawpitchroll_0(1) ! yaw
+        psi_dt   = 0.d0
+        beta_dt  = - 15.d0  *pi/180.d0*sin(2.d0*pi*time)*2.d0*pi
+        gamma_dt = 0.d0
+        xc = Insect%x0
+        vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
+        Insect%body_moves = "yes"
+
     case ("pitch")
         psi      = 0.d0
         beta     = 30.d0*pi/180.d0*sin(2.d0*pi*time)

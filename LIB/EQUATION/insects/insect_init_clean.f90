@@ -71,7 +71,18 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! read in the complete ini file, from which we initialize the insect
   call read_ini_file_mpi(PARAMS, fname_ini, verbose=.true.)
 
-  call read_param_mpi(PARAMS,"Insects","WingShape",Insect%WingShape,"none")
+  ! determine whether the second pair of wings is present
+  call read_param_mpi(PARAMS,"Insects","LeftWing2",Insect%LeftWing2,"no")
+  call read_param_mpi(PARAMS,"Insects","RightWing2",Insect%RightWing2,"no")
+  if ( ( Insect%LeftWing2 == "yes" ) .or. ( Insect%RightWing2 == "yes" ) ) then
+    Insect%second_wing_pair = .true.
+  else
+    Insect%second_wing_pair = .false.
+  endif
+
+  ! read data for the first pair of wings
+  call read_param_mpi(PARAMS,"Insects","WingShape",Insect%WingShape(1),"none")
+  Insect%WingShape(2) = Insect%WingShape(1)
   call read_param_mpi(PARAMS,"Insects","b_top",Insect%b_top, 0.d0)
   call read_param_mpi(PARAMS,"Insects","b_bot",Insect%b_bot, 0.d0)
   call read_param_mpi(PARAMS,"Insects","L_span",Insect%L_span, 0.d0)
@@ -130,6 +141,67 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! motion is first called
   Insect%kine_wing_l%initialized = .false.
   Insect%kine_wing_r%initialized = .false.
+
+  ! read data for the second pair of wings
+  if (Insect%second_wing_pair) then
+    ! note that only Fourier wing shape can be different from first wings
+    call read_param_mpi(PARAMS,"Insects","WingShape2",Insect%WingShape(3),"none")
+    Insect%WingShape(4) = Insect%WingShape(3)
+    call read_param_mpi(PARAMS,"Insects","FlappingMotion_right2",Insect%FlappingMotion_right2,"none")
+    call read_param_mpi(PARAMS,"Insects","FlappingMotion_left2",Insect%FlappingMotion_left2,"none")
+    ! this file is used in old syntax form for both wings:
+    call read_param_mpi(PARAMS,"Insects","infile2",Insect%infile2,"none.in")
+
+    if ( index(Insect%FlappingMotion_right2,"from_file::") /= 0 ) then
+      ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
+      Insect%kine_wing_r2%infile = Insect%FlappingMotion_right2( 12:strlen  )
+      Insect%FlappingMotion_right2 = "from_file"
+
+    elseif ( index(Insect%FlappingMotion_right,"kinematics_loader::") /= 0 ) then
+      ! new syntax, uses the kinematics loader for non-periodic kinematics
+      Insect%kine_wing_r2%infile = Insect%FlappingMotion_right2( 20:strlen )
+      Insect%FlappingMotion_right2 = "kinematics_loader"
+
+    elseif ( Insect%FlappingMotion_right2 == "from_file" ) then
+      ! old syntax, implies symmetric periodic motion, read from *.ini file
+      Insect%kine_wing_r2%infile = Insect%infile2
+
+    elseif ( Insect%FlappingMotion_right2 == "kinematics_loader" ) then
+      ! old syntax, implies symmetric non-periodic motion, read from *.dat file
+      Insect%kine_wing_r2%infile = Insect%infile2
+    endif
+
+    if ( index(Insect%FlappingMotion_left2,"from_file::") /= 0 ) then
+      ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
+      Insect%kine_wing_l2%infile = Insect%FlappingMotion_left2( 12:strlen  )
+      Insect%FlappingMotion_left2 = "from_file"
+
+    elseif ( index(Insect%FlappingMotion_left2,"kinematics_loader::") /= 0 ) then
+      ! new syntax, uses the kinematics loader for non-periodic kinematics
+      Insect%kine_wing_l2%infile = Insect%FlappingMotion_left2( 20:strlen )
+      Insect%FlappingMotion_left2 = "kinematics_loader"
+
+    elseif ( Insect%FlappingMotion_left2 == "from_file" ) then
+      ! old syntax, implies symmetric periodic motion, read from *.ini file
+      Insect%kine_wing_l2%infile = Insect%infile2
+
+    elseif ( Insect%FlappingMotion_left2 == "kinematics_loader" ) then
+      ! old syntax, implies symmetric non-periodic motion, read from *.dat file
+      Insect%kine_wing_l2%infile = Insect%infile2
+    endif
+
+    if (root) then
+      write(*,*) "Second left wing: "//trim(adjustl(Insect%FlappingMotion_left2))
+      write(*,*) "Second left wing: "//trim(adjustl(Insect%kine_wing_l2%infile))
+      write(*,*) "Second right wing: "//trim(adjustl(Insect%FlappingMotion_right2))
+      write(*,*) "Second right wing: "//trim(adjustl(Insect%kine_wing_r2%infile))
+    endif
+  endif
+
+  ! these flags trigger reading the kinematics from file when the Flapping
+  ! motion is first called
+  Insect%kine_wing_l2%initialized = .false.
+  Insect%kine_wing_r2%initialized = .false.
 
   call read_param_mpi(PARAMS,"Insects","BodyType",Insect%BodyType,"ellipsoid")
   call read_param_mpi(PARAMS,"Insects","HasDetails",Insect%HasDetails,"all")
@@ -215,10 +287,22 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   defaultvec=(/0.d0, -Insect%b_body, 0.d0 /)
   call read_param_mpi(PARAMS,"Insects","x_pivot_r",Insect%x_pivot_r_b, defaultvec)
 
+  ! read data for the second pair of wing hinges
+  if (Insect%second_wing_pair) then
+    defaultvec = Insect%x_pivot_l_b
+    call read_param_mpi(PARAMS,"Insects","x_pivot_l2",Insect%x_pivot_l2_b, defaultvec)
+    defaultvec = Insect%x_pivot_r_b
+    call read_param_mpi(PARAMS,"Insects","x_pivot_r2",Insect%x_pivot_r2_b, defaultvec)
+  endif
+
   ! default colors for body and wings
   Insect%color_body=1
   Insect%color_l=2
   Insect%color_r=3
+  if (Insect%second_wing_pair) then
+    Insect%color_l2=4
+    Insect%color_r2=5
+  endif
 
   ! clean ini file
   call clean_ini_file_mpi(PARAMS)

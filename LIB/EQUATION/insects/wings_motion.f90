@@ -1,15 +1,15 @@
 !-------------------------------------------------------------------------------
 ! WRAPPER Motion protocol wrapper
 !-------------------------------------------------------------------------------
-subroutine FlappingMotionWrap ( time, Insect, idw )
+subroutine FlappingMotionWrap ( time, Insect, wingID )
   implicit none
 
   real(kind=rk),intent(in) :: time
   real(kind=rk),dimension(0:3)::ep
   type(diptera) :: Insect
-  integer(kind=2), intent(in) :: idw
+  integer(kind=2), intent(in) :: wingID
 
-  select case ( idw )
+  select case ( wingID )
   case (1) !("left")  
     if (Insect%wing_fsi == "yes") then
       !**********************************

@@ -304,22 +304,22 @@ contains
       type(diptera),intent(inout) :: Insect
 
       logical, save :: first_call = .true.
-      integer(kind=2) :: idw
+      integer(kind=2) :: wingID
 
       !-----------------------------------------------------------------------------
       ! fetch current motion state
       !-----------------------------------------------------------------------------
       call BodyMotion (time, Insect)
-      idw = 1
-      call FlappingMotionWrap (time, Insect, idw)
-      idw = 2
-      call FlappingMotionWrap (time, Insect, idw)
+      wingID = 1
+      call FlappingMotionWrap (time, Insect, wingID)
+      wingID = 2
+      call FlappingMotionWrap (time, Insect, wingID)
 
       if (Insect%second_wing_pair) then
-        idw = 3
-        call FlappingMotionWrap (time, Insect, idw)
-        idw = 4
-        call FlappingMotionWrap (time, Insect, idw)
+        wingID = 3
+        call FlappingMotionWrap (time, Insect, wingID)
+        wingID = 4
+        call FlappingMotionWrap (time, Insect, wingID)
       endif
       call StrokePlane (time, Insect)
 
@@ -932,7 +932,7 @@ contains
     real(kind=rk) :: M_wing_r2(1:3,1:3), M_wing_l2(1:3,1:3)
     type(diptera) :: Insect2
     real(kind=rk) :: dt,t
-    integer(kind=2) :: idw
+    integer(kind=2) :: wingID
 
     dt = 1.0d-8
     Insect2 = Insect
@@ -942,16 +942,16 @@ contains
 
     ! fetch motion state at time+dt
     call BodyMotion (time+dt, Insect2)
-    idw = 1
-    call FlappingMotionWrap(time+dt, Insect2, idw)
-    idw = 2
-    call FlappingMotionWrap(time+dt, Insect2, idw)
+    wingID = 1
+    call FlappingMotionWrap(time+dt, Insect2, wingID)
+    wingID = 2
+    call FlappingMotionWrap(time+dt, Insect2, wingID)
 
     if (Insect%second_wing_pair) then
-      idw = 3
-      call FlappingMotionWrap(time+dt, Insect2, idw)
-      idw = 4
-      call FlappingMotionWrap(time+dt, Insect2, idw)
+      wingID = 3
+      call FlappingMotionWrap(time+dt, Insect2, wingID)
+      wingID = 4
+      call FlappingMotionWrap(time+dt, Insect2, wingID)
     endif
     call StrokePlane (time+dt, Insect2)
     call body_rotation_matrix( Insect2, M_body )
@@ -1211,7 +1211,7 @@ contains
     real(kind=rk) :: time, dt
     real(kind=rk) :: phil_min, phil_max, phir_min, phir_max
     logical, save :: first_call = .true.
-    integer(kind=2) :: idw
+    integer(kind=2) :: wingID
 
     ! the second call is just a return statement
     if ( first_call .eqv. .false.) return
@@ -1219,8 +1219,8 @@ contains
     ! only root does this...
     if (root) then
       ! we need the wing area to compute the mean wing chord
-      idw = 1 ! use the left wing area (idw=1)
-      call compute_wing_surface(Insect, idw, area) 
+      wingID = 1 ! use the left wing area (wingID=1)
+      call compute_wing_surface(Insect, wingID, area) 
       write(*,'(50("~"))')
       write(*,'("Wing area is A=",g15.8)') area
       write(*,'("Mean chord length is c_m=",g15.8)') area/1.d0 ! note c_m = A/R but R=1
@@ -1239,12 +1239,12 @@ contains
         phir_max = 0.d0
         ! we use only one stroke ( the first one )
         do while (time < 1.d0)
-          idw = 1
-          call FlappingMotionWrap ( time, Insect, idw )
-!!          call FlappingMotionWrap ( time, Insect_copy, idw )
-          idw = 2
-          call FlappingMotionWrap ( time, Insect, idw )
-!!          call FlappingMotionWrap ( time, Insect_copy, idw )
+          wingID = 1
+          call FlappingMotionWrap ( time, Insect, wingID )
+!!          call FlappingMotionWrap ( time, Insect_copy, wingID )
+          wingID = 2
+          call FlappingMotionWrap ( time, Insect, wingID )
+!!          call FlappingMotionWrap ( time, Insect_copy, wingID )
           phil_min = min( phil_min, Insect%phi_l )
           phil_max = max( phil_max, Insect%phi_l )
           phir_min = min( phir_min, Insect%phi_r )

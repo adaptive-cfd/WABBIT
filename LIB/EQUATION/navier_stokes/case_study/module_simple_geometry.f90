@@ -296,7 +296,7 @@ subroutine draw_geometry(x0, dx, Bs, g, mask)
     integer(kind=ik), intent(in) :: g
     integer(kind=ik), dimension(3), intent(in) :: Bs !< grid parameter
     real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
-    real(kind=rk), intent(inout), allocatable  :: mask(:,:,:)    !< mask function
+    real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
     ! -----------------------------------------------------------------
 
     select case(MASK_GEOMETRY)

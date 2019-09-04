@@ -92,6 +92,7 @@ subroutine init_penalization( FILE )
     C_eta_inv=1.0_rk/params_ns%C_eta
     C_sp_inv =1.0_rk/params_ns%C_sp
     R_domain =domain_size(2)*0.5_rk
+    params_ns%N_mask_components=1
 
 end subroutine init_penalization
 

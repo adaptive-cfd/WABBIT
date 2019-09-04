@@ -176,6 +176,7 @@ end type type_boundary
         real(kind=rk)                               :: force(3)
         ! we need to know which mpirank prints output..
         integer(kind=ik)                            :: mpirank, mpisize
+        integer(kind=ik)                            :: N_mask_components
         !---------------------------------------------------------
         ! filter structure containing all parameters of the filter
         type(type_params_filter)                    :: filter

@@ -169,7 +169,7 @@ end subroutine read_case_parameters
       integer(kind=ik), intent(in)  :: g          !< grid parameter
       integer(kind=ik), dimension(3), intent(in) :: Bs
       real(kind=rk), intent(in)     :: x0(3), dx(3) !< coordinates of block and block spacinf
-      real(kind=rk), intent(inout), allocatable  :: mask(:,:,:)    !< mask function
+      real(kind=rk), intent(inout)  :: mask(:,:,:)    !< mask function
       type(type_params_ns),intent(inout)   :: params    !< NStokes Params structure
       logical, optional, intent(in) :: mask_is_colored
       logical, save :: is_colored =.false.

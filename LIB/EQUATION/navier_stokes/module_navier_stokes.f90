@@ -41,7 +41,7 @@ module module_navier_stokes
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
             INICOND_NSTOKES, FIELD_NAMES_NStokes,&
-            STATISTICS_NStokes,FILTER_NSTOKES
+            STATISTICS_NStokes,FILTER_NSTOKES,create_mask_NSTOKES
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
@@ -66,10 +66,11 @@ contains
   !> Main level wrapper routine to read parameters in the physics module. It reads
   !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   !> the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_NStokes( filename )
+  subroutine READ_PARAMETERS_NStokes( filename ,N_mask_components)
     implicit none
     !> name of inifile
     character(len=*), intent(in) :: filename
+    integer(kind=ik)             :: N_mask_components
 
     ! inifile structure
     type(inifile)               :: FILE
@@ -103,6 +104,7 @@ contains
     call init_navier_stokes_eq( FILE )
     ! init all parameters used for penalization
     call init_penalization( FILE )
+    N_mask_components=params_ns%N_mask_components
     ! init all parameters used for the filter
     call init_filter( params_ns%filter, FILE)
     ! init all params for organisation
@@ -898,6 +900,56 @@ contains
     call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
 
   end subroutine filter_NStokes
+
+! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+! mask functions separately. This makes the mask routines tree-level routines (and no longer
+! block level) so the physics modules have to provide an interface to create the mask at a tree
+! level. All parts of the mask shall be included: chi, boundary values, sponges.
+! This is a block-level wrapper to fill the mask.
+subroutine create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: Bs(3), g
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
+    !     stage == "time-independent-part"
+    !     stage == "time-dependent-part"
+    !     stage == "all-parts"
+    character(len=*), intent(in) :: stage
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+
+    !integer(kind=2), allocatable, save :: mask_color(:,:,:)
+
+
+    ! usually, the routine should not be called with no penalization, but if it still
+    ! happens, do nothing.
+    if ( params_ns%penalization .eqv. .false.) then
+        mask = 0.0_rk
+        return
+    endif
+
+    ! check if the array has the right dimension, if not, put money in swear jar.
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        write(*,*) shape(mask)
+        call abort(7107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    !if (size(mask,4) < 5 ) then
+        !write(*,*) shape(mask)
+        !call abort(7108, "mask: wrong number of components (5), there's pirates, captain!")
+    !endif
+
+
+    !if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+
+
+    if (stage == "time-dependent-part" .or. stage == "all-parts") then
+        call get_mask(params_ns, x0, dx, Bs, g , mask(:,:,:,1))
+    endif
+
+end subroutine create_mask_NSTOKES
 
 
 

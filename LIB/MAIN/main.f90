@@ -173,6 +173,7 @@ program main
     ! they want
     call init_physics_modules( params, filename, params%N_mask_components )
     ! allocate memory for heavy, light, work and neighbor data
+write(*,*) "---------------<",params%N_mask_components
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
         hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n)
 

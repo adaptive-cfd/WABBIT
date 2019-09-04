@@ -51,9 +51,6 @@ contains
         if ( .not. params%penalization ) return
 
 
-        ! HACK
-        if (params%physics_type /= "ACM-new") return
-
         force_all_parts = .false.
         if (present(all_parts)) force_all_parts = all_parts
 

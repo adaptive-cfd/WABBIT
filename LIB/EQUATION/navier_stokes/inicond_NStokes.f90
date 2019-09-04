@@ -2,7 +2,7 @@
   !>\file
   !> Initial Conditions of the Navier Stokes module
   !-----------------------------------------------------------------------------
-  subroutine INICOND_NStokes( time, u, g, x0, dx )
+  subroutine INICOND_NStokes( time, u, g, x0, dx, boundary_flag )
 
     use module_shock, only : set_shock_in_direction,moving_shockVals,standing_shockVals
 
@@ -28,6 +28,16 @@
     real(kind=rk)             :: x,y_rel,tmp(1:3),b,mach,T_init,x_cntr(3),sigma,&
                                 left(size(u,4)),right(size(u,4)),phi_init(size(u,4))
     real(kind=rk),allocatable:: mask(:,:,:) ! we dont save this datafield, since it is only called once
+    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+    ! boundary_flag(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    integer(kind=2)          , intent(in):: boundary_flag(3)
+
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -41,6 +51,9 @@
     ! red from a file
     if ( params_ns%read_from_files ) then
       ! convert (rho,u,v,p) to (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) if data was read from file
+        if ( .not. ALL(params_ns%periodic_BC)) then
+          call compute_boundary_2D( time, g, Bs, dx, x0, u(:,:,1,:), boundary_flag)
+        end if
         call pack_statevector(u(:,:,:,:),'pure_variables')
         return
     else

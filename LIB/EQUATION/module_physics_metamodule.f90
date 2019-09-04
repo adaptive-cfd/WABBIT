@@ -64,8 +64,7 @@ contains
             ! not implemented yet (this module does not use penalization)
 
         case ('navier_stokes')
-            ! not implemented yet
-
+            call create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
         case default
             call abort(1212,'unknown physics...say whaaat?')
 
@@ -96,7 +95,7 @@ contains
             call READ_PARAMETERS_convdiff( filename )
 
         case ('navier_stokes')
-            call READ_PARAMETERS_NStokes( filename )
+            call READ_PARAMETERS_NStokes( filename, N_mask_components )
 
         case default
             call abort(1212,'unknown physics...say whaaat?')
@@ -389,7 +388,7 @@ contains
     !-----------------------------------------------------------------------------
     ! main level wrapper for setting the initial condition on a block
     !-----------------------------------------------------------------------------
-    subroutine INICOND_meta( physics, time, u, g, x0, dx)
+    subroutine INICOND_meta( physics, time, u, g, x0, dx, boundary_flag)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -409,6 +408,16 @@ contains
         ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
         real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
+        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
+        ! boundary_flag(i) can be either 0, 1, -1,
+        !  0: no boundary in the direction +/-e_i
+        !  1: boundary in the direction +e_i
+        ! -1: boundary in the direction - e_i
+        ! currently only acessible in the local stage
+        integer(kind=2)          , intent(in):: boundary_flag(3)
+
 
         select case (physics)
         case ("ACM-new")
@@ -418,7 +427,7 @@ contains
             call INICOND_ConvDiff( time, u, g, x0, dx )
 
         case ("navier_stokes")
-            call INICOND_NStokes( time, u, g, x0, dx )
+            call INICOND_NStokes( time, u, g, x0, dx, boundary_flag )
 
         case default
             call abort(999,"[INICOND (metamodule):] unkown physics. Its getting hard to find qualified personel.")

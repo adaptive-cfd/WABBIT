@@ -68,56 +68,105 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     ! reset detail
     detail = -1.0_rk
 
-    ! loop over all datafields
-    do dF = 1, size(block_data,4)
-        ! is this component of the block used for thresholding or not?
-        if (thresholding_component(dF)) then
-            if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
+    ! --------------------------- 3D -------------------------------------------
 
-            if ( params%dim == 3 ) then
-                ! ********** 3D **********
-                ! allocate interpolation fields
-                if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ) )
-                ! coarsened field is half block size + 1/2
-                if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1:(Bs(3)+1)/2 + g) )
+    if (params%dim == 3) then
 
-                ! now, coarsen block data (restriction)
-                call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
-                ! then, re-interpolate to the initial level (prediciton)
-                call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
+        ! allocate interpolation fields
+        if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ) )
+        ! coarsened field is half block size + 1/2
+        if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1:(Bs(3)+1)/2 + g) )
 
-                ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                do i = 1, Bs(1)+2*g
-                    do j = 1, Bs(2)+2*g
-                        do l = 1, Bs(3)+2*g
-                            detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
+        ! loop over all datafields
+        do dF = 1, size(block_data,4)
+            ! is this component of the block used for thresholding or not?
+            if (thresholding_component(dF)) then
+                if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
+
+                if (params%harten_multiresolution) then
+                    ! coarsen block data (restriction)
+                    call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
+                    ! then, re-interpolate to the initial level (prediciton)
+                    call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
+
+                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                    do i = 1, Bs(1)+2*g
+                        do j = 1, Bs(2)+2*g
+                            do l = 1, Bs(3)+2*g
+                                detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
+                            end do
                         end do
                     end do
-                end do
-            else
-                ! ********** 2D **********
-                ! allocate interpolation fields
-                if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ) )
-                ! coarsened field is half block size + 1/2
-                if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1) )
+                else
+                    ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
+                    call restriction_prefilter_3D( block_data( :, :, :, dF ), u2(:,:,:), params%wavelet )
+                    ! now, coarsen block data (restriction)
+                    call restriction_3D( u2, u3 )  ! fine, coarse
+                    ! then, re-interpolate to the initial level (prediciton)
+                    call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
-                ! now, coarsen block data (restriction)
-                call restriction_2D( block_data( :, :, 1, dF ), u3(:,:,1) )  ! fine, coarse
-                ! then, re-interpolate to the initial level (prediciton)
-                call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
-
-                ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                do i = 1, Bs(1)+2*g
-                    do j = 1, Bs(2)+2*g
-                        detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
+                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    do i = g+1, Bs(1)+g
+                        do j = g+1, Bs(2)+g
+                            do l = g+1, Bs(3)+g
+                                detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
+                            end do
+                        end do
                     end do
-                end do
+                end if
 
             end if
-        end if
-    end do
+        end do
+    end if
+
+    ! --------------------------- 2D -------------------------------------------
+
+    if (params%dim == 2 ) then
+        ! allocate interpolation fields
+        if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ) )
+        ! coarsened field is half block size + 1/2
+        if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1) )
+
+        ! loop over all datafields
+        do dF = 1, size(block_data,4)
+            ! is this component of the block used for thresholding or not?
+            if (thresholding_component(dF)) then
+                if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
+
+                ! Harten multiresolution or biorthogonal?
+                if (params%harten_multiresolution) then
+                    ! coarsen block data (restriction)
+                    call restriction_2D( block_data( :, :, 1, dF ), u3(:,:,1) )  ! fine, coarse
+                    ! then, re-interpolate to the initial level (prediciton)
+                    call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+
+                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                    do i = 1, Bs(1)+2*g
+                        do j = 1, Bs(2)+2*g
+                            detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
+                        end do
+                    end do
+                else
+                    ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
+                    call restriction_prefilter_2D(block_data( :, :, 1, dF ), u2(:,:,1), params%wavelet)
+                    ! now, coarsen block data (restriction)
+                    call restriction_2D( u2(:,:,1), u3(:,:,1) )  ! fine, coarse
+                    ! then, re-interpolate to the initial level (prediciton)
+                    call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+
+                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    do i = g+1, Bs(1)+g
+                        do j = g+1, Bs(2)+g
+                            detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
+                        end do
+                    end do
+                end if
+            end if
+        end do
+    end if
+
 
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1

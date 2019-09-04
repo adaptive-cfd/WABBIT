@@ -21,7 +21,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx )
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     real(kind=rk)    :: x, y, z
-    integer(kind=ik) :: ix, iy, iz, idir, Bs(3)
+    integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -30,11 +30,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx )
 
     u = 0.0_rk
 
-    if (params_acm%dim==2 .and. size(u,4)/=3) then
-        call abort(23091801,"ACM: state vector has not the right number of components")
-    endif
-
-    if (params_acm%dim==3 .and. size(u,4)/=4) then
+    if (params_acm%dim==2 .and. size(u,4) /= params_acm%dim + 1 + params_acm%N_scalars) then
         call abort(23091801,"ACM: state vector has not the right number of components")
     endif
 
@@ -137,5 +133,19 @@ subroutine INICOND_ACM( time, u, g, x0, dx )
         call abort(428764, "ACM inicond: "//trim(adjustl(params_acm%inicond))//" is unkown.")
 
     end select
+
+    ! --------------------------------------------------------------------------
+    ! initial conditions for passive scalars, if used.
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_passive_scalar) then
+        do iscalar = 1, params_acm%N_scalars
+            ! if (params_acm%dim == 2) then
+            !     ! 2D
+            ! else
+            !     ! 3D
+                u(:,:,:,params_acm%dim + 1 + iscalar) = 0.0_rk
+            ! endif
+        enddo
+    endif
 
 end subroutine INICOND_ACM

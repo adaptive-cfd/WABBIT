@@ -143,7 +143,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         if (params_acm%dim == 2) then
             ! this is a 2d case (ux,uy,p)
             call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
-                 time, rhs(:,:,1,:), mask(:,:,1,:))
+            time, rhs(:,:,1,:), mask(:,:,1,:))
+            call RHS_2D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
 
         else
             ! this is a 3d case (ux,uy,uz,p)
@@ -213,7 +214,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
     eps_inv = 1.0_rk / eps
 
-    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=3) then
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars) then
         call abort(66233,"wrong size, I go for a walk instead.")
     endif
 
@@ -458,8 +459,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     eps_inv = 1.0_rk / eps
 
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -641,4 +640,421 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         end do
     end if
 
+    ! --------------------------------------------------------------------------
+    ! passive scalars
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_passive_scalar) then
+        call RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+    endif
+
 end subroutine RHS_3D_acm
+
+
+
+
+subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+    implicit none
+
+    !> grid parameter
+    integer(kind=ik), intent(in)            :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> origin and spacing of the block
+    real(kind=rk), dimension(3), intent(in) :: x0, dx
+    !> datafields
+    real(kind=rk), intent(inout)            :: phi(:,:,:,:)
+    real(kind=rk), intent(inout)            :: rhs(:,:,:,:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(in)               :: mask(:,:,:,:)
+    !> discretization order
+    character(len=80), intent(in)           :: order_discretization
+    !> time
+    real(kind=rk), intent(in)               :: time
+
+    integer(kind=rk) :: ix, iy, iz, iscalar, j
+
+    !> coefficients for Tam&Webb
+    real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    real(kind=rk) :: kappa, x, y, z, masksource, nu, R
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
+    real(kind=rk) :: ux,uy,uz,&
+    usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
+    ! 4th order coefficients for second derivative
+    real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
+    ! we have quite some of these work arrays in the code, but they are very small,
+    ! only one block. They're ngeligible in front of the lgt_block array.
+    real(kind=rk), allocatable, save :: source(:,:,:)
+
+    if (.not. allocated(source)) allocate(source(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
+
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+    dz_inv = 1.0_rk / dx(3)
+
+    dx2_inv = 1.0_rk / (dx(1)**2)
+    dy2_inv = 1.0_rk / (dx(2)**2)
+    dz2_inv = 1.0_rk / (dx(3)**2)
+
+    nu = params_acm%nu
+
+    if (order_discretization == "FD_2nd_central" ) then
+        call abort(2208191, "passive scalar implemented only with 4th order....sorry, I am lazy")
+    else if (order_discretization == "FD_4th_central_optimized") then
+        !-----------------------------------------------------------------------
+        ! 4th order
+        !-----------------------------------------------------------------------
+        do iscalar = 1, params_acm%N_scalars
+            ! actual index of this scalar in the array
+            j = iscalar + (params_acm%dim + 1)
+
+            ! compute diffusivity from schmidt number (and fluid viscosity)
+            kappa = params_acm%schmidt_numbers(iscalar) * nu
+
+            ! reset source term for each scalar.
+            source = 0.0_rk
+
+            ! 1st: compute source terms (note the strcmp needs to be outside the loop)
+            if (params_acm%scalar_source_type(iscalar)=="gaussian") then
+                do iz = g+1, Bs(3)+g
+                    z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
+                    do iy = g+1, Bs(2)+g
+                        y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                        do ix = g+1, Bs(1)+g
+                            x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
+
+                            R = x + y + z ! note this is (x-x0)**2
+
+                            masksource = dexp( -R / (params_acm%widthsource(iscalar))  )
+
+                            if (masksource > 1.0d-6) then
+                                ! for the source term, we use the usual dirichlet C_eta
+                                ! to force scalar to 1
+                                source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                            endif
+                        end do
+                    end do
+                end do
+            elseif (params_acm%scalar_source_type(iscalar)=="mask_color_emission") then
+
+            else
+                call abort(2608191,"scalar source is unkown.")
+            end if
+
+
+            ! sponge layer
+            if (params_acm%absorbing_sponge) then
+                do iz = g+1, Bs(3)+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
+                            ! for the source term, we use the usual dirichlet C_eta
+                            ! to force scalar to 1
+                            source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) / params_acm%C_eta
+                        end do
+                    end do
+                enddo
+            endif
+
+
+            ! 2nd: compute rhs for this scalar.
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ux = phi(ix,iy,iz,1)
+                        uy = phi(ix,iy,iz,2)
+                        uz = phi(ix,iy,iz,3)
+
+                        usx = mask(ix,iy,iz,2)
+                        usy = mask(ix,iy,iz,3)
+                        usz = mask(ix,iy,iz,4)
+
+                        ! ATTENTION you need to sync the mask
+                        chi = mask(ix,iy,iz,1)
+
+                        ! penalized diffusion coefficient at this point
+                        D = kappa*(1.0_rk - chi) + params_acm%scalar_Ceta(iscalar)*chi
+
+                        ! this is the vector in front of the gradient
+                        wx = -((1.d0-chi)*ux + chi*usx)
+                        wy = -((1.d0-chi)*uy + chi*usy)
+                        wz = -((1.d0-chi)*uz + chi*usz)
+
+                        ! gradient of passive scalar
+                        gx = (a(-3)*phi(ix-3,iy,iz,j)&
+                             +a(-2)*phi(ix-2,iy,iz,j)&
+                             +a(-1)*phi(ix-1,iy,iz,j)&
+                             +a( 0)*phi(ix  ,iy,iz,j)&
+                             +a(+2)*phi(ix+2,iy,iz,j)&
+                             +a(+3)*phi(ix+3,iy,iz,j)&
+                             +a(+1)*phi(ix+1,iy,iz,j))*dx_inv
+
+                        gy = (a(-3)*phi(ix,iy-3,iz,j)&
+                             +a(-2)*phi(ix,iy-2,iz,j)&
+                             +a(-1)*phi(ix,iy-1,iz,j)&
+                             +a( 0)*phi(ix,iy  ,iz,j)&
+                             +a(+2)*phi(ix,iy+2,iz,j)&
+                             +a(+3)*phi(ix,iy+3,iz,j)&
+                             +a(+1)*phi(ix,iy+1,iz,j))*dy_inv
+
+                        gz = (a(-3)*phi(ix,iy,iz-3,j)&
+                             +a(-2)*phi(ix,iy,iz-2,j)&
+                             +a(-1)*phi(ix,iy,iz-1,j)&
+                             +a( 0)*phi(ix,iy,iz  ,j)&
+                             +a(+2)*phi(ix,iy,iz+2,j)&
+                             +a(+3)*phi(ix,iy,iz+3,j)&
+                             +a(+1)*phi(ix,iy,iz+1,j))*dz_inv
+
+                        ! gradient of mask function ( we need that for the diffusive term)
+                        ! since this guy reads div( (kappa(1-mask) + eps*mask) * grad(phi) )
+                        ! so this boils down to d/dx (D*gx) = D_dx*gx + D*gxx
+                        ! so we need D_dx and this is kappa*(1-mask_dx)+ eps*mask_dx
+                        chidx = (a(-3)*mask(ix-3,iy,iz, 1)&
+                                +a(-2)*mask(ix-2,iy,iz, 1)&
+                                +a(-1)*mask(ix-1,iy,iz, 1)&
+                                +a( 0)*mask(ix  ,iy,iz, 1)&
+                                +a(+3)*mask(ix+3,iy,iz, 1)&
+                                +a(+2)*mask(ix+2,iy,iz, 1)&
+                                +a(+1)*mask(ix+1,iy,iz, 1))*dx_inv
+
+                        chidy = (a(-3)*mask(ix,iy-3,iz, 1)&
+                                +a(-2)*mask(ix,iy-2,iz, 1)&
+                                +a(-1)*mask(ix,iy-1,iz, 1)&
+                                +a( 0)*mask(ix,iy  ,iz, 1)&
+                                +a(+3)*mask(ix,iy+3,iz, 1)&
+                                +a(+2)*mask(ix,iy+2,iz, 1)&
+                                +a(+1)*mask(ix,iy+1,iz, 1))*dy_inv
+
+                        chidz = (a(-3)*mask(ix,iy,iz-3, 1)&
+                                +a(-2)*mask(ix,iy,iz-2, 1)&
+                                +a(-1)*mask(ix,iy,iz-1, 1)&
+                                +a( 0)*mask(ix,iy,iz  , 1)&
+                                +a(+3)*mask(ix,iy,iz+3, 1)&
+                                +a(+2)*mask(ix,iy,iz+2, 1)&
+                                +a(+1)*mask(ix,iy,iz+1, 1))*dz_inv
+
+                        D_dx = kappa*(1.0_rk-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
+                        D_dy = kappa*(1.0_rk-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
+                        D_dz = kappa*(1.0_rk-chidz) + params_acm%scalar_Ceta(iscalar) * chidz
+
+                        ! second derivatives of passive scalar
+                        gxx = (b(-2)*phi(ix-2,iy,iz ,j)&
+                              +b(-1)*phi(ix-1,iy,iz ,j)&
+                              +b( 0)*phi(ix  ,iy,iz ,j)&
+                              +b(+1)*phi(ix+1,iy,iz ,j)&
+                              +b(+2)*phi(ix+2,iy,iz ,j))*dx2_inv
+                        gyy = (b(-2)*phi(ix,iy-2,iz ,j)&
+                              +b(-1)*phi(ix,iy-1,iz ,j)&
+                              +b( 0)*phi(ix,iy  ,iz ,j)&
+                              +b(+1)*phi(ix,iy+1,iz ,j)&
+                              +b(+2)*phi(ix,iy+2,iz ,j))*dy2_inv
+                        gzz = (b(-2)*phi(ix,iy,iz-2 ,j)&
+                              +b(-1)*phi(ix,iy,iz-1 ,j)&
+                              +b( 0)*phi(ix,iy,iz   ,j)&
+                              +b(+1)*phi(ix,iy,iz+1 ,j)&
+                              +b(+2)*phi(ix,iy,iz+2 ,j))*dz2_inv
+
+                        ! assemble everything
+                        rhs(ix,iy,iz,j) = wx*gx + wy*gy + wz*gz & ! penalized convection term
+                        + D_dx*gx + D*gxx & ! penalized laplacian
+                        + D_dy*gy + D*gyy &
+                        + D_dz*gz + D*gzz &
+                        + source(ix,iy,iz)
+                    end do
+                end do
+            end do
+        end do ! loop over scalars
+
+
+    else
+        call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
+    end if
+end subroutine RHS_3D_scalar
+
+
+subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+    implicit none
+
+    !> grid parameter
+    integer(kind=ik), intent(in)            :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> origin and spacing of the block
+    real(kind=rk), dimension(3), intent(in) :: x0, dx
+    !> datafields
+    real(kind=rk), intent(inout)            :: phi(:,:,:,:)
+    real(kind=rk), intent(inout)            :: rhs(:,:,:,:)
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(in)               :: mask(:,:,:,:)
+    !> discretization order
+    character(len=80), intent(in)           :: order_discretization
+    !> time
+    real(kind=rk), intent(in)               :: time
+
+    integer(kind=rk) :: ix, iy, iscalar, j
+
+    !> coefficients for Tam&Webb
+    real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    real(kind=rk) :: kappa, x, y, masksource, nu, R
+    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv
+    real(kind=rk) :: ux, uy, usx, usy, wx, wy, gx, gy, D, chi, chidx, chidy, D_dx, D_dy, gxx, gyy
+    ! 4th order coefficients for second derivative
+    real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
+    ! we have quite some of these work arrays in the code, but they are very small,
+    ! only one block. They're ngeligible in front of the lgt_block array.
+    real(kind=rk), allocatable, save :: source(:,:,:)
+
+    if (.not. allocated(source)) allocate(source(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
+    source = 0.0_rk
+
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+
+    dx2_inv = 1.0_rk / (dx(1)**2)
+    dy2_inv = 1.0_rk / (dx(2)**2)
+
+    nu = params_acm%nu
+
+    if (order_discretization == "FD_2nd_central" ) then
+        call abort(2208199, "passive scalar implemented only with 4th order....sorry, I am lazy")
+
+    else if (order_discretization == "FD_4th_central_optimized") then
+        !-----------------------------------------------------------------------
+        ! 4th order
+        !-----------------------------------------------------------------------
+        do iscalar = 1, params_acm%N_scalars
+            ! actual index of this scalar in the array
+            j = iscalar + (params_acm%dim + 1)
+
+            ! compute diffusivity from schmidt number (and of course fluid viscosity)
+            kappa = params_acm%schmidt_numbers(iscalar) * nu
+
+            source = 0.0_rk
+
+            ! 1st: compute source terms (note the strcmp needs to be outside the loop)
+            if (params_acm%scalar_source_type(iscalar)=="gaussian") then
+                do iy = g+1, Bs(2)+g
+                    y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                    do ix = g+1, Bs(1)+g
+                        x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
+
+                        masksource = dexp( -(x + y) / (params_acm%widthsource(iscalar))**2  )
+
+                        if (masksource > 1.0d-6) then
+                            ! for the source term, we use the usual dirichlet C_eta
+                            ! to force scalar to 1
+                            source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / params_acm%C_eta
+                        endif
+                    end do
+                end do
+
+            elseif (params_acm%scalar_source_type(iscalar)=="mask_color_emission") then
+
+                where ( abs(mask(:,:,:,5) - params_acm%widthsource(iscalar)) <=1.0e-8 )
+                    source = -mask(:,:,:,5)*(phi(:,:,:,j)-1.d0) / params_acm%C_eta
+                end where
+
+            else
+                call abort(2608191,"scalar source is unkown.")
+            end if
+
+
+            ! sponge layer
+            if (params_acm%absorbing_sponge) then
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! for the source term, we use the usual dirichlet C_eta
+                        ! to force scalar to 1
+                        source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / params_acm%C_eta
+                    end do
+                end do
+            endif
+
+
+            ! 2nd: compute rhs for this scalar.
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ux = phi(ix,iy,1,1)
+                    uy = phi(ix,iy,1,2)
+
+                    ! ATTENTION you need to sync the mask
+                    chi = mask(ix,iy,1,1)
+                    usx = mask(ix,iy,1,2)
+                    usy = mask(ix,iy,1,3)
+
+                    ! penalized diffusion coefficient at this point
+                    D = kappa*(1.0_rk - chi) + params_acm%scalar_Ceta(iscalar)*chi
+
+                    ! this is the vector in front of the gradient
+                    wx = -((1.d0-chi)*ux + chi*usx)
+                    wy = -((1.d0-chi)*uy + chi*usy)
+
+                    ! gradient of passive scalar
+                    gx = (a(-3)*phi(ix-3,iy,1,j)&
+                         +a(-2)*phi(ix-2,iy,1,j)&
+                         +a(-1)*phi(ix-1,iy,1,j)&
+                         +a( 0)*phi(ix  ,iy,1,j)&
+                         +a(+2)*phi(ix+2,iy,1,j)&
+                         +a(+3)*phi(ix+3,iy,1,j)&
+                         +a(+1)*phi(ix+1,iy,1,j))*dx_inv
+
+                    gy = (a(-3)*phi(ix,iy-3,1,j)&
+                         +a(-2)*phi(ix,iy-2,1,j)&
+                         +a(-1)*phi(ix,iy-1,1,j)&
+                         +a( 0)*phi(ix,iy  ,1,j)&
+                         +a(+2)*phi(ix,iy+2,1,j)&
+                         +a(+3)*phi(ix,iy+3,1,j)&
+                         +a(+1)*phi(ix,iy+1,1,j))*dy_inv
+
+                    ! gradient of mask function ( we need that for the diffusive term)
+                    ! since this guy reads div( (kappa(1-mask) + eps*mask) * grad(phi) )
+                    ! so this boils down to d/dx (D*gx) = D_dx*gx + D*gxx
+                    ! so we need D_dx and this is kappa*(1-mask_dx)+ eps*mask_dx
+                    chidx = (a(-3)*mask(ix-3,iy,1, 1)&
+                            +a(-2)*mask(ix-2,iy,1, 1)&
+                            +a(-1)*mask(ix-1,iy,1, 1)&
+                            +a( 0)*mask(ix  ,iy,1, 1)&
+                            +a(+3)*mask(ix+3,iy,1, 1)&
+                            +a(+2)*mask(ix+2,iy,1, 1)&
+                            +a(+1)*mask(ix+1,iy,1, 1))*dx_inv
+
+                    chidy = (a(-3)*mask(ix,iy-3,1, 1)&
+                            +a(-2)*mask(ix,iy-2,1, 1)&
+                            +a(-1)*mask(ix,iy-1,1, 1)&
+                            +a( 0)*mask(ix,iy  ,1, 1)&
+                            +a(+3)*mask(ix,iy+3,1, 1)&
+                            +a(+2)*mask(ix,iy+2,1, 1)&
+                            +a(+1)*mask(ix,iy+1,1, 1))*dy_inv
+
+                    D_dx = kappa*(1.0_rk-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
+                    D_dy = kappa*(1.0_rk-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
+
+                    ! second derivatives of passive scalar
+                    gxx = (b(-2)*phi(ix-2,iy,1 ,j)&
+                          +b(-1)*phi(ix-1,iy,1 ,j)&
+                          +b( 0)*phi(ix  ,iy,1 ,j)&
+                          +b(+1)*phi(ix+1,iy,1 ,j)&
+                          +b(+2)*phi(ix+2,iy,1 ,j))*dx2_inv
+                    gyy = (b(-2)*phi(ix,iy-2,1 ,j)&
+                          +b(-1)*phi(ix,iy-1,1 ,j)&
+                          +b( 0)*phi(ix,iy  ,1 ,j)&
+                          +b(+1)*phi(ix,iy+1,1 ,j)&
+                          +b(+2)*phi(ix,iy+2,1 ,j))*dy2_inv
+
+                    ! assemble everything
+                    rhs(ix,iy,1,j) = wx*gx + wy*gy & ! penalized convection term
+                                   + D_dx*gx + D*gxx + D_dy*gy + D*gyy & ! penalized laplacian
+                                   + source(ix, iy, 1)
+                end do
+            end do
+        end do ! loop over scalars
+
+
+    else
+        call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
+    end if
+end subroutine RHS_2D_scalar

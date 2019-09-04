@@ -67,6 +67,8 @@ module module_params
         logical                                      :: eps_normalized=.false.
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
+        logical :: harten_multiresolution = .true.
+        character(len=80) :: wavelet="none", wavelet_transform_type="harten-multiresolution"
         ! minimal level for blocks in data tree
         integer(kind=ik)                             :: min_treelevel=0
         ! maximal level for blocks in data tree

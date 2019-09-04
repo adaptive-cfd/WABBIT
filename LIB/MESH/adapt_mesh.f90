@@ -106,7 +106,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
     do while ( lgt_n_old /= lgt_n )
-
         lgt_n_old = lgt_n
 
         !> (a) check where coarsening is possible
@@ -179,7 +178,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         if (present(external_loop)) then
             if (external_loop) exit ! exit loop
         endif
-
     end do
 
     ! The grid adaptation is done now, the blocks that can be coarsened are coarser.

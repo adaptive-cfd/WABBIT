@@ -68,6 +68,19 @@ module module_acm
     logical :: use_sponge=.false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
 
+    logical :: use_passive_scalar = .false.
+    integer(kind=ik) :: N_scalars = 0
+    real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
+    z0source(:), scalar_Ceta(:), widthsource(:)
+    character(len=80), allocatable :: scalar_inicond(:), scalar_source_type(:)
+    ! when computing passive scalars, we require derivatives of the mask function, which
+    ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
+    ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
+    ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
+    ! to set the mask on all points of a block (incl ghost nodes)
+    logical :: set_mask_on_ghost_nodes = .false.
+    logical :: absorbing_sponge = .true.
+
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
@@ -119,7 +132,7 @@ contains
 
     ! inifile structure
     type(inifile) :: FILE
-    integer :: g
+    integer :: g, Neqn
 
     N_mask_components = 0
 
@@ -167,6 +180,7 @@ contains
     ! initial condition
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
 
+
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
@@ -191,6 +205,52 @@ contains
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
+    call read_param_mpi(FILE, 'Blocks', 'number_equations', Neqn, 0 )
+
+
+    call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)
+    if (params_acm%use_passive_scalar) then
+        call read_param_mpi(FILE, 'ConvectionDiffusion', 'N_scalars', params_acm%N_scalars, 1)
+
+        allocate( params_acm%schmidt_numbers(1:params_acm%N_scalars) )
+        allocate( params_acm%x0source(1:params_acm%N_scalars) )
+        allocate( params_acm%y0source(1:params_acm%N_scalars) )
+        allocate( params_acm%z0source(1:params_acm%N_scalars) )
+        allocate( params_acm%widthsource(1:params_acm%N_scalars) )
+        allocate( params_acm%scalar_Ceta(1:params_acm%N_scalars) )
+
+        allocate( params_acm%scalar_inicond(1:params_acm%N_scalars) )
+        allocate( params_acm%scalar_source_type(1:params_acm%N_scalars) )
+
+        params_acm%scalar_inicond = "dummy"
+        params_acm%scalar_source_type = "dummy"
+
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'Sc', params_acm%schmidt_numbers )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'x0source', params_acm%x0source )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'y0source', params_acm%y0source )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'z0source', params_acm%z0source )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'widthsource', params_acm%widthsource )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'C_eta', params_acm%scalar_Ceta)
+
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_acm%scalar_inicond, params_acm%scalar_inicond )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'source', params_acm%scalar_source_type, params_acm%scalar_source_type )
+
+        if (params_acm%use_sponge) then
+            call read_param_mpi( FILE, 'ConvectionDiffusion', 'absorbing_sponge', params_acm%absorbing_sponge, .true. )
+        else
+            params_acm%absorbing_sponge = .false.
+        endif
+
+        ! when computing passive scalars, we require derivatives of the mask function, which
+        ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
+        ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
+        ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
+        ! to set the mask on all points of a block (incl ghost nodes)
+        params_acm%set_mask_on_ghost_nodes = .true.
+    else
+        params_acm%set_mask_on_ghost_nodes = .false.
+        params_acm%N_scalars = 0
+    endif
 
     ! set defaults
     if (params_acm%dim==3) then
@@ -201,6 +261,11 @@ contains
     params_acm%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_acm%Bs, params_acm%dim)
 
     call clean_ini_file_mpi( FILE )
+
+    if (Neqn /= params_acm%dim + 1 + params_acm%N_scalars) then
+        call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
+    endif
+
 
     dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
     nx_max = (params_acm%Bs(1)-1) * 2**(params_acm%Jmax)
@@ -218,12 +283,22 @@ contains
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
       write(*,'("N_mask_components=",i1)') N_mask_components
+      write(*,'("N_scalars=",i2)') params_acm%N_scalars
       write(*,'(80("<"))')
     endif
 
-    ! if used, setup insect
-    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree") then
-        call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, g)
+    ! if used, setup insect. Note fractal tree and active grid are part of the insects: they require the same init module
+    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree" .or. params_acm%geometry=="active_grid") then
+        ! when computing passive scalars, we require derivatives of the mask function, which
+        ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
+        ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
+        ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
+        ! to set the mask on all points of a block (incl ghost nodes)
+        if (params_acm%set_mask_on_ghost_nodes) then
+            call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, N_ghost_nodes=0)
+        else
+            call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, N_ghost_nodes=g)
+        endif
     endif
 
     if (params_acm%geometry=="fractal_tree") then

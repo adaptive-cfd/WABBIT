@@ -127,6 +127,27 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'VPM', 'mask_time_dependent_part', params%mask_time_dependent_part, .true.)
     call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
 
+    ! decide if we use hartens point value multiresolution transform, which uses a coarsening operator
+    ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)
+    ! prior to downsampling.
+    call read_param_mpi(FILE, 'Wavelet', 'transform_type', params%wavelet_transform_type, 'harten-multiresolution')
+    if (params%wavelet_transform_type == 'harten-multiresolution') then
+        params%harten_multiresolution = .true.
+
+    elseif (params%wavelet_transform_type == 'biorthogonal') then
+        params%harten_multiresolution = .false.
+        call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF4,4')
+
+        select case (params%wavelet)
+        case ('CDF4,4')
+            
+
+        case default
+            call abort(0309191,"unkown wavelet specified in parameter file (Wavelet::wavelet)")
+
+        end select
+
+    endif
 
     !***************************************************************************
     ! read DEBUG parameters

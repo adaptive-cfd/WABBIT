@@ -41,7 +41,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
 
 
     ! local variables
-    integer(kind=ik) :: mpierr, i
+    integer(kind=ik) :: mpierr, i, dim
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2
 
@@ -49,6 +49,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
+
+    dim = params_acm%dim
 
     select case(stage)
     case ("init_stage")
@@ -60,8 +62,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
 
         params_acm%mean_flow = 0.0_rk
         params_acm%mean_p = 0.0_rk
-        params_acm%umax = 0.0_rk
-        params_acm%urms = 0.0_rk
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -84,31 +84,23 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         enddo
 
         if (params_acm%dim == 2) then
-            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1))*dx(1)*dx(2)
-            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2))*dx(1)*dx(2)
+            if (params_acm%u_mean_zero .or. params_acm%forcing) then
+                params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1))*dx(1)*dx(2)
+                params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2))*dx(1)*dx(2)
+            endif
+            if (params_acm%p_mean_zero) then
+                params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 3))*dx(1)*dx(2)
+            endif
 
-            params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 3))*dx(1)*dx(2)
-
-            params_acm%urms(1) = params_acm%urms(1)  + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1)**2)*dx(1)*dx(2)
-            params_acm%urms(2) = params_acm%urms(2)  + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2)**2)*dx(1)*dx(2)
-
-            tmp2 = maxval( u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1)**2 + u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2)**2)
-            params_acm%umax = max( params_acm%umax, tmp2 )
         else
-            params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1))*dx(1)*dx(2)*dx(3)
-            params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2))*dx(1)*dx(2)*dx(3)
-            params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3))*dx(1)*dx(2)*dx(3)
-
-            params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 4))*dx(1)*dx(2)*dx(3)
-
-            params_acm%urms(1) = params_acm%urms(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1)**2)*dx(1)*dx(2)*dx(3)
-            params_acm%urms(2) = params_acm%urms(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2)**2)*dx(1)*dx(2)*dx(3)
-            params_acm%urms(3) = params_acm%urms(3) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3)**2)*dx(1)*dx(2)*dx(3)
-
-            tmp2 = maxval( u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1)**2 + u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2)**2 &
-                         + u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3)**2 )
-
-            params_acm%umax = max( params_acm%umax, tmp2)
+            if (params_acm%u_mean_zero .or. params_acm%forcing) then
+                params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1))*dx(1)*dx(2)*dx(3)
+                params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2))*dx(1)*dx(2)*dx(3)
+                params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3))*dx(1)*dx(2)*dx(3)
+            endif
+            if (params_acm%p_mean_zero) then
+                params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 4))*dx(1)*dx(2)*dx(3)
+            endif
         endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
     case ("post_stage")
@@ -117,14 +109,14 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         !-------------------------------------------------------------------------
         ! this stage is called only once, not for each block.
 
-        tmp = params_acm%mean_flow
-        call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        tmp2 = params_acm%mean_p
-        call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        tmp2 = sqrt(params_acm%umax)
-        call MPI_ALLREDUCE(tmp2, params_acm%umax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-        tmp = params_acm%urms
-        call MPI_ALLREDUCE(tmp, params_acm%urms, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        if (params_acm%u_mean_zero .or. params_acm%forcing) then
+            tmp = params_acm%mean_flow
+            call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
+        if (params_acm%p_mean_zero) then
+            tmp2 = params_acm%mean_p
+            call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
 
         if (params_acm%dim == 2) then
             params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))

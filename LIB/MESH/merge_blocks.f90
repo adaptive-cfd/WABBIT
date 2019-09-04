@@ -83,13 +83,20 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
         enddo
     enddo
 
-    if (.not. allocated(tmpblock)) then
+    ! allocate tmp buffer (used only for biorthogonal wavelets, not harten-style multiresolution)
+    if ( .not. allocated(tmpblock) ) then
         allocate( tmpblock(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4)) )
         tmpblock = 0.0_rk
+    else
+        ! it may happen that we use this routine for fields with different # components: in this case,
+        ! tmp block has to change size.
+        if (size(tmpblock,1)/=size(hvy_block,1) .or.size(tmpblock,2)/=size(hvy_block,2) &
+            .or.size(tmpblock,4)/=size(hvy_block,4) .or.size(tmpblock,3)/=size(hvy_block,3) ) then
+            deallocate(tmpblock)
+            allocate( tmpblock(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4)) )
+        endif
     endif
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
 
     ! merge the specified blocks into one new block. Merging is done in two steps,
     ! first for light data (which all CPUS do redundantly, so light data is kept synched)
@@ -269,10 +276,6 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
             endif
         endif
 
-        ! delete old heavy data (recall that they are all on the same CPU)
-        ! do i = 1, N_merge
-        !     hvy_block( :,:,:,:,heavy_ids(i) ) = 5.0e5_rk
-        ! enddo
     end if
 
     ! merging is complete now, remove the original blocks from light data:

@@ -53,13 +53,13 @@ module module_acm
     real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, u_mean_set(1:3), urms(1:3), div_max, div_min
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3), urms(1:3), div_max, div_min
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:5), moment_color(1:3,0:5)
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
-    logical :: forcing, penalization, smooth_mask=.True.
+    logical :: forcing, penalization, smooth_mask=.True., compute_flow=.true.
     ! the mean pressure has no meaning in incompressible fluids, but sometimes it can
     ! be nice to ensure the mean is zero, e.g., for comparison wit other codes. if set to true
     ! wabbit removes the mean pressure at every time step.
@@ -175,6 +175,7 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_zero', params_acm%u_mean_zero, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
+    call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
 
 
     ! initial condition
@@ -192,6 +193,7 @@ contains
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
+    call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
 
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
     call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )
@@ -336,9 +338,12 @@ contains
     real(kind=rk), intent(out) :: dt
     ! temporary array. note this is just one block and hence not important for overall memory consumption
     real(kind=rk), allocatable, save :: u_mag(:,:,:)
-    real(kind=rk) :: u_eigen
+    real(kind=rk) :: u_eigen, kappa
+    integer :: iscalar, dim
 
     if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
+
+    dim = params_acm%dim
 
     ! compute square of velocity magnitude
     if (params_acm%dim == 2) then
@@ -346,6 +351,7 @@ contains
     else
         u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2) + u(:,:,:,3)*u(:,:,:,3)
     endif
+
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
     u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
 
@@ -353,14 +359,23 @@ contains
     ! ususal CFL condition
     ! if the characteristic velocity is very small, avoid division by zero
     if ( u_eigen >= 1.0e-6_rk ) then
-        dt = params_acm%CFL * minval(dx(1:params_acm%dim)) / u_eigen
+        dt = params_acm%CFL * minval(dx(1:dim)) / u_eigen
     else
         dt = 1.0e-2_rk
     endif
 
     ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
-    if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:params_acm%dim))**2 / params_acm%nu)
+    if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:dim))**2 / params_acm%nu)
+
+    ! diffusivity of scalars, if they are in use.(NOTE: factor 0.5 is valid only for RK4, other time steppers have more
+    ! severe restrictions)
+    if (params_acm%use_passive_scalar)  then
+        do iscalar = 1, params_acm%N_scalars
+            kappa = params_acm%nu*params_acm%schmidt_numbers(iscalar)
+            dt = min(dt, 0.99_rk*(2.79_rk/(dble(dim)*pi**2)) * minval(dx(1:dim))**2 / kappa)
+        enddo
+    endif
 
     ! just for completeness...this condition should never be active (gamma ~ 1)
     if (params_acm%gamma_p>0) dt = min( dt, params_acm%CFL_eta*params_acm%gamma_p )

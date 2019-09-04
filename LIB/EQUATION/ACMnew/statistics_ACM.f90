@@ -121,9 +121,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !
         ! called for each block.
 
-        if (maxval(abs(u))>1.0e5) then
-            call abort(16102018, "ACM fail: very very large values in state vector.")
-        endif
+        do k = 1, size(u,4)
+            if (maxval(abs(u(:,:,:,k)))>1.0e6) then
+                write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') k, maxval(abs(u(:,:,:,k)))
+                call abort(0409201934,"ACM fail: very very large values in state vector.")
+            endif
+        enddo
 
         !-------------------------------------------------------------------------
         ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
@@ -367,8 +370,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! write statistics to ascii files.
         if (params_acm%mpirank == 0) then
             open(14,file='umag.t',status='unknown',position='append')
-            write(14,'(5(es15.8,1x))') time, sqrt(umag), params_acm%c_0, &
-            params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+            if (umag > 1.0e-12_rk) then
+                write(14,'(5(es15.8,1x))') time, sqrt(umag), params_acm%c_0, &
+                params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+            else
+                write(14,'(5(es15.8,1x))') time, sqrt(umag), params_acm%c_0, &
+                0.0_rk, sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+            endif
             close(14)
 
             ! find minimum spacing (so that we can print the CFL number)

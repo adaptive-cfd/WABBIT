@@ -357,7 +357,7 @@ contains
                 call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
 
                 if (rank_full /= rank_pruned) then
-                    ! This is an erorr one should never see: the block xfer is done, and coexisting blocks should
+                    ! This is an error one should never see: the block xfer is done, and coexisting blocks should
                     ! be on the same mpirank now.
                     call abort(030719,"pruned_to_full_tree: although we xferred, we found a coexisting block on a different rank.")
                 endif
@@ -373,7 +373,6 @@ contains
                     ! hvy_block(:,:,:,:,hvy_id2) = max(hvy_block(:,:,:,:,hvy_id2),hvy_block(:,:,:,:,hvy_id1))
 
                     where ( hvy_block(:,:,:,1,hvy_id2)<hvy_block(:,:,:,1,hvy_id1) )
-
                         hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id1)
                         hvy_block(:,:,:,2,hvy_id2) = hvy_block(:,:,:,2,hvy_id1)
                         hvy_block(:,:,:,3,hvy_id2) = hvy_block(:,:,:,3,hvy_id1)
@@ -1396,7 +1395,7 @@ contains
           ! we have to synchronize lgt data since we were updating it locally
           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
 
-          ! the updates were only involving dest_tree_id so 
+          ! the updates were only involving dest_tree_id so
           ! all other active lists are still updated
           !call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,dest_tree_id),&
           !lgt_n(dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id), &

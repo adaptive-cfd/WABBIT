@@ -41,7 +41,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
 
 
     ! local variables
-    integer(kind=ik) :: mpierr
+    integer(kind=ik) :: mpierr, i
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2
 
@@ -76,9 +76,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         ! them nicer, two RHS stages have to be defined: integral / local stage.
         !
         ! called for each block.
-        if (maxval(abs(u))>1.0e5) then
-            call abort(6661,"ACM fail: very very large values in state vector.")
-        endif
+        do i = 1, size(u,4)
+            if (maxval(abs(u(:,:,:,i)))>1.0e6) then
+                write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') i, maxval(abs(u(:,:,:,i)))
+                call abort(0409201933,"ACM fail: very very large values in state vector.")
+            endif
+        enddo
 
         if (params_acm%dim == 2) then
             params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1))*dx(1)*dx(2)
@@ -141,14 +144,36 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         ! called for each block.
 
         if (params_acm%dim == 2) then
-            ! this is a 2d case (ux,uy,p)
-            call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
-            time, rhs(:,:,1,:), mask(:,:,1,:))
-            call RHS_2D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+            ! --------------------------------------------------------------------------
+            ! flow
+            ! --------------------------------------------------------------------------
+            if (params_acm%compute_flow) then
+                ! this is a 2d case (ux,uy,p)
+                call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
+                time, rhs(:,:,1,:), mask(:,:,1,:))
+            endif
+            ! --------------------------------------------------------------------------
+            ! passive scalars
+            ! --------------------------------------------------------------------------
+            if (params_acm%use_passive_scalar) then
+                call RHS_2D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+            endif
 
         else
-            ! this is a 3d case (ux,uy,uz,p)
-            call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+            ! --------------------------------------------------------------------------
+            ! flow
+            ! --------------------------------------------------------------------------
+            if (params_acm%compute_flow) then
+                ! this is a 3d case (ux,uy,uz,p)
+                call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+            endif
+
+            ! --------------------------------------------------------------------------
+            ! passive scalars
+            ! --------------------------------------------------------------------------
+            if (params_acm%use_passive_scalar) then
+                call RHS_3D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+            endif
 
         endif
 
@@ -640,12 +665,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         end do
     end if
 
-    ! --------------------------------------------------------------------------
-    ! passive scalars
-    ! --------------------------------------------------------------------------
-    if (params_acm%use_passive_scalar) then
-        call RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
-    endif
+
 
 end subroutine RHS_3D_acm
 
@@ -717,7 +737,8 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
             source = 0.0_rk
 
             ! 1st: compute source terms (note the strcmp needs to be outside the loop)
-            if (params_acm%scalar_source_type(iscalar)=="gaussian") then
+            select case (params_acm%scalar_source_type(iscalar))
+            case ("gaussian")
                 do iz = g+1, Bs(3)+g
                     z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
                     do iy = g+1, Bs(2)+g
@@ -737,11 +758,17 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         end do
                     end do
                 end do
-            elseif (params_acm%scalar_source_type(iscalar)=="mask_color_emission") then
 
-            else
+            case ("mask_color_emission")
+                call abort(26081919,"lazy tommy not done yet")
+
+            case ("none", "empty")
+                ! do nothing
+
+            case default
                 call abort(2608191,"scalar source is unkown.")
-            end if
+
+            end select
 
 
             ! sponge layer
@@ -936,7 +963,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
             source = 0.0_rk
 
             ! 1st: compute source terms (note the strcmp needs to be outside the loop)
-            if (params_acm%scalar_source_type(iscalar)=="gaussian") then
+            select case (params_acm%scalar_source_type(iscalar))
+            case ("gaussian")
                 do iy = g+1, Bs(2)+g
                     y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
                     do ix = g+1, Bs(1)+g
@@ -952,15 +980,18 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     end do
                 end do
 
-            elseif (params_acm%scalar_source_type(iscalar)=="mask_color_emission") then
-
+            case ("mask_color_emission")
                 where ( abs(mask(:,:,:,5) - params_acm%widthsource(iscalar)) <=1.0e-8 )
                     source = -mask(:,:,:,5)*(phi(:,:,:,j)-1.d0) / params_acm%C_eta
                 end where
 
-            else
+            case ("none", "empty")
+                ! do nothing.
+
+            case default
                 call abort(2608191,"scalar source is unkown.")
-            end if
+
+            end select
 
 
             ! sponge layer
@@ -968,7 +999,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
                         ! for the source term, we use the usual dirichlet C_eta
-                        ! to force scalar to 1
+                        ! to force scalar to 0
                         source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / params_acm%C_eta
                     end do
                 end do

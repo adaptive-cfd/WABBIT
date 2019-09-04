@@ -136,6 +136,8 @@ contains
         ny = size(fine,2)
         nz = size(fine,3)
 
+        if (.not.allocated(fine_filtered)) allocate(fine_filtered(1:nx,1:ny,1:nz))
+
         ! initialize filter according to wavelet
         if (.not. allocated(HD)) then
             select case(wavelet)

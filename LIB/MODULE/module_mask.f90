@@ -46,6 +46,7 @@ contains
         g  = params%n_ghosts
         Jactive = max_active_level(lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow))
         Jmax = params%max_treelevel
+        tree_n = params%forest_size ! used only for resetting at this point
 
         ! without penalization, do nothing.
         if ( .not. params%penalization ) return

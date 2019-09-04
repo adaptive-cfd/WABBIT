@@ -366,7 +366,9 @@ contains
 
     ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
-    if (params_acm%nu>1.0e-13_rk) dt = min(dt, 0.5_rk * minval(dx(1:dim))**2 / params_acm%nu)
+    if (params_acm%nu>1.0e-13_rk) then
+        dt = min(dt,  0.99_rk*(2.79_rk/(dble(dim)*pi**2)) * minval(dx(1:dim))**2 / params_acm%nu)
+    endif
 
     ! diffusivity of scalars, if they are in use.(NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)

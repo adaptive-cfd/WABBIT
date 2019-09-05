@@ -61,9 +61,9 @@ contains
         force_all_parts = .false.
         if (present(all_parts)) force_all_parts = all_parts
 
-    !-----------------------------------------------------------------------
-    ! simple generation of all parts, if required
-    !-----------------------------------------------------------------------
+        !-----------------------------------------------------------------------
+        ! simple generation of all parts, if required
+        !-----------------------------------------------------------------------
         ! The advanced pruned-tree technology works only if the mask is sufficiently
         ! fine, either on Jmax or Jmax-1. If this condition is not met, generate the
         ! entire mask.
@@ -81,12 +81,12 @@ contains
                 hvy_mask(:,:,:,:,hvy_id), "all-parts" )
             enddo
 
-            if (params%rank==0) then
-                write(*,'("Generating mask without pruned trees.. Jactive=",i2," Jmax=",i2," threshold_mask=",L1," force_all=",L1)') &
-                Jactive, Jmax, params%threshold_mask, force_all_parts
-            endif
+            ! if (params%rank==0) then
+            !     write(*,'("Generating mask without pruned trees.. Jactive=",i2," Jmax=",i2," threshold_mask=",L1," force_all=",L1)') &
+            !     Jactive, Jmax, params%threshold_mask, force_all_parts
+            ! endif
 
-        ! we're done, all parts of mask function are created, leave routine now
+            ! we're done, all parts of mask function are created, leave routine now
             return
         endif
 
@@ -96,9 +96,9 @@ contains
 
 
 
-    !-----------------------------------------------------------------------
-    ! advanced mask generation, if possible
-    !-----------------------------------------------------------------------
+        !-----------------------------------------------------------------------
+        ! advanced mask generation, if possible
+        !-----------------------------------------------------------------------
         ! initialization of time-independent part, if this is required.
         ! done only once. mask is generated starting from the coarsest to the
         ! finest level (refined only where interesting).

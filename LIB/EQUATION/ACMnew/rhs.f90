@@ -112,18 +112,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         if (params_acm%u_mean_zero .or. params_acm%forcing) then
             tmp = params_acm%mean_flow
             call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domain_size(1:dim))
         endif
         if (params_acm%p_mean_zero) then
             tmp2 = params_acm%mean_p
             call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        endif
-
-        if (params_acm%dim == 2) then
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
-            params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2))
-        else
-            params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
-            params_acm%mean_p = params_acm%mean_p / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
+            params_acm%mean_p = params_acm%mean_p / product(params_acm%domain_size(1:dim))
         endif
 
     case ("local_stage")

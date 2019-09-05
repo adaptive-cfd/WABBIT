@@ -141,9 +141,15 @@ contains
     call MPI_COMM_RANK (WABBIT_COMM, params_acm%mpirank, mpicode)
 
     if (params_acm%mpirank==0) then
-      write(*,'(80("<"))')
-      write(*,*) "Initializing artificial compressibility module!"
-      write(*,'(80("<"))')
+        write(*,'(80("~"))')
+        write(*,*) "    _    ____ __  __       _       _ _   "
+        write(*,*) "   / \  / ___|  \/  |     (_)_ __ (_) |_ "
+        write(*,*) "  / _ \| |   | |\/| |_____| | '_ \| | __|"
+        write(*,*) " / ___ \ |___| |  | |_____| | | | | | |_ "
+        write(*,*) "/_/   \_\____|_|  |_|     |_|_| |_|_|\__|"
+        write(*,'(80("~"))')
+        write(*,*) "Initializing artificial compressibility module!"
+        write(*,'(80("~"))')
     endif
 
     ! read the file, only process 0 should create output on screen

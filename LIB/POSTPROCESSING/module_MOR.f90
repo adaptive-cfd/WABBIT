@@ -623,8 +623,8 @@ contains
     character(len=80) :: fname_acoefs, filename, args 
     character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
     character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in 
-    real(kind=rk)   , allocatable :: L2error(:)
-    integer(kind=ik), allocatable :: iteration(:)
+    real(kind=rk)   , allocatable :: L2error(:),time(:)
+    integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
     real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
@@ -636,12 +636,12 @@ contains
     real(kind=rk), dimension(3)      :: domain
     integer(hsize_t), dimension(2)   :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes
-    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r
-    integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id
+    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
+    integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
-    real(kind=rk)    :: time
+    real(kind=rk)    :: unused_var
     character(len=2)  :: order
-    logical :: verbose = .false., save_all = .true.
+    logical :: verbose = .false., save_all = .false.
 
     call get_command_argument(2, args)
     if ( args== '--help' .or. args == '--h') then
@@ -653,7 +653,18 @@ contains
             write(*,*) "Call mpi_command -n number_procs ./wabbit-post --wPODerr a_coefs --components=3"
             write(*,*) "                                --snapshot-list list_u1.txt [list_u2.txt] [list_u3.txt]"
             write(*,*) "                                --mode-list     list_m1.txt [list_m2.txt] [list_m3.txt]"
-            write(*,*) "                                [--order=[2|4] --adapt=0.1 --memory=2GB]"
+            write(*,*) "                                [--order=[2|4] --adapt=0.1 --memory=2GB --iteration=1]"
+            write(*,*) "                                [--save_all]"
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,*) " a_coef.txt           list of temporal coefficients for all modes"
+            write(*,*) " --snapshot-list      list of files containing all snapshots"
+            write(*,*) " --mode-list          list of files containing all modes for reconstruction"
+            write(*,*) " --components         number of components in statevector"
+            write(*,*) " --save_all           reconstruct all snapshots (default is false)"
+            write(*,*) " --iteration          reconstruct single snapshot (default is no snapshots)"
+            write(*,*) " --order              order of the predictor"
+            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot" 
+            write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
         return
@@ -706,6 +717,13 @@ contains
         end do
       end if
       !-------------------------------
+      ! TIMESTEP
+      if ( index(args,"--iteration=")==1 ) then
+        N_snapshots = 1
+        read(args(13:len_trim(args)),* ) iteration
+        n_opt_args = n_opt_args + 1
+      end if
+      !-------------------------------
       ! List of files
       if ( index(args,"--mode-list")==1 ) then
         allocate(fmode_list(n_components))
@@ -718,13 +736,19 @@ contains
       ! TEMPORAL COEFFS
       if ( index(args,"--POD-error")==1 ) then
         call get_command_argument(i+1, fname_acoefs)
-        if (params%rank==0) write(*,*) "Temporal coefficients are read from", fname_acoefs
+        if (params%rank==0) write(*,*) "Temporal coefficients are read from: ", fname_acoefs
         n_opt_args = n_opt_args + 1
       end if
 
     end do
 
+    if ( iteration>0 ) then
+      if ( params%rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
+    endif
 
+    if ( save_all ) then
+      if ( params%rank == 0 ) write(*,*) "Reconstructing all snapshots!"
+    endif
     !-------------------------------
     ! Set some wabbit specific params
     !-------------------------------
@@ -781,12 +805,18 @@ contains
     allocate(params%input_files(n_components))
     allocate(mode_in(1:N_modes,1:n_components))
     allocate(snapshot_in(N_snapshots,n_components))
-    allocate(iteration(N_snapshots))
+    allocate(time(N_snapshots))
+    allocate(iter_list(N_snapshots))
     !----------------------------------
     ! READ a_coefficient from file
     !----------------------------------
     call read_array_from_ascii_file_mpi(fname_acoefs, a_coefs, n_header=0_ik) 
     call count_lines_in_ascii_file_mpi(fsnapshot_list(1), N_snapshots, n_header=0_ik)
+
+    !-------------------------------------------
+    !-------------------------------------------
+    ! SNAPSHOTS
+    !-------------------------------------------
     !-------------------------------------------
     ! check and find common params in all h5-files
     ! of all snapshots
@@ -806,12 +836,12 @@ contains
 
         if ( i == 1 .and. j == 1 ) then
           ! read all geometric parameters of grid
-          call read_attributes(snapshot_in(i,j), lgt_n_tmp, time, iteration(1), params%domain_size, &
+          call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(1), iter_list(1), params%domain_size, &
                          params%Bs, params%max_treelevel, params%dim)
         endif
-        call read_attributes(snapshot_in(i,j), lgt_n_tmp, time, iteration(i), domain, bs, level, dim)
+        call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(i), iter_list(i), domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
-        if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
+        if (any(params%Bs .ne. Bs)) call abort( 204191, " Block size is not consistent ")
         if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
         if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
       end do
@@ -824,6 +854,11 @@ contains
     do j = 1, n_components
       close(10+j)
     enddo
+    !-------------------------------------------
+    !-------------------------------------------
+    ! MODES
+    !-------------------------------------------
+    !-------------------------------------------
     !--------------------------------
     ! MODES: open all the given txt-files
     !--------------------------------
@@ -844,11 +879,14 @@ contains
     !-------------------------------------------
     ! check and find common params in all h5-files
     !-------------------------------------------
-        call read_attributes(mode_in(i,j), lgt_n_tmp, time, iteration(i), domain, bs, level, dim)
+        call read_attributes(mode_in(i,j), lgt_n_tmp, unused_var, unused_int, domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
-        if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
+        if (any(params%Bs .ne. Bs)) then
+          write(*,*) "Bs: ",Bs, " vs ",params%Bs; 
+          call abort( 203199, " Block size is not consistent ")
+        end if
         if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
-        if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
+        if (params%dim .ne. dim) call abort( 204193, "Dimension is not consistent ")
       end do
     enddo
     !--------------------------------
@@ -911,12 +949,18 @@ contains
         write(*,*) "WABBIT POD."
         write(*,*) "Snapshot matrix X build from:"
         do i = 1, N_snapshots
-          write(*, '("Snapshot=",i3 , " it=",i7,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
-          i, iteration(i), lgt_n(i), &
+          write(*, '("Snapshot=",i3 , " time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
+          i, time(i), lgt_n(i), &
           100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
           min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
           max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+        end do
+        write(*,*) "Modes used for reconstruction:"
+        do i = 1, N_modes
+          do j = 1, params%n_eqn
+            write(*, '("file=",A )') mode_in(i,j)
+          end do
         end do
         write(*,'(80("-"))')
         write(*,'("L2 norm ||X||_2^2: ",g18.8)') L2norm_snapshots**2
@@ -957,11 +1001,30 @@ contains
     do r = 1, N_modes
       L2norm = 0.0_rk
       do j = 1, N_snapshots
+
         call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
-                       hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       a_coefs, j , r, reconst_tree_id, opt_offset_mode_tree_id=N_snapshots)
+        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+        a_coefs, j , r, reconst_tree_id, opt_offset_mode_tree_id=N_snapshots)
+
+        !---------------------------------
+        ! save the reconstructed snapshot
+        if (j == iteration .or. save_all) then
+          ! loop over every component
+          do dF = 1, n_components
+            ! filename is constructed from: reconst<dF>-<r>_<time>.h5
+            !                   - componentnumber dF 
+            !                   - number of modes used for reconstruction r
+            !                   - time of reconstructed snapshot
+            write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk) 
+            call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
+            lgt_n, hvy_n, hvy_active, dF, reconst_tree_id ,time(j), iter_list(j) )
+          end do
+        end if
+        !---------------------------------
+
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_id, j)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_id, j)
+        ! compute L2 norm  
         do dF = 1, params%n_eqn
           norm = compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt=dF, &
                               tree_id_opt=reconst_tree_id, verbosity=verbose)
@@ -987,7 +1050,7 @@ contains
 
     
   end subroutine
- 
+  !###############################################################
 
 
 

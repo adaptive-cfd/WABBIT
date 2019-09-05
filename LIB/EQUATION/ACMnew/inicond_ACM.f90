@@ -138,13 +138,32 @@ subroutine INICOND_ACM( time, u, g, x0, dx )
     ! initial conditions for passive scalars, if used.
     ! --------------------------------------------------------------------------
     if (params_acm%use_passive_scalar) then
+        ! loop over scalars
         do iscalar = 1, params_acm%N_scalars
-            ! if (params_acm%dim == 2) then
-            !     ! 2D
-            ! else
-            !     ! 3D
+            select case (params_acm%scalar_inicond(iscalar))
+            case ("empty", "none", "zero")
                 u(:,:,:,params_acm%dim + 1 + iscalar) = 0.0_rk
-            ! endif
+            case ("Kadoch2012")
+                if (params_acm%dim == 2) then
+                    do iy = 1, Bs(2)+2*g
+                        do ix = 1, Bs(1)+2*g
+                            x = x0(1) + dble(ix-g-1)*dx(1) - 1.0_rk ! domain is -1...1 in kadoch
+                            y = x0(2) + dble(iy-g-1)*dx(2) - 1.0_rk
+
+                            x = x - params_acm%length ! finite size of cavity
+                            y = y - params_acm%length
+
+                            ! in their original work, they set the initial condition
+                            ! everywhere in the domain (even in the penalization layer)
+                            u(ix,iy,:,params_acm%dim + 1 + iscalar) = cos(pi*y)*(cos(4.0_rk*pi*x)+cos(pi*x))
+                        end do
+                    end do
+                else
+                    call abort(0409191, "Scalar inicond Kadoch2012 is only for 2D")
+                endif
+            case default
+                call abort(0409192, "Unkown scalar inicond")
+            end select
         enddo
     endif
 

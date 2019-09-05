@@ -187,6 +187,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_two_cylinders( mask(:,:,1), x0, dx, Bs, g )
         endif
 
+    case ('cavity')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_cavity( mask, x0, dx, Bs, g )
+        endif
+
     case ('none')
         mask = 0.0_rk
 
@@ -262,6 +267,54 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     end do
 
 end subroutine draw_cylinder
+
+
+subroutine draw_cavity(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, length
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+    length= Params_acm%length
+
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        do ix = 1, Bs(1)+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+            if ( x<length .or. x>params_acm%domain_size(1)-length &
+                .or. y<length .or. y>params_acm%domain_size(2)-length) then
+                ! mask function
+                mask(ix,iy,1) = 1.0_rk
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine draw_cavity
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------

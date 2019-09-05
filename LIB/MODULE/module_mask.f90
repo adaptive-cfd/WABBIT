@@ -46,18 +46,27 @@ contains
         g  = params%n_ghosts
         Jactive = max_active_level(lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow))
         Jmax = params%max_treelevel
+        tree_n = params%forest_size ! used only for resetting at this point
 
         ! without penalization, do nothing.
         if ( .not. params%penalization ) return
+
+        ! HACK
+        if (params%physics_type /= "ACM-new") return
+
+
         if ( params%forest_size < 3) call abort(190719,"Forest size is too small (increase to at least 3 in parameter file)")
 
+        ! default is false
         force_all_parts = .false.
         if (present(all_parts)) force_all_parts = all_parts
 
+        !-----------------------------------------------------------------------
+        ! simple generation of all parts, if required
+        !-----------------------------------------------------------------------
         ! The advanced pruned-tree technology works only if the mask is sufficiently
         ! fine, either on Jmax or Jmax-1. If this condition is not met, generate the
         ! entire mask.
-! As a hint, we use the flag (params%threshold_mask) which forces the
         if ((Jactive < Jmax-1) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
             do k = 1, hvy_n(tree_ID_flow)
                 hvy_id = hvy_active(k, tree_ID_flow)
@@ -72,12 +81,12 @@ contains
                 hvy_mask(:,:,:,:,hvy_id), "all-parts" )
             enddo
 
-            if (params%rank==0) then
-                write(*,'("Generating mask without pruned trees.. Jactive=",i2," Jmax=",i2," threshold_mask=",L1," force_all=",L1)') &
-                Jactive, Jmax, params%threshold_mask, force_all_parts
-            endif
+            ! if (params%rank==0) then
+            !     write(*,'("Generating mask without pruned trees.. Jactive=",i2," Jmax=",i2," threshold_mask=",L1," force_all=",L1)') &
+            !     Jactive, Jmax, params%threshold_mask, force_all_parts
+            ! endif
 
-            ! we're done, leave routine now
+            ! we're done, all parts of mask function are created, leave routine now
             return
         endif
 
@@ -87,6 +96,9 @@ contains
 
 
 
+        !-----------------------------------------------------------------------
+        ! advanced mask generation, if possible
+        !-----------------------------------------------------------------------
         ! initialization of time-independent part, if this is required.
         ! done only once. mask is generated starting from the coarsest to the
         ! finest level (refined only where interesting).

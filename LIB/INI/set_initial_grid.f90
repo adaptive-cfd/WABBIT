@@ -152,6 +152,25 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         if (params%physics_type == 'navier_stokes') then
             call set_inicond_blocks(params, lgt_block, hvy_block, hvy_active, hvy_n)
         end if
+
+        !-----------------------------------------------------------------------
+        ! in some situations, it is necessary to create the intial grid, and then refine it for a couple of times.
+        ! for example if one does non-adaptive non-equidistant spatial convergence tests
+        if (params%inicond_refinements > 0) then
+            do k = 1, params%inicond_refinements
+                ! refine entire mesh.
+                call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+                lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID_flow)
+
+                if (params%rank == 0) then
+                    write(*,'(" did ",i2," refinement stage (beyond what is required for the &
+                    &prescribed precision eps) Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') k, lgt_n, &
+                    min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ),&
+                    max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
+                endif
+            enddo
+        endif
+
     else
         if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
         !---------------------------------------------------------------------------

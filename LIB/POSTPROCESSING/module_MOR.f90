@@ -1662,6 +1662,9 @@ contains
   ! adapted reconstructed field
   !---------------------------------------------------------------------------
   if ( params%adapt_mesh) then
+     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,dest_tree_id),&
+        lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id) )
+
      call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
      lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
      hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )

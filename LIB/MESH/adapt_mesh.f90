@@ -101,6 +101,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !   9   |    10    |    11   |  12
     !       |          |         |
 
+    ! To avoid that the incomming hvy_neighbor array and active lists are outdated
+    ! we synchronice them.
+    t0 = MPI_Wtime()
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
     !> we iterate until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -

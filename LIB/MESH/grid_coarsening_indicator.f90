@@ -142,13 +142,15 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
                 ! norm(1) = norm(1) + sum(hvy_block(:,:,:,1,hvy_active(k))**2)*dx(1)*dx(2)
 
                 ! max over velocities
-                norm(1) = max( norm(1), maxval(abs(hvy_block(:,:,:,1:neq-1,hvy_active(k)))) )
+                norm(1) = max( norm(1), maxval(abs(hvy_block(:,:,:,1:params%dim,hvy_active(k)))) )
                 ! pressure
-                norm(neq) = max( norm(neq), maxval(abs(hvy_block(:,:,:,neq,hvy_active(k)))) )
+                norm( params%dim+1 ) = max( norm(params%dim+1), maxval(abs(hvy_block(:,:,:,params%dim+1,hvy_active(k)))) )
+                ! passive scalars
+                norm( params%dim+2:neq ) = 1.0d0
             enddo
             ! isotropy: uz=uy=ux
             ! (last entry is pressure)
-            norm(1:neq-1) = norm(1)
+            norm(1:params%dim) = norm(1)
             ! norm(2) = sqrt( norm(1) )
         endif
 

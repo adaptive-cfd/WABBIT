@@ -38,7 +38,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
     real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, k
+    integer(kind=ik)  :: neqn, nwork, k, iscalar
     integer(kind=ik), dimension(3) :: Bs
     character(len=80) :: name
 
@@ -98,9 +98,6 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
             ! div(u)
             call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
 
-        case('scalar1', 'scalar')
-            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + 1)
-
         case('mask')
             work(:,:,:,k) = mask(:,:,:,1)
 
@@ -120,6 +117,12 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
             work(:,:,:,k) = mask(:,:,:,6)
 
         end select
+
+
+        if (name(1:6) == "scalar") then
+            read( name(7:7), * ) iscalar
+            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + iscalar)
+        endif
     end do
 
 end subroutine

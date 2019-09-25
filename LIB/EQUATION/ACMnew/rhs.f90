@@ -734,7 +734,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
                             R = x + y + z ! note this is (x-x0)**2
 
-                            masksource = dexp( -R / (params_acm%widthsource(iscalar))  )
+                            masksource = dexp( -R / (params_acm%widthsource(iscalar)**2)  )
 
                             if (masksource > 1.0d-6) then
                                 ! for the source term, we use the usual dirichlet C_eta

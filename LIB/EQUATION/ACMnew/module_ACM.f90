@@ -18,6 +18,7 @@ module module_acm
 
   use mpi
   use module_insects
+  use module_t_files
 
   use module_precision
   ! ini file parser module, used to read parameters. note: in principle, you can also
@@ -48,11 +49,12 @@ module module_acm
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params_acm
-    real(kind=rk) :: CFL, T_end, CFL_eta
+    real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
     ! nu
     real(kind=rk) :: nu
+    real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3), urms(1:3), div_max, div_min
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:5), moment_color(1:3,0:5)
@@ -87,7 +89,7 @@ module module_acm
     character(len=80) :: sponge_type=""
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
-    real(kind=rk) :: mean_flow(1:3), mean_p, umax
+    real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
@@ -127,7 +129,7 @@ contains
     real(kind=rk) :: dx_min, dt_min
     character(len=80) :: Bs_str, Bs_conc
     character(:), allocatable :: Bs_short
-    real(kind=rk), dimension(3) :: Bs_real
+    real(kind=rk), dimension(3) :: ddx
     integer(kind=ik), intent(out) :: N_mask_components
 
     ! inifile structure
@@ -194,7 +196,7 @@ contains
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
-    call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0e-3_rk)
+    call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
@@ -209,6 +211,7 @@ contains
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
+    call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(dble(params_acm%dim)*pi**2) )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
@@ -274,10 +277,13 @@ contains
         call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
+    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
 
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
-    nx_max = (params_acm%Bs(1)-1) * 2**(params_acm%Jmax)
+    dx_min = minval( ddx(1:params_acm%dim) )
+    nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
     dt_min = params_acm%CFL*dx_min/params_acm%c_0
+    ! nice to have this elsewhere in the ACM module:
+    params_acm%dx_min = dx_min
 
     ! at most, we need 6 components: mask, usx, usy, usz, color, sponge
     ! in 2d, less arrays could be used, but its easier to just go ahead and use all of them.
@@ -289,7 +295,9 @@ contains
       write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
-      write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+      if (params_acm%penalization) then
+          write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+      endif
       write(*,'("N_mask_components=",i1)') N_mask_components
       write(*,'("N_scalars=",i2)') params_acm%N_scalars
       write(*,'(80("<"))')
@@ -373,15 +381,15 @@ contains
     ! explicit diffusion (NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
     if (params_acm%nu>1.0e-13_rk) then
-        dt = min(dt,  0.99_rk*(2.79_rk/(dble(dim)*pi**2)) * minval(dx(1:dim))**2 / params_acm%nu)
+        dt = min(dt,  params_acm%CFL_nu * minval(dx(1:dim))**2 / params_acm%nu)
     endif
 
     ! diffusivity of scalars, if they are in use.(NOTE: factor 0.5 is valid only for RK4, other time steppers have more
     ! severe restrictions)
     if (params_acm%use_passive_scalar)  then
         do iscalar = 1, params_acm%N_scalars
-            kappa = params_acm%nu*params_acm%schmidt_numbers(iscalar)
-            dt = min(dt, 0.99_rk*(2.79_rk/(dble(dim)*pi**2)) * minval(dx(1:dim))**2 / kappa)
+            kappa = params_acm%nu * params_acm%schmidt_numbers(iscalar)
+            dt = min(dt, params_acm%CFL_nu * minval(dx(1:dim))**2 / kappa)
         enddo
     endif
 

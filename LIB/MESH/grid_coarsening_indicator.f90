@@ -157,11 +157,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         call MPI_ALLREDUCE(tmp, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         ! during dev is it useful to know what the normalization is, if that is active
-        if (params%rank == 0) then
-            open(14,file='eps_norm.t',status='unknown',position='append')
-            write (14,'(10(g15.8,1x))') time, norm, params%eps
-            close(14)
-        endif
+        call append_t_file('eps_norm.t', (/time, norm, params%eps/))
     endif
 
 

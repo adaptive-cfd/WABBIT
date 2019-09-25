@@ -126,6 +126,7 @@ program main
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
+    logical                             :: overwrite
 
 
     ! init time loop
@@ -225,54 +226,37 @@ program main
 
     end if
 
+    overwrite = .false.
     if (rank==0 .and. iteration==0) then
-        open (77, file='meanflow.t', status='replace')
-        close(77)
-        open (77, file='forces.t', status='replace')
-        close(77)
-        open (77, file='e_kin.t', status='replace')
-        close(77)
-        open (77, file='enstrophy.t', status='replace')
-        close(77)
-        open (44, file='dt.t', status='replace')
-        close(44)
-        open (44, file='performance.t', status='replace')
-        close(44)
-        open (44, file='eps_norm.t', status='replace')
-        close(44)
-        open (44, file='div.t', status='replace')
-        close(44)
-        open (44, file='block_dist.dat', status='replace')
-        close(44)
-        open (44, file='mask_volume.t', status='replace')
-        close(44)
-        open (44, file='u_residual.t', status='replace')
-        close(44)
-        open (44, file='krylov_err.t', status='replace')
-        close(44)
-        open (44, file='umag.t', status='replace')
-        write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
-        close(44)
-        open (44, file='CFL.t', status='replace')
-        write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
-        close(44)
-        open (14, file='moments.t', status='replace')
-        close(14)
-        open (14, file='aero_power.t', status='replace')
-        close(14)
-        open (14, file='forces_body.t', status='replace')
-        close(14)
-        open (14, file='moments_body.t', status='replace')
-        close(14)
-        open (14, file='forces_leftwing.t', status='replace')
-        close(14)
-        open (14, file='moments_leftwing.t', status='replace')
-        close(14)
-        open (14, file='forces_rightwing.t', status='replace')
-        close(14)
-        open (14, file='moments_rightwing.t', status='replace')
-        close(14)
+        overwrite = .true.
     endif
+
+    call init_t_file('meanflow.t', overwrite)
+    call init_t_file('forces.t', overwrite)
+    call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
+    call init_t_file('enstrophy.t', overwrite)
+    call init_t_file('dt.t', overwrite)
+    call init_t_file('performance.t', overwrite)
+    call init_t_file('eps_norm.t', overwrite)
+    call init_t_file('div.t', overwrite)
+    call init_t_file('block_dist.dat', overwrite)
+    call init_t_file('mask_volume.t', overwrite)
+    call init_t_file('u_residual.t', overwrite)
+    call init_t_file('krylov_err.t', overwrite)
+    call init_t_file('umag.t', overwrite)
+    ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
+    call init_t_file('CFL.t', overwrite)
+    ! write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
+    call init_t_file('moments.t', overwrite)
+    call init_t_file('aero_power.t', overwrite)
+    call init_t_file('forces_body.t', overwrite)
+    call init_t_file('moments_body.t', overwrite)
+    call init_t_file('forces_leftwing.t', overwrite)
+    call init_t_file('moments_leftwing.t', overwrite)
+    call init_t_file('forces_rightwing.t', overwrite)
+    call init_t_file('moments_rightwing.t', overwrite)
+    call init_t_file('error_taylor_green.t', overwrite)
+
 
     if (rank==0) then
         call Initialize_runtime_control_file()
@@ -396,6 +380,11 @@ program main
 
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
+
+            ! if multiple time steps are performed on the same grid, we have to be careful
+            ! not to skip past saving time intervals. Therefore, if it is time to save, we
+            ! interupt the inner loop prematurely.
+            if (it_is_time_to_save_data) exit
         enddo
 
         !***********************************************************************
@@ -455,12 +444,10 @@ program main
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
              ! information, so I renamed it when adding those (since post-scripts would no longer be compatible
              ! it made sense to me to change the name)
-             open(14,file='performance.t',status='unknown',position='append')
-             write (14,'(g15.8,1x,i9,1x,g15.8,1x,i6,1x,i6,1x,i2,1x,i2,1x,i6)') time, iteration, t2, Nblocks_rhs, Nblocks, &
-             min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
-             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
-             params%number_procs
-             close(14)
+             call append_t_file( 'performance.t', (/time, dble(iteration), t2, dble(Nblocks_rhs), dble(Nblocks), &
+             dble(min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )), &
+             dble(max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )), &
+             dble(params%number_procs) /) )
         end if
 
         !***********************************************************************
@@ -492,6 +479,9 @@ program main
     ! end of main time loop
     !***************************************************************************
     if (rank==0) write(*,*) "This is the end of the main time loop!"
+
+    ! close and flush all existings *.t files
+    call close_all_t_files()
 
     ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then

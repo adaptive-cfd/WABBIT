@@ -35,10 +35,40 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   yl = box_domain(2)
   zl = box_domain(3)
   nu = viscosity
-
   ! header information
   if (root) then
-      write(*,'(80("<"))')
+      write(*,*) "-------------------------------------------------------------------------------------------------------------"
+      write(*,*) "                                                                                                             "
+      write(*,*) "                                                                                                             "
+      write(*,*) "                                                                                                .*#@@@%      "
+      write(*,*) "                                                                                         (@.            (@   "
+      write(*,*) "                                                         @                             (&                 @  "
+      write(*,*) "                                                           @                          @                    & "
+      write(*,*) "                                                            %@                       @                     @ "
+      write(*,*) "          Initializing                                        %%                    @                      @ "
+      write(*,*) "                                                                @*.                @                      #  "
+      write(*,*) "                  Insect-module                             *@      @             @                      #&  "
+      write(*,*) "                                                  @@%*      @          @         &                     @&    "
+      write(*,*) "                                                      @@@%(&@           @@@@@@,  @                  @@       "
+      write(*,*) "                                                             @          @        @@              #@          "
+      write(*,*) "  @                                                           @       @@           *%       &@@              "
+      write(*,*) "  @                                                             (@@@@,   @             @@,                   "
+      write(*,*) "                                                                          @  ,           ,@                  "
+      write(*,*) "                                                                       %@@%                .@                "
+      write(*,*) "                                                                   %@                        @               "
+      write(*,*) "                                                                *@                  @         @              "
+      write(*,*) "                                                              @*                   /@          @             "
+      write(*,*) "    @                                                      %(                     .@   @@# ## @,             "
+      write(*,*) "     @                                  /&@@@@@(.         #.                      @                          "
+      write(*,*) "      (@                                                  @                      @                           "
+      write(*,*) "                                                          @                     @                            "
+      write(*,*) "                             #@@@@&,                      @                    @                             "
+      write(*,*) "          #%%%#(*.                                        &                  (&                              "
+      write(*,*) "                                                           &/              &@                                "
+      write(*,*) "                                                             .@@#%@@@@@@(                                    "
+      write(*,*) "                                                                                                             "
+      write(*,*) "                                                                                                             "
+      write(*,*) "-------------------------------------------------------------------------------------------------------------"
       write(*,*) "Initializing insect module!"
       write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
       write(*,'(80("<"))')

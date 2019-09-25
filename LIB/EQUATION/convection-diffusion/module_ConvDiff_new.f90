@@ -38,8 +38,8 @@ module module_convdiff_new
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
-    real(kind=rk) :: CFL, T_end, T_swirl
-    real(kind=rk)                               :: domain_size(3)=0.0_rk
+    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094
+    real(kind=rk) :: domain_size(3)=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
     character(len=80), allocatable :: names(:), inicond(:), velocity(:)
@@ -126,6 +126,7 @@ contains
 
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_convdiff%CFL, 1.0_rk)
+    call read_param_mpi(FILE, 'Time', 'CFL_nu', params_convdiff%CFL_nu, 0.99_rk*2.79_rk/(dble(params_convdiff%dim)*pi**2) )
     call read_param_mpi(FILE, 'Time', 'time_max', params_convdiff%T_end, 1.0_rk)
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'T_swirl', params_convdiff%T_swirl, params_convdiff%T_end)
 
@@ -266,14 +267,22 @@ contains
             unorm = maxval( u0(:,:,:,1)*u0(:,:,:,1) + u0(:,:,:,2)*u0(:,:,:,2) + u0(:,:,:,3)*u0(:,:,:,3) )
         endif
 
-      if ( unorm < 1.0e-5_rk) then
-        ! if the value of u is very small, which may happen if it is time dependent
-        ! we choose some fixed value in order not to miss the instant when u becomes
-        ! large again.
-        dt = min( 1.0e-3_rk, params_convdiff%CFL * dx(1) / sqrt(unorm) )
-      else
-        dt = min(params_convdiff%CFL * dx(1) / sqrt(unorm), dt)
-      endif
+        if ( unorm < 1.0e-8_rk) then
+            ! if the value of u is very small, which may happen if it is time dependent
+            ! we choose some fixed value in order not to miss the instant when u becomes
+            ! large again.
+
+            dt = min( 1.0e-3_rk, dt )
+
+            ! constant zero velocity: nothing from CFL
+            if (params_convdiff%velocity(i) == "constant") dt = 9e9_rk
+        else
+            dt = min(params_convdiff%CFL * dx(1) / sqrt(unorm), dt)
+        endif
+
+        if (params_convdiff%nu(i) > 1.0e-13_rk) then
+            dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+        endif
 
     enddo
 

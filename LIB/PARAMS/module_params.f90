@@ -27,6 +27,8 @@ module module_params
     use module_ini_files_parser_mpi
     ! MPI general bridge module
     use module_bridge
+
+    use module_t_files
 !---------------------------------------------------------------------------------------------
 ! variables
 
@@ -47,7 +49,9 @@ module module_params
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
-        integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1
+        ! number of stages "s" for the RungeKuttaChebychev method. Memory is always 6 registers
+        ! independent of stages.
+        integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1, s = 4
         ! data writing frequency
         integer(kind=ik)                             :: write_freq=0
         ! data writing frequency

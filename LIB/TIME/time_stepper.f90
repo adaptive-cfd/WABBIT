@@ -122,7 +122,8 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
     endif
 
 
-    if (params%time_step_method=="Krylov") then
+    select case (params%time_step_method)
+    case ("Krylov")
         !-----------------------------------------------------------------------
         ! krylov scheme
         !-----------------------------------------------------------------------
@@ -131,7 +132,15 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
             hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
 
-    elseif (params%time_step_method=="RungeKuttaGeneric") then
+    case("RungeKuttaChebychev")
+        !-----------------------------------------------------------------------
+        ! runge-kutta chebychev scheme
+        !-----------------------------------------------------------------------
+        call RungeKuttaChebychev(time, dt, params, lgt_block, hvy_block, hvy_work, &
+            hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
+
+
+    case("RungeKuttaGeneric")
         !-----------------------------------------------------------------------
         ! runge-kutta scheme
         !-----------------------------------------------------------------------
@@ -177,9 +186,11 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
 
         ! final stage
         call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), rk_coeffs)
-    else
+
+    case default
         call abort(19101816, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
-    endif
+
+    end select
 
     ! increase time variable after all RHS substeps
     time = time + dt

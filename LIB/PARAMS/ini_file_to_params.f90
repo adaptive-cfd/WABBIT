@@ -140,7 +140,7 @@ subroutine ini_file_to_params( params, filename )
 
         select case (params%wavelet)
         case ('CDF4,4')
-            
+
 
         case default
             call abort(0309191,"unkown wavelet specified in parameter file (Wavelet::wavelet)")
@@ -170,10 +170,13 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    ! if ( (params%n_ghosts < 4) .and. (params%order_predictor == 'multiresolution_4th') ) then
-    !     call abort("ERROR: need more ghost nodes for given refinement order")
-    ! end if
-    if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+    if ( (params%n_ghosts < 3) .and. (params%order_predictor == 'multiresolution_4th') ) then
+        call abort("ERROR: need more ghost nodes for given refinement order")
+    end if
+    if ( (params%n_ghosts < 6) .and. (params%wavelet == 'CDF4,4') .and. (params%wavelet_transform_type == 'biorthogonal') ) then
+        call abort(050920194, "ERROR: for CDF44 wavelet, 6 ghost nodes are required")
+    end if
+    if ( (params%n_ghosts < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
     if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
@@ -362,6 +365,9 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'dt_max', params%dt_max, 0.0_rk )
       ! read CFL number
       call read_param_mpi(FILE, 'Time', 'CFL', params%CFL, 0.5_rk )
+      ! number of stages "s" for the RungeKuttaChebychev method. Memory is always 6 registers
+      ! independent of stages.
+      call read_param_mpi(FILE, 'Time', 's', params%s, 4 )
 
       ! read butcher tableau (set default value to RK4)
       butcher_RK4(1,1:5) = (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/)

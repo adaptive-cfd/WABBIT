@@ -2,6 +2,7 @@ module module_insects
   ! The following module includes required functions from FLUSI/WABBIT and hence
   ! makes this module here independent of that
   use module_insects_integration_flusi_wabbit
+  use module_t_files
 
   implicit none
 
@@ -331,7 +332,7 @@ contains
       call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
       if (Insect%second_wing_pair) then
           call wing_right2_rotation_matrix( Insect, Insect%M_wing_r2 )
-          call wing_left2_rotation_matrix( Insect, Insect%M_wing_l2 )    
+          call wing_left2_rotation_matrix( Insect, Insect%M_wing_l2 )
       endif
 
       ! inverse of the body rotation matrices
@@ -881,11 +882,11 @@ contains
 
       ! second wing pair rotation matrices
       call Ry(M1_l,alpha_l)
-      call Rz(M2_l,theta_l) 
+      call Rz(M2_l,theta_l)
       call Rx(M3_l,phi_l)
       M_wing_l = matmul(M1_l,matmul(M2_l,matmul(M3_l,M_stroke_l)))
       call Ry(M1_r,-alpha_r)
-      call Rz(M2_r,theta_r) 
+      call Rz(M2_r,theta_r)
       call Rx(M3_r,-phi_r)
       M_wing_r = matmul(M1_r,matmul(M2_r,matmul(M3_r,M_stroke_r)))
 
@@ -962,7 +963,7 @@ contains
     call wing_left_rotation_matrix( Insect, M_wing_l )
     if (Insect%second_wing_pair) then
         call wing_right2_rotation_matrix( Insect, M_wing_r2 )
-        call wing_left2_rotation_matrix( Insect, M_wing_l2 )    
+        call wing_left2_rotation_matrix( Insect, M_wing_l2 )
     endif
 
     ! use one-sided finite differences to derive the absolute angular velocity with
@@ -1220,7 +1221,7 @@ contains
     if (root) then
       ! we need the wing area to compute the mean wing chord
       wingID = 1 ! use the left wing area (wingID=1)
-      call compute_wing_surface(Insect, wingID, area) 
+      call compute_wing_surface(Insect, wingID, area)
       write(*,'(50("~"))')
       write(*,'("Wing area is A=",g15.8)') area
       write(*,'("Mean chord length is c_m=",g15.8)') area/1.d0 ! note c_m = A/R but R=1

@@ -83,6 +83,11 @@ subroutine ini_file_to_params( params, filename )
     ! and never the entire grid as such.
     call read_param_mpi(FILE, 'Physics', 'read_from_files', params%read_from_files, .false. )
 
+    ! sometimes you want to save each iteration, therefore it is better to use the
+    ! iteration number as an identifier of the file
+    call read_param_mpi(FILE, 'Physics', 'use_iteration_as_fileid', params%use_iteration_as_fileid, .false. )
+
+
     if (params%read_from_files ) then
         ! read variable names
         allocate( params%input_files( params%n_eqn ) )

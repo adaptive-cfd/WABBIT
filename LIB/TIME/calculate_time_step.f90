@@ -89,10 +89,7 @@ subroutine calculate_time_step( params, time, hvy_block, hvy_active, hvy_n, lgt_
     ! --------------------------------------------------------------------------
     ! log time step to accii file
     ! --------------------------------------------------------------------------
-    if (params%rank==0) then
-        open(14,file='dt.t',status='unknown',position='append')
-        write (14,'(2(g15.8,1x))') time, dt
-        close(14)
-    endif
+    call append_t_file('dt.t', (/time, dt/))
+
 
 end subroutine calculate_time_step

@@ -47,9 +47,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: force_block(1:3, 0:5), moment_block(1:3,0:5), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:5), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu
-    real(kind=rk) :: C_eta_inv, dV, dx_min, x, y, z, penal(1:3)
+    real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
-    real(kind=rk), save :: umag
+    real(kind=rk), save :: umag, umax, dx_min
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: div(:,:,:)
@@ -100,7 +100,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%u_residual = 0.0_rk
         params_acm%div_max = 0.0_rk
         params_acm%div_min = 0.0_rk
-        umag = 0.0_rk
+        dx_min = 90.0e9_rk
 
         if (is_insect) then
             call Update_Insect(time, Insect)
@@ -114,6 +114,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         endif
 
     case ("integral_stage")
+        ! minium spacing of current grid, not smallest possible one.
+        dx_min = min( dx_min, minval(dx(1:params_acm%dim)) )
         !-------------------------------------------------------------------------
         ! 2nd stage: integral_stage.
         !-------------------------------------------------------------------------
@@ -122,7 +124,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! called for each block.
 
         do k = 1, size(u,4)
-            if (maxval(abs(u(:,:,:,k)))>1.0e6) then
+            if (maxval(abs(u(:,:,:,k))) > 1.0e4_rk) then
                 write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') k, maxval(abs(u(:,:,:,k)))
                 call abort(0409201934,"ACM fail: very very large values in state vector.")
             endif
@@ -196,7 +198,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
 
                 ! maximum of velocity in the field
-                umag = max( umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
+                params_acm%umag = max( params_acm%umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
 
                 ! maximum/min divergence in velocity field
                 params_acm%div_max = max( params_acm%div_max, div(ix,iy,1) )
@@ -272,7 +274,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
 
                         ! maximum of velocity in the field
-                        umag = max( umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
+                        params_acm%umag = max( params_acm%umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
 
                         ! maximum/min divergence in velocity field
                         params_acm%div_max = max( params_acm%div_max, div(ix,iy,iz) )
@@ -351,9 +353,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         tmp(1)= params_acm%enstrophy
         call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
-        tmp(1) = umag
-        call MPI_ALLREDUCE(tmp(1), umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        tmp(1) = dx_min ! minium spacing of current grid, not smallest possible one.
+        call MPI_ALLREDUCE(tmp(1), dx_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
 
+        tmp(1) = params_acm%umag
+        call MPI_ALLREDUCE(tmp(1), params_acm%umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        umag = params_acm%umag
 
         ! compute aerodynamic power
         if (is_insect) then
@@ -369,114 +374,51 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !-------------------------------------------------------------------------
         ! write statistics to ascii files.
         if (params_acm%mpirank == 0) then
-            open(14,file='umag.t',status='unknown',position='append')
             if (umag > 1.0e-12_rk) then
-                write(14,'(5(es15.8,1x))') time, sqrt(umag), params_acm%c_0, &
-                params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+                call append_t_file( 'umag.t', (/time, sqrt(umag), params_acm%c_0, &
+                params_acm%c_0/sqrt(umag), sqrt(umag) + sqrt(params_acm%c_0**2 + umag)/) )
             else
-                write(14,'(5(es15.8,1x))') time, sqrt(umag), params_acm%c_0, &
-                0.0_rk, sqrt(umag) + sqrt(params_acm%c_0**2 + umag)
+                call append_t_file( 'umag.t', (/time, sqrt(umag), params_acm%c_0, &
+                0.0_rk, sqrt(umag) + sqrt(params_acm%c_0**2 + umag) /) )
             endif
-            close(14)
 
-            ! find minimum spacing (so that we can print the CFL number)
-            if (params_acm%dim==3) then
-              dxyz(3) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(3) / real(params_acm%Bs(3)-1, kind=rk)
-              dxyz(2) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(2) / real(params_acm%Bs(2)-1, kind=rk)
-              dxyz(1) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
-              dx_min = minval( (/dxyz(1),dxyz(2),dxyz(3)/))
-            else
-              dxyz(3) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(3) / 1
-              dxyz(2) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(2) / real(params_acm%Bs(2)-1, kind=rk)
-              dxyz(1) = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
-              dx_min = minval( (/dxyz(1),dxyz(2)/))
-            endif
 
             CFL   = dt * (sqrt(umag) + sqrt(params_acm%c_0**2 + umag)) / dx_min
             CFL_nu = dt * params_acm%nu / dx_min**2
             CFL_eta = dt / params_acm%C_eta
 
-            open(14,file='CFL.t',status='unknown',position='append')
-            write(14,'(4(es15.8,1x))') time, CFL, CFL_nu, CFL_eta
-            close(14)
-
-            ! write mean flow to disk...
-            open(14,file='meanflow.t',status='unknown',position='append')
-            write(14,'(4(es15.8,1x))') time, params_acm%mean_flow
-            close(14)
-
-            ! write divergence to disk...
-            open(14,file='div.t',status='unknown',position='append')
-            write(14,'(3(es15.8,1x))') time, params_acm%div_max, params_acm%div_min
-            close(14)
-
-            ! write forces to disk...
-            open(14,file='forces.t',status='unknown',position='append')
-            write(14,'(4(es15.8,1x))') time, sum(params_acm%force_color(1,:)), &
-            sum(params_acm%force_color(2,:)), sum(params_acm%force_color(3,:))
-            close(14)
+            call append_t_file( 'CFL.t', (/time, CFL, CFL_nu, CFL_eta/) )
+            call append_t_file( 'meanflow.t', (/time, params_acm%mean_flow/) )
+            call append_t_file( 'div.t', (/time, params_acm%div_max, params_acm%div_min/) )
+            call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,:)), &
+            sum(params_acm%force_color(2,:)), sum(params_acm%force_color(3,:)) /) )
 
 
             if (is_insect) then
                 color = 5_2
-                open(14,file='moments.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
-                close(14)
-
-                open(14,file='aero_power.t',status='unknown',position='append')
-                write(14,'(3(es15.8,1x))') time, apowtotal, ipowtotal
-                close(14)
+                call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color)/) )
+                call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )
 
                 ! body
                 color = Insect%color_body
-                open(14,file='forces_body.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%force_color(:,color)
-                close(14)
-
-                open(14,file='moments_body.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
-                close(14)
+                call append_t_file( 'forces_body.t', (/time, params_acm%force_color(:,color)/) )
+                call append_t_file( 'moments_body.t', (/time, params_acm%moment_color(:,color)/) )
 
                 ! left wing
                 color = Insect%color_l
-                open(14,file='forces_leftwing.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%force_color(:,color)
-                close(14)
-
-                open(14,file='moments_leftwing.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
-                close(14)
+                call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color)/) )
+                call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color)/) )
 
                 ! right wing
                 color = Insect%color_r
-                open(14,file='forces_rightwing.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%force_color(:,color)
-                close(14)
-
-                open(14,file='moments_rightwing.t',status='unknown',position='append')
-                write(14,'(4(es15.8,1x))') time, params_acm%moment_color(:,color)
-                close(14)
+                call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color)/) )
+                call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color)/) )
             endif
 
-            ! write kinetic energy to disk...
-            open(14,file='e_kin.t',status='unknown',position='append')
-            write(14,'(2(es15.8,1x))') time, params_acm%e_kin
-            close(14)
-
-            ! write enstrophy to disk...
-            open(14,file='enstrophy.t',status='unknown',position='append')
-            write(14,'(2(es15.8,1x))') time, params_acm%enstrophy
-            close(14)
-
-            ! write mask_volume to disk...
-            open(14,file='mask_volume.t',status='unknown',position='append')
-            write(14,'(2(es15.8,1x))') time, params_acm%mask_volume
-            close(14)
-
-            ! write residual velocity to disk...
-            open(14,file='u_residual.t',status='unknown',position='append')
-            write(14,'(4(es15.8,1x))') time, params_acm%u_residual
-            close(14)
+            call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
+            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume/) )
+            call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
         end if
 
         if (params_acm%forcing_type(1) .eq. "taylor_green") then
@@ -486,10 +428,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%domain_size(1)*params_acm%domain_size(2))
 
             if (params_acm%mpirank == 0) then
-                ! write error to disk...
-                open(15,file='error_taylor_green.t',status='unknown',position='append')
-                write (15,'(4(es15.8,1x))') time, params_acm%error(1:3)
-                close(15)
+                call append_t_file( 'error_taylor_green.t', (/time, params_acm%error(1:3)/) )
             end if
 
         end if

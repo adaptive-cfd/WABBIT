@@ -95,6 +95,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
             call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
         endif
+        
         ! call preparatory routines. this routine saves the variables to be stored
         ! to disk in the work array. This way, we can also store derived variables
         ! such as the vorticity. Note in most cases, this copies just the state vector

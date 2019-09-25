@@ -77,7 +77,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         !
         ! called for each block.
         do i = 1, size(u,4)
-            if (maxval(abs(u(:,:,:,i)))>1.0e6) then
+            if (maxval(abs(u(:,:,:,i))) > 1.0e4_rk) then
                 write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') i, maxval(abs(u(:,:,:,i)))
                 call abort(0409201933,"ACM fail: very very large values in state vector.")
             endif
@@ -944,7 +944,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
             j = iscalar + (params_acm%dim + 1)
 
             ! compute diffusivity from schmidt number (and of course fluid viscosity)
-            kappa = params_acm%schmidt_numbers(iscalar) * nu
+            kappa = nu / params_acm%schmidt_numbers(iscalar)
 
             source = 0.0_rk
 
@@ -1047,8 +1047,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                             +a(+2)*mask(ix,iy+2,1, 1)&
                             +a(+1)*mask(ix,iy+1,1, 1))*dy_inv
 
-                    D_dx = kappa*(1.0_rk-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
-                    D_dy = kappa*(1.0_rk-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
+                    D_dx = kappa*(-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
+                    D_dy = kappa*(-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
 
                     ! second derivatives of passive scalar
                     gxx = (b(-2)*phi(ix-2,iy,1 ,j)&

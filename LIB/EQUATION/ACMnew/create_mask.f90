@@ -285,7 +285,8 @@ subroutine draw_cavity(mask, x0, dx, Bs, g )
     real(kind=rk), dimension(2), intent(in) :: x0, dx
 
     ! auxiliary variables
-    real(kind=rk)  :: x, y, length
+    real(kind=rk)  :: x, y, length, tmp
+    real(kind=rk), parameter :: c_smooth = 2.0_rk
     ! loop variables
     integer(kind=ik) :: ix, iy
 
@@ -295,22 +296,39 @@ subroutine draw_cavity(mask, x0, dx, Bs, g )
 
     ! reset mask array
     mask = 0.0_rk
-    length= Params_acm%length
+    length= params_acm%length
+
+    if (params_acm%dx_min <= 0.0_rk) call abort(0509198,"params_acm%dx_min invalid (not set?)")
 
 
     ! Note: this basic mask function is set on the ghost nodes as well.
+    ! Discontinuous version
+    ! do iy = 1, Bs(2)+2*g
+    !     y = dble(iy-(g+1)) * dx(2) + x0(2)
+    !     do ix = 1, Bs(1)+2*g
+    !         x = dble(ix-(g+1)) * dx(1) + x0(1)
+    !
+    !         if ( x<length .or. x>params_acm%domain_size(1)-length &
+    !             .or. y<length .or. y>params_acm%domain_size(2)-length) then
+    !             ! mask function
+    !             mask(ix,iy,1) = 1.0_rk
+    !             ! color
+    !             mask(ix,iy,5) = 1.0_rk
+    !         endif
+    !     end do
+    ! end do
+
+    ! smoothed version
     do iy = 1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2)
         do ix = 1, Bs(1)+2*g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
 
-            if ( x<length .or. x>params_acm%domain_size(1)-length &
-                .or. y<length .or. y>params_acm%domain_size(2)-length) then
-                ! mask function
-                mask(ix,iy,1) = 1.0_rk
-                ! color
-                mask(ix,iy,5) = 1.0_rk
-            endif
+            ! distance to borders of domain
+            tmp = minval( (/x,y,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2))/) )
+
+            mask(ix,iy,1) = smoothstep( tmp, length, c_smooth*params_acm%dx_min)
+
         end do
     end do
 

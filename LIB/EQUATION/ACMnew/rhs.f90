@@ -739,7 +739,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                             if (masksource > 1.0d-6) then
                                 ! for the source term, we use the usual dirichlet C_eta
                                 ! to force scalar to 1
-                                source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                                ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / params_acm%C_eta
+                                source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / params_acm%C_eta
+                                ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
                             endif
                         end do
                     end do
@@ -961,7 +963,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         if (masksource > 1.0d-6) then
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
-                            source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / params_acm%C_eta
+                            source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) / params_acm%C_eta
+                            ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / params_acm%C_eta
                         endif
                     end do
                 end do

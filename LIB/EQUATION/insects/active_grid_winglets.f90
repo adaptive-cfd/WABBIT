@@ -68,7 +68,7 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
     real(kind=rk) :: alpha, sigma
 
     real(kind=rk), parameter :: scaling_winglet = 18.5/20.0
-    real(kind=rk), parameter :: t_winglet = (3.0/20.0) / 2.0
+    real(kind=rk), parameter :: t_winglet = (1.5/20.0) / 2.0
     real(kind=rk), parameter :: r_axis = (3.0/20.0 ) / 2.0
 
     integer:: ix,iy,iz

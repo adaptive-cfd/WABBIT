@@ -114,7 +114,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! the components to be stored to hard disk (in the work array)
         call FIELD_NAMES_meta(params%physics_type, k, tmp)
         ! create filename
-        write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+        if (params%use_iteration_as_fileid) then
+          write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
+        else
+          write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+        endif
         ! actual writing
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
         lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow))

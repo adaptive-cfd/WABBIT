@@ -1449,9 +1449,9 @@ contains
         call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, treeid_list(1))
 
-        do i = 1, size(treeid_list)
+        do i = 2, size(treeid_list)
           call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list(i), dest_tree_id)
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor,dest_tree_id, treeid_list(i))
         enddo
 
     end subroutine
@@ -1614,7 +1614,7 @@ function scalar_product_two_trees( params, tree_n, &
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------
     integer(kind=ik) :: free_tree_id, Jmax, Bs(3), g, &
-                        N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
+                         N, k, lgt_id, hvy_id, rank, i, mpierr
     real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2)
     real(kind=rk) :: x0(3), dx(3)
 
@@ -1630,7 +1630,6 @@ function scalar_product_two_trees( params, tree_n, &
     g = params%n_ghosts
     Bs= params%Bs
     Volume = product(params%domain_size(1:params%dim))
-    if (params%forest_size < N_snapshots + 1 ) call abort(030319,"Forest is to small")
 
     !----------------------------------------------
     ! sprod = <X_i, X_j>

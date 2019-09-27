@@ -155,6 +155,8 @@ module module_params
         ! -------------------------------------------------------------------------------------
         integer(kind=ik) :: N_fields_saved=0
         character(len=80), allocatable, dimension(:) :: field_names
+        logical ::use_iteration_as_fileid = .false.
+
 
 
         ! -------------------------------------------------------------------------------------

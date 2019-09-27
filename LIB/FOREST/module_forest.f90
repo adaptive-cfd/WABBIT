@@ -1449,9 +1449,9 @@ contains
         call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, treeid_list(1))
 
-        do i = 1, size(treeid_list)
+        do i = 2, size(treeid_list)
           call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, treeid_list(i), dest_tree_id)
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor,dest_tree_id, treeid_list(i))
         enddo
 
     end subroutine

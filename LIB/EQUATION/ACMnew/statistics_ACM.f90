@@ -413,6 +413,25 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 color = Insect%color_r
                 call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color)/) )
                 call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color)/) )
+
+                ! kinematics data ('kinematics.t')
+                if (Insect%second_wing_pair) then
+                    call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+                    Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+                    Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+                    Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+                    Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
+                    Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
+                    Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
+                    Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
+                    Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
+                else
+                    call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+                    Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+                    Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+                    Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+                    Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
+                endif
             endif
 
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )

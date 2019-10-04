@@ -684,7 +684,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     !> coefficients for Tam&Webb
     real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    real(kind=rk) :: kappa, x, y, z, masksource, nu, R
+    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
     real(kind=rk) :: ux,uy,uz,&
     usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
@@ -742,6 +742,25 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                                 ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / params_acm%C_eta
                                 source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / params_acm%C_eta
                                 ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                            endif
+                        end do
+                    end do
+                end do
+            case ("circular")
+                R0sq = params_acm%widthsource(iscalar)**2
+                do iz = g+1, Bs(3)+g
+                    z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
+                    do iy = g+1, Bs(2)+g
+                        y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                        do ix = g+1, Bs(1)+g
+                            x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
+
+                            R = x + y + z ! note this is (x-x0)**2
+
+                            if ( R <= R0sq ) then
+                                ! for the source term, we use the usual dirichlet C_eta
+                                ! to force scalar to 1
+                                source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
                             endif
                         end do
                     end do

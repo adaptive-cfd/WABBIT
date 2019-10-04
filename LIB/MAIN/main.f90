@@ -226,37 +226,24 @@ program main
 
     end if
 
+    ! decide whether the ascii log files are overwritten and re-initialized (on startup
+    ! this is what we want) or just openend for writing (when resuming a backup, of course we
+    ! do not want old data to be erased)
     overwrite = .false.
     if (rank==0 .and. iteration==0) then
         overwrite = .true.
     endif
 
-    call init_t_file('meanflow.t', overwrite)
-    call init_t_file('forces.t', overwrite)
-    call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
-    call init_t_file('enstrophy.t', overwrite)
+    ! the physics modules should initialize the ascii files they require, e.g. for
+    ! saving kinetic energy over time, etc.
+    call INITIALIZE_ASCII_FILES_meta( params%physics_type, time, overwrite )
+
+    ! a few files have to be intialized by wabbit, because they are logfiles produced
+    ! by wabbit independent of the physics modules.
     call init_t_file('dt.t', overwrite)
     call init_t_file('performance.t', overwrite)
     call init_t_file('eps_norm.t', overwrite)
-    call init_t_file('div.t', overwrite)
-    call init_t_file('block_dist.dat', overwrite)
-    call init_t_file('mask_volume.t', overwrite)
-    call init_t_file('u_residual.t', overwrite)
     call init_t_file('krylov_err.t', overwrite)
-    call init_t_file('umag.t', overwrite)
-    ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
-    call init_t_file('CFL.t', overwrite)
-    ! write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
-    call init_t_file('moments.t', overwrite)
-    call init_t_file('aero_power.t', overwrite)
-    call init_t_file('forces_body.t', overwrite)
-    call init_t_file('moments_body.t', overwrite)
-    call init_t_file('forces_leftwing.t', overwrite)
-    call init_t_file('moments_leftwing.t', overwrite)
-    call init_t_file('forces_rightwing.t', overwrite)
-    call init_t_file('moments_rightwing.t', overwrite)
-    call init_t_file('error_taylor_green.t', overwrite)
-
 
     if (rank==0) then
         call Initialize_runtime_control_file()

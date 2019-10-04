@@ -27,6 +27,7 @@ module module_navier_stokes
   use module_ns_penalization
   use module_navier_stokes_cases
   use module_operators
+  use module_t_files
 
 #ifdef SBLAS
   use module_sparse_operators
@@ -40,8 +41,8 @@ module module_navier_stokes
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
-            INICOND_NSTOKES, FIELD_NAMES_NStokes,&
-            STATISTICS_NStokes,FILTER_NSTOKES,create_mask_NSTOKES
+            INICOND_NSTOKES, FIELD_NAMES_NStokes, &
+            STATISTICS_NStokes, FILTER_NSTOKES, create_mask_NSTOKES, INITIALIZE_ASCII_FILES_Nstokes
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
@@ -756,19 +757,11 @@ contains
                     'pressure=',params_ns%mean_pressure/area, &
                     'drag=',params_ns%force(1),&!*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
                     'Fy=',params_ns%force(2)
-         open(14,file='meandensity.t',status='unknown',position='append')
-         write (14,'(2(es15.8,1x))') time, params_ns%mean_density/area
-         close(14)
 
-         ! write mean Force
-         open(14,file='Force.t',status='unknown',position='append')
-         write (14,'(4(es15.8,1x))') time, params_ns%force
-         close(14)
+         call append_t_file('meandensity.t', (/time, params_ns%mean_density/area/) )
+         call append_t_file('Force.t', (/time, params_ns%force/) )
+         call append_t_file('meanpressure.t', (/time, params_ns%mean_pressure/area/) )
 
-         ! write forces to disk...
-         open(14,file='meanpressure.t',status='unknown',position='append')
-         write (14,'(2(es15.8,1x))') time, params_ns%mean_pressure/area
-         close(14)
        end if
 
      case default
@@ -953,6 +946,26 @@ end subroutine create_mask_NSTOKES
 
 
 
+
+
+  ! the statistics are written to ascii files (usually *.t files) with the help
+  ! of module_t_files. In any case, the files have to be intialized: ideally, they
+  ! are equipped with a header and resetted on the very first call, and they must not be deleted
+  ! if the simuation is resumed from a backup. We therefore provide this function so that all physics
+  ! modules can initialize those files.
+  subroutine INITIALIZE_ASCII_FILES_NSTOKES( time, overwrite )
+      implicit none
+
+      ! it may happen that some source terms have an explicit time-dependency
+      ! therefore the general call has to pass time
+      real(kind=rk), intent (in) :: time
+      logical, intent(in) :: overwrite
+
+      call init_t_file('meandensity.t', overwrite)
+      call init_t_file('Force.t', overwrite)
+      call init_t_file('meanpressure.t', overwrite)
+
+  end subroutine INITIALIZE_ASCII_FILES_NSTOKES
 
 
 

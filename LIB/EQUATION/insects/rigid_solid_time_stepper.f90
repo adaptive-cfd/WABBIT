@@ -47,13 +47,8 @@ subroutine rigid_solid_time_step(time, dt0, dt1, it, Insect, force_g, torque_g)
     if (Insect%STATE(3)>=zl) Insect%STATE(3) = Insect%STATE(3) - zl
 
     if (root) then
-        open  (17,file='rigidsolidsolver.t',status='unknown',position='append')
-        write (17,'(14(es15.8,1x))') time, Insect%STATE(1:13)
-        close (17)
-
-        open  (17,file='insect_state.t',status='unknown',position='append')
-        write (17,'(30(es15.8,1x))') time, Insect%STATE
-        close (17)
+        call append_t_file('rigidsolidsolver.t', (/time, Insect%STATE(1:13)/) )
+        call append_t_file('insect_state.t', (/time, Insect%STATE/) )
     endif
 
 end subroutine rigid_solid_time_step

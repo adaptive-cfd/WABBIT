@@ -9,6 +9,7 @@
 module module_physics_metamodule
 
     use module_globals
+    use module_helpers, only: component_wise_max_norm
     ! at this point, you bind all physics modules into one metamodule, so in the rest
     ! of the code, we just load that. as all other physics modules, it provides some
     ! public routines, at which the corresponding actual physics modules are called
@@ -26,7 +27,7 @@ module module_physics_metamodule
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
-    INICOND_meta, FIELD_NAMES_meta,&
+    INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, NORM_THRESHOLDFIELD_meta, &
     STATISTICS_meta, FILTER_meta, CREATE_MASK_meta
     !**********************************************************************************************
 
@@ -203,7 +204,7 @@ contains
         end select
 
     end subroutine FIELD_NAMES_meta
-
+    
 
     !-----------------------------------------------------------------------------
     ! main level wrapper to set the right hand side on a block. Note this is completely
@@ -211,7 +212,7 @@ contains
     ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
     ! from that. Ghost nodes are assumed to be sync'ed.
     !-----------------------------------------------------------------------------
-    subroutine RHS_meta( physics, time, u, g, x0, dx, rhs, mask, stage, boundary_flag)
+    subroutine RHS_META( physics, time, u, g, x0, dx, rhs, mask, stage, boundary_flag)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -275,6 +276,100 @@ contains
 
     end subroutine RHS_meta
 
+
+  
+     !-----------------------------------------------------------------------------
+     ! Adaptation is dependent on the different physics application. 
+     ! Every physics module can choose its own coarsening indicator.
+    !-----------------------------------------------------------------------------
+    subroutine PREPARE_THRESHOLDFIELD_meta( physics, time, u, g, x0, dx, &
+                                            thresholdfield_block, mask, &
+                                            N_thresholding_components )
+        implicit none
+
+        character(len=*), intent(in) :: physics
+        ! it may happen that some source terms have an explicit time-dependency
+        ! therefore the general call has to pass time
+        real(kind=rk), intent (in) :: time
+
+        ! block data, containg the state vector. In general a 4D field (3 dims+components)
+        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+        ! as you are allowed to compute the RHS only in the interior of the field
+        ! you also need to know where 'interior' starts: so we pass the number of ghost points
+        integer, intent(in) :: g
+
+        ! for each block, you'll need to know where it lies in physical space. The first
+        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+        ! output. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: thresholdfield_block(1:,1:,1:,1:)
+
+        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+        ! block level) so the physics modules have to provide an interface to create the mask at a tree
+        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
+        
+       ! !> if true then wabbit will ignore threshold_field and use the normal statevector instead
+        !!> note: if false additional synchronicing will be needed, which makes
+        !!>      adaptation SLOOOOOWWWWWWWWWW
+       ! logical, intent(out)                 :: thresholding_statevector
+        integer(kind=ik), intent(out):: N_thresholding_components
+
+        select case(physics)
+        case ("ACM-new")
+            call PREPARE_THRESHOLDFIELD_ACM( u, g, x0, dx, thresholdfield_block, &
+                               N_thresholding_components)
+
+        case ("ConvDiff-new")
+
+        case ("navier_stokes")
+            call PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, thresholdfield_block, &
+                               N_thresholding_components)
+        case default
+            call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
+
+        end select
+
+    end subroutine 
+
+    !-----------------------------------------------------------------------------
+    ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
+    ! MPI_MAX 
+    ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
+    !-----------------------------------------------------------------------------
+    subroutine NORM_THRESHOLDFIELD_meta( physics, thresholdfield_block , BLOCK_NORM)
+        implicit none
+        character(len=*), intent(in) :: physics
+        !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
+        real(kind=rk), intent(inout)        :: thresholdfield_block(:, :, :, :)
+        ! component index
+        real(kind=rk), intent(inout) :: BLOCK_NORM(:)
+        ! returns the name
+
+        select case(physics)
+        case ('ACM-new')
+          call NORM_THRESHOLDFIELD_ACM(thresholdfield_block, BLOCK_NORM)
+
+        case ('ConvDiff-new')
+
+        case ('navier_stokes')
+          call NORM_THRESHOLDFIELD_NSTOKES(thresholdfield_block, BLOCK_NORM)
+          
+        case ('POD')
+          call component_wise_max_norm( thresholdfield_block, BLOCK_NORM)
+
+        case default
+            call abort(88119, "[FIELD_NAMES (metamodule):] unknown physics....")
+
+        end select
+
+    end subroutine
+    
 
     !-----------------------------------------------------------------------------
     ! main level wrapper to compute statistics (such as mean flow, global energy,

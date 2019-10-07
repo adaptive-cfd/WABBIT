@@ -124,6 +124,9 @@ end type type_boundary
         integer(kind=ik), dimension(3)              :: Bs
         ! maximal tree level
         integer(kind=ik)                            :: Jmax
+        ! indicator for coarsening "treshold-vorticity", "primary-variables" etc. 
+        character(len=80)                           :: coarsening_indicator="primary-variables"
+        ! Courant-Friedrichs-Lewy
         ! dimension
         integer(kind=ik)                            :: dim, N_fields_saved
         ! adiabatic coefficient
@@ -432,6 +435,9 @@ subroutine init_other_params( FILE )
     call read_param_mpi(FILE, 'Time', 'time_max', params_ns%T_end, 1.0_rk)
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
+    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_ns%Jmax, 1   )
+
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_ns%coarsening_indicator, "primary-variables" )
 
     params_ns%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_ns%Bs, params_ns%dim)
 

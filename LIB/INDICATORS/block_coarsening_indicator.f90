@@ -97,7 +97,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         !! note we assume block_work contains the vorticity
         call threshold_block( params, block_work, thresholding_component, refinement_status, norm )
 
-    case ("threshold-state-vector")
+    case ("threshold-state-vector","primary-variables")
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
         !! to be used can be specified in the PARAMS file. default is all componants.

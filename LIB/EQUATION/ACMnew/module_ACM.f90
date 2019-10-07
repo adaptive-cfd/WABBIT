@@ -43,7 +43,8 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, create_mask_3D_ACM
+  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
+  create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -87,6 +88,7 @@ module module_acm
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=80) :: sponge_type=""
+    character(len=80) :: coarsening_indicator=""
     character(len=80), allocatable :: names(:), forcing_type(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
@@ -97,7 +99,7 @@ module module_acm
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
-    integer(kind=ik) :: Jmax
+    integer(kind=ik) :: Jmax, N_eqn
     integer(kind=ik), dimension(3) :: Bs
   end type type_params_acm
   ! parameters for this module. they should not be seen outside this physics module
@@ -193,6 +195,7 @@ contains
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-vorticity")
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
@@ -217,7 +220,7 @@ contains
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', Neqn, 0 )
-
+    params_acm%N_eqn = Neqn
 
     call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)
     if (params_acm%use_passive_scalar) then
@@ -430,4 +433,71 @@ contains
 
   end subroutine continue_periodic
 
+ !-----------------------------------------------------------------------------
+     ! Adaptation is dependent on the different physics application. 
+     ! Every physics module can choose its own coarsening indicator.
+    !-----------------------------------------------------------------------------
+    subroutine PREPARE_THRESHOLDFIELD_ACM( u, g, x0, dx, threshold_field, &
+                               N_thresholding_components )
+        implicit none
+
+        ! block data, containg the state vector. In general a 4D field (3 dims+components)
+        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+        ! as you are allowed to compute the RHS only in the interior of the field
+        ! you also need to know where 'interior' starts: so we pass the number of ghost points
+        integer, intent(in) :: g
+
+        ! for each block, you'll need to know where it lies in physical space. The first
+        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+        ! output. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: threshold_field(1:,1:,1:,1:)
+        
+        integer(kind=ik), intent(out):: N_thresholding_components
+        
+
+        call compute_vorticity( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+        dx, params_acm%Bs, g, params_acm%discretization, threshold_field(:,:,:,1:3) )
+
+        N_thresholding_components = params_acm%dim
+    end subroutine 
+
+
+    !-----------------------------------------------------------------------------
+    ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
+    ! MPI_MAX 
+    ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
+    !-----------------------------------------------------------------------------
+    subroutine NORM_THRESHOLDFIELD_ACM( thresholdfield_block , norm)
+        implicit none
+        !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
+        real(kind=rk), intent(in)        :: thresholdfield_block(:, :, :, :)
+        ! component index
+       real(kind=rk), intent(inout) :: norm(:) 
+
+       integer(kind=ik) :: neq
+
+       neq = params_acm%N_eqn
+
+        if (params_acm%coarsening_indicator=="threshold-vorticity") then
+          ! loop over my active hvy data
+          norm(1) =  maxval(abs(thresholdfield_block(:, :, :, 1))) 
+        else
+
+          ! max over velocities
+          norm(1) = maxval(abs(thresholdfield_block(:,:,:,1:params_acm%dim)) )
+          norm(1:params_acm%dim) = norm(1) 
+          ! pressure
+          norm(params_acm%dim+1) = maxval(abs(thresholdfield_block(:,:,:,params_acm%dim+1)) )
+          norm(params_acm%dim+2:neq) = 1.0d0
+        endif
+
+
+    end subroutine
+
+
+  
 end module module_acm

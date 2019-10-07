@@ -63,11 +63,11 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
-    real(kind=rk) :: dx(1:3), x0(1:3), tmp(1:params%n_eqn)
-    real(kind=rk) :: norm(1:params%n_eqn)
+    real(kind=rk) :: dx(1:3), x0(1:3)
+    real(kind=rk), allocatable, save :: norm(:), block_norm(:), tmp(:)
     !> mask term for every grid point in this block
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> velocity of the solid
@@ -93,8 +93,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! block_coarsening_indicator, where it should be. but after computing it, we have to synch
     !! its vorticity ghost nodes in order to apply the detail operator to the entire
     !! vorticity field (incl gost nodes)
-    if (params%coarsening_indicator=="threshold-vorticity") then
-        if (params%threshold_mask) call abort(2801191,"the combination threshold-vorticity & threshold-mask cannot work.")
+    if (params%coarsening_indicator/="threshold-state-vector")then
 
         ! loop over my active hvy data
         do k = 1, hvy_n
@@ -106,15 +105,25 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
             ! we pass the spacing and origin of the block
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-            ! actual computation of vorticity on the block
-            call compute_vorticity( hvy_block(:,:,:,1,hvy_id), hvy_block(:,:,:,2,hvy_id), hvy_block(:,:,:,3,hvy_id), &
-            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_id) )
+            ! actual computation of thresholding quantity (vorticity etc)
+            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), & 
+                                 g, x0, dx, hvy_tmp(:,:,:,:,hvy_id),hvy_mask(:,:,:,:,hvy_id) , &
+                                 N_thresholding_components )
         enddo
 
         ! note here we synch hvy_tmp (=vorticity) and not hvy_block
-        call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:3,:), hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active, hvy_n )
+        if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
+          call abort(2801191,"your thresholding does not work with threshold-mask.")
+    else
+      ! in the default case we threshold all statevector components
+      N_thresholding_components = params%n_eqn
     endif
 
+    if (.not. allocated(norm)) then
+     allocate(norm(1:N_thresholding_components), block_norm(1:N_thresholding_components),&
+              tmp(1:N_thresholding_components))
+    endif
     !---------------------------------------------------------------------------
     !> Compute normalization for eps, if desired.
     !---------------------------------------------------------------------------
@@ -127,29 +136,29 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
     !! is an absolute value.
     norm = 1.0_rk
-
-    if (params%eps_normalized .and. ( params%physics_type=="ACM-new" .or. params%physics_type=="POD")) then
+  
+    
+    if (params%eps_normalized) then
+        ! normalizing is dependent on the variables you want to threshold! 
+        ! for customized variables you need custom normalization -> physics module
         norm = 0.0_rk
-        if (params%coarsening_indicator=="threshold-vorticity") then
-            ! loop over my active hvy data
-            do k = 1, hvy_n
-                norm(1) = max(norm(1),  maxval(abs(hvy_tmp(:, :, :, 1, hvy_active(k)))) )
-            enddo
+        block_norm = 0.0_rk       
+        if (params%coarsening_indicator=="threshold-state-vector" ) then
+          do k = 1, hvy_n
+              hvy_id = hvy_active(k)
+              call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_block(:,:,:,:,hvy_id), block_norm)
+              do p = 1, N_thresholding_components
+                norm(p) = max( norm(p), block_norm(p) )
+              enddo
+          end do
         else
-            do k = 1, hvy_n
-                ! call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-                ! call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                ! norm(1) = norm(1) + sum(hvy_block(:,:,:,1,hvy_active(k))**2)*dx(1)*dx(2)
-
-                ! max over velocities
-                norm(1) = max( norm(1), maxval(abs(hvy_block(:,:,:,1:neq-1,hvy_active(k)))) )
-                ! pressure
-                norm(neq) = max( norm(neq), maxval(abs(hvy_block(:,:,:,neq,hvy_active(k)))) )
-            enddo
-            ! isotropy: uz=uy=ux
-            ! (last entry is pressure)
-            norm(1:neq-1) = norm(1)
-            ! norm(2) = sqrt( norm(1) )
+          do k = 1, hvy_n
+              hvy_id = hvy_active(k)
+              call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_tmp(:,:,:,:,hvy_id), block_norm)
+              do p = 1, N_thresholding_components
+                norm(p) = max( norm(p), block_norm(p) )
+              enddo
+          end do
         endif
 
         ! note that a check norm>1.0e-10 is in threshold-block

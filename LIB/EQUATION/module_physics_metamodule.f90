@@ -28,7 +28,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
     INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, NORM_THRESHOLDFIELD_meta, &
-    STATISTICS_meta, FILTER_meta, CREATE_MASK_meta
+    STATISTICS_meta, FILTER_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta
     !**********************************************************************************************
 
 contains
@@ -429,6 +429,38 @@ contains
         end select
 
     end subroutine STATISTICS_meta
+
+    ! the statistics are written to ascii files (usually *.t files) with the help
+    ! of module_t_files. In any case, the files have to be intialized: ideally, they
+    ! are equipped with a header and resetted on the very first call, and they must not be deleted
+    ! if the simuation is resumed from a backup. We therefore provide this function so that all physics
+    ! modules can initialize those files.
+    subroutine INITIALIZE_ASCII_FILES_meta( physics, time, overwrite )
+        implicit none
+
+        character(len=*), intent(in) :: physics
+        ! it may happen that some source terms have an explicit time-dependency
+        ! therefore the general call has to pass time
+        real(kind=rk), intent (in) :: time
+        logical, intent(in) :: overwrite
+
+        select case(physics)
+        case ("ACM-new")
+            call INITIALIZE_ASCII_FILES_ACM( time, overwrite )
+
+        case ("ConvDiff-new")
+            ! not implemented yet.
+            !  call INITIALIZE_ASCII_FILES_convdiff( time, overwrite )
+
+        case ("navier_stokes")
+            call INITIALIZE_ASCII_FILES_NStokes( time, overwrite )
+
+        case default
+            call abort(3102019, "[INITIALIZE_ASCII_FILES_meta]: physics_type is unknown"//physics)
+
+        end select
+
+    end subroutine INITIALIZE_ASCII_FILES_meta
 
 
     !-----------------------------------------------------------------------------

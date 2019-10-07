@@ -114,6 +114,18 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
             end do
         end do
 
+    elseif (params_acm%sponge_type == "inlet-outlet-x") then
+        ! outlet sponge in x-direction
+        do ix = g+1, Bs(1)+g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+            ! distance to borders of domain
+            tmp = minval( (/x,-(x-params_acm%domain_size(1))/) )
+
+            sponge(ix,:,:) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+        end do
+
+
     elseif (params_acm%sponge_type == "p-norm") then
         ! p-norm sponge. The shape of the sponge is dictated as the p-norm
         ! https://de.wikipedia.org/wiki/P-Norm

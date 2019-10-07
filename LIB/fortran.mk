@@ -162,7 +162,7 @@ $(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_
 $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o \
 	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 \
 	wings_motion.f90 stroke_plane.f90 pointcloud.f90 fractal_trees.f90 insect_init_clean.f90 \
-	kineloader.f90 active_grid_winglets.f90
+	kineloader.f90 active_grid_winglets.f90 $(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o
@@ -208,7 +208,7 @@ $(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)
 
 $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_penalization.o  $(OBJDIR)/module_navier_stokes_params.o\
 	$(OBJDIR)/module_navier_stokes_cases.o $(OBJDIR)/module_sparse_operators.o  $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes_periodic.f90 RHS_2D_navier_stokes_bc.f90 \
+	$(OBJDIR)/module_funnel.o  RHS_2D_navier_stokes_periodic.f90 RHS_2D_navier_stokes_bc.f90  $(OBJDIR)/module_t_files.o\
 	RHS_2D_cylinder.f90 RHS_3D_navier_stokes.f90 inicond_NStokes.f90 save_data_ns.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -217,7 +217,7 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o \
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

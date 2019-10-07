@@ -44,7 +44,8 @@ module module_acm
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
-  create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM
+  create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM, &
+  INITIALIZE_ASCII_FILES_ACM
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -500,4 +501,44 @@ contains
 
 
   
+
+
+  ! the statistics are written to ascii files (usually *.t files) with the help
+  ! of module_t_files. In any case, the files have to be intialized: ideally, they
+  ! are equipped with a header and resetted on the very first call, and they must not be deleted
+  ! if the simuation is resumed from a backup. We therefore provide this function so that all physics
+  ! modules can initialize those files.
+  subroutine INITIALIZE_ASCII_FILES_ACM( time, overwrite )
+      implicit none
+
+      ! it may happen that some source terms have an explicit time-dependency
+      ! therefore the general call has to pass time
+      real(kind=rk), intent (in) :: time
+      logical, intent(in) :: overwrite
+
+
+      call init_t_file('meanflow.t', overwrite)
+      call init_t_file('forces.t', overwrite)
+      call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
+      call init_t_file('enstrophy.t', overwrite)
+      call init_t_file('div.t', overwrite)
+      call init_t_file('umag.t', overwrite)
+      ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
+      call init_t_file('CFL.t', overwrite)
+      ! write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
+      call init_t_file('moments.t', overwrite)
+      call init_t_file('aero_power.t', overwrite)
+      call init_t_file('forces_body.t', overwrite)
+      call init_t_file('moments_body.t', overwrite)
+      call init_t_file('forces_leftwing.t', overwrite)
+      call init_t_file('moments_leftwing.t', overwrite)
+      call init_t_file('forces_rightwing.t', overwrite)
+      call init_t_file('moments_rightwing.t', overwrite)
+      call init_t_file('error_taylor_green.t', overwrite)
+      call init_t_file('mask_volume.t', overwrite)
+      call init_t_file('u_residual.t', overwrite)
+      call init_t_file('kinematics.t', overwrite)
+
+  end subroutine INITIALIZE_ASCII_FILES_ACM
+
 end module module_acm

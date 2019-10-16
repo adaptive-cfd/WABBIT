@@ -317,7 +317,7 @@ contains
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
+    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
     integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
     integer(hid_t)                          :: file_id
@@ -325,7 +325,7 @@ contains
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
-    integer(kind=ik) :: j, n_components=1, io_error
+    integer(kind=ik) :: j, n_components=1, io_error,tree_n
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
     character(len=2)  :: order
@@ -514,12 +514,13 @@ contains
    call reset_forest(lgt_block, lgt_active(:, 1), &
    params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
 
-    hvy_neighbor = -1
-    lgt_n = 0 ! reset number of acitve light blocks
-    tree_n= 0 ! reset number of trees in forest
+    hvy_neighbor = -1_ik
+    lgt_n = 0_ik ! reset number of acitve light blocks
+    tree_n= 0_ik ! reset number of trees in forest
     !----------------------------------
     ! READ ALL SNAPSHOTS
     !----------------------------------
+
     do tree_id = 1, N_snapshots
       call read_field2tree(params,file_in(tree_id,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
@@ -629,7 +630,7 @@ contains
     real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
     integer(kind=ik), allocatable :: hvy_neighbor(:,:), hvy_active(:, :)
-    integer(kind=ik), allocatable :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
+    integer(kind=ik), allocatable :: lgt_active(:,:), lgt_n(:), hvy_n(:)
     integer(kind=tsize), allocatable :: lgt_sortednumlist(:,:,:)
     integer(kind=ik)                 :: max_neighbors, level, k, Bs(3), tc_length
     integer(hid_t)                   :: file_id
@@ -637,7 +638,7 @@ contains
     integer(hsize_t), dimension(2)   :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
-    integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int
+    integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
     character(len=2)  :: order
@@ -1239,13 +1240,13 @@ contains
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :), mode_number(:)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:),tree_n
+    integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
     integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components
+    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time

@@ -99,6 +99,7 @@ contains
     ! distribute *.stl to all procs, from root. avoids that all cpu have to perform
     ! i/o
     subroutine broadcast_stl_file(ntri, triangles, normals)
+        use mpi
         implicit none
         integer, intent(inout) :: ntri
         ! dimensionality is (3,ntri)
@@ -126,6 +127,10 @@ contains
             call MPI_BCAST( triangles(2,:), 3*ntri, MPI_REAL, 0, MPI_COMM_WORLD, mpicode )
             call MPI_BCAST( triangles(3,:), 3*ntri, MPI_REAL, 0, MPI_COMM_WORLD, mpicode )
         enddo
+
+        ! security barrier: if for some reason not all ranks call MPI_BCAST approx. at the same time,
+        ! that causes crashes on some machines.
+        call MPI_BARRIER(MPI_COMM_WORLD, mpicode)
     end subroutine
 
 

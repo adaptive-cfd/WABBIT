@@ -24,8 +24,7 @@
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
-  !---------------------------------------------------------------------------------------------
-  ! modules
+
     use module_indicators
 
     implicit none
@@ -79,7 +78,6 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     Bs = params%Bs
     g = params%n_ghosts
 
-
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n
         lgt_id = lgt_active(k)
@@ -87,43 +85,55 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     enddo
 
     !---------------------------------------------------------------------------
-    !> Compute vorticity (if required)
+    !> Preparation for thresholding (if required)
     !---------------------------------------------------------------------------
-    !! it is a little unfortunate that we have to compute the vorticity here and not in
-    !! block_coarsening_indicator, where it should be. but after computing it, we have to synch
-    !! its vorticity ghost nodes in order to apply the detail operator to the entire
-    !! vorticity field (incl gost nodes)
-    if (params%coarsening_indicator/="threshold-state-vector")then
+    !! The idea is that you want to threshold something else than your statevector
+    !! whatever reason. For example, vorticity, or in the skew-symmetric case you want
+    !! to apply some statevector conversion first.
+    !! it is a little unfortunate that we have to do this preparation here and not in
+    !! block_coarsening_indicator, where it should be. but after computing it, we have to
+    !! sync its ghost nodes in order to apply the detail operator to the entire
+    !! derived field (incl gost nodes).
+    if (params%coarsening_indicator /= "threshold-state-vector") then
+        ! case with derived quantities.
 
         ! loop over my active hvy data
         do k = 1, hvy_n
             hvy_id = hvy_active(k)
+
             ! get lgt id of block
             call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            ! some indicators may depend on the grid (e.g. to compute the vorticity), hence
+            ! some indicators may depend on the grid (e.g. the vorticity), hence
             ! we pass the spacing and origin of the block
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
             ! actual computation of thresholding quantity (vorticity etc)
-            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), & 
-                                 g, x0, dx, hvy_tmp(:,:,:,:,hvy_id),hvy_mask(:,:,:,:,hvy_id) , &
-                                 N_thresholding_components )
+            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
+            g, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), N_thresholding_components )
         enddo
 
-        ! note here we synch hvy_tmp (=vorticity) and not hvy_block
+        ! note here we sync hvy_tmp (=derived qty) and not hvy_block
         call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active, hvy_n )
+
         if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
-          call abort(2801191,"your thresholding does not work with threshold-mask.")
+        call abort(2801191,"your thresholding does not work with threshold-mask.")
+
     else
-      ! in the default case we threshold all statevector components
-      N_thresholding_components = params%n_eqn
+        ! case without derived quantities. NOTE: while it would be nicer to have
+        ! PREPARE_THRESHOLDFIELD_meta simply copy the relevant components to HVY_TMP,
+        ! this overhead slows down the code and must be avoided.
+
+        ! in the default case we threshold all statevector components
+        N_thresholding_components = params%n_eqn
     endif
 
     if (.not. allocated(norm)) then
-     allocate(norm(1:N_thresholding_components), block_norm(1:N_thresholding_components),&
-              tmp(1:N_thresholding_components))
+        allocate(norm(1:N_thresholding_components), block_norm(1:N_thresholding_components),&
+        tmp(1:N_thresholding_components))
     endif
+
+
     !---------------------------------------------------------------------------
     !> Compute normalization for eps, if desired.
     !---------------------------------------------------------------------------
@@ -136,29 +146,31 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
     !! is an absolute value.
     norm = 1.0_rk
-  
-    
+
     if (params%eps_normalized) then
-        ! normalizing is dependent on the variables you want to threshold! 
+        ! normalizing is dependent on the variables you want to threshold!
         ! for customized variables you need custom normalization -> physics module
         norm = 0.0_rk
-        block_norm = 0.0_rk       
-        if (params%coarsening_indicator=="threshold-state-vector" ) then
-          do k = 1, hvy_n
-              hvy_id = hvy_active(k)
-              call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_block(:,:,:,:,hvy_id), block_norm)
-              do p = 1, N_thresholding_components
-                norm(p) = max( norm(p), block_norm(p) )
-              enddo
-          end do
+        block_norm = 0.0_rk
+
+        if ( params%coarsening_indicator == "threshold-state-vector" ) then
+            ! Apply thresholding directly to the statevector, not to derived quantities
+            do k = 1, hvy_n
+                call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_block(:,:,:,:,hvy_active(k)), block_norm)
+
+                do p = 1, N_thresholding_components
+                    norm(p) = max( norm(p), block_norm(p) )
+                enddo
+            end do
         else
-          do k = 1, hvy_n
-              hvy_id = hvy_active(k)
-              call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_tmp(:,:,:,:,hvy_id), block_norm)
-              do p = 1, N_thresholding_components
-                norm(p) = max( norm(p), block_norm(p) )
-              enddo
-          end do
+            ! Apply thresholding to derived qtys, such as the vorticity
+            do k = 1, hvy_n
+                call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_tmp(:,:,:,:,hvy_active(k)), block_norm)
+
+                do p = 1, N_thresholding_components
+                    norm(p) = max( norm(p), block_norm(p) )
+                enddo
+            end do
         endif
 
         ! note that a check norm>1.0e-10 is in threshold-block
@@ -173,6 +185,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> evaluate coarsing criterion on all blocks
     !---------------------------------------------------------------------------
+    ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
+    ! notably because of the ghost nodes unit test, where random refinement / coarsening
+    ! is used. hence, checking the flag params%threshold_mask alone is not enough.
     if (params%threshold_mask .and. present(hvy_mask)) then
         ! loop over all my blocks
         do k = 1, hvy_n
@@ -225,7 +240,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     endif
 
 
-    !> after modifying all refinement statusses, we need to synchronize light data
+    !> after modifying all refinement flags, we need to synchronize light data
     call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
 
 end subroutine grid_coarsening_indicator

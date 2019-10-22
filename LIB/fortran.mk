@@ -73,12 +73,22 @@ FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument 
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz -ldl -lm -lblas -llapack
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz
 FFLAGS += -I$(HDF_INC) $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
 PRAGMAS = #-DSBLAS
+ifdef MKLROOT
+# Use MKL lapack
+LDFLAGS += -I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldl -lm
+else
+# Use custom LAPACK installation
+LDFLAGS += -llapack -lblas -ldl -lm
 endif
+endif
+
+
+
 
 #-------------------------------------------------------------------------------
 # Intel compiler
@@ -88,18 +98,26 @@ ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
 FFLAGS += -FR -O3 -heap-arrays
 # timing flags: attention they might disable all optimization!
-# FFLAGS += -warn all,nounused -traceback -check bounds -timing all -check all,noarg_temp_created
+##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz -ldl -lm -llapack -lblas
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz 
+#####-ldl -lm # -llapack -lblas
 FFLAGS += -I$(HDF_INC)
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
 # different pragmas are space-separated
 PRAGMAS = #
+ifdef MKLROOT
+# Use MKL lapack
+LDFLAGS += -I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldl -lm
+else
+# Use custom LAPACK installation
+LDFLAGS += -llapack -lblas -ldl -lm
+endif
 endif
 
 #-------------------------------------------------------------------------------

@@ -7,7 +7,7 @@ module module_treelib
 
 contains
 
-    include "get_neighbor_treecode.f90"
+#include "get_neighbor_treecode.f90"
 
   !===============================================================================
   !> \brief from a tree id and treecode we make a tree-identifieer, which is

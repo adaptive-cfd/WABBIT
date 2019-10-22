@@ -109,14 +109,14 @@ module module_MPI
 
 contains
 
-    include "synchronize_ghosts.f90"
-    include "synchronize_ghosts_generic.f90"
-    include "blocks_per_mpirank.f90"
-    include "synchronize_lgt_data.f90"
-    include "reset_ghost_nodes.f90"
-    include "check_redundant_nodes.f90"
-    include "calc_data_bounds.f90"
-    include "restrict_predict_data.f90"
+#include "synchronize_ghosts.f90"
+#include "synchronize_ghosts_generic.f90"
+#include "blocks_per_mpirank.f90"
+#include "synchronize_lgt_data.f90"
+#include "reset_ghost_nodes.f90"
+#include "check_redundant_nodes.f90"
+#include "calc_data_bounds.f90"
+#include "restrict_predict_data.f90"
 
 
 !! initialize ghost nodes module. allocate buffers and create data bounds array,

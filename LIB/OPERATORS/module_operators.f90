@@ -39,9 +39,9 @@ PUBLIC :: compute_vorticity, divergence, compute_Qcriterion
 
 contains
 
-    include "compute_Qcriterion.f90"
-    include "compute_vorticity.f90"
-    include "divergence.f90"
+#include "compute_Qcriterion.f90"
+#include "compute_vorticity.f90"
+#include "divergence.f90"
 
 
 

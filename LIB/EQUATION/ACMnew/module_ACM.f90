@@ -112,13 +112,13 @@ module module_acm
 
 contains
 
-  include "rhs.f90"
-  include "create_mask.f90"
-  include "inicond_ACM.f90"
-  include "sponge.f90"
-  include "save_data_ACM.f90"
-  include "statistics_ACM.f90"
-  include "filter_ACM.f90"
+#include "rhs.f90"
+#include "create_mask.f90"
+#include "inicond_ACM.f90"
+#include "sponge.f90"
+#include "save_data_ACM.f90"
+#include "statistics_ACM.f90"
+#include "filter_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads

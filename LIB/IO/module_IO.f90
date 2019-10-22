@@ -56,20 +56,20 @@ module module_IO
 contains
 
     ! create list of active blocks (light data)
-    include "save_data.f90"
+#include "save_data.f90"
 
     ! write fields to disk
-    include "write_field.f90"
+#include "write_field.f90"
 
     ! read mesh properties and time from input file
-    include "read_mesh.f90"
+#include "read_mesh.f90"
 
     ! read field from input file
-    include "read_field.f90"
+#include "read_field.f90"
 
-    include "read_attributes.f90"
+#include "read_attributes.f90"
 
-    include "read_file_flusi.f90"
-    include "forest_IO.f90"
+#include "read_file_flusi.f90"
+#include "forest_IO.f90"
 
 end module module_IO

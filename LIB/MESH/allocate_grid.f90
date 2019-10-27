@@ -496,7 +496,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
         endif
-        
+
     elseif ( present(hvy_mask) .and. params%N_mask_components <= 0 ) then
         ! dummy allocation, to prevent IFORT from yelling.
         allocate( hvy_mask(1, 1, 1, 1, 1)  )

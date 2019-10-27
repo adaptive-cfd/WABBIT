@@ -72,7 +72,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! process rank
     integer(kind=ik)                    :: rank, lgt_rank
     ! loop variable
-    integer(kind=ik)                    :: k, hvy_id, l, lgt_id
+    integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status
     ! grid parameter
     integer(kind=ik)                    :: g, dim
     integer(kind=ik), dimension(3)      :: Bs
@@ -88,8 +88,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     integer(hid_t)                      :: file_id
 
     ! offset variables
-    integer,dimension(1:4)              :: ubounds3D, lbounds3D
-    integer,dimension(1:3)              :: ubounds2D, lbounds2D
+    integer(kind=ik), dimension(1:4)    :: ubounds3D, lbounds3D
+    integer(kind=ik), dimension(1:3)    :: ubounds2D, lbounds2D
 
     character(len=80) :: arg
     type(INIFILE) :: FILE
@@ -115,7 +115,10 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ))
+    allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+    if (status /= 0) then
+        call abort(2510191, "IO: sorry, but buffer allocation failed! At least the weather is clearing up. Go outside.")
+    endif
     allocate(coords_spacing(1:3, 1:hvy_n) )
     allocate(coords_origin(1:3, 1:hvy_n))
     allocate(procs(1:hvy_n))
@@ -136,7 +139,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! output on screen
     if (rank == 0) then
-        write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i5," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
+        write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
         time, trim(adjustl(fname)), lgt_n, 100.0*dble(lgt_n)/dble( (2**max_active_level( lgt_block, lgt_active, lgt_n ))**dim ), &
         100.0*dble(lgt_n)/dble( (2**params%max_treelevel)**dim )
     endif

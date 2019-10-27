@@ -6,7 +6,8 @@ proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_t
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 error_msg.f90 \
 startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
 compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
-post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90
+post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90 \
+post_superstl.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -105,7 +106,7 @@ LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
 HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz 
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz
 #####-ldl -lm # -llapack -lblas
 FFLAGS += -I$(HDF_INC)
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code

@@ -124,7 +124,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                     lgt_n_tmp = lgt_n(tree_ID_flow)
 
                     call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-                    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .true. )
+                    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, all_parts=.true. )
 
                     call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                     lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
@@ -222,7 +222,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                         lgt_n_tmp = lgt_n(tree_ID_flow)
 
                         call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-                        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .true. )
+                        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, all_parts=.true. )
 
                         call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                         lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &

@@ -278,7 +278,7 @@ contains
     call clean_ini_file_mpi( FILE )
 
     if (Neqn /= params_acm%dim + 1 + params_acm%N_scalars) then
-        call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
+        ! call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
     ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))

@@ -32,7 +32,7 @@ module module_globals
   ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
   ! universality dictates that we can also use a different number of components, for example
   ! when syn'ing the mask function (which in many cases has six entries.)
-  integer, parameter, public  :: N_MAX_COMPONENTS = 10
+  integer, public  :: N_MAX_COMPONENTS = 6
 
   !subroutines of this module
   interface abort

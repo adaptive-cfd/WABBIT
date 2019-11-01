@@ -72,18 +72,18 @@ subroutine post_superstl(params)
 
     call read_stl_file(fname_stl, ntri, triangles, normals)
     call normalize_stl_file( ntri, triangles, "--scale", scale, origin )
+    ! compute all vertex- and edgenormals, store them in an ascii file
+    ! See:
+    ! Baerentzen, Aanaes. Generating Signed Distance Fields From Triangle Meshes. (IMM-TECHNICAL REPORT-2002-21)
     call compute_superstl_file( triangles, normals, ntri, superstl )
 
     if (params%rank == 0) then
         write(*,*) "Writing output to: "//trim(adjustl(fname_out))
-        
-        ! write output
-        call init_t_file(fname_out, .true.)
 
+        open (14,file='fname_out', status='replace')
         do i = 1, size(superstl, 1)
-            call append_t_file(fname_out, real(superstl(i,:), kind=rk))
+            write(14,'(30(es15.8,1x))') superstl(i,:)
         enddo
-
-        call close_t_file(fname_out)
+        close(14)
     endif
 end subroutine

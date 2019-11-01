@@ -98,7 +98,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
     ! spacing and origin (new)
-    real(kind=rk) :: xx0(1:3) , ddx(1:3)
+    real(kind=rk) :: xx0(1:3) , ddx(1:3), sparsity_Jcurrent, sparsity_Jmax
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
 
 !---------------------------------------------------------------------------------------------
@@ -129,6 +129,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     coords_origin = 7.0e6_rk
 
+    if (lgt_n < 1 ) call abort(291019, "you try to save an empty mesh.")
+
 !---------------------------------------------------------------------------------------------
 ! main body
 
@@ -139,9 +141,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! output on screen
     if (rank == 0) then
+        sparsity_Jcurrent = dble(lgt_n) / dble(2**max_active_level( lgt_block, lgt_active, lgt_n ))**dim
+        sparsity_Jmax = dble(lgt_n) / dble(2**params%max_treelevel)**dim
+
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
-        time, trim(adjustl(fname)), lgt_n, 100.0*dble(lgt_n)/dble( (2**max_active_level( lgt_block, lgt_active, lgt_n ))**dim ), &
-        100.0*dble(lgt_n)/dble( (2**params%max_treelevel)**dim )
+        time, trim(adjustl(fname)), lgt_n, 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
     endif
 
     ! we need to know how many blocks each rank actually holds, and all procs need to

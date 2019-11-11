@@ -151,7 +151,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
         if (params%threshold_mask .and. present(hvy_mask)) then
-            ! if the mask function is used as secondary coarsening criterion, we also pass the mask data array
+            ! if the mask function is used as secondary coarsening criterion, we also pass the mask data array.
             ! the idea is that now coarse-mesh will keep both hvy_block and hvy_mask on the same grid, i.e.
             ! the same coarsening is applied to both. the mask does not have to be re-created here, because
             ! regions with sharp gradients (that's where the mask is interesting) will remain unchanged

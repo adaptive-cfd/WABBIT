@@ -112,13 +112,13 @@ module module_acm
 
 contains
 
-  include "rhs.f90"
-  include "create_mask.f90"
-  include "inicond_ACM.f90"
-  include "sponge.f90"
-  include "save_data_ACM.f90"
-  include "statistics_ACM.f90"
-  include "filter_ACM.f90"
+#include "rhs.f90"
+#include "create_mask.f90"
+#include "inicond_ACM.f90"
+#include "sponge.f90"
+#include "save_data_ACM.f90"
+#include "statistics_ACM.f90"
+#include "filter_ACM.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -278,7 +278,7 @@ contains
     call clean_ini_file_mpi( FILE )
 
     if (Neqn /= params_acm%dim + 1 + params_acm%N_scalars) then
-        call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
+        ! call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
     ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
@@ -429,78 +429,79 @@ contains
                                                   , params_acm%domain_size(2)/real(params_acm%Bs(2)-1, kind=rk))
       ! u(x=0) should be set equal to u(x=L)
       if ( abs(x-L)<min_dx*0.5_rk ) then
-        x = 0.0_rk
+          x = 0.0_rk
       end if
 
   end subroutine continue_periodic
 
- !-----------------------------------------------------------------------------
-     ! Adaptation is dependent on the different physics application. 
-     ! Every physics module can choose its own coarsening indicator.
-    !-----------------------------------------------------------------------------
-    subroutine PREPARE_THRESHOLDFIELD_ACM( u, g, x0, dx, threshold_field, &
-                               N_thresholding_components )
-        implicit none
+  !-----------------------------------------------------------------------------
+  ! Adaptation is dependent on the different physics application.
+  ! Every physics module can choose its own coarsening indicator.
+  !-----------------------------------------------------------------------------
+  subroutine PREPARE_THRESHOLDFIELD_ACM( u, g, x0, dx, threshold_field, N_thresholding_components )
+      implicit none
 
-        ! block data, containg the state vector. In general a 4D field (3 dims+components)
-        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+      ! block data, containg the state vector. In general a 4D field (3 dims+components)
+      ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+      real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-        ! as you are allowed to compute the RHS only in the interior of the field
-        ! you also need to know where 'interior' starts: so we pass the number of ghost points
-        integer, intent(in) :: g
+      ! as you are allowed to compute the RHS only in the interior of the field
+      ! you also need to know where 'interior' starts: so we pass the number of ghost points
+      integer, intent(in) :: g
 
-        ! for each block, you'll need to know where it lies in physical space. The first
-        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+      ! for each block, you'll need to know where it lies in physical space. The first
+      ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+      real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-        ! output. Note assumed-shape arrays
-        real(kind=rk), intent(inout) :: threshold_field(1:,1:,1:,1:)
-        
-        integer(kind=ik), intent(out):: N_thresholding_components
-        
+      ! output. Note assumed-shape arrays
+      real(kind=rk), intent(inout) :: threshold_field(1:,1:,1:,1:)
 
-        call compute_vorticity( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
-        dx, params_acm%Bs, g, params_acm%discretization, threshold_field(:,:,:,1:3) )
-
-        N_thresholding_components = params_acm%dim
-    end subroutine 
+      ! WABBIT needs to know how many components are involved in thresholding,
+      ! so return this number as well.
+      integer(kind=ik), intent(out):: N_thresholding_components
 
 
-    !-----------------------------------------------------------------------------
-    ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-    ! MPI_MAX 
-    ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
-    !-----------------------------------------------------------------------------
-    subroutine NORM_THRESHOLDFIELD_ACM( thresholdfield_block , norm)
-        implicit none
-        !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-        real(kind=rk), intent(in)        :: thresholdfield_block(:, :, :, :)
-        ! component index
-       real(kind=rk), intent(inout) :: norm(:) 
+      call compute_vorticity( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+      dx, params_acm%Bs, g, params_acm%discretization, threshold_field(:,:,:,1:3) )
 
-       integer(kind=ik) :: neq
+      N_thresholding_components = params_acm%dim
+  end subroutine
 
-       neq = params_acm%N_eqn
 
-        if (params_acm%coarsening_indicator=="threshold-vorticity") then
+  !-----------------------------------------------------------------------------
+  ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
+  ! MPI_MAX
+  ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
+  !-----------------------------------------------------------------------------
+  subroutine NORM_THRESHOLDFIELD_ACM( thresholdfield_block , norm)
+      implicit none
+      !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
+      real(kind=rk), intent(in) :: thresholdfield_block(:, :, :, :)
+      !> normalization for details, ouput of this routine
+      real(kind=rk), intent(inout) :: norm(:)
+
+      integer(kind=ik) :: neq
+
+      neq = params_acm%N_eqn
+
+      if (params_acm%coarsening_indicator=="threshold-vorticity") then
           ! loop over my active hvy data
-          norm(1) =  maxval(abs(thresholdfield_block(:, :, :, 1))) 
-        else
+          norm(1) =  maxval(abs(thresholdfield_block(:, :, :, 1)))
+      else
 
           ! max over velocities
           norm(1) = maxval(abs(thresholdfield_block(:,:,:,1:params_acm%dim)) )
-          norm(1:params_acm%dim) = norm(1) 
+          norm(1:params_acm%dim) = norm(1)
           ! pressure
           norm(params_acm%dim+1) = maxval(abs(thresholdfield_block(:,:,:,params_acm%dim+1)) )
           norm(params_acm%dim+2:neq) = 1.0d0
-        endif
+      endif
 
 
-    end subroutine
+  end subroutine
 
 
-  
+
 
 
   ! the statistics are written to ascii files (usually *.t files) with the help

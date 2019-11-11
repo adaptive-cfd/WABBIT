@@ -18,7 +18,6 @@ subroutine post_prune_tree(params)
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
-    real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
@@ -50,28 +49,28 @@ subroutine post_prune_tree(params)
 
     call get_command_argument(3, fname_out)
 
+    N_MAX_COMPONENTS  = 1
 
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim)
 
     ! just to get some memory:
-    params%number_blocks = N1 + 20
+    params%number_blocks = 20 + N1 / params%number_procs
     params%domain_size = domain
     params%max_treelevel = tc_length1
     params%min_treelevel = 1
     params%n_eqn = 1
-    params%n_ghosts = 4
-    params%forest_size = 2
+    params%n_ghosts = 2
+    params%forest_size = 4
     fsize = params%forest_size
-    params%order_predictor = "multiresolution_4th"
+    params%order_predictor = "multiresolution_2nd"
     params%block_distribution = "sfc_hilbert"
-
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
     ! we have to allocate grid if this routine is called for the first time
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of active light blocks
@@ -81,20 +80,17 @@ subroutine post_prune_tree(params)
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
-    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
-
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
+    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=2, time=time, iteration=iteration )
+    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout

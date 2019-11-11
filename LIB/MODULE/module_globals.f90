@@ -20,7 +20,7 @@ module module_globals
 
   implicit none
   !> global communicator for WABBIT! Dont use MPI_COMM_WORLD!!!!!
-  integer(kind=ik)       :: WABBIT_COMM
+  integer(kind=ik) :: WABBIT_COMM
   ! index of light data quantities lgt_data(block_index,max_treeleve+idx_<quantity>)
   ! we define the global indices idx_<quantity> here, because it enables us to choose the order of indexing
   ! if necessary
@@ -32,7 +32,7 @@ module module_globals
   ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
   ! universality dictates that we can also use a different number of components, for example
   ! when syn'ing the mask function (which in many cases has six entries.)
-  integer, parameter, public  :: N_MAX_COMPONENTS = 10
+  integer, public  :: N_MAX_COMPONENTS = 6
 
   !subroutines of this module
   interface abort
@@ -40,6 +40,23 @@ module module_globals
   end interface
 
 contains
+
+! helper routine to print when entering a routine. DEBUG only!
+! all MPIRANKS do print
+subroutine debug_header_barrier(msg)
+    use mpi
+    implicit none
+    character(len=*), intent(in) :: msg
+    integer :: mpirank, mpicode
+
+    ! fetch my process id
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+    call MPI_BARRIER(WABBIT_COMM, mpicode)
+    write(*,'(A,i5,1x,A)') "DEBUG_BARRIER Entry, rank=", mpirank, msg
+    call MPI_BARRIER(WABBIT_COMM, mpicode)
+
+end subroutine
 
 !> use the abort function instead of stop!
 !> this is necessary since stop, does not kill

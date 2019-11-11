@@ -109,14 +109,14 @@ module module_MPI
 
 contains
 
-    include "synchronize_ghosts.f90"
-    include "synchronize_ghosts_generic.f90"
-    include "blocks_per_mpirank.f90"
-    include "synchronize_lgt_data.f90"
-    include "reset_ghost_nodes.f90"
-    include "check_redundant_nodes.f90"
-    include "calc_data_bounds.f90"
-    include "restrict_predict_data.f90"
+#include "synchronize_ghosts.f90"
+#include "synchronize_ghosts_generic.f90"
+#include "blocks_per_mpirank.f90"
+#include "synchronize_lgt_data.f90"
+#include "reset_ghost_nodes.f90"
+#include "check_redundant_nodes.f90"
+#include "calc_data_bounds.f90"
+#include "restrict_predict_data.f90"
 
 
 !! initialize ghost nodes module. allocate buffers and create data bounds array,
@@ -146,9 +146,12 @@ subroutine init_ghost_nodes( params )
         rank            = params%rank
         Ncpu            = params%number_procs
 
-        if (rank==0) write(*,'("---------------------------------------------------------")')
-        if (rank==0) write(*,'("                     GHOST-INIT ")')
-        if (rank==0) write(*,'("---------------------------------------------------------")')
+        if (rank==0) then
+            write(*,'("---------------------------------------------------------")')
+            write(*,'("                     GHOST-INIT ")')
+            write(*,'("---------------------------------------------------------")')
+            write(*,'("GHOSTS-INIT: We can synchronize at most N_MAX_COMPONENTS=",i2)') N_MAX_COMPONENTS
+        endif
 
         if ( params%dim==3 ) then
             if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. g>=(Bs(3)+1)/2) then
@@ -268,6 +271,8 @@ subroutine init_ghost_nodes( params )
         allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
         allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
 
+        ! wait now so that if allocation fails, we get at least the above info
+        call MPI_barrier( WABBIT_COMM, status(1))
 
         !-----------------------------------------------------------------------
         ! set up constant arrays
@@ -442,6 +447,15 @@ subroutine init_ghost_nodes( params )
         inverse_neighbor(74,3) = 68
 
         ghost_nodes_module_ready = .true.
+
+        ! this routine is not performance-critical
+        call MPI_barrier( WABBIT_COMM, status(1))
+
+        if (rank==0) then
+            write(*,'("---------------------------------------------------------")')
+            write(*,'("                     GHOST-INIT complete :)")')
+            write(*,'("---------------------------------------------------------")')
+        endif
     endif
 
 end subroutine

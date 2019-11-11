@@ -15,8 +15,8 @@ module module_helpers
 
 contains
 
-  include "most_common_element.f90"
-  include "rotation_matrices.f90"
+#include "most_common_element.f90"
+#include "rotation_matrices.f90"
 
   !-----------------------------------------------------------------------------
   !> This function computes the factorial of n

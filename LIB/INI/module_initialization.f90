@@ -48,7 +48,7 @@ module module_initialization
 contains
 
     ! init_data subroutine
-    include "set_initial_grid.f90"
-    include "set_inicond_blocks.f90"
-    include "get_inicond_from_file.f90"
+#include "set_initial_grid.f90"
+#include "set_inicond_blocks.f90"
+#include "get_inicond_from_file.f90"
 end module module_initialization

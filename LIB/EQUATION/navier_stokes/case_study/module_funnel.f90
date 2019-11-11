@@ -102,8 +102,8 @@ module module_funnel
 
 contains
 
-  include 'funnel2D.f90'
-  include 'funnel3D.f90'
+#include "funnel2D.f90"
+#include "funnel3D.f90"
 
 
 

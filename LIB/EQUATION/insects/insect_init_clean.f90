@@ -25,6 +25,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   real(kind=rk),dimension(1:3)::defaultvec
   character(len=strlen) :: DoF_string, dummystr
   integer :: j, tmp, mpirank, mpicode
+  integer(kind=2) :: wingID, Nwings
 
   ! in this module, we use the logical ROOT to avoid the integer comparison mpirank==0
   call MPI_COMM_RANK (MPI_COMM_WORLD, mpirank, mpicode)
@@ -37,38 +38,38 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   nu = viscosity
   ! header information
   if (root) then
-      write(*,*) "-------------------------------------------------------------------------------------------------------------"
-      write(*,*) "                                                                                                             "
-      write(*,*) "                                                                                                             "
-      write(*,*) "                                                                                                .*#@@@%      "
-      write(*,*) "                                                                                         (@.            (@   "
-      write(*,*) "                                                         @                             (&                 @  "
-      write(*,*) "                                                           @                          @                    & "
-      write(*,*) "                                                            %@                       @                     @ "
-      write(*,*) "          Initializing                                        %%                    @                      @ "
-      write(*,*) "                                                                @*.                @                      #  "
-      write(*,*) "                  Insect-module                             *@      @             @                      #&  "
-      write(*,*) "                                                  @@%*      @          @         &                     @&    "
-      write(*,*) "                                                      @@@%(&@           @@@@@@,  @                  @@       "
-      write(*,*) "                                                             @          @        @@              #@          "
-      write(*,*) "  @                                                           @       @@           *%       &@@              "
-      write(*,*) "  @                                                             (@@@@,   @             @@,                   "
-      write(*,*) "                                                                          @  ,           ,@                  "
-      write(*,*) "                                                                       %@@%                .@                "
-      write(*,*) "                                                                   %@                        @               "
-      write(*,*) "                                                                *@                  @         @              "
-      write(*,*) "                                                              @*                   /@          @             "
-      write(*,*) "    @                                                      %(                     .@   @@# ## @,             "
-      write(*,*) "     @                                  /&@@@@@(.         #.                      @                          "
-      write(*,*) "      (@                                                  @                      @                           "
-      write(*,*) "                                                          @                     @                            "
-      write(*,*) "                             #@@@@&,                      @                    @                             "
-      write(*,*) "          #%%%#(*.                                        &                  (&                              "
-      write(*,*) "                                                           &/              &@                                "
-      write(*,*) "                                                             .@@#%@@@@@@(                                    "
-      write(*,*) "                                                                                                             "
-      write(*,*) "                                                                                                             "
-      write(*,*) "-------------------------------------------------------------------------------------------------------------"
+      write(*,*) "---------------------------------------------------------------------------------------"
+      write(*,*) "                                                                                       "
+      write(*,*) "                                                                                       "
+      write(*,*) "                                                                          .*#@@@%      "
+      write(*,*) "                                                                   (@.            (@   "
+      write(*,*) "                                   @                             (&                 @  "
+      write(*,*) "                                     @                          @                    & "
+      write(*,*) "                                      %@                       @                     @ "
+      write(*,*) "Initializing                            %%                    @                      @ "
+      write(*,*) "                                          @*.                @                      #  "
+      write(*,*) "        Insect-module                 *@      @             @                      #&  "
+      write(*,*) "                              %*      @          @         &                     @&    "
+      write(*,*) "                                @@@%(&@           @@@@@@,  @                  @@       "
+      write(*,*) "                                       @          @        @@              #@          "
+      write(*,*) "                                        @       @@           *%       &@@              "
+      write(*,*) "                                          (@@@@,   @             @@,                   "
+      write(*,*) "                                                    @  ,           ,@                  "
+      write(*,*) "                                                 %@@%                .@                "
+      write(*,*) "                                             %@                        @               "
+      write(*,*) "                                          *@                  @         @              "
+      write(*,*) "                                        @*                   /@          @             "
+      write(*,*) "                                     %(                     .@   @@# ## @,             "
+      write(*,*) "                        /&@@@@      #.                      @                          "
+      write(*,*) "                                    @                      @                           "
+      write(*,*) "                                    @                     @                            "
+      write(*,*) "                   #@@&,            @                    @                             "
+      write(*,*) "#%%%#(*.                            &                  (&                              "
+      write(*,*) "                                     &/              &@                                "
+      write(*,*) "                                       .@@#%@@@@@@(                                    "
+      write(*,*) "                                                                                       "
+      write(*,*) "                                                                                       "
+      write(*,*) "---------------------------------------------------------------------------------------"
       write(*,*) "Initializing insect module!"
       write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
       write(*,'(80("<"))')
@@ -76,7 +77,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
       write(*,'("dx=",g12.4," nx_equidistant=",i6)') dx_reference, nint(xl/dx_reference)
   endif
 
-  ! ghost nodes are optional..
+  ! ghost nodes are optional..because in FLUSI, we do not have them
   if (present(N_ghost_nodes)) then
       ! g is a module global private variable.
       g = N_ghost_nodes
@@ -341,7 +342,6 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! other initialization
   !-----------------------------------------------------------------------------
 
-
   ! If required, initialize rigid solid dynamics solver
   if (Insect%BodyMotion=="free_flight") then
     ! note we have to do that before init_fields as rigid_solid_init sets up
@@ -354,6 +354,27 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! once per time step. Do this here as well, so we can safely call draw_insect after
   ! calling this routine.
   call Update_Insect( time, Insect )
+
+
+  ! At this point, we must also initialize all wing / body data: in wabbit, it may
+  ! be that the initial grid contains less blocks than we wave MPIRANKS. Therefore,
+  ! not all CPUS might call the MPI_BCAST for this initialization. (This is a BUGFIX
+  ! 21 Oct 2019, Yokohama, Thomas)
+  Nwings = 2
+  if (Insect%second_wing_pair) Nwings = 4
+
+  ! wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
+  do wingID = 1, Nwings
+      if (Insect%WingShape(wingID)/="pointcloud" .and. Insect%WingShape(wingID)/="mosquito_iams" .and. &
+          Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
+          Insect%WingShape(wingID)/="TwoEllipses") then
+          
+          ! we have some pre-defined, hard-coded data, but also can read the wing shape
+          ! from INI files.
+          call Setup_Wing_Fourier_coefficients(Insect, wingID)
+      endif
+  enddo
+
 
   if (root) then
     write(*,'(80("<"))')

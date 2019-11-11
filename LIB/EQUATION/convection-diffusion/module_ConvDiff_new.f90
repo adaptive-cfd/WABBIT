@@ -55,7 +55,7 @@ module module_convdiff_new
 
 contains
 
-  include "rhs_convdiff.f90"
+#include "rhs_convdiff.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads

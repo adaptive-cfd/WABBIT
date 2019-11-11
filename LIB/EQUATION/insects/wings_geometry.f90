@@ -143,34 +143,40 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
 
   select case(Insect%WingShape(wingID))
   case ("pointcloud")
-    call draw_wing_pointcloud(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,M_wing,&
-         x_pivot_b,rot_rel_wing_w)
+      call draw_wing_pointcloud(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+      x_pivot_b,rot_rel_wing_w)
+
   case ("mosquito_iams")
-    call draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,&
-         M_wing,x_pivot_b,rot_rel_wing_w)
+      call draw_wing_mosquito(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, &
+      M_wing,x_pivot_b,rot_rel_wing_w)
+
   case ("rectangular")
-    call draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,&
-         M_wing,x_pivot_b,rot_rel_wing_w)
+      call draw_wing_rectangular(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, &
+      M_wing,x_pivot_b,rot_rel_wing_w)
+
   case ("suzuki")
-    ! this wing has a finite thickness
-    call draw_wing_suzuki(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,&
-         M_wing,x_pivot_b,rot_rel_wing_w)
+      ! this wing has a finite thickness
+      call draw_wing_suzuki(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, &
+      M_wing,x_pivot_b,rot_rel_wing_w)
+
   case ("TwoEllipses")
-    call draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,&
-         M_wing,x_pivot_b,rot_rel_wing_w)
+      call draw_wing_twoellipses(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, &
+      M_wing,x_pivot_b,rot_rel_wing_w)
+
   case default
-    ! if all other options fail, we still might load coefficients from file:
-    wingshape_str = Insect%WingShape(wingID)
-    if (index(wingshape_str,"from_file::bristled") /= 0) then
-      ! wing blade shape is read from ini-file and bristles are hardcoded
-      call draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,M_wing,&
-         x_pivot_b,rot_rel_wing_w)
-    else
-      ! we assume the default to be defined in fourier coefficients, the subroutine
-      ! yells if it does not recongnize the wing.
-      call draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,M_wing,&
-           x_pivot_b,rot_rel_wing_w)
-    end if
+      ! if all other options fail, we still might load coefficients from file:
+      wingshape_str = Insect%WingShape(wingID)
+      if (index(wingshape_str,"from_file::bristled") /= 0) then
+          ! wing blade shape is read from ini-file and bristles are hardcoded
+          call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          x_pivot_b,rot_rel_wing_w)
+      else
+          ! we assume the default to be defined in fourier coefficients, the subroutine
+          ! yells if it does not recongnize the wing.
+          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          x_pivot_b,rot_rel_wing_w)
+      end if
+
   end select
 
 end subroutine draw_wing
@@ -203,8 +209,6 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
 
-  !-- define the wings fourier coeffients, but do that only once
-  call Setup_Wing_Fourier_coefficients(Insect, wingID)
 
   s = Insect%safety
   do iz = g, size(mask,3)-1-g
@@ -317,9 +321,6 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
 
-  !-- define the wings fourier coeffients, but do that only once
-  call Setup_Wing_Fourier_coefficients(Insect,wingID)
-
   !-- reset the bounding box
   Insect%wing_bounding_box(1:4,wingID) = (/-1.0d0, 1.0d0, 0.0d0, 1.0d0/)
 
@@ -427,6 +428,8 @@ subroutine draw_wing_pointcloud(xx0, ddx, mask, mask_color, us,Insect,color_wing
   real(kind=rk) :: xd, yd, zd, dxinv
   real(kind=rk) :: c00, c10, c01, c11, c0, c1
   integer :: iix, iiy, iiz
+
+  call abort(211019,"not ready: initialization has to be moved to insect_init")
 
   ! ----------------------------------------------------------------------------
   ! Step 0.

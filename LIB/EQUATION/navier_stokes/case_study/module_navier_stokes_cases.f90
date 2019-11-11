@@ -27,7 +27,7 @@ module module_navier_stokes_cases
     !***************************************************************
 contains
 
-  ! include 'sod_shock_tube.f90'
+  !#include  'sod_shock_tube.f90'
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !> In this subroutine you should read in the necessary parameters of your study.
 !> Furthermore you can choose a geometry for the volume penalization.

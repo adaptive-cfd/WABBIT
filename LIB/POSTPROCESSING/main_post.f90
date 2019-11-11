@@ -71,6 +71,9 @@ program main_post
     case ("--prune-tree")
         call post_prune_tree(params)
 
+    case ("--superstl")
+        call post_superstl(params)
+
     case ("--add-two-masks")
         call post_add_two_masks(params)
 
@@ -82,14 +85,14 @@ program main_post
 
     case("--mult-mask")
         call mult_mask(params)
-        
+
     !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
     case("--mean")
-        call post_mean(params) 
+        call post_mean(params)
 
     ! average of multiple snapshots the result is the averaged snapshot
     case("--average")
-        call post_average_snapshots(params) 
+        call post_average_snapshots(params)
 
     case("--sparse-to-dense")
         call sparse_to_dense(params)

@@ -78,7 +78,7 @@ contains !count_entries, merge_blancs
     ncols = size(array,2)
 
     write(*,'(80("-"))')
-    write(*,'("INFO: reading ",i5," lines with ",i3," colums from ",A)') nlines, ncols, file
+    write(*,'("INFO: reading ",i7," lines with ",i7," colums from ",A)') nlines, ncols, file
 
     ! set up format string
     write(ncols_str,'(i3.3)') ncols

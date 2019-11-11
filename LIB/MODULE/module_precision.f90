@@ -68,6 +68,47 @@ contains
     end function
 
     !-----------------------------------------------------------------------------
+    ! angle between two vectors
+    !-----------------------------------------------------------------------------
+    function angle_between_vectors(a,b)
+        implicit none
+        real(kind=rk),dimension(1:3),intent(in) :: a,b
+        real(kind=rk) :: angle_between_vectors
+
+        angle_between_vectors = acos(sum(a*b) / (norm2(a)*norm2(b)))
+
+    end function
+
+    !-----------------------------------------------------------------------------
+    ! turn vector into unit vector
+    !-----------------------------------------------------------------------------
+    function unit_vector(a)
+        implicit none
+        real(kind=rk),dimension(1:3),intent(in) :: a
+        real(kind=rk),dimension(1:3) :: unit_vector
+        unit_vector = a / norm2(a)
+    end function
+
+    !-----------------------------------------------------------------------------
+    ! check if two vectors are identical
+    !-----------------------------------------------------------------------------
+    function is_same_vector(a,b)
+        implicit none
+        real(kind=rk),dimension(1:),intent(in) :: a,b
+        logical :: is_same_vector
+        integer :: i
+
+        is_same_vector = .true.
+
+        do i = 1, size(a)
+            if ( abs(a(i)-b(i)) >= 1.0e-11 ) then
+                is_same_vector = .false.
+                return
+            endif
+        enddo
+    end function
+
+    !-----------------------------------------------------------------------------
     ! 2-norm length of vectors
     !-----------------------------------------------------------------------------
     function norm2(a)

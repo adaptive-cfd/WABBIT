@@ -85,6 +85,7 @@ contains
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
                       free_tree_id, tree_id, N_modes, max_nr_pod_modes, it
     character(len=80):: filename
+    character(len=30) :: rowfmt
     !---------------------------------------------------------------------------
     ! check inputs and set default values
     !---------------------------------------------------------------------------
@@ -127,6 +128,19 @@ contains
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp)
 
+    ! Save covariance matrix
+    if (save_all .and. rank==0) then
+      filename ="covariance_matrix.txt"
+      write(*,'( "covariance_matrix saved to file: ", A30 )') filename
+      write(*,*)
+      write(rowfmt,'(A,I4,A)') '(',N_snapshots,'(es15.8,1x))'
+      open(14,file=filename, status='replace')
+      do i = 1,N_snapshots
+        write(14,FMT=rowfmt) C(i,:) 
+      enddo
+      close(14)
+    end if
+
     !---------------------------------------------------------------------------
     ! eigenvalues of covariance matrix
     !---------------------------------------------------------------------------
@@ -147,8 +161,8 @@ contains
       write(*,'("sum(eigs) = ", g18.8)') sum(eigenvalues)
       write(*,*)
     endif
-    ! Save Eigenvalues if requested:
     if (save_all .and. rank==0) then
+    ! Save Eigenvalues if requested:
       filename ="eigenvalues.txt"
       write(*,'( "eigenvalues saved to file: ", A30 )') filename
       write(*,*)
@@ -157,7 +171,17 @@ contains
         write (14,'(i4,1x,g18.8)') i, eigenvalues(i)
       end do
       close(14)
-    end if
+
+    ! save eigenvectors
+      write(*,*)
+      filename = "eigenvectors.txt"
+      write(*,'( "Eigenvectors saved to file: ", A30 )') filename
+      open(14, file=filename, status='replace')
+      do i = 1, N_snapshots
+         write(14,FMT=rowfmt) V(:, i)
+      enddo
+      close(14)
+  end if
 
   !---------------------------------------------------------------------------
   ! construct POD basis functions (modes)

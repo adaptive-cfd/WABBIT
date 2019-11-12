@@ -80,7 +80,7 @@ subroutine post_superstl(params)
     if (params%rank == 0) then
         write(*,*) "Writing output to: "//trim(adjustl(fname_out))
 
-        open (14,file='fname_out', status='replace')
+        open (14,file = fname_out, status='replace')
         do i = 1, size(superstl, 1)
             write(14,'(30(es15.8,1x))') superstl(i,:)
         enddo

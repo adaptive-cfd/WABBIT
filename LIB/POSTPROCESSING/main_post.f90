@@ -100,6 +100,9 @@ program main_post
     case("--dense-to-sparse")
         call dense_to_sparse(params)
 
+    case("--dry-run")
+        call post_dry_run()
+
     case("--vorticity", "--divergence", "--vor-abs", "--Q")
         call compute_vorticity_post(params)
 
@@ -139,6 +142,7 @@ program main_post
             write(*,*) "--divergence"
             write(*,*) "--Q"
             write(*,*) "--keyvalues"
+            write(*,*) "--dry-run"
             write(*,*) "--compare-keys"
             write(*,*) "--flusi-to-wabbit"
             write(*,*) "--POD"

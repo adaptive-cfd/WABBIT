@@ -95,7 +95,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
             call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
         endif
-        
+
         ! call preparatory routines. this routine saves the variables to be stored
         ! to disk in the work array. This way, we can also store derived variables
         ! such as the vorticity. Note in most cases, this copies just the state vector
@@ -113,12 +113,14 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! physics modules shall provide an interface for wabbit to know how to label
         ! the components to be stored to hard disk (in the work array)
         call FIELD_NAMES_meta(params%physics_type, k, tmp)
+
         ! create filename
         if (params%use_iteration_as_fileid) then
           write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
         else
           write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
         endif
+        
         ! actual writing
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
         lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow))

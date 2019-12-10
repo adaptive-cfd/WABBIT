@@ -200,9 +200,11 @@ module module_insects
     real(kind=rk) :: Jxx=0.d0,Jyy=0.d0,Jzz=0.d0,Jxy=0.d0
     character(len=strlen) :: wing_thickness_distribution = "constant"
     character(len=strlen) :: pointcloudfile = "none"
-    character(len=strlen) :: smoothing_thickness = "global"
+    character(len=strlen) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
     logical :: corrugated = .false.
     real(kind=rk) :: corrugation_array_bbox(1:4)
+    logical :: bristles = .false.
+    real(kind=rk), ALLOCATABLE :: bristles_coords(:,:,:)
 
     !--------------------------------------------------------------
     ! Wing kinematics

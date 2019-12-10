@@ -365,10 +365,11 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
   ! wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   do wingID = 1, Nwings
+      ! exclude wings that are hard-coded, otherwise, call initialization routine
       if (Insect%WingShape(wingID)/="pointcloud" .and. Insect%WingShape(wingID)/="mosquito_iams" .and. &
           Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
           Insect%WingShape(wingID)/="TwoEllipses") then
-          
+
           ! we have some pre-defined, hard-coded data, but also can read the wing shape
           ! from INI files.
           call Setup_Wing_Fourier_coefficients(Insect, wingID)

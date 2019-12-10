@@ -41,7 +41,7 @@ module module_time_step
     implicit none
 
     ! coefficient tables for RKC scheme
-    real(kind=rk), dimension(1:20,1:20), private, save :: mu=0.0_rk, mu_tilde=0.0_rk, nu=0.0_rk, gamma_tilde=0.0_rk, c=0.0_rk
+    real(kind=rk), dimension(1:40,1:40), private, save :: mu=0.0_rk, mu_tilde=0.0_rk, nu=0.0_rk, gamma_tilde=0.0_rk, c=0.0_rk
 
 !---------------------------------------------------------------------------------------------
 ! variables initialization

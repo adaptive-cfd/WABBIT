@@ -32,7 +32,7 @@ subroutine post_stl2dist(params)
     integer :: hvy_id, lgt_id
     integer :: c_plus, c_minus,res, tree_n
     integer :: ix1,iy1,iz1
-    logical :: done, array_compare_real
+    logical :: done, array_compare_real, pruning
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -42,9 +42,10 @@ subroutine post_stl2dist(params)
     if (fname_ini=='--help' .or. fname_ini=='--h' .or. fname_ini=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --stl2dist --x0 2.0,3.0,4.0 --superstl vertexnormals.sstl --params PARAMS.ini"
+            write(*,*) "./wabbit-post --stl2dist --x0 2.0,3.0,4.0 --superstl vertexnormals.sstl --params PARAMS.ini --no-pruning"
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) ""
+            write(*,*) " Output file name:"
+            write(*,*) " -o mask_00000.h5 "
             write(*,*) ""
             write(*,*) ""
             write(*,*) ""
@@ -56,6 +57,7 @@ subroutine post_stl2dist(params)
     ! defaults
     scale = 1.0_rk
     origin = 0.0_rk
+    pruning = .true.
 
 
     ! fetch parameters from command line call
@@ -74,6 +76,9 @@ subroutine post_stl2dist(params)
 
         case ("-o")
             call get_command_argument(i+1, fname_out)
+
+        case ("--no-pruning")
+            pruning = .false.
 
         case ("--scale")
             call get_command_argument(i+1, dummy)
@@ -285,9 +290,12 @@ subroutine post_stl2dist(params)
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
-    if (params%rank==0) write(*,*) "now pruning!"
-    call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
+    if (pruning) then
+        if (params%rank==0) write(*,*) "now pruning!"
+        
+        call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
+    endif
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
     lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=0.0_rk, iteration=-1 )

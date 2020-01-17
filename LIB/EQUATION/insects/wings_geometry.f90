@@ -170,11 +170,25 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
           ! wing blade shape is read from ini-file and bristles are hardcoded
           call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
           x_pivot_b,rot_rel_wing_w)
+
       else
           ! we assume the default to be defined in fourier coefficients, the subroutine
           ! yells if it does not recongnize the wing.
-          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-          x_pivot_b,rot_rel_wing_w)
+          select case (Insect%wing_file_type(wingID))
+          case ("fourier")
+              ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
+              call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+              x_pivot_b,rot_rel_wing_w)
+
+          case ("kleemeier")
+              ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
+              ! membrane is bad for the fourier series.
+              call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+              x_pivot_b,rot_rel_wing_w)
+
+          case default
+              call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
+          end select
       end if
 
   end select
@@ -188,26 +202,28 @@ end subroutine draw_wing
 ! datastructure, so the function Set_Wing_Fourier_coefficients must be called
 ! before calling this subroutine. Fourier series is evaluated in
 ! Radius_Fourier
-subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_body,M_wing,x_pivot_b,rot_rel_wing_w)
+subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, x_pivot_b, rot_rel_wing_w)
   implicit none
 
-  type(diptera),intent(inout) :: Insect
-  real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-  real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-  real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-  integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-  integer(kind=2),intent(in) :: color_wing
-  real(kind=rk),intent(in)::M_body(1:3,1:3),M_wing(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
+  type(diptera), intent(inout) :: Insect
+  real(kind=rk), intent(in) :: xx0(1:3), ddx(1:3)
+  real(kind=rk), intent(inout) :: mask(0:,0:,0:)
+  real(kind=rk), intent(inout) :: us(0:,0:,0:,1:)
+  integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
+  integer(kind=2), intent(in) :: color_wing
+  real(kind=rk),intent(in) :: M_body(1:3,1:3), M_wing(1:3,1:3), x_pivot_b(1:3), rot_rel_wing_w(1:3)
 
-  integer :: ix,iy,iz
+  integer :: ix,iy,iz,j
   integer(kind=2) :: wingID
-  real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3)
+  real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), xa(1:3), xb(1:3)
   real(kind=rk) :: R, R0, R_tmp, zz0
   real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
+
+  if ((Insect%wing_file_type(wingID)) /= "fourier") call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
 
 
   s = Insect%safety
@@ -270,6 +286,119 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_
                           ! set new value for mask and velocity us
                           !-----------------------------------------
                           if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0)) then
+
+                              mask(ix,iy,iz) = mask_tmp
+                              mask_color(ix,iy,iz) = color_wing
+
+                              !------------------------------------------------
+                              ! solid body rotation
+                              ! Attention: the Matrix transpose(M) brings us back to the body
+                              ! coordinate system, not to the inertial frame. this is done in
+                              ! the main routine Draw_Insect
+                              !------------------------------------------------
+                              ! v_tmp is in wing system:
+                              v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
+                              v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
+                              v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
+                              ! note we set this only if it is a part of the wing
+                              ! us is now in body system (note M_wing contains the stroke plane)
+                              us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
+                          endif
+                      endif
+                  endif
+              endif
+
+          enddo
+      enddo
+  enddo
+
+  !-----------------------------------------------------------------------------
+  ! bristles
+  !-----------------------------------------------------------------------------
+  ! generic fourier wings can also have bristles: they are read from an inifile
+  if (Insect%bristles) then
+      ! Loop for all bristles
+      do j = 1, size(Insect%bristles_coords, 2)
+          ! start / end point (in wing coordinate system)
+          xa = (/Insect%bristles_coords(wingID,j,1), Insect%bristles_coords(wingID,j,2), 0.0d0/)
+          xb = (/Insect%bristles_coords(wingID,j,3), Insect%bristles_coords(wingID,j,4), 0.0d0/)
+          R = Insect%bristles_coords(wingID,j,5)
+
+          ! note input to draw_bristle in in wing coordinates
+          call draw_bristle(xa, xb, R, xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, x_pivot_b, rot_rel_wing_w)
+      enddo
+  endif
+
+end subroutine draw_wing_fourier
+
+
+subroutine draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, x_pivot_b, rot_rel_wing_w)
+  implicit none
+
+  type(diptera), intent(inout) :: Insect
+  real(kind=rk), intent(in) :: xx0(1:3), ddx(1:3)
+  real(kind=rk), intent(inout) :: mask(0:,0:,0:)
+  real(kind=rk), intent(inout) :: us(0:,0:,0:,1:)
+  integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
+  integer(kind=2), intent(in) :: color_wing
+  real(kind=rk),intent(in) :: M_body(1:3,1:3), M_wing(1:3,1:3), x_pivot_b(1:3), rot_rel_wing_w(1:3)
+
+  integer :: ix,iy,iz,j
+  integer(kind=2) :: wingID
+  real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), xa(1:3), xb(1:3)
+  real(kind=rk) :: R, R0, R_tmp, zz0
+  real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t
+  real(kind=rk) :: v_tmp(1:3), mask_tmp, theta
+  real(kind=rk) :: L_membrane=100.0_rk/130.0_rk, c_membrane=8.6_rk/130.0_rk
+
+  !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
+  wingID = color_wing-1
+
+  if ((Insect%wing_file_type(wingID)) /= "kleemeier") call abort(26111902,"draw_wing_kleemeier called with non-kleemeier wing...")
+
+  s = Insect%safety
+
+  do iz = g, size(mask,3)-1-g
+      x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+      do iy = g, size(mask,2)-1-g
+          x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+          do ix = g, size(mask,1)-1-g
+              x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+
+              !-- define the various coordinate systems we are going to use
+              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+
+              x_body = matmul(M_body,x)
+              x_wing = matmul(M_wing,x_body-x_pivot_b)
+
+              ! spanwise length:
+              if ((x_wing(2)>=-s).and.(x_wing(2)<=L_membrane+s)) then
+                  ! thickness: (note left and right wing have a different orientation of the z-axis
+                  ! but this does not matter since this is the same.
+                  if (dabs(x_wing(3))<=0.5*Insect%WingThickness + s) then
+                      ! in the x-direction, the actual wing shape plays.
+                      if ((x_wing(1)>-c_membrane/2.0-s).and.(x_wing(1)<c_membrane/2.0+s)) then
+                          !-- smooth length
+                          if (x_wing(2)<0.d0) then  ! xs is chordlength coordinate
+                              y_tmp = steps(-x_wing(2), 0.d0, Insect%smooth)
+                          else
+                              y_tmp = steps( x_wing(2), L_membrane, Insect%smooth)
+                          endif
+
+                          !-- smooth height
+                          z_tmp = steps(dabs(x_wing(3)), 0.5d0*Insect%WingThickness, Insect%smooth) ! thickness
+
+                          !-- smooth shape
+                          if (x_wing(1)<0.d0) then
+                              x_tmp = steps(-x_wing(1), c_membrane/2.0, Insect%smooth)
+                          else
+                              x_tmp = steps( x_wing(1), c_membrane/2.0, Insect%smooth)
+                          endif
+
+                          mask_tmp = z_tmp*y_tmp*x_tmp
+
+                          if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0)) then
                               mask(ix,iy,iz) = mask_tmp
                               mask_color(ix,iy,iz) = color_wing
                               !------------------------------------------------
@@ -281,18 +410,35 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_
                               v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
                               v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
                               v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
                               ! note we set this only if it is a part of the wing
                               us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
                           endif
                       endif
                   endif
               endif
-
           enddo
       enddo
   enddo
 
-end subroutine draw_wing_fourier
+  !-----------------------------------------------------------------------------
+  ! bristles
+  !-----------------------------------------------------------------------------
+  ! generic fourier wings can also have bristles: they are read from an inifile
+  if (Insect%bristles) then
+      ! Loop for all bristles
+      do j = 1, size(Insect%bristles_coords, 2)
+          ! start / end point (in wing coordinate system)
+          xa = (/Insect%bristles_coords(wingID,j,1), Insect%bristles_coords(wingID,j,2), 0.0d0/)
+          xb = (/Insect%bristles_coords(wingID,j,3), Insect%bristles_coords(wingID,j,4), 0.0d0/)
+          R = Insect%bristles_coords(wingID,j,5)
+
+          ! note input to draw_bristle in in wing coordinates
+          call draw_bristle(xa, xb, R, xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, x_pivot_b, rot_rel_wing_w)
+      enddo
+  endif
+
+end subroutine draw_wing_kleemeier
 
 
 !-------------------------------------------------------------------------------
@@ -1178,7 +1324,7 @@ end subroutine
 ! stops the code. This prevents errors for wings that are NOT given by Fourier
 ! series.
 !-------------------------------------------------------------------------------
-subroutine Setup_Wing_Fourier_coefficients(Insect,wingID)
+subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
   implicit none
   real(kind=rk) :: xroot, yroot
   type(diptera),intent(inout)::Insect
@@ -1591,41 +1737,42 @@ subroutine Setup_Wing_Fourier_coefficients(Insect,wingID)
     -0.0004308,-0.0002758,0.0002298,-0.0000548/)
     Insect%yc(wingID) = 0.4171918
     Insect%xc(wingID) = -0.0395258
-  case ('hawkmoth2')
-    ! this wingshape is digitized from https://en.wikipedia.org/wiki/Manduca_sexta#/media/File:Manduca_sexta_female_sjh.JPG
-    ! it has a greater aerea (A=0.40), but the original image is tricky since it is rotated. we therefore used a bit of modeling
-    ! for this wing shape.
-    Insect%nfft_wings(wingID) = 18
-    Insect%a0_wings(wingID) = 0.6617728
-    Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = &
-    (/-0.0837648,-0.0802108,0.0703808,0.0069808,-0.0183478,0.0156518,&
-    -0.0000308,-0.0153718,-0.0011538,0.0032378,-0.0005008,0.0020798,&
-    0.0019888,-0.0009568,-0.0016378,-0.0010208,0.0005658,0.0009028/)
-    Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = &
-    (/0.0086968,0.0763208,0.0216658,-0.0322558,-0.0125988,0.0042128,&
-    -0.0066278,-0.0040288,0.0093858,0.0045358,-0.0043238,0.0006298,&
-    0.0010848,-0.0028958,0.0007268,0.0022578,-0.0013068,-0.0003538/)
-    Insect%yc(wingID) = 0.3946798
-    Insect%xc(wingID) = -0.2157968
+    case ('hawkmoth2')
+        ! this wingshape is digitized from https://en.wikipedia.org/wiki/Manduca_sexta#/media/File:Manduca_sexta_female_sjh.JPG
+        ! it has a greater aerea (A=0.40), but the original image is tricky since it is rotated. we therefore used a bit of modeling
+        ! for this wing shape.
+        Insect%nfft_wings(wingID) = 18
+        Insect%a0_wings(wingID) = 0.6617728
+        Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = &
+        (/-0.0837648,-0.0802108,0.0703808,0.0069808,-0.0183478,0.0156518,&
+        -0.0000308,-0.0153718,-0.0011538,0.0032378,-0.0005008,0.0020798,&
+        0.0019888,-0.0009568,-0.0016378,-0.0010208,0.0005658,0.0009028/)
+        Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = &
+        (/0.0086968,0.0763208,0.0216658,-0.0322558,-0.0125988,0.0042128,&
+        -0.0066278,-0.0040288,0.0093858,0.0045358,-0.0043238,0.0006298,&
+        0.0010848,-0.0028958,0.0007268,0.0022578,-0.0013068,-0.0003538/)
+        Insect%yc(wingID) = 0.3946798
+        Insect%xc(wingID) = -0.2157968
 
-  case default
+    case default
 
-    ! if all other options fail, we still might load coefficients from file:
-    wingshape_str = Insect%WingShape(wingID)
-    if (index(wingshape_str,"from_file::") /= 0) then
-      !-------------------------------------------------------------------------
-      ! wing shape is read from ini-file
-      !-------------------------------------------------------------------------
-      call Setup_Wing_from_inifile(Insect, wingID, trim(adjustl(wingshape_str( 12:len_trim(wingshape_str) ))))
+        ! if all other options fail, we still might load coefficients from file:
+        wingshape_str = Insect%WingShape(wingID)
+        if (index(wingshape_str,"from_file::") /= 0) then
+            !-------------------------------------------------------------------------
+            ! wing shape is read from ini-file
+            !-------------------------------------------------------------------------
+            call Setup_Wing_from_inifile(Insect, wingID, trim(adjustl(wingshape_str( 12:len_trim(wingshape_str) ))))
 
-    else
-      ! now we theres an error...
-      write (*,*) "Insect module: trying to set up fourier descriptors for wing&
-                  & shape but the type Insect%WingShape is unknown! :: "// Insect%WingShape
-      call abort(554329, "Insect module: trying to set up fourier descriptors for wing&
-                  & shape but the type Insect%WingShape is unknown!")
-    end if
-  end select
+        else
+            ! now we theres an error...
+            write (*,*) "Insect module: trying to set up fourier descriptors for wing&
+            & shape but the type Insect%WingShape is unknown! :: "// Insect%WingShape
+
+            call abort(554329, "Insect module: trying to set up fourier descriptors for wing&
+            & shape but the type Insect%WingShape is unknown!")
+        end if
+    end select
 
   ! skip this routine in the future and let other routines know that the wing
   ! shape is ready to be used.
@@ -1651,6 +1798,8 @@ subroutine Setup_Wing_Fourier_coefficients(Insect,wingID)
 
 end subroutine Setup_Wing_Fourier_coefficients
 
+
+
 !-------------------------------------------------------------------------------
 ! Initialize the wing from an ini file
 !-------------------------------------------------------------------------------
@@ -1666,7 +1815,6 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
 
   type(inifile) :: ifile
   real(kind=rk), allocatable :: tmparray(:,:)
-  character(len=strlen) :: type_str
   integer :: a,b
   integer(kind=2), intent(in) :: wingID ! wing id number
   real(kind=rk) :: init_thickness
@@ -1682,57 +1830,65 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
 
 
   ! check if this file seem to be valid:
-  call read_param_mpi(ifile,"Wing","type",type_str,"none")
-  if (type_str /= "fourier") then
+  call read_param_mpi(ifile, "Wing", "type", Insect%wing_file_type(wingID), "none")
+
+  if (Insect%wing_file_type(wingID) /= "fourier" .and. Insect%wing_file_type(wingID) /= "kleemeier" ) then
     call abort(6652, "ini file for wing does not seem to be fourier series...")
   endif
 
   !-----------------------------------------------------------------------------
   ! Read fourier coeffs for wing radius
   !-----------------------------------------------------------------------------
-  call read_param_mpi( ifile, "Wing", "a0_wings", Insect%a0_wings(wingID), 0.d0)
-  ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
-  ! as arguments. so we have to split the routine in one part that returns the size
-  ! of the array, then let the caller allocate, then read the matrix. very tedious.
-  ! fetch size of matrix
-  call param_matrix_size_mpi( ifile, "Wing", "ai_wings", a, b)
-  ! allocate matrix
-  allocate( tmparray(1:a,1:b) )
-  ! read matrix
-  call param_matrix_read_mpi( ifile, "Wing", "ai_wings", tmparray)
-  Insect%nfft_wings = size(tmparray,2)
-  Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
-  deallocate(tmparray)
+  if (Insect%wing_file_type(wingID) == "fourier") then
+      call read_param_mpi( ifile, "Wing", "a0_wings", Insect%a0_wings(wingID), 0.d0)
+
+      ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
+      ! as arguments. so we have to split the routine in one part that returns the size
+      ! of the array, then let the caller allocate, then read the matrix. very tedious.
+      ! fetch size of matrix
+      call param_matrix_size_mpi( ifile, "Wing", "ai_wings", a, b)
+      ! allocate matrix
+      allocate( tmparray(1:a,1:b) )
+      ! read matrix
+      call param_matrix_read_mpi( ifile, "Wing", "ai_wings", tmparray)
+      Insect%nfft_wings = size(tmparray,2)
+      Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
+      deallocate(tmparray)
 
 
-  call param_matrix_size_mpi( ifile, "Wing", "bi_wings", a, b)
-  ! allocate matrix
-  allocate( tmparray(1:a,1:b) )
-  ! read matrix
-  call param_matrix_read_mpi( ifile, "Wing", "bi_wings", tmparray)
-  Insect%nfft_wings = size(tmparray,2)
-  Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
-  deallocate(tmparray)
+      call param_matrix_size_mpi( ifile, "Wing", "bi_wings", a, b)
+      ! allocate matrix
+      allocate( tmparray(1:a,1:b) )
+      ! read matrix
+      call param_matrix_read_mpi( ifile, "Wing", "bi_wings", tmparray)
+      Insect%nfft_wings = size(tmparray,2)
+      Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
+      deallocate(tmparray)
 
-  ! wing mid-point (of course in wing system..)
-  call read_param_mpi(ifile,"Wing","x0w",Insect%xc(wingID), 0.d0)
-  call read_param_mpi(ifile,"Wing","y0w",Insect%yc(wingID), 0.d0)
+      ! wing mid-point (of course in wing system..)
+      call read_param_mpi(ifile,"Wing","x0w",Insect%xc(wingID), 0.d0)
+      call read_param_mpi(ifile,"Wing","y0w",Insect%yc(wingID), 0.d0)
+  endif
 
   !-----------------------------------------------------------------------------
   ! wing thickness
   !-----------------------------------------------------------------------------
   call read_param_mpi(ifile,"Wing","wing_thickness_distribution",Insect%wing_thickness_distribution, "constant")
   if ( Insect%wing_thickness_distribution == "constant") then
+
       if (root) write(*,*) "Wing thickness is constant along the wing"
+
       ! wing thickness (NOTE: overwrites settings in other params file)
       if ( (Insect%WingThickness>0.0d0) .and. (Insect%WingThickness<1.0d0) ) then
          init_thickness = Insect%WingThickness ! Use existing value if it is reasonable
       else
          init_thickness = 0.05d0 ! This is the defauls value otherwise, because we may not know dx here
       endif
+      
       call read_param_mpi(ifile,"Wing","wing_thickness_value",Insect%WingThickness, init_thickness)
 
   elseif ( Insect%wing_thickness_distribution == "variable") then
+
       if (root) write(*,*) "Wing thickness is variable, i.e. t = t(x,y)"
 
       ! read matrix from ini file, see comments on SXF90 compiler
@@ -1743,6 +1899,22 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
   else
       call abort(77623, " Insect wing thickness distribution is unknown (must be constant or variable)")
   endif
+
+
+  !-----------------------------------------------------------------------------
+  ! bristles
+  !-----------------------------------------------------------------------------
+  call read_param_mpi(ifile, "Wing","bristles", Insect%bristles, .false.)
+  if (Insect%bristles) then
+      call param_matrix_size_mpi( ifile, "Wing", "bristles_coords", a, b)
+
+      if (.not. allocated(Insect%bristles_coords)) then
+          allocate(Insect%bristles_coords(1:4, 1:a, 1:b)) ! four wings...
+      endif
+
+      call param_matrix_read_mpi( ifile, "Wing", "bristles_coords", Insect%bristles_coords(wingID,:,:))
+  endif
+
 
   !-----------------------------------------------------------------------------
   ! wing corrugation
@@ -1847,3 +2019,277 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
     write(*,'("zwmin=",es15.8," zwmax=",es15.8)') Insect%wing_bounding_box(5:6,wingID)
   endif
 end subroutine set_wing_bounding_box_fourier
+
+
+
+
+subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, color_val, M_body, M_wing, x_pivot_b, rot_rel_wing_w)
+    implicit none
+
+    real(kind=rk), dimension(1:3), intent(in):: x1w, x2w
+    real(kind=rk),intent(in)::R0
+    type(diptera),intent(inout)::Insect
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+    integer(kind=2),intent(in) :: color_val
+    real(kind=rk),intent(in) :: M_body(1:3,1:3), M_wing(1:3,1:3), x_pivot_b(1:3), rot_rel_wing_w(1:3)
+
+    real(kind=rk),dimension(1:3) ::  cb, rb, ab, u, vp, x1, x2, x_wing, x_body, v_tmp, x
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, tmp, e_r, e_3
+    real(kind=rk) :: ceta1, ceta2, ceta3, R, RR0, clength, safety, t
+    integer :: ix,iy,iz
+
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer :: xmin,xmax,ymin,ymax,zmin,zmax
+    integer :: Nsafety
+
+    safety = Insect%safety
+    Nsafety = nint(safety / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+
+    RR0 = R0 + safety
+
+
+    !---------------------------------------------------------------------------
+    ! transform coordinates to global system. they are defined in the wing system
+    !---------------------------------------------------------------------------
+    x1 = matmul( transpose(M_wing), x1w) + x_pivot_b
+    x1 = matmul( transpose(M_body), x1) + Insect%xc_body_g
+
+    x2 = matmul( transpose(M_wing), x2w) + x_pivot_b
+    x2 = matmul( transpose(M_body), x2) + Insect%xc_body_g
+
+
+    !---------------------------------------------------------------------------
+    ! define bristle (cylinder) coordinate system
+    !---------------------------------------------------------------------------
+    ! unit vector in bristle (cylinder) axis direction and bristle (cylinder) length
+    e_x = x2 - x1
+    clength = norm2(e_x)
+    e_x = e_x / clength
+
+    ! radial unit vector
+    ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
+    ! it does not really matter which one. however, we must be sure that the vector
+    ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
+    e_r = (/0.d0, 0.d0, 0.d0/)
+    do while ( norm2(e_r) <= 1.0d-12 )
+        e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
+    enddo
+    e_r = e_r / norm2(e_r)
+
+    ! third (also radial) unit vector, simply the cross product of the others
+    e_3 = cross(e_x,e_r)
+    e_3 = e_3 / norm2(e_3)
+
+
+    !---------------------------------------------------------------------------
+    ! bounding box of the vicinity of the bristle (cylinder).
+    !---------------------------------------------------------------------------
+    t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+    xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
+
+    t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+    xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
+
+    t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+    ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
+
+    t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+    ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+
+    t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+    zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+
+    t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+    zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+
+
+    ! first we draw the cylinder, then the endpoint spheres
+    do iz = max(zmin, lbounds(3)), min(zmax, ubounds(3))
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3)
+
+        do iy = max(ymin, lbounds(2)), min(ymax, ubounds(2))
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2)
+
+            do ix = max(xmin, lbounds(1)), min(xmax, ubounds(1))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
+                ! cb is the distance to the cylinder mid-point
+                cb = 0.5d0*(x1+x2) - x_glob
+                ! rb is the length of the clinder
+                rb = x1 - x2
+
+                ! this is a spherical bounding box, centered around the mid-point
+                if ( sum(cb**2) < 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
+                    ab = x_glob - x1
+                    u = x2 - x1
+
+                    vp = cross(ab, u)
+                    R = sqrt( sum(vp**2) / sum(u**2) )
+
+                    if (R <= R0+safety) then
+                        t = steps(R, R0, Insect%smooth)
+                        if (t >= mask(ix,iy,iz)) then
+
+                            mask(ix,iy,iz) = t
+                            mask_color(ix,iy,iz) = color_val
+
+                            x_body = matmul(M_body, x_glob - Insect%xc_body_g)
+                            x_wing = matmul(M_wing, x_body - x_pivot_b)
+
+                            !---------------------------------------------------
+                            ! solid body rotation
+                            ! Attention: the Matrix transpose(M) brings us back to the body
+                            ! coordinate system, not to the inertial frame. this is done in
+                            ! the main routine Draw_Insect
+                            !---------------------------------------------------
+                            v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
+                            v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
+                            v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
+                            ! note we set this only if it is a part of the wing
+                            ! note velocity is to be set in BODY coordinate system.
+                            us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
+                        endif
+                    endif
+                endif
+            enddo
+        enddo
+    enddo
+
+    !---------------------------------------------------------------------------
+    ! endpoint sphere x2
+    !---------------------------------------------------------------------------
+    Nsafety = nint( (R0+Insect%safety) / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+
+    ! bounding box of the vicinity of the sphere.
+    xmin = nint( (x2(1)-xx0(1)) / ddx(1) ) - (Nsafety)
+    xmax = nint( (x2(1)-xx0(1)) / ddx(1) ) + (Nsafety)
+    ymin = nint( (x2(2)-xx0(2)) / ddx(2) ) - (Nsafety)
+    ymax = nint( (x2(2)-xx0(2)) / ddx(2) ) + (Nsafety)
+    zmin = nint( (x2(3)-xx0(3)) / ddx(3) ) - (Nsafety)
+    zmax = nint( (x2(3)-xx0(3)) / ddx(3) ) + (Nsafety)
+
+
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
+        x(3) = xx0(3) + dble(iz)*ddx(3) - x2(3)
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
+            x(2) = xx0(2) + dble(iy)*ddx(2) - x2(2)
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
+                x(1) = xx0(1) + dble(ix)*ddx(1) - x2(1)
+
+                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+
+                ! the bounding box check is incorporated in the loop bounds - no if clause!
+                ! compute radius
+                R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
+                if ( R <= R0+Insect%safety ) then
+                    t = steps(R, R0, Insect%smooth)
+                    if ( t >= mask(ix,iy,iz) ) then
+                        ! set new value
+                        mask(ix,iy,iz) = t
+                        mask_color(ix,iy,iz) = color_val
+
+                        x_body = matmul(M_body, x + x2 - Insect%xc_body_g)
+                        x_wing = matmul(M_wing, x_body - x_pivot_b)
+
+                        !---------------------------------------------------
+                        ! solid body rotation
+                        ! Attention: the Matrix transpose(M) brings us back to the body
+                        ! coordinate system, not to the inertial frame. this is done in
+                        ! the main routine Draw_Insect
+                        !---------------------------------------------------
+                        v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
+                        v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
+                        v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
+                        ! note we set this only if it is a part of the wing
+                        ! note velocity is to be set in BODY coordinate system.
+                        us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
+                    endif
+                endif
+            enddo
+        enddo
+    enddo
+
+    !---------------------------------------------------------------------------
+    ! endpoint sphere x1
+    !---------------------------------------------------------------------------
+    Nsafety = nint( (R0+Insect%safety) / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+
+    ! bounding box of the vicinity of the sphere.
+    xmin = nint( (x1(1)-xx0(1)) / ddx(1) ) - (Nsafety)
+    xmax = nint( (x1(1)-xx0(1)) / ddx(1) ) + (Nsafety)
+    ymin = nint( (x1(2)-xx0(2)) / ddx(2) ) - (Nsafety)
+    ymax = nint( (x1(2)-xx0(2)) / ddx(2) ) + (Nsafety)
+    zmin = nint( (x1(3)-xx0(3)) / ddx(3) ) - (Nsafety)
+    zmax = nint( (x1(3)-xx0(3)) / ddx(3) ) + (Nsafety)
+
+
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
+        x(3) = xx0(3) + dble(iz)*ddx(3) - x1(3)
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
+            x(2) = xx0(2) + dble(iy)*ddx(2) - x1(2)
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
+                x(1) = xx0(1) + dble(ix)*ddx(1) - x1(1)
+
+                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+
+                ! the bounding box check is incorporated in the loop bounds - no if clause!
+                ! compute radius
+                R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
+                if ( R <= R0+Insect%safety ) then
+                    t = steps(R, R0, Insect%smooth)
+                    if ( t >= mask(ix,iy,iz) ) then
+                        ! set new value
+                        mask(ix,iy,iz) = t
+                        mask_color(ix,iy,iz) = color_val
+
+                        x_body = matmul(M_body, x + x1 - Insect%xc_body_g)
+                        x_wing = matmul(M_wing, x_body - x_pivot_b)
+
+                        !---------------------------------------------------
+                        ! solid body rotation
+                        ! Attention: the Matrix transpose(M) brings us back to the body
+                        ! coordinate system, not to the inertial frame. this is done in
+                        ! the main routine Draw_Insect
+                        !---------------------------------------------------
+                        v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
+                        v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
+                        v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
+                        ! note we set this only if it is a part of the wing
+                        ! note velocity is to be set in BODY coordinate system.
+                        us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
+                    endif
+                endif
+            enddo
+        enddo
+    enddo
+
+end subroutine

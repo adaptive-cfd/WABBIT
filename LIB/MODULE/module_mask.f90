@@ -44,18 +44,18 @@ contains
 
         Bs = params%Bs
         g  = params%n_ghosts
-        Jactive = max_active_level(lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow))
+        Jactive = max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow))
         Jmax = params%max_treelevel
         tree_n = params%forest_size ! used only for resetting at this point
 
         ! without penalization, do nothing.
-        if ( .not. params%penalization ) return
+        if (.not. params%penalization) return
 
         ! HACK
         if (params%physics_type /= "ACM-new") return
 
 
-        if ( params%forest_size < 3) call abort(190719,"Forest size is too small (increase to at least 3 in parameter file)")
+        if (params%forest_size < 3) call abort(190719,"Forest size is too small (increase to at least 3 in parameter file)")
 
         ! default is false
         force_all_parts = .false.

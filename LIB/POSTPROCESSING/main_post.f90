@@ -19,7 +19,7 @@ program main_post
     use mpi
     ! global parameters
     use module_params
-    use module_MOR, only : post_POD, post_reconstruct, post_PODerror
+    use module_MOR, only : post_POD, post_reconstruct, post_PODerror, post_timecoef_POD
     use module_timing
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -126,6 +126,8 @@ program main_post
   case ("--POD-error")
     call post_PODerror(params)
 
+  case ("--POD-time")
+    call post_timecoef_POD(params)
 
     case default
 
@@ -144,6 +146,7 @@ program main_post
             write(*,*) "--POD"
             write(*,*) "--POD-reconstruct"
             write(*,*) "--POD-error"
+            write(*,*) "--POD-time"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
             write(*,*) "--post_rhs"

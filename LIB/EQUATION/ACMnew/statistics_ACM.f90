@@ -104,13 +104,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         if (is_insect) then
             call Update_Insect(time, Insect)
-            x0_moment = 0.0_rk
-            ! body moment
-            x0_moment(1:3, 1) = Insect%xc_body_g
-            ! left wing
-            x0_moment(1:3, 2) = Insect%x_pivot_l_g
-            ! right wing
-            x0_moment(1:3, 3) = Insect%x_pivot_r_g
         endif
 
     case ("integral_stage")
@@ -247,6 +240,16 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! the wing moments wrt to the hinge points. The latter two are used to compute the
                         ! aerodynamic power. Makes sense only in 3D.
                         if (is_insect) then
+
+                            ! point of reference for the moments
+                            x0_moment = 0.0_rk
+                            ! body moment
+                            x0_moment(1:3, 1) = Insect%xc_body_g
+                            ! left wing
+                            x0_moment(1:3, 2) = Insect%x_pivot_l_g
+                            ! right wing
+                            x0_moment(1:3, 3) = Insect%x_pivot_r_g
+
                             ! exclude walls, trees, etc...
                             if (color > 0_2) then
                                 ! moment with color-dependent lever

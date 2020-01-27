@@ -366,6 +366,10 @@ program main
                 lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
 
                 params%next_stats_time = params%next_stats_time + params%tsave_stats
+                ! Ensure that the output is written in the end of the simulation
+                if (params%next_stats_time > params%time_max) then
+                    params%next_stats_time = params%time_max
+                endif
             endif
 
             ! if multiple time steps are performed on the same grid, we have to be careful

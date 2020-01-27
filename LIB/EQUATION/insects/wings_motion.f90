@@ -315,6 +315,26 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     theta = 0.d0
     theta_dt = 0.d0
 
+  case ("revolving-set3")
+    ! revolving wing kinematics, pre-defined set. We fix alpha and increase
+    ! phi linearily with a quadratic startup transient until phi=pi/16,
+    ! which is reached at time equal to pi/8
+    ! we use PHI_DOT = 1 as normalization
+    ! Therefore, the acceleration is twice as fast as in "revolving-set2"
+    if (time < pi/8.0d0) then
+      phi = 4.0d0*time**2/pi
+      phi_dt = 8.0d0*time/pi
+    else
+      phi = time - pi/16.0d0
+      phi_dt = 1.0d0	
+    endif
+    ! feathering angle is constant
+    alpha = - Insect%init_alpha_phi_theta(1) ! Mind the "-" sign
+    alpha_dt = 0.d0
+    ! elevation angle is always zero
+    theta = 0.d0
+    theta_dt = 0.d0
+
   case ("Drosophila_hovering_fry")
     !---------------------------------------------------------------------------
     ! motion protocoll digitalized from Fry et al JEB 208, 2303-2318 (2005)

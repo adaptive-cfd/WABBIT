@@ -49,7 +49,7 @@ subroutine dense_to_sparse(params)
             write(*,*) " "
             write(*,*) "Command:"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 --eps=0.1"
-            write(*,*) "[--indicator=threshold-vorticity|threshold-state-vector --memory==2GB --order=[2|4]]"
+            write(*,*) "[--indicator=threshold-vorticity|threshold-state-vector --memory==2GB --order=[CDF02|CDF04|CDF44]]"
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. indicator = which quantity is thresholded"
@@ -97,11 +97,18 @@ subroutine dense_to_sparse(params)
     end do
 
     ! Check parameters for correct inputs:
-    if (order == "2") then
+    if (order == "CDF02") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
-    else
+    elseif (order=="CDF04")
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_4th"
+        params%n_ghosts = 4_ik
+    else
+        params%harten_multiresolution = .false.
+        params%wavelet_transform_type = 'biorthogonal'
+        params%wavelet='CDF4,4'
         params%n_ghosts = 4_ik
     end if
 
@@ -147,8 +154,6 @@ subroutine dense_to_sparse(params)
         params%input_files(i) = trim(file_in)
         file_out(i) = trim(file_in)
     end do
-
-
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,

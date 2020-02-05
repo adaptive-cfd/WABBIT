@@ -32,7 +32,8 @@ subroutine dense_to_sparse(params)
     integer(kind=ik)                        :: max_neighbors, level, k, tc_length, lgt_n_tmp
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
-    character(len=2)                        :: level_in, order
+    character(len=2)                        :: level_in
+    character(len=5)                        :: order
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: treecode_size, number_dense_blocks, &
@@ -49,7 +50,7 @@ subroutine dense_to_sparse(params)
             write(*,*) " "
             write(*,*) "Command:"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 --eps=0.1"
-            write(*,*) "[--indicator=threshold-vorticity|threshold-state-vector --memory==2GB --order=[2|4]]"
+            write(*,*) "[--indicator=threshold-vorticity|threshold-state-vector --memory==2GB --order=[CDF02|CDF04|CDF44]]"
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. indicator = which quantity is thresholded"
@@ -97,12 +98,20 @@ subroutine dense_to_sparse(params)
     end do
 
     ! Check parameters for correct inputs:
-    if (order == "2") then
+    if (order == "CDF02") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
-    else
+    elseif (order=="CDF04") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
+    else
+        params%harten_multiresolution = .false.
+        params%wavelet_transform_type = 'biorthogonal'
+        params%order_predictor = "multiresolution_4th"
+        params%wavelet='CDF4,4'
+        params%n_ghosts = 6_ik
     end if
 
     if (eps > 0) then
@@ -148,8 +157,6 @@ subroutine dense_to_sparse(params)
         file_out(i) = trim(file_in)
     end do
 
-
-
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
@@ -179,6 +186,7 @@ subroutine dense_to_sparse(params)
             write(*,'(A20,1x,A80)') "Writing to file:", file_out(i)
         end do
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
+        write(*,'(A20,1x,A8)') "Wavelets used:", order
         write(*,'(A20,1x,es9.3)') "eps:", params%eps
         write(*,'(A20,1x,A80)')"indicator:", params%coarsening_indicator
         write(*,'(80("-"))')

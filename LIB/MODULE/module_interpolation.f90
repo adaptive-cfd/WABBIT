@@ -105,7 +105,7 @@ contains
         ! apply the filter (first in x-direction)
         do ix = -a+1, nx-b
             do shift = a, b
-                fine_filtered(ix, -a+1:nx-b) = fine_filtered(ix, -a+1:nx-b) + fine(ix+shift, -a+1:nx-b)*HD(shift)
+                fine_filtered(ix, -a+1:ny-b) = fine_filtered(ix, -a+1:ny-b) + fine(ix+shift, -a+1:ny-b)*HD(shift)
             enddo
         enddo
 
@@ -172,7 +172,7 @@ contains
         ! apply the filter (first in x-direction)
         do ix = -a+1, nx-b
             do shift = a, b
-                fine_filtered2(ix, -a+1:nx-b, -a+1:nz-b) = fine_filtered2(ix, -a+1:nx-b, -a+1:nz-b) + fine(ix+shift, -a+1:nx-b, -a+1:nz-b)*HD(shift)
+                fine_filtered2(ix, -a+1:ny-b, -a+1:nz-b) = fine_filtered2(ix, -a+1:ny-b, -a+1:nz-b) + fine(ix+shift, -a+1:ny-b, -a+1:nz-b)*HD(shift)
             enddo
         enddo
 

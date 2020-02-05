@@ -45,7 +45,9 @@ module module_params
         real(kind=rk)                                :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
         character(len=80)                            :: time_step_method="RungeKuttaGeneric"
         character(len=80)                            :: krylov_subspace_dimension="fixed"
-        ! dt
+        logical :: RKC_custom_scheme=.false.
+        real(kind=rk), dimension(1:60) :: RKC_mu=0.0_rk, RKC_mu_tilde=0.0_rk, RKC_nu=0.0_rk, RKC_gamma_tilde=0.0_rk, RKC_c=0.0_rk
+         ! dt
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0

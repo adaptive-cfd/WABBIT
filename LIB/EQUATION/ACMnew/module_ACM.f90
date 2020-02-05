@@ -73,7 +73,7 @@ module module_acm
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
 
     logical :: use_passive_scalar = .false.
-    integer(kind=ik) :: N_scalars = 0
+    integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
     real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
     z0source(:), scalar_Ceta(:), widthsource(:)
     character(len=80), allocatable :: scalar_inicond(:), scalar_source_type(:)
@@ -217,6 +217,7 @@ contains
     call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
     call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(dble(params_acm%dim)*pi**2) )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
+    call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params_acm%nsave_stats, 999999   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
@@ -332,12 +333,13 @@ contains
   ! condition, sometimes not. So each physic module must be able to decide on its
   ! time step. This routine is called for all blocks, the smallest returned dt is used.
   !-----------------------------------------------------------------------------
-  subroutine GET_DT_BLOCK_ACM( time, u, Bs, g, x0, dx, dt )
+  subroutine GET_DT_BLOCK_ACM( time, iteration, u, Bs, g, x0, dx, dt )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
+    real(kind=rk), intent(in) :: time
+    integer(kind=ik), intent(in) :: iteration
 
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays

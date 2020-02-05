@@ -50,12 +50,13 @@
 !! (up to RK of order 4)
 ! ********************************************************************************************
 
-subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
+subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
     hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
     implicit none
 
     !> time varible
     real(kind=rk), intent(inout)        :: time, dt
+    integer(kind=ik), intent(inout)     :: iteration
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -128,7 +129,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
         ! krylov scheme
         !-----------------------------------------------------------------------
         ! use krylov time stepping
-        call krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
+        call krylov_time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
             hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
 
@@ -136,7 +137,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
         !-----------------------------------------------------------------------
         ! runge-kutta chebychev scheme
         !-----------------------------------------------------------------------
-        call RungeKuttaChebychev(time, dt, params, lgt_block, hvy_block, hvy_work, &
+        call RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
             hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
 
@@ -149,7 +150,7 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
         ! calculate time step
-        call calculate_time_step(params, time, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
+        call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
             lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), dt)
 
         ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
@@ -194,5 +195,6 @@ subroutine time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, hvy_ma
 
     ! increase time variable after all RHS substeps
     time = time + dt
+    iteration = iteration + 1
 
 end subroutine time_stepper

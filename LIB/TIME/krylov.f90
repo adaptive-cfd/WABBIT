@@ -1,4 +1,4 @@
-subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work, &
+subroutine krylov_time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
     hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
     ! use module_blas
     implicit none
@@ -6,6 +6,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     !---------------------------------------------------------------------------
     !> time varible
     real(kind=rk), intent(inout)        :: time, dt
+    integer(kind=ik), intent(in)        :: iteration
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
@@ -58,7 +59,7 @@ subroutine krylov_time_stepper(time, dt, params, lgt_block, hvy_block, hvy_work,
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
     ! calculate time step
-    call calculate_time_step(params, time, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
+    call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
         lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), dt)
 
     ! compute norm "normv" of input state vector ("hvy_block")

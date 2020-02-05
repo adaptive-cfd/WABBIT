@@ -236,7 +236,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
   call read_param_mpi(PARAMS,"Insects","BodyType",Insect%BodyType,"ellipsoid")
   call read_param_mpi(PARAMS,"Insects","HasDetails",Insect%HasDetails,"all")
-  call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"yes")
+  call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"tethered")
   call read_param_mpi(PARAMS,"Insects","LeftWing",Insect%LeftWing,"yes")
   call read_param_mpi(PARAMS,"Insects","RightWing",Insect%RightWing,"yes")
   call read_param_mpi(PARAMS,"Insects","b_body",Insect%b_body, 0.1d0)

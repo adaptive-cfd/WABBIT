@@ -14,7 +14,7 @@ subroutine post_add_two_masks(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: fname_ini, fname1, fname2, fname_out
+    character(len=80) :: mode, fname1, fname2, fname_out
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
@@ -31,13 +31,15 @@ subroutine post_add_two_masks(params)
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
-    call get_command_argument(2, fname_ini)
+    call get_command_argument(1, mode)
 
     ! does the user need help?
-    if (fname_ini=='--help' .or. fname_ini=='--h' .or. fname_ini=='-h') then
+    if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --add-two-masks mask_001.h5 mask_002.h5 output.h5"
+            write(*,*) "./wabbit-post --add mask_001.h5 mask_002.h5 output.h5"
+            write(*,*) "./wabbit-post --subtract mask_001.h5 mask_002.h5 output.h5"
+            write(*,*) "./wabbit-post --multiply mask_001.h5 mask_002.h5 output.h5"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) ""
             write(*,*) ""
@@ -94,48 +96,26 @@ subroutine post_add_two_masks(params)
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
-
-
-    ! call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    ! hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_dest=2, tree_id_source=1)
-    !
-    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-    !
-    ! call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    ! hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=2)
-
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
 
+    select case(mode)
+    case ("--add")
+        call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
 
+    case ("--subtract")
+        call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
 
-    !     tree_id = 1
-    ! N1 =  max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
-    !     call refine_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    !         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id)
-    !
-    !         N2= max_active_level(lgt_block,lgt_active(:,tree_id),lgt_n(tree_id))
-    ! write(*,*) N1, n2
-    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    case ("--multiply")
+        call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
 
-    ! j = 2
-    ! call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-    ! lgt_active(:, j), lgt_n(j), lgt_sortednumlist(:,:,j), hvy_active(:, j), hvy_n(j), hvy_tmp )
-    !
-    !     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    !     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-    ! !
-    !     call add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    !     hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned=2, tree_id_full=1)
-    !
-    !         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    !         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-
-    call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
+    case default
+        call abort(301219,"unkown mode...")
+    end select
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
@@ -147,6 +127,7 @@ subroutine post_add_two_masks(params)
     tree_id = 2
     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
     lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id) )
+
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
     lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )

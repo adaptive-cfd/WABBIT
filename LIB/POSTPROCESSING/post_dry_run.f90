@@ -161,14 +161,14 @@ subroutine post_dry_run
         write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
         call write_field( fname, time, -99, 1, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 
-        write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
-        call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
-
-        write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
-        call write_field( fname, time, -99, 3, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
-
-        write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
-        call write_field( fname, time, -99, 4, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+        !write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+        !call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+	!
+        !write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+        !call write_field( fname, time, -99, 3, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+        !
+        !write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+        ! call write_field( fname, time, -99, 4, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 
         time = time + params%write_time
     end do

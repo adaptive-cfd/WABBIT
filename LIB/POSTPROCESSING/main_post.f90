@@ -74,7 +74,7 @@ program main_post
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add-two-masks")
+    case ("--add-two-masks", "--add", "--subtract", "--multiply")
         call post_add_two_masks(params)
 
     case ("--stl2dist")

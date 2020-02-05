@@ -330,10 +330,9 @@ program main
             ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, hvy_neighbor, &
+            call time_stepper( time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, hvy_neighbor, &
             hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
-            iteration = iteration + 1
 
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.

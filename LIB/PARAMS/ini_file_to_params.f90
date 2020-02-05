@@ -31,9 +31,7 @@ subroutine ini_file_to_params( params, filename )
 
     !> user defined parameter structure
     type (type_params), intent(inout)               :: params
-
-    character(len=*), intent(in)                   :: filename
-
+    character(len=*), intent(in)                    :: filename
     ! process rank
     integer(kind=ik)                                :: rank
     ! number of processes
@@ -65,6 +63,7 @@ subroutine ini_file_to_params( params, filename )
     ! which physics module is used? (note that the initialization of different parameters takes
     ! place in those modules, i.e., they are not read here.)
     call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
+
 
     call ini_domain(params, FILE )
     call ini_blocks(params,FILE)
@@ -373,6 +372,16 @@ end subroutine ini_file_to_params
       ! number of stages "s" for the RungeKuttaChebychev method. Memory is always 6 registers
       ! independent of stages.
       call read_param_mpi(FILE, 'Time', 's', params%s, 4 )
+
+      call read_param_mpi(FILE, 'Time', 'RKC_custom_scheme', params%RKC_custom_scheme, .false. )
+      if (params%RKC_custom_scheme) then
+          call read_param_mpi(FILE, 'Time', 'RKC_mu', params%RKC_mu(1:params%s) )
+          call read_param_mpi(FILE, 'Time', 'RKC_mu_tilde', params%RKC_mu_tilde(1:params%s) )
+          call read_param_mpi(FILE, 'Time', 'RKC_nu', params%RKC_nu(1:params%s) )
+          call read_param_mpi(FILE, 'Time', 'RKC_gamma_tilde', params%RKC_gamma_tilde(1:params%s) )
+          call read_param_mpi(FILE, 'Time', 'RKC_c', params%RKC_c(1:params%s) )
+      endif
+
 
       ! read butcher tableau (set default value to RK4)
       butcher_RK4(1,1:5) = (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/)

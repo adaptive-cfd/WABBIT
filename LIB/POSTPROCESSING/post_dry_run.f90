@@ -21,6 +21,9 @@ subroutine post_dry_run
     use module_bridge_interface
     use module_forest
     use module_mask
+    ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
+    ! to dump kinematics data.
+    use module_ACM
 
     implicit none
 
@@ -150,6 +153,10 @@ subroutine post_dry_run
             enddo
 
         enddo
+
+
+        call WRITE_INSECT_DATA(time)
+
 
         !***********************************************************************
         ! Write fields to HDF5 file

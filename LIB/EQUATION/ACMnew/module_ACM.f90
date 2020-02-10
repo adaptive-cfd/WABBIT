@@ -45,7 +45,7 @@ module module_acm
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM, &
-  INITIALIZE_ASCII_FILES_ACM
+  INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -119,6 +119,34 @@ contains
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
 #include "filter_ACM.f90"
+
+! this routine is public, even though it is non-standard for all physics modules.
+! it is used in "dry-run" mode, which we use to create insect mask functions without
+! solving the fluid equations. This is an incredibly useful mode, and it needs to write
+! the kinematics to *.t file. until a permanent solution is found, this is a HACK
+subroutine WRITE_INSECT_DATA(time)
+    implicit none
+    real(kind=rk), intent(in) :: time
+
+    if (Insect%second_wing_pair) then
+        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
+        Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
+        Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
+        Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
+        Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
+    else
+        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
+    endif
+
+end subroutine
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads

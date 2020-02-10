@@ -10,7 +10,7 @@ subroutine FlappingMotionWrap ( time, Insect, wingID )
   integer(kind=2), intent(in) :: wingID
 
   select case ( wingID )
-  case (1) !("left")  
+  case (1) !("left")
     if (Insect%wing_fsi == "yes") then
       !**********************************
       !** Wing fsi model               **
@@ -41,7 +41,7 @@ subroutine FlappingMotionWrap ( time, Insect, wingID )
       Insect%phi_r, Insect%alpha_r, Insect%theta_r, Insect%phi_dt_r, &
       Insect%alpha_dt_r, Insect%theta_dt_r, Insect%kine_wing_r )
 
-  case (3) !("left2")  
+  case (3) !("left2")
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_left2, &
       Insect%phi_l2, Insect%alpha_l2, Insect%theta_l2, Insect%phi_dt_l2,&
       Insect%alpha_dt_l2, Insect%theta_dt_l2, Insect%kine_wing_l2 )
@@ -117,7 +117,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     endif
 
     !---------------------------------------------------------------------------
-    ! this block is excecuted only once
+    ! this block is excecuted only once per simulation, on first call of this routine
     !---------------------------------------------------------------------------
     if (.not.kine%initialized) then
         if (root) then
@@ -165,7 +165,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       call read_param_mpi(kinefile,"kinematics","bi_theta",kine%bi_theta(1:kine%nfft_theta))
       kine%initialized = .true.
       call clean_ini_file_mpi( kinefile )
-      
+
       if (root) write(*,'(80(">"))')
     endif
 
@@ -183,9 +183,9 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
 
     case ("Hermite","hermite","HERMITE")
       ! evaluate hermite interpolation
-      call hermite_eval(time,phi,phi_dt    , kine%ai_phi(1:kine%nfft_phi), kine%bi_phi(1:kine%nfft_phi))
-      call hermite_eval(time,alpha,alpha_dt, kine%ai_alpha(1:kine%nfft_alpha), kine%bi_alpha(1:kine%nfft_alpha))
-      call hermite_eval(time,theta,theta_dt, kine%ai_theta(1:kine%nfft_theta), kine%bi_theta(1:kine%nfft_theta))
+      call hermite_eval(time, phi, phi_dt    , kine%ai_phi(1:kine%nfft_phi), kine%bi_phi(1:kine%nfft_phi))
+      call hermite_eval(time, alpha, alpha_dt, kine%ai_alpha(1:kine%nfft_alpha), kine%bi_alpha(1:kine%nfft_alpha))
+      call hermite_eval(time, theta, theta_dt, kine%ai_theta(1:kine%nfft_theta), kine%bi_theta(1:kine%nfft_theta))
 
     case default
       call abort(1717,"kinematics file does not appear to be valid, set type=fourier or type=hermite")
@@ -306,7 +306,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       phi_dt = 4.0d0*time/pi
     else
       phi = time - pi/8.0d0
-      phi_dt = 1.0d0	
+      phi_dt = 1.0d0
     endif
     ! feathering angle is constant
     alpha = - Insect%init_alpha_phi_theta(1) ! Mind the "-" sign
@@ -326,7 +326,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       phi_dt = 8.0d0*time/pi
     else
       phi = time - pi/16.0d0
-      phi_dt = 1.0d0	
+      phi_dt = 1.0d0
     endif
     ! feathering angle is constant
     alpha = - Insect%init_alpha_phi_theta(1) ! Mind the "-" sign

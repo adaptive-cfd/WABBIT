@@ -43,7 +43,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     ! local variables
     integer(kind=ik) :: mpierr, ix, iy, iz, k
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume
+    real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:5), moment_block(1:3,0:5), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:5), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu
@@ -154,6 +154,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         residual_block = 0.0_rk
         ekin_block = 0.0_rk
         tmp_volume = 0.0_rk
+        tmp_volume2 = 0.0_rk
 
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
@@ -178,6 +179,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
                 ! volume of mask (useful to see if it is properly generated)
                 tmp_volume = tmp_volume + mask(ix,iy,1,1)
+                tmp_volume2 = tmp_volume2 + mask(ix,iy,1,6)
 
                 ! forces acting on body
                 force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-mask(ix,iy,1,2))*mask(ix,iy,1,1)*C_eta_inv
@@ -229,6 +231,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! volume of mask (useful to see if it is properly generated)
                         ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
                         tmp_volume = tmp_volume + mask(ix, iy, iz, 1)
+                        tmp_volume2 = tmp_volume2 + mask(ix, iy, iz, 6)
 
                         ! penalization term
                         penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
@@ -292,6 +295,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%u_residual = params_acm%u_residual + residual_block * dV
         params_acm%mean_flow = params_acm%mean_flow + meanflow_block * dV
         params_acm%mask_volume = params_acm%mask_volume + tmp_volume * dV
+        params_acm%sponge_volume = params_acm%sponge_volume + tmp_volume2 * dV
         params_acm%force_color = params_acm%force_color + force_block * dV
         params_acm%moment_color = params_acm%moment_color + moment_block * dV
         params_acm%e_kin = params_acm%e_kin + ekin_block * dV
@@ -337,6 +341,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! volume of mask (useful to see if it is properly generated)
         tmp(1) = params_acm%mask_volume
         call MPI_ALLREDUCE(tmp(1), params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        tmp(1) = params_acm%sponge_volume
+        call MPI_ALLREDUCE(tmp(1), params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! kinetic energy
@@ -439,7 +445,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
-            call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume/) )
+            call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
         end if
 

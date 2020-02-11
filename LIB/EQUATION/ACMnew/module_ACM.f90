@@ -29,6 +29,7 @@ module module_acm
   use module_params, only: read_bs
   use module_helpers, only : startup_conditioner, smoothstep
   use module_params, only: merge_blancs, count_entries
+  use module_timing
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -96,7 +97,7 @@ module module_acm
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3)
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -569,6 +570,39 @@ end subroutine
       call init_t_file('mask_volume.t', overwrite)
       call init_t_file('u_residual.t', overwrite)
       call init_t_file('kinematics.t', overwrite)
+
+      if (Insect%second_wing_pair) then
+          ! TODO
+          call init_t_file('kinematics.t', overwrite)
+      else
+          call init_t_file('kinematics.t', .true., (/&
+          "           time", &
+          "    xc_body_g_x", &
+          "    xc_body_g_y", &
+          "    xc_body_g_z", &
+          "            psi", &
+          "           beta", &
+          "          gamma", &
+          "     eta_stroke", &
+          "        alpha_l", &
+          "          phi_l", &
+          "        theta_l", &
+          "        alpha_r", &
+          "          phi_r", &
+          "        theta_r", &
+          "  rot_rel_l_w_x", &
+          "  rot_rel_l_w_y", &
+          "  rot_rel_l_w_z", &
+          "  rot_rel_r_w_x", &
+          "  rot_rel_r_w_y", &
+          "  rot_rel_r_w_z", &
+          "   rot_dt_l_w_x", &
+          "   rot_dt_l_w_y", &
+          "   rot_dt_l_w_z", &
+          "   rot_dt_r_w_x", &
+          "   rot_dt_r_w_y", &
+          "   rot_dt_r_w_z"/) )
+      endif
 
   end subroutine INITIALIZE_ASCII_FILES_ACM
 

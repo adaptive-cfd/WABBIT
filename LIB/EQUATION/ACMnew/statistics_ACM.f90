@@ -215,10 +215,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
                 z = x0(3) + dble(iz-(g+1)) * dx(3)
-
                 do iy = g+1, Bs(2)+g-1
                     y = x0(2) + dble(iy-(g+1)) * dx(2)
-
                     do ix = g+1, Bs(1)+g-1
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
@@ -247,11 +245,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                             ! point of reference for the moments
                             x0_moment = 0.0_rk
                             ! body moment
-                            x0_moment(1:3, 1) = Insect%xc_body_g
+                            x0_moment(1:3, Insect%color_body) = Insect%xc_body_g
                             ! left wing
-                            x0_moment(1:3, 2) = Insect%x_pivot_l_g
+                            x0_moment(1:3, Insect%color_l) = Insect%x_pivot_l_g
                             ! right wing
-                            x0_moment(1:3, 3) = Insect%x_pivot_r_g
+                            x0_moment(1:3, Insect%color_r) = Insect%x_pivot_r_g
 
                             ! exclude walls, trees, etc...
                             if (color > 0_2) then
@@ -266,10 +264,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                                 moment_block(:,color) = moment_block(:,color) - cross(x_lev, penal)
 
                                 ! in the fifth color, we compute the total moment for the whole
-                                ! insect wrt the center point (body+wingS)
+                                ! insect wrt the center point (body+wings)
                                 x_lev(1:3) = (/x, y, z/) - Insect%xc_body_g(1:3)
                                 moment_block(:,5)  = moment_block(:,5) - cross(x_lev, penal)
                             endif
+
                         endif
 
                         ! residual velocity in the solid domain
@@ -372,9 +371,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! compute aerodynamic power
         if (is_insect) then
             ! store moments for the insect (so that it can compute the aerodynamic power)
-            Insect%PartIntegrals( Insect%color_body )%Torque = params_acm%moment_color(:, Insect%color_body )
-            Insect%PartIntegrals( Insect%color_l )%Torque = params_acm%moment_color(:, Insect%color_l )
-            Insect%PartIntegrals( Insect%color_r )%Torque = params_acm%moment_color(:, Insect%color_r )
+            Insect%PartIntegrals( Insect%color_body )%Torque = params_acm%moment_color(1:3, Insect%color_body )
+            Insect%PartIntegrals( Insect%color_l )%Torque = params_acm%moment_color(1:3, Insect%color_l )
+            Insect%PartIntegrals( Insect%color_r )%Torque = params_acm%moment_color(1:3, Insect%color_r )
 
             call aero_power (Insect, apowtotal)
             call inert_power(Insect, ipowtotal)
@@ -404,9 +403,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
 
             if (is_insect) then
+                call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )
+
                 color = 5_2
                 call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color)/) )
-                call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )
 
                 ! body
                 color = Insect%color_body

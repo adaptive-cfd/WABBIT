@@ -350,13 +350,15 @@ contains
       !-----------------------------------------------------------------------------
       ! vector from body centre to left/right pivot point in global reference frame,
       ! for aerodynamic power
+      ! NOTE: this qty is used to compute aerody. moments in FLUSI, something odd happens and
+      ! we need the relative vector. In wabbit, we need the absolute vector.
       !-----------------------------------------------------------------------------
-      Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b)
-      Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b)
+      Insect%x_pivot_l_g = matmul(Insect%M_body_inv, Insect%x_pivot_l_b) + Insect%xc_body_g
+      Insect%x_pivot_r_g = matmul(Insect%M_body_inv, Insect%x_pivot_r_b) + Insect%xc_body_g
 
       if (Insect%second_wing_pair) then
-          Insect%x_pivot_l2_g = matmul(Insect%M_body_inv, Insect%x_pivot_l2_b)
-          Insect%x_pivot_r2_g = matmul(Insect%M_body_inv, Insect%x_pivot_r2_b)
+          Insect%x_pivot_l2_g = matmul(Insect%M_body_inv, Insect%x_pivot_l2_b) + Insect%xc_body_g
+          Insect%x_pivot_r2_g = matmul(Insect%M_body_inv, Insect%x_pivot_r2_b) + Insect%xc_body_g
       endif
 
       if (first_call) then

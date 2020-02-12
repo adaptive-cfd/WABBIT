@@ -575,7 +575,7 @@ end subroutine
           ! TODO
           call init_t_file('kinematics.t', overwrite)
       else
-          call init_t_file('kinematics.t', .true., (/&
+          call init_t_file('kinematics.t', overwrite, (/&
           "           time", &
           "    xc_body_g_x", &
           "    xc_body_g_y", &

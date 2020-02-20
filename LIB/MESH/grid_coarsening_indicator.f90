@@ -62,10 +62,10 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
-    real(kind=rk) :: dx(1:3), x0(1:3)
+    real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:), block_norm(:), tmp(:)
     !> mask term for every grid point in this block
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
@@ -185,43 +185,75 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> evaluate coarsing criterion on all blocks
     !---------------------------------------------------------------------------
-    ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
-    ! notably because of the ghost nodes unit test, where random refinement / coarsening
-    ! is used. hence, checking the flag params%threshold_mask alone is not enough.
-    if (params%threshold_mask .and. present(hvy_mask)) then
-        ! loop over all my blocks
-        do k = 1, hvy_n
-            hvy_id = hvy_active(k)
-            ! get lgt id of block
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+    ! the indicator "random" requires special treatment below (it does not pass via
+    ! block_coarsening_indicator)
+    if (indicator /= "random") then
+        ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
+        ! notably because of the ghost nodes unit test, where random refinement / coarsening
+        ! is used. hence, checking the flag params%threshold_mask alone is not enough.
+        if (params%threshold_mask .and. present(hvy_mask)) then
+            ! loop over all my blocks
+            do k = 1, hvy_n
+                hvy_id = hvy_active(k)
+                ! get lgt id of block
+                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            ! some indicators may depend on the grid, hence
-            ! we pass the spacing and origin of the block (as we have to compute vorticity
-            ! here, this can actually be omitted.)
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                ! some indicators may depend on the grid, hence
+                ! we pass the spacing and origin of the block (as we have to compute vorticity
+                ! here, this can actually be omitted.)
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-            ! evaluate the criterion on this block.
-            call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
-            hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-            lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_id))
-        enddo
+                ! evaluate the criterion on this block.
+                call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
+                hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_id))
+            enddo
+        else
+            ! loop over all my blocks
+            do k = 1, hvy_n
+                hvy_id = hvy_active(k)
+                ! get lgt id of block
+                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+                ! some indicators may depend on the grid, hence
+                ! we pass the spacing and origin of the block (as we have to compute vorticity
+                ! here, this can actually be omitted.)
+                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+                ! evaluate the criterion on this block.
+                call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
+                hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm)
+            enddo
+        endif
     else
-        ! loop over all my blocks
-        do k = 1, hvy_n
-            hvy_id = hvy_active(k)
-            ! get lgt id of block
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+        ! random coarsening. Done only in the first iteration of grid adaptation,
+        ! because otherwise, the grid would continue changing, and the coarsening
+        ! stops only if all blocks are at Jmin.
+        if (iteration==0) then
+            ! set random seed
+            call init_random_seed()
+            ! only root tags blocks (can be messy otherwise)
+            if (params%rank == 0) then
+                tags = 0
+                ! the chance for coarsening: (note to coarsen, all 4 or 8 sisters need to have this status,
+                ! hence the probability for a block to actually coarsen is only crsn_chance**(2^D))
+                crsn_chance = (0.50_rk)**(1.0_rk / 2.0_rk**params%dim)
 
-            ! some indicators may depend on the grid, hence
-            ! we pass the spacing and origin of the block (as we have to compute vorticity
-            ! here, this can actually be omitted.)
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-            ! evaluate the criterion on this block.
-            call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
-            hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-            lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm)
-        enddo
+                do k = 1, lgt_n
+                    lgt_id = lgt_active(k)
+                    ! random number
+                    call random_number(r)
+                    ! set refinement status to coarsen based on random numbers.
+                    if ( r <= crsn_chance ) then
+                        lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
+                        tags = tags + 1
+                    endif
+                enddo
+            endif
+            ! sync light data, as only root sets random refinement
+            call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
+        endif
     endif
 
 

@@ -91,7 +91,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! this stage is called only once, NOT for each block.
         ! performs initializations in the RHS module, such as resetting integrals
         params_acm%mean_flow = 0.0_rk
-        if (params_acm%forcing_type(1) .eq. "taylor_green") params_acm%error = 0.0_rk
         params_acm%force_color = 0.0_rk
         params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
@@ -122,30 +121,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call abort(0409201934,"ACM fail: very very large values in state vector.")
             endif
         enddo
-
-        !-------------------------------------------------------------------------
-        ! if the forcing is taylor-green, then we know the exact solution in time. Therefore
-        ! we compute the error w.r.t. this solution here
-        if (params_acm%forcing_type(1) .eq. "taylor_green") then
-            do iy = g+1,Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    x = x0(1) + dble(ix-g-1)*dx(1)
-                    y = x0(2) + dble(iy-g-1)*dx(2)
-                    tmp(1) = params_acm%u_mean_set(1) + dsin(x-params_acm%u_mean_set(1)*time)*&
-                    dcos(y-params_acm%u_mean_set(2)*time)*dcos(time)
-
-                    tmp(2) = params_acm%u_mean_set(2) - dcos(x-params_acm%u_mean_set(1)*time)*&
-                    dsin(y-params_acm%u_mean_set(2)*time)*dcos(time)
-
-                    tmp(3) = 0.25_rk*(dcos(2.0_rk*(x-params_acm%u_mean_set(1)*time)) +&
-                    dcos(2.0_rk*(y-params_acm%u_mean_set(2)*time)))*dcos(time)**2
-
-                    params_acm%error(1:3) = params_acm%error(1:3) + abs(u(ix,iy,1,:)-tmp(1:3))
-                    params_acm%error(4:6) = params_acm%error(4:6) + sqrt(tmp(1:3)**2)
-                end do
-            end do
-            params_acm%error = params_acm%error*dx(1)*dx(2)
-        end if
 
         ! tmp values for computing the current block only
         meanflow_block = 0.0_rk
@@ -447,18 +422,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
-        end if
-
-        if (params_acm%forcing_type(1) .eq. "taylor_green") then
-            tmp = params_acm%error
-            call MPI_REDUCE(tmp, params_acm%error, 6, MPI_DOUBLE_PRECISION, MPI_SUM, 0, WABBIT_COMM,mpierr)
-            !params_acm%error(1:3) = params_acm%error(1:3)/params_acm%error(4:6)
-            params_acm%error(1:3) = params_acm%error(1:3)/(params_acm%domain_size(1)*params_acm%domain_size(2))
-
-            if (params_acm%mpirank == 0) then
-                call append_t_file( 'error_taylor_green.t', (/time, params_acm%error(1:3)/) )
-            end if
-
         end if
 
     case default

@@ -97,6 +97,9 @@ program main_post
     case("--sparse-to-dense")
         call sparse_to_dense(params)
 
+    case ("--performance-test")
+        call performance_test(params)
+
     case("--dense-to-sparse")
         call dense_to_sparse(params)
 

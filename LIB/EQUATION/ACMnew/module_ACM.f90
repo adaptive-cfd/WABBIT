@@ -26,9 +26,9 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
-  use module_params, only: read_bs
-  use module_helpers, only : startup_conditioner, smoothstep
-  use module_params, only: merge_blancs, count_entries
+  use module_params, only : read_bs
+  use module_helpers, only : startup_conditioner, smoothstep, random_data
+  use module_params, only : merge_blancs, count_entries
   use module_timing
 
   !---------------------------------------------------------------------------------------------
@@ -64,13 +64,10 @@ module module_acm
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
-    logical :: forcing, penalization, smooth_mask=.True., compute_flow=.true.
-    ! the mean pressure has no meaning in incompressible fluids, but sometimes it can
-    ! be nice to ensure the mean is zero, e.g., for comparison wit other codes. if set to true
-    ! wabbit removes the mean pressure at every time step.
-    logical :: p_mean_zero=.false., u_mean_zero=.false.
+    logical :: penalization, smooth_mask=.True., compute_flow=.true.
     ! sponge term:
-    logical :: use_sponge=.false.
+    logical :: use_sponge = .false.
+    logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
 
     logical :: use_passive_scalar = .false.
@@ -87,17 +84,17 @@ module module_acm
     logical :: absorbing_sponge = .true.
 
     integer(kind=ik) :: dim, N_fields_saved
-    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+    real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=80) :: sponge_type=""
     character(len=80) :: coarsening_indicator=""
-    character(len=80), allocatable :: names(:), forcing_type(:)
+    character(len=80), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -206,16 +203,10 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     ! gamma_p
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
-    ! want to add a forcing term?
-    call read_param_mpi(FILE, 'ACM-new', 'forcing', params_acm%forcing, .false.)
-    if (allocated(params_acm%forcing_type)) deallocate(params_acm%forcing_type)
-    allocate( params_acm%forcing_type(1:3) )
-    call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
-    call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
-    call read_param_mpi(FILE, 'ACM-new', 'u_mean_zero', params_acm%u_mean_zero, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
+    call read_param_mpi(FILE, 'ACM-new', 'use_HIT_linear_forcing', params_acm%use_HIT_linear_forcing, .false. )
 
 
     ! initial condition

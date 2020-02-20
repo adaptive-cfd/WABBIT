@@ -48,9 +48,9 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
     ! local variables
     integer(kind=ik) :: k, Jmax, max_blocks, ierr
     ! chance for block refinement, random number
-    real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4))
+    real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
     logical :: used(1:size(hvy_block,4))
-    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g
+    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags
 
 
     Jmax = params%max_treelevel
@@ -164,38 +164,44 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
 
     case ("random")
         !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))
-        ! randomized refinement. This can be used to generate debug meshes for
-        ! testing purposes. For example the unit tests use this.
-        ref_chance = 0.10_rk
-        ! random refinement can set at most this many blocks to refine (avoid errors
-        ! due to insufficient memory) (since we already have lgt_n blocks we can set the status
-        ! at most for Nmax-lgt_n blocks)
-        max_blocks = (size(lgt_block,1) - lgt_n ) ! / 4 ! 4: safety
-        ! each block flagged for refinement creates (2**d-1) new blocks
-        max_blocks = ( max_blocks / (2**params%dim-1) )
-        ! safety
-        max_blocks = max_blocks / 40
-
         ! set random seed
         call init_random_seed()
 
-        ! unset all refinement flags
-        lgt_block( :, Jmax + IDX_REFINE_STS ) = 0
+        ! random refinement can set at most this many blocks to refine (avoid errors
+        ! due to insufficient memory)
+        max_grid_density = params%max_grid_density
+        current_grid_density = dble(lgt_n) / dble(size(lgt_block,1))
+        ! we allow at most this number of blocks to be active:
+        max_blocks = floor( max_grid_density * dble(size(lgt_block,1)) )
+        ! we already have lgt_n blocks we can set the status
+        ! at most for Nmax-lgt_n blocks
+        max_blocks = max_blocks - lgt_n
+        ! each block flagged for refinement creates (2**d -1) new blocks
+        max_blocks = max_blocks / (2**params%dim - 1)
+        ! chance for randomized refinement
 
-        ! only root rank sets the flag, then we sync. It is messy if all procs set a
+        ! the idea is to generate a grid as close as possible to the desired max_grid_density
+        ! so if the desired density is high, and the grid sparse, the probability to refine is high
+        ! but we still cap it at some value
+        ref_chance = 1.0_rk - current_grid_density / max_grid_density
+
+        ! unset all refinement flags
+        lgt_block( :, Jmax+IDX_REFINE_STS ) = 0
+
+        ! only root sets the flag, then we sync. It is messy if all procs set a
         ! random value which is not sync'ed
         if (params%rank == 0) then
+            tags = 0
             do k = 1, lgt_n
-                ! random number
                 call random_number(r)
                 ! set refinement status to refine
-                if ( r <= ref_chance .and. sum(lgt_block(:, Jmax+ IDX_REFINE_STS)) <= max_blocks) then
+                if (r<=ref_chance .and. tags<max_blocks .and. lgt_block(lgt_active(k), Jmax + IDX_REFINE_STS)==0) then
+                    tags = tags + 1
                     lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = 1
-                else
-                    lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = 0
                 end if
             end do
         endif
+
         ! sync light data, as only root sets random refinement
         call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
 

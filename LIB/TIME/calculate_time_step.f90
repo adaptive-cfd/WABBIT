@@ -82,15 +82,9 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, 
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time
 
-
-    if (dt <= 0.0_rk) then
-      call abort(12131,"For some reason, we ended up with a negative or zero time step. This is not back to the future!!!")
-    endif
-
     ! --------------------------------------------------------------------------
     ! log time step to accii file
     ! --------------------------------------------------------------------------
     call append_t_file('dt.t', (/time, dt/))
-
 
 end subroutine calculate_time_step

@@ -25,7 +25,7 @@ subroutine performance_test(params)
     type (type_params), intent(inout)  :: params
 
     ! perform 20 time steps per mesh.
-    integer, parameter :: N_timesteps = 10
+    integer, parameter :: N_timesteps = 15
     integer, parameter :: N_grids = 100
 
     integer(kind=ik)                    :: number_procs, ierr, rank
@@ -90,8 +90,6 @@ subroutine performance_test(params)
         do k = 1, hvy_n(tree_ID_flow)
             call random_data( hvy_block(:, :, :, :, hvy_active(k, tree_ID_flow) ) )
         enddo
-
-
 
 
         do j = 1, N_timesteps

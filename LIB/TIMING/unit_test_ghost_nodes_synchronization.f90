@@ -111,7 +111,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !---------------------------------------------------------------------------
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
-    params%max_grid_density = 0.20_rk
+    params%max_grid_density = 0.02_rk
     ! perform 5 iterations of random refinement/coarsening
     l = 5
     call create_random_grid( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &

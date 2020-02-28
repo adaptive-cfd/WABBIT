@@ -50,7 +50,8 @@ subroutine dense_to_sparse(params)
             write(*,*) " "
             write(*,*) "Command:"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 --eps=0.1"
-            write(*,*) "[--indicator=threshold-state-vector --memory==2GB --order=[CDF20|CDF40|CDF44]]"
+            write(*,*) "[--indicator=threshold-state-vector --memory==2GB"
+            write(*,*) "--order=[CDF20|CDF40|CDF44] --eps-norm=[Linfty (default), L2, H1]"
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. indicator = which quantity is thresholded"
@@ -194,6 +195,7 @@ subroutine dense_to_sparse(params)
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,A8)') "Wavelets used:", order
         write(*,'(A20,1x,es9.3)') "eps:", params%eps
+        write(*,'(A20,1x,A80)')"wavelet normalization:", params%eps_norm
         write(*,'(A20,1x,A80)')"indicator:", params%coarsening_indicator
         write(*,'(80("-"))')
     endif

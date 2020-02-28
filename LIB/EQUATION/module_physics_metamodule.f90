@@ -9,7 +9,7 @@
 module module_physics_metamodule
 
     use module_globals
-    use module_helpers, only: component_wise_max_norm
+    use module_helpers, only: component_wise_Linfty_norm
     ! at this point, you bind all physics modules into one metamodule, so in the rest
     ! of the code, we just load that. as all other physics modules, it provides some
     ! public routines, at which the corresponding actual physics modules are called
@@ -278,9 +278,9 @@ contains
 
 
 
-     !-----------------------------------------------------------------------------
-     ! Adaptation is dependent on the different physics application.
-     ! Every physics module can choose its own coarsening indicator.
+    !-----------------------------------------------------------------------------
+    ! Adaptation is dependent on the different physics application.
+    ! Every physics module can choose its own coarsening indicator.
     !-----------------------------------------------------------------------------
     subroutine PREPARE_THRESHOLDFIELD_meta( physics, time, u, g, x0, dx, &
                                             thresholdfield_block, mask, &
@@ -339,17 +339,17 @@ contains
 
     !-----------------------------------------------------------------------------
     ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-    ! MPI_MAX
-    ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
+    ! MPI_MAX if params%eps_norm=="Linfty"
+    ! MPI_SUM if params%eps_norm=="L2", "H1"
     !-----------------------------------------------------------------------------
     subroutine NORM_THRESHOLDFIELD_meta( physics, thresholdfield_block , BLOCK_NORM)
         implicit none
         character(len=*), intent(in) :: physics
-        !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-        real(kind=rk), intent(inout)        :: thresholdfield_block(:, :, :, :)
-        ! component index
+        ! Data to operate on. You pass this field, and here, we compute its norm,
+        ! based on other parameters
+        real(kind=rk), intent(inout) :: thresholdfield_block(:, :, :, :)
+        ! this is the norm we compute here
         real(kind=rk), intent(inout) :: BLOCK_NORM(:)
-        ! returns the name
 
         select case(physics)
         case ('ACM-new')
@@ -361,7 +361,7 @@ contains
           call NORM_THRESHOLDFIELD_NSTOKES(thresholdfield_block, BLOCK_NORM)
 
         case ('POD')
-          call component_wise_max_norm( thresholdfield_block, BLOCK_NORM)
+          call component_wise_Linfty_norm( thresholdfield_block, BLOCK_NORM)
 
         case default
             call abort(88119, "[FIELD_NAMES (metamodule):] unknown physics....")

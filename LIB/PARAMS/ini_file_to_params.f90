@@ -282,6 +282,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
 

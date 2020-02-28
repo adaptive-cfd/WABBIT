@@ -74,8 +74,9 @@ module module_params
         logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false.
 
         ! threshold for wavelet indicator
-        real(kind=rk)                                :: eps=0.0_rk
-        logical                                      :: eps_normalized=.false.
+        real(kind=rk) :: eps=0.0_rk
+        logical :: eps_normalized=.false.
+        character(len=80) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
         logical :: harten_multiresolution = .true.

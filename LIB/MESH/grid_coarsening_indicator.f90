@@ -62,7 +62,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr, level
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
@@ -139,7 +139,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
     !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
-    !! the vector of normalization factors for each qty that adaptivity will bebased on (state vector
+    !! the vector of normalization factors for each qty that adaptivity will be based on (state vector
     !! or vorticity). We currently use the L_infty norm. I have made bad experience with L_2 norm
     !! (to be checked...)
 
@@ -174,8 +174,24 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         endif
 
         ! note that a check norm>1.0e-10 is in threshold-block
-        tmp = norm
-        call MPI_ALLREDUCE(tmp, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        select case(params%eps_norm)
+        case ("Linfty")
+            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+
+        case ("L2")
+            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, neq, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            norm = sqrt(norm)
+
+        case ("H1")
+            call abort(270220179,"How DARE you use this function before I implement it?!")
+
+        end select
+
+        ! avoid division by zero (corresponds to using an absolute eps if the norm
+        ! is very small)
+        do p = 1, N_thresholding_components
+            norm(p) = max( norm(p), 1.0e-9_rk )
+        enddo
 
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
@@ -183,7 +199,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
 
     !---------------------------------------------------------------------------
-    !> evaluate coarsing criterion on all blocks
+    !> evaluate coarsening criterion on all blocks
     !---------------------------------------------------------------------------
     ! the indicator "random" requires special treatment below (it does not pass via
     ! block_coarsening_indicator)
@@ -202,11 +218,12 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
                 ! we pass the spacing and origin of the block (as we have to compute vorticity
                 ! here, this can actually be omitted.)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
                 ! evaluate the criterion on this block.
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_id))
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
             enddo
         else
             ! loop over all my blocks
@@ -219,11 +236,12 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
                 ! we pass the spacing and origin of the block (as we have to compute vorticity
                 ! here, this can actually be omitted.)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
                 ! evaluate the criterion on this block.
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm)
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
             enddo
         endif
     else

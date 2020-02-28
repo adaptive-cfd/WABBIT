@@ -25,7 +25,7 @@
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 
-subroutine threshold_block( params, block_data, thresholding_component, refinement_status, norm, eps )
+subroutine threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, eps )
 
     implicit none
 
@@ -38,32 +38,24 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
+    ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
+    ! we pass the level to this routine
+    integer(kind=ik), intent(in)        :: level
     !
     real(kind=rk), intent(inout)        :: norm( size(block_data,4) )
+    ! if different from the default eps (params%eps), you can pass a different value here. This is optional
+    ! and used for example when thresholding the mask function.
     real(kind=rk), intent(in), optional :: eps
 
-    ! loop parameter
     integer(kind=ik)                    :: dF, i, j, l
-    ! detail
     real(kind=rk)                       :: detail( size(block_data,4) )
-    ! grid parameter
     integer(kind=ik)                    :: g
     integer(kind=ik), dimension(3)      :: Bs
-
-    ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, eps2
 
-
-    ! start time
     t0 = MPI_Wtime()
-    ! grid parameter
     Bs = params%Bs
     g  = params%n_ghosts
-
-    ! default threshlding level is the one in the parameter struct
-    eps2 = params%eps
-    ! but if we pass another one, use that.
-    if (present(eps)) eps2 = eps
 
     ! reset detail
     detail = -1.0_rk
@@ -81,8 +73,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         do dF = 1, size(block_data,4)
             ! is this component of the block used for thresholding or not?
             if (thresholding_component(dF)) then
-                if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
-
                 if (params%harten_multiresolution) then
                     ! coarsen block data (restriction)
                     call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
@@ -90,7 +80,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
                     ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
+                    ! NOTE: the detail is evaluated on the entire block, INCLUDING the ghost nodes layer
                     do i = 1, Bs(1)+2*g
                         do j = 1, Bs(2)+2*g
                             do l = 1, Bs(3)+2*g
@@ -107,6 +97,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
                     ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
+                    ! NOTE: we EXCLUDE ghost nodes
                     do i = g+1, Bs(1)+g
                         do j = g+1, Bs(2)+g
                             do l = g+1, Bs(3)+g
@@ -132,8 +123,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         do dF = 1, size(block_data,4)
             ! is this component of the block used for thresholding or not?
             if (thresholding_component(dF)) then
-                if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
-
                 ! Harten multiresolution or biorthogonal?
                 if (params%harten_multiresolution) then
                     ! coarsen block data (restriction)
@@ -167,6 +156,30 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         end do
     end if
 
+    ! default threshlding level is the one in the parameter struct
+    eps2 = params%eps
+    ! but if we pass another one, use that.
+    if (present(eps)) eps2 = eps
+
+    select case(params%eps_norm)
+    case ("Linfty")
+        ! do nothing, our wavelets are normalized in L_infty norm by default, hence
+        ! a simple threshold controls this norm
+        eps2 = eps2
+
+    case ("L2")
+        ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
+        ! we have to have a level-dependent threshold
+        eps2 = eps2 * ( 2**(-level*params%dim*0.5_rk) )
+        
+    case ("H1")
+        ! H1 norm mimicks filtering of vorticity
+        eps2 = eps2 * ( 2**(-level*(params%dim+2.0_rk)*0.5_rk) )
+
+    case default
+        call abort(20022811, "ERROR:threshold_block.f90:Unknown wavelet normalization!")
+
+    end select
 
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1

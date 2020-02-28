@@ -9,34 +9,15 @@
 !
 !> \brief refinement and coarsening subroutines
 !
-!>
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4 \n
-!! 03/02/17 - create subroutines for 3D
-!
 ! ********************************************************************************************
-
 module module_interpolation
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    ! global parameters
     use module_params
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
 
     implicit none
 
     PRIVATE
-    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
+    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
 
 contains
 
@@ -155,7 +136,7 @@ contains
                 HD  = HD*2.0d0
 
             case default
-                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
 
             end select
         endif

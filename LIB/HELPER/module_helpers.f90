@@ -440,7 +440,7 @@ contains
  !> This function computes the max norm of each vector component.
  !>   \f$ (\vec{u}_{max})_n = \mathrm{max}_{\vec{x}\in\Omega_\mathrm{Block}}(|u_n(\vec{x})|) \f$ for \f$n=1,\dots, N_\mathrm{eqn}\f$
  !-------------------------------------------------------------------------------
-  subroutine component_wise_max_norm( block_data, block_norm)
+  subroutine component_wise_Linfty_norm( block_data, block_norm)
      implicit none
      !------------------------------------------------------------------------
      !> heavy data - this routine is called on one block only,

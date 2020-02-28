@@ -50,7 +50,7 @@ subroutine dense_to_sparse(params)
             write(*,*) " "
             write(*,*) "Command:"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 --eps=0.1"
-            write(*,*) "[--indicator=threshold-vorticity|threshold-state-vector --memory==2GB --order=[CDF02|CDF04|CDF44]]"
+            write(*,*) "[--indicator=threshold-state-vector --memory==2GB --order=[CDF20|CDF40|CDF44]]"
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. indicator = which quantity is thresholded"
@@ -77,7 +77,7 @@ subroutine dense_to_sparse(params)
             n_opt_args = n_opt_args + 1
         end if
         !-------------------------------
-        ! Threshold indicator [threshold-vorticity, threshold-state-vector (default)]
+        ! Threshold indicator [threshold-state-vector (default)] (just one choice now)
         if ( index(args,"--indicator=")==1 ) then
             read(args(13:len_trim(args)),* ) indicator
             n_opt_args = n_opt_args + 1
@@ -94,15 +94,21 @@ subroutine dense_to_sparse(params)
             read(args(10:len_trim(args)-2),* ) maxmem
             n_opt_args = n_opt_args + 1
         endif
+        !-------------------------------
+        ! WAVELET normalization
+        if ( index(args,"--eps-norm=")==1 ) then
+            read(args(12:len_trim(args)),* ) params%eps_norm
+            n_opt_args = n_opt_args + 1
+        endif
 
     end do
 
     ! Check parameters for correct inputs:
-    if (order == "CDF02") then
+    if (order == "CDF20") then
         params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
-    elseif (order=="CDF04") then
+    elseif (order=="CDF40") then
         params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik

@@ -50,7 +50,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
     logical :: used(1:size(hvy_block,4))
-    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags
+    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level
 
 
     Jmax = params%max_treelevel
@@ -80,6 +80,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
 
             ! light id of this block
             call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
             nnorm = 1.0_rk
@@ -89,7 +90,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
             used(1) = .true.
 
             call threshold_block( params, hvy_block(:,:,:,:, hvy_id), used, &
-            lgt_block(lgt_id, Jmax + IDX_REFINE_STS), nnorm, eps=1.0e-6_rk )
+            lgt_block(lgt_id, Jmax + IDX_REFINE_STS), nnorm, level, eps=1.0e-6_rk )
 
             ! hack: currently, threshold_block assigns only -1 or 0
             lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = lgt_block(lgt_id, Jmax + IDX_REFINE_STS)+1

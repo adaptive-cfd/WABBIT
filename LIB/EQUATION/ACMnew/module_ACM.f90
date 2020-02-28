@@ -69,6 +69,7 @@ module module_acm
     logical :: use_sponge = .false.
     logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
+    character(len=80) :: eps_norm
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
@@ -216,7 +217,8 @@ end subroutine
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
-    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-vorticity")
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
+    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params_acm%eps_norm, "Linfty")
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
@@ -482,18 +484,15 @@ end subroutine
       ! so return this number as well.
       integer(kind=ik), intent(out):: N_thresholding_components
 
-
-      call compute_vorticity( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
-      dx, params_acm%Bs, g, params_acm%discretization, threshold_field(:,:,:,1:3) )
-
-      N_thresholding_components = params_acm%dim
+      ! this function should not be called for the regular statevector thresholding
+      call abort(27022017,"The ACM module supports only coarsening_indicator=threshold-state-vector; !")
   end subroutine
 
 
   !-----------------------------------------------------------------------------
   ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-  ! MPI_MAX
-  ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
+  ! MPI_MAX if params%eps_norm=="Linfty"
+  ! MPI_SUM if params%eps_norm=="L2", "H1"
   !-----------------------------------------------------------------------------
   subroutine NORM_THRESHOLDFIELD_ACM( thresholdfield_block , norm)
       implicit none
@@ -502,21 +501,39 @@ end subroutine
       !> normalization for details, ouput of this routine
       real(kind=rk), intent(inout) :: norm(:)
 
-      integer(kind=ik) :: neq
+      integer(kind=ik) :: neq, D, i
 
       neq = params_acm%N_eqn
+      D = params_acm%dim
 
-      if (params_acm%coarsening_indicator=="threshold-vorticity") then
-          ! loop over my active hvy data
-          norm(1) =  maxval(abs(thresholdfield_block(:, :, :, 1)))
+      if (params_acm%coarsening_indicator == "threshold-state-vector") then
+          select case(params_acm%eps_norm)
+          case ("Linfty")
+              ! max over velocity components
+              norm(1) = maxval(abs(thresholdfield_block(:,:,:,1:D)) )
+              ! velocity components
+              norm(1:D) = norm(1)
+              ! pressure
+              norm(D+1) = maxval(abs(thresholdfield_block(:,:,:,D+1)) )
+              ! passive scalars (if any, they are attached to the state vector)
+              norm(D+2:neq) = 1.0d0
+
+          case ("L2")
+              ! note: SQRT needs to be done in MPI_ALLREDUCE in the WABBIT core
+              norm(1) = sum(thresholdfield_block(:,:,:,1:D)**2)
+              ! velocity components
+              norm(1:D) = norm(1)
+              ! pressure (component=D+1), scalars (components D+2 until the end)
+              do i = D+1, neq
+                  norm(i) = sum(thresholdfield_block(:,:,:,i)**2)
+              enddo
+
+          case ("H1")
+              call abort(270220179,"How DARE you use this function before I implement it?!")
+
+          end select
       else
-
-          ! max over velocities
-          norm(1) = maxval(abs(thresholdfield_block(:,:,:,1:params_acm%dim)) )
-          norm(1:params_acm%dim) = norm(1)
-          ! pressure
-          norm(params_acm%dim+1) = maxval(abs(thresholdfield_block(:,:,:,params_acm%dim+1)) )
-          norm(params_acm%dim+2:neq) = 1.0d0
+          call abort(270220178,"The ACM module supports only coarsening_indicator=threshold-state-vector; !")
       endif
 
 

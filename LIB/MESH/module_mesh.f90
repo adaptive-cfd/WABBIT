@@ -23,7 +23,7 @@ module module_mesh
     !
     use module_boundary_conditions
     ! module helpers is needed in grid coarsening indicator
-    use module_helpers , only: component_wise_max_norm
+    use module_helpers , only: component_wise_Linfty_norm
     ! used in coarse_mesh
     use module_helpers, only: most_common_element
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here

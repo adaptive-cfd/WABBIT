@@ -154,6 +154,7 @@ program main
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
 
+    call print_command_line_arguments()
 
     ! start time
     sub_t0 = MPI_Wtime()

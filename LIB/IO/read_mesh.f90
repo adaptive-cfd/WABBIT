@@ -26,13 +26,6 @@
 ! ********************************************************************************************
 
 subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> file name
@@ -53,51 +46,70 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! process rank, number of procs
     integer(kind=ik)      :: rank, number_procs
     ! grid parameter
-    integer(kind=ik)      :: g
+    integer(kind=ik)      :: g, datarank
     integer(kind=ik), dimension(3)    :: Bs
     ! offset variables
     integer(kind=ik)      :: ubounds(2), lbounds(2)
     integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik)      :: lgt_id, k, tree_id
     integer(kind=ik)      :: ierr
-    integer(kind=ik)      :: treecode_size
+    integer(kind=ik)      :: treecode_size, tmp(1)
     integer(hsize_t)      :: dims_treecode(2)
+    integer(kind=hsize_t) :: size_field(1:4)
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
     if (present(tree_id_optional)) then
         tree_id=tree_id_optional
     else
         tree_id=1
     endif
 
-    ! set MPI parameters
     rank         = params%rank
     number_procs = params%number_procs
-    ! grid parameter
-    Bs   = params%Bs
-    g    = params%n_ghosts
+    Bs           = params%Bs
+    g            = params%n_ghosts
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     call check_file_exists(fname)
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
+    ! how much blocks are we going to read?
+    call read_attribute(file_id, "blocks", "total_number_blocks", tmp)
+    lgt_n = tmp(1)
+
+    call get_rank_datafield(file_id, "blocks", datarank)
+    call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
+
+    !---------------------------------------------------------------------------
+    ! Header, useful for finding errors
+    !---------------------------------------------------------------------------
     if ( rank == 0 ) then
-        write(*,'(80("_"))')
-        write(*,'(A)') "READING: initializing grid from file..."
-        write(*,'("Filename: ",A)') trim(adjustl(fname))
-        ! NOTE: we pass the routine lgt_n, which must be previsouly read from the
-        ! file. This is done using read_attributes. This can possibly be merged here
-        ! and mustnt be done in the caller
-        write(*,'("Expected Nblocks=",i6," (on all cpus)")') lgt_n
+        write(*,'(80("~"))')
+        write(*,'(A)') "READING: initializing grid from file... (NOT reading the actual data!)"
+        write(*,'(80("~"))')
+        write(*,'("Filename         = ",A)') trim(adjustl(fname))
+        write(*,'("Expected Nblocks = ",i9," (on all cpus)")') lgt_n
+        write(*,'("datarank         = ",i1," ---> ",i1,"D data")') datarank, datarank-1
+        write(*,'("Bs_file          = ",3(i3,1x))') size_field(1:datarank-1)
+        write(*,'("Bs_memory        = ",3(i3,1x))') params%Bs
+
+        ! If the file has the wrong dimensions, we cannot read it
+        if (maxval(Bs(1:datarank-1)-size_field(1:datarank-1)) > 0) then
+            call abort(20030218, "ERROR:read_mesh:We try to load a file which has the wrong block size!")
+        endif
+
+        ! do we have enough memory?
+        if (lgt_n > size(lgt_block,1)) then
+            call abort(20030219, "ERROR:read_mesh:We try to load a file which will not fit in the memory!")
+        endif
+
         ! check if there is already some data on the grid
         if ( maxval(lgt_block(:,1))>=0 ) then
             write(*,'(A)') "ERROR: READ_MESH is called with NON_EMPTY DATA!!!!!"
         end if
     end if
+
+    if (lgt_n <= 0) call abort(20030219, "We try to read an empty data file! Something is wrong, Nb<=0")
 
     ! Nblocks per CPU
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note
@@ -107,9 +119,9 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
 
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
     if (mod(lgt_n, number_procs) > 0) then
-        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = &
-            blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
+        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
     end if
+
     ! some error control -> did we loose blocks? should never happen.
     if ( sum(blocks_per_rank_list) /= lgt_n) then
         call abort(1028,"ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
@@ -142,7 +154,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
 
-    ! this is expensive but we do it only once:
+    ! this resetting is expensive but we do it only once:
     lgt_block = -1
 
      do k = 1, hvy_n
@@ -167,9 +179,11 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! it is useful to print out the information on active levels in the file
     ! to get an idea how it looks like and if the desired dense level is larger
     ! or smaller
-    if (params%rank==0) then
+    if (rank==0) then
         write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
         max_active_level( lgt_block )
+        write(*,*) "Done reading MESH! (NOT the actual data!)"
+        write(*,'(80("~"))')
     endif
 
 end subroutine read_mesh

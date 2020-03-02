@@ -106,7 +106,6 @@ subroutine dense_to_sparse(params)
     allocate(file_out(params%n_eqn))
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%eps_normalized = .true.
-    params%physics_type = "POD"
     params%threshold_state_vector_component = .true.
 
     !-------------------------------------------

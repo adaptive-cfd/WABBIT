@@ -11,8 +11,6 @@
 ! = log ======================================================================================
 !
 !> \date 02/02/18 - create
-!
-
 subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim)
 
     implicit none
@@ -36,7 +34,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     integer(kind=ik), dimension(1)                :: iiteration, number_blocks
     real(kind=rk), dimension(1)                   :: ttime
     integer(hid_t)                                :: file_id
-    integer(kind=ik)                              :: datarank, Nb
+    integer(kind=ik)                              :: datarank, Nb, rank, ierr
     integer(kind=hsize_t)                         :: size_field(1:4)
     integer(hsize_t), dimension(2)                :: dims_treecode
 
@@ -102,5 +100,24 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
+
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    if (rank == 0) then
+        write(*,'(80("~"))')
+        write(*,*) "read_attributes.f90: Read important numbers from a file."
+        write(*,'(80("~"))')
+        write(*,*) "These numbers are used either for initializiation/allocation (in post-"
+        write(*,*) "processing) or to check if a file we try to load matches the"
+        write(*,*) "specification of the current simulation."
+        write(*,*) "We read:"
+        write(*,'(" file      = ",A)') trim(adjustl(fname))
+        write(*,'(" Bs        = ",3(i3,1x))') Bs
+        write(*,'(" domain    = ",3(g15.8,1x))') domain
+        write(*,'(" tc_length = ",i3)') tc_length
+        write(*,'(" lgt_n     = ",i8)') lgt_n
+        write(*,'(" dim       = ",i8)') dim
+        write(*,'(80("~"))')
+    endif
 
 end subroutine read_attributes

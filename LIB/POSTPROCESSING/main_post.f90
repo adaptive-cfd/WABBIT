@@ -12,18 +12,12 @@
 ! ********************************************************************************************
 
 program main_post
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     ! global parameters
     use module_params
     use module_MOR, only : post_POD, post_reconstruct, post_PODerror, post_timecoef_POD
     use module_timing
-!---------------------------------------------------------------------------------------------
-! variables
-
+    use module_helpers
     implicit none
 
     ! MPI error variable
@@ -38,14 +32,16 @@ program main_post
     character(len=80)                   :: filename, key1, key2
 
     real(kind=rk)                       :: elapsed_time
-!---------------------------------------------------------------------------------------------
-! main body
+
 
     ! init mpi
     call MPI_Init(ierr)
     ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     params%rank = rank
+
+    ! this is used to document a bit (one often forgets to write down the params in the command line call)
+    call print_command_line_arguments()
 
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
@@ -68,6 +64,9 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
+    case ("--denoising")
+        call post_denoising(params)
+        
     case ("--prune-tree")
         call post_prune_tree(params)
 

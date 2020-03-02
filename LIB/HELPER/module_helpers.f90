@@ -388,6 +388,9 @@ contains
         enddo
     end subroutine
 
+
+
+
     !-------------------------------------------------------------------------------
     ! runtime control routines
     ! flusi regularily reads from a file runtime_control.ini if it should do some-
@@ -732,6 +735,31 @@ contains
         value = default
         if (rank == 0) then
             write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
+
+    ! this routine simply prints the entire command line call with all arguments.
+    ! that is a useful part of documentation (to recall later what parameters were
+    ! used). Used mostly for postprocessing, but WABBIT also uses it.
+    subroutine print_command_line_arguments()
+        implicit none
+        integer :: i, rank, ierr
+        character(len=120) :: args
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+        if (rank == 0) then
+            write(*,'(80("~"))')
+            write(*,*) "INFORMATION: The command line call was:"
+            write(*,'(80("~"))')
+
+            do i = 0, command_argument_count()
+                call get_command_argument(i,args)
+                write(*,'(A,1x)', advance="no") trim(adjustl(args))
+            enddo
+            write(*,*) " "
+
+            write(*,'(80("~"))')
         endif
 
     end subroutine

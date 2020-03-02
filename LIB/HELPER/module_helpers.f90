@@ -542,14 +542,15 @@ contains
         do i = 1, command_argument_count()
             call get_command_argument(i,args)
 
-            if (index(args, trim(adjustl(name))) /= 0) then
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
                 value = str_replace_text( args, trim(adjustl(name))//"=", "")
                 value = str_replace_text( value, '"', '')
 
                 if (rank == 0) then
                     write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
-                    return
                 endif
+
+                return
             endif
 
         enddo
@@ -590,7 +591,7 @@ contains
         do i = 1, command_argument_count()
             call get_command_argument(i, args)
 
-            if (index(args, trim(adjustl(name))) /= 0) then
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
                 ! remove the string "--name="
                 args = str_replace_text( args, trim(adjustl(name))//"=", "")
                 ! remove str delimiter "
@@ -600,13 +601,19 @@ contains
 
                 allocate( value(1:n) )
 
-                read(args, *) value
+                if (n == 1) then
+                    read(args, '(A)') value(1)(:)
+                else
+                    read(args, *) value
+                end if
 
                 if (rank == 0) then
-                    write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
+                    write(*,'(A)') args
                     write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
-                    return
                 endif
+
+                return
             endif
 
         enddo
@@ -644,7 +651,7 @@ contains
         do i = 1, command_argument_count()
             call get_command_argument(i,args)
 
-            if (index(args, trim(adjustl(name))) /= 0) then
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
                 args = str_replace_text( args, trim(adjustl(name))//"=", "")
                 args = str_replace_text( args, '"', '')
 
@@ -652,13 +659,14 @@ contains
 
                 if (iostat /= 0) then
                     write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
-                    call abort(20030201, "Failed to convert to INTEGER.")
+                    call abort(200302018, "Failed to convert to INTEGER.")
                 endif
 
                 if (rank == 0) then
                     write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
-                    return
                 endif
+
+                return
             endif
 
         enddo
@@ -701,7 +709,7 @@ contains
         do i = 1, command_argument_count()
             call get_command_argument(i,args)
 
-            if (index(args, trim(adjustl(name))) /= 0) then
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
                 args = str_replace_text( args, trim(adjustl(name))//"=", "")
                 args = str_replace_text( args, '"', '')
 
@@ -709,13 +717,14 @@ contains
 
                 if (iostat /= 0) then
                     write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
-                    call abort(20030201, "Failed to convert to DOUBLE.")
+                    call abort(200302017, "Failed to convert to DOUBLE.")
                 endif
 
                 if (rank == 0) then
                     write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
-                    return
                 endif
+
+                return
             endif
 
         enddo

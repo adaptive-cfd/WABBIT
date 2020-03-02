@@ -53,8 +53,7 @@ subroutine sparse_to_dense(params)
             write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform"
             write(*,*) "grid (up and downsampling ensured)."
             write(*,*) "Command:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --sparse-to-dense "
-            write(*,*) "source.h5 target.h5 [target_treelevel order-predictor(2 or 4)]"
+            write(*,*) "./wabbit-post --sparse-to-dense source.h5 target.h5 [target_treelevel order-predictor(2 or 4)]"
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. target_treelevel = number specifying the desired treelevel"
@@ -69,8 +68,7 @@ subroutine sparse_to_dense(params)
 
     ! get values from command line (filename and level for interpolation)
     call check_file_exists(trim(file_in))
-    call read_attributes(file_in, lgt_n, time, iteration, &
-                         domain, Bs,tc_length, params%dim)
+    call read_attributes(file_in, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
 
     if (len_trim(file_out)==0) then
       call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")

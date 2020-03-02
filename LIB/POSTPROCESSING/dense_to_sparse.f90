@@ -94,7 +94,7 @@ subroutine dense_to_sparse(params)
         call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
     end if
 
-    if (params%eps < 0) then
+    if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
     endif
 

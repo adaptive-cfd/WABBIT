@@ -64,8 +64,9 @@ subroutine dense_to_sparse(params)
         end if
         return
     end if
+
     !----------------------------------
-    ! read predefined params
+    ! read parameters
     !----------------------------------
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--eps", params%eps, default=-1.0_rk )

@@ -511,7 +511,18 @@ contains
 
     end subroutine count_entries
 
-
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
     ! Form in command line:
     ! --name=3.0    (returns 3.0)
     ! alternatively:
@@ -549,6 +560,18 @@ contains
 
     end subroutine
 
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
     ! Form in command line:
     ! --name=3.0    (returns 3.0)
     ! alternatively:
@@ -590,6 +613,18 @@ contains
 
     end subroutine
 
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
     ! Form in command line:
     ! --name=3.0    (returns 3.0)
     ! alternatively:
@@ -635,6 +670,18 @@ contains
 
     end subroutine
 
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
     ! Form in command line:
     ! --name=3.0    (returns 3.0)
     ! alternatively:

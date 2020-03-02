@@ -101,8 +101,10 @@ module module_acm
     !
     integer(kind=ik) :: Jmax, N_eqn, n_ghosts = -9999999
     integer(kind=ik), dimension(3) :: Bs = -1
+
+    logical :: initialized = .false.
   end type type_params_acm
-  
+
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params_acm), save :: params_acm
@@ -127,6 +129,8 @@ contains
 subroutine WRITE_INSECT_DATA(time)
     implicit none
     real(kind=rk), intent(in) :: time
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: WRITE_INSECT_DATA called but ACM not initialized"
 
     if (Insect%second_wing_pair) then
         call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
@@ -349,6 +353,8 @@ end subroutine
     if (params_acm%geometry=="fractal_tree") then
         call fractal_tree_init()
     endif
+
+    params_acm%initialized = .true.
   end subroutine READ_PARAMETERS_ACM
 
 
@@ -386,6 +392,8 @@ end subroutine
     integer :: iscalar, dim
 
     if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: GET_DT_BLOCK_ACM called but ACM not initialized"
 
     dim = params_acm%dim
 

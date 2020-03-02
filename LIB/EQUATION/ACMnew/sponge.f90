@@ -34,6 +34,8 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
     ! loop variables
     integer(kind=ik) :: ix, iy
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: sponge_2D called but ACM not initialized"
+
     if (params_acm%sponge_type == "rect") then
         ! rectangular sponge with 45deg edges
         do iy = g+1, Bs(2)+g
@@ -94,6 +96,8 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
     real(kind=rk)     :: x, y, z, tmp, p, offset
     ! loop variables
     integer(kind=ik)  :: ix, iy, iz
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: sponge_3D called but ACM not initialized"
 
 
     if (params_acm%sponge_type == "rect") then

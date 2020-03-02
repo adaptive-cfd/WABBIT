@@ -47,6 +47,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2, dV, dV2
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: RHS_ACM called but ACM not initialized"
+
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
@@ -1082,6 +1084,8 @@ subroutine vorticity_ACM_block(Bs, g, dx, u, vor)
     integer(kind=ik) :: ix, iy, iz
     ! coefficients for Tam&Webb
     real(kind=rk) :: a(-3:3)
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: vorticity_ACM_block called but ACM not initialized"
 
     ! Tam & Webb, 4th order optimized (for first derivative)
     a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &

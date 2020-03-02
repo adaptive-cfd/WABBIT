@@ -43,6 +43,8 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array )
   Bs(2) = size(u,2) - 2*g
   Bs(3) = size(u,3) - 2*g
 
+  if (.not. params_acm%initialized) write(*,*) "WARNING: filter_ACM called but ACM not initialized"
+
 
   select case (params_acm%filter_type)
   case ("explicit_7pt")

@@ -41,6 +41,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
     if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_3D_ACM called but ACM not initialized"
 
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ! mask function and boundary values
@@ -172,6 +173,8 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if (.not. params_acm%penalization) return
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_2D_ACM called but ACM not initialized"
 
     !---------------------------------------------------------------------------
     ! Mask function and forcing values

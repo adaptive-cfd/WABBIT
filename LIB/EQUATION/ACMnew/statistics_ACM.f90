@@ -62,6 +62,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     integer(kind=2) :: color
     logical :: is_insect
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
+
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g

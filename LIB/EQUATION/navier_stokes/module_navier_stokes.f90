@@ -23,7 +23,7 @@ module module_navier_stokes
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_navier_stokes_params
-  use module_helpers, only: block_contains_NaN, component_wise_Linfty_norm
+  use module_helpers, only: block_contains_NaN
   use module_ns_penalization
   use module_navier_stokes_cases
   use module_operators
@@ -42,7 +42,7 @@ module module_navier_stokes
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
             INICOND_NSTOKES, FIELD_NAMES_NStokes, PREPARE_THRESHOLDFIELD_NStokes,&
-            NORM_THRESHOLDFIELD_NStokes, STATISTICS_NStokes,FILTER_NSTOKES,create_mask_NSTOKES, &
+            STATISTICS_NStokes,FILTER_NSTOKES,create_mask_NSTOKES, &
             INITIALIZE_ASCII_FILES_Nstokes
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
@@ -944,30 +944,6 @@ subroutine create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
     endif
 
 end subroutine create_mask_NSTOKES
-
-
-    !-----------------------------------------------------------------------------
-    ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-    ! MPI_MAX if params%eps_norm=="Linfty"
-    ! MPI_SUM if params%eps_norm=="L2", "H1"
-    !-----------------------------------------------------------------------------
-    subroutine NORM_THRESHOLDFIELD_NStokes( thresholdfield_block , norm)
-        implicit none
-        !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-        real(kind=rk), intent(in)        :: thresholdfield_block(:, :, :, :)
-        ! component index
-       real(kind=rk), intent(inout) :: norm(:)
-
-
-        select case (params_ns%coarsening_indicator)
-        case("primary-variables", "threshold-state-vector")
-          call component_wise_Linfty_norm( thresholdfield_block(:,:,:,1:params_ns%n_eqn), norm)
-
-        case default
-          call abort(0201019, "dude somethings wrong, please help!")
-
-        endselect
-    end subroutine
 
      !-----------------------------------------------------------------------------
      ! Adaptation is dependent on the different physics application.

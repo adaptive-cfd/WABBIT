@@ -58,9 +58,9 @@ subroutine sparse_to_dense(params)
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. target_treelevel = number specifying the desired treelevel"
-            write(*,*) "  (default is the max treelevel of the source file) " 
+            write(*,*) "  (default is the max treelevel of the source file) "
             write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
-            write(*,*) "  (default is preditor order 4) " 
+            write(*,*) "  (default is preditor order 4) "
             write(*,*)
             write(*,*)
         end if
@@ -75,7 +75,7 @@ subroutine sparse_to_dense(params)
     if (len_trim(file_out)==0) then
       call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
-    
+
     ! check if optional arguments are specified
     if (command_argument_count()<4) then
       ! set defaults
@@ -88,9 +88,11 @@ subroutine sparse_to_dense(params)
     endif
 
     if (order == "4") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
     elseif (order == "2") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
     else

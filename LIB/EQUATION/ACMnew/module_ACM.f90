@@ -45,7 +45,7 @@ module module_acm
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
-  create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM, &
+  create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA
   !**********************************************************************************************
 
@@ -99,9 +99,10 @@ module module_acm
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
-    integer(kind=ik) :: Jmax, N_eqn
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: Jmax, N_eqn, n_ghosts = -9999999
+    integer(kind=ik), dimension(3) :: Bs = -1
   end type type_params_acm
+  
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params_acm), save :: params_acm
@@ -243,6 +244,7 @@ end subroutine
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_acm%n_ghosts, 0 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', Neqn, 0 )
     params_acm%N_eqn = Neqn
 
@@ -487,60 +489,6 @@ end subroutine
       ! this function should not be called for the regular statevector thresholding
       call abort(27022017,"The ACM module supports only coarsening_indicator=threshold-state-vector; !")
   end subroutine
-
-
-  !-----------------------------------------------------------------------------
-  ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-  ! MPI_MAX if params%eps_norm=="Linfty"
-  ! MPI_SUM if params%eps_norm=="L2", "H1"
-  !-----------------------------------------------------------------------------
-  subroutine NORM_THRESHOLDFIELD_ACM( thresholdfield_block , norm)
-      implicit none
-      !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-      real(kind=rk), intent(in) :: thresholdfield_block(:, :, :, :)
-      !> normalization for details, ouput of this routine
-      real(kind=rk), intent(inout) :: norm(:)
-
-      integer(kind=ik) :: neq, D, i
-
-      neq = params_acm%N_eqn
-      D = params_acm%dim
-
-      if (params_acm%coarsening_indicator == "threshold-state-vector") then
-          select case(params_acm%eps_norm)
-          case ("Linfty")
-              ! max over velocity components
-              norm(1) = maxval(abs(thresholdfield_block(:,:,:,1:D)) )
-              ! velocity components
-              norm(1:D) = norm(1)
-              ! pressure
-              norm(D+1) = maxval(abs(thresholdfield_block(:,:,:,D+1)) )
-              ! passive scalars (if any, they are attached to the state vector)
-              norm(D+2:neq) = 1.0d0
-
-          case ("L2")
-              ! note: SQRT needs to be done in MPI_ALLREDUCE in the WABBIT core
-              norm(1) = sum(thresholdfield_block(:,:,:,1:D)**2)
-              ! velocity components
-              norm(1:D) = norm(1)
-              ! pressure (component=D+1), scalars (components D+2 until the end)
-              do i = D+1, neq
-                  norm(i) = sum(thresholdfield_block(:,:,:,i)**2)
-              enddo
-
-          case ("H1")
-              call abort(270220179,"How DARE you use this function before I implement it?!")
-
-          end select
-      else
-          call abort(270220178,"The ACM module supports only coarsening_indicator=threshold-state-vector; !")
-      endif
-
-
-  end subroutine
-
-
-
 
 
   ! the statistics are written to ascii files (usually *.t files) with the help

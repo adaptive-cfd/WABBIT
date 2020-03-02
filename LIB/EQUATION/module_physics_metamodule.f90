@@ -9,7 +9,6 @@
 module module_physics_metamodule
 
     use module_globals
-    use module_helpers, only: component_wise_Linfty_norm
     ! at this point, you bind all physics modules into one metamodule, so in the rest
     ! of the code, we just load that. as all other physics modules, it provides some
     ! public routines, at which the corresponding actual physics modules are called
@@ -27,7 +26,7 @@ module module_physics_metamodule
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
-    INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, NORM_THRESHOLDFIELD_meta, &
+    INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, &
     STATISTICS_meta, FILTER_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta
     !**********************************************************************************************
 
@@ -332,39 +331,6 @@ contains
                                N_thresholding_components)
         case default
             call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
-
-        end select
-
-    end subroutine
-
-    !-----------------------------------------------------------------------------
-    ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-    ! MPI_MAX if params%eps_norm=="Linfty"
-    ! MPI_SUM if params%eps_norm=="L2", "H1"
-    !-----------------------------------------------------------------------------
-    subroutine NORM_THRESHOLDFIELD_meta( physics, thresholdfield_block , BLOCK_NORM)
-        implicit none
-        character(len=*), intent(in) :: physics
-        ! Data to operate on. You pass this field, and here, we compute its norm,
-        ! based on other parameters
-        real(kind=rk), intent(inout) :: thresholdfield_block(:, :, :, :)
-        ! this is the norm we compute here
-        real(kind=rk), intent(inout) :: BLOCK_NORM(:)
-
-        select case(physics)
-        case ('ACM-new')
-          call NORM_THRESHOLDFIELD_ACM(thresholdfield_block, BLOCK_NORM)
-
-        case ('ConvDiff-new')
-
-        case ('navier_stokes')
-          call NORM_THRESHOLDFIELD_NSTOKES(thresholdfield_block, BLOCK_NORM)
-
-        case ('POD')
-          call component_wise_Linfty_norm( thresholdfield_block, BLOCK_NORM)
-
-        case default
-            call abort(88119, "[FIELD_NAMES (metamodule):] unknown physics....")
 
         end select
 

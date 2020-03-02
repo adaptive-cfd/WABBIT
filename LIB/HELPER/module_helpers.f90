@@ -436,27 +436,5 @@ contains
       endif
   end function runtime_control_stop
 
- !-------------------------------------------------------------------------------
- !> This function computes the max norm of each vector component.
- !>   \f$ (\vec{u}_{max})_n = \mathrm{max}_{\vec{x}\in\Omega_\mathrm{Block}}(|u_n(\vec{x})|) \f$ for \f$n=1,\dots, N_\mathrm{eqn}\f$
- !-------------------------------------------------------------------------------
-  subroutine component_wise_Linfty_norm( block_data, block_norm)
-     implicit none
-     !------------------------------------------------------------------------
-     !> heavy data - this routine is called on one block only,
-     !> not on the entire grid. hence th 4D array.
-     real(kind=rk), intent(in)    :: block_data(:, :, :, :)
-     !> norm of the block
-     real(kind=rk), intent(inout) :: block_norm(:)
-     !------------------------------------------------------------------------
-     integer(kind=ik) :: n_eqn, n
-
-     n_eqn = size(block_data,4)
-
-     do n= 1, n_eqn
-       block_norm(n) = maxval(abs(block_data(:,:,:,n)) )
-     end do
-
-  end subroutine
 
 end module module_helpers

@@ -66,7 +66,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
-    real(kind=rk), allocatable, save :: norm(:), block_norm(:), tmp(:)
+    real(kind=rk), allocatable, save :: norm(:)
     !> mask term for every grid point in this block
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> velocity of the solid
@@ -128,10 +128,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         N_thresholding_components = params%n_eqn
     endif
 
-    if (.not. allocated(norm)) then
-        allocate(norm(1:N_thresholding_components), block_norm(1:N_thresholding_components),&
-        tmp(1:N_thresholding_components))
-    endif
+    if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
 
 
     !---------------------------------------------------------------------------
@@ -140,63 +137,32 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
     !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
     !! the vector of normalization factors for each qty that adaptivity will be based on (state vector
-    !! or vorticity). We currently use the L_infty norm. I have made bad experience with L_2 norm
-    !! (to be checked...)
+    !! or vorticity). The nor is specified in params%eps_norm, default is Linfty.
 
     !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
     !! is an absolute value.
     norm = 1.0_rk
 
-    if (params%eps_normalized) then
-        ! normalizing is dependent on the variables you want to threshold!
-        ! for customized variables you need custom normalization -> physics module
-        norm = 0.0_rk
-        block_norm = 0.0_rk
-
+    if ( params%eps_normalized ) then
         if ( params%coarsening_indicator == "threshold-state-vector" ) then
             ! Apply thresholding directly to the statevector, not to derived quantities
-            do k = 1, hvy_n
-                call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_block(:,:,:,:,hvy_active(k)), block_norm)
-
-                do p = 1, N_thresholding_components
-                    norm(p) = max( norm(p), block_norm(p) )
-                enddo
-            end do
+            call component_wise_tree_norm(params, hvy_block, hvy_active, hvy_n, params%eps_norm, norm)
         else
-            ! Apply thresholding to derived qtys, such as the vorticity
-            do k = 1, hvy_n
-                call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_tmp(:,:,:,:,hvy_active(k)), block_norm)
-
-                do p = 1, N_thresholding_components
-                    norm(p) = max( norm(p), block_norm(p) )
-                enddo
-            end do
+            ! use derived qtys instead
+            call component_wise_tree_norm(params, hvy_tmp, hvy_active, hvy_n, params%eps_norm, norm)
         endif
 
-        ! note that a check norm>1.0e-10 is in threshold-block
-        select case(params%eps_norm)
-        case ("Linfty")
-            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-
-        case ("L2")
-            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, neq, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            norm = sqrt(norm)
-
-        case ("H1")
-            call abort(270220179,"How DARE you use this function before I implement it?!")
-
-        end select
-
-        ! avoid division by zero (corresponds to using an absolute eps if the norm
-        ! is very small)
+        ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
         do p = 1, N_thresholding_components
-            norm(p) = max( norm(p), 1.0e-9_rk )
+            if (norm(p) <= 1.0e-9) norm(p) = 1.0_rk
         enddo
 
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
     endif
 
+    ! HACK
+    if (params%physics_type == "ACM-new") norm(1:params%dim) = maxval(norm(1:params%dim))
 
     !---------------------------------------------------------------------------
     !> evaluate coarsening criterion on all blocks

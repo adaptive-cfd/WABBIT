@@ -2,12 +2,12 @@
 !> Note you must not have any dependencies for this module (other than precision)
 !> in order not to create makefile conflicts.
 module module_helpers
-    use module_globals
-    use mpi
-    implicit none
+use module_globals
+use mpi
+implicit none
 
-    interface smoothstep
-        module procedure smoothstep1, smoothstep2
+interface smoothstep
+    module procedure smoothstep1, smoothstep2
     end interface
 
     ! routines of the interface should be private to hide them from outside this module
@@ -18,53 +18,50 @@ contains
 #include "most_common_element.f90"
 #include "rotation_matrices.f90"
 
-  !-----------------------------------------------------------------------------
-  !> This function computes the factorial of n
-  !-----------------------------------------------------------------------------
-  function factorial (n) result (res)
+    !-----------------------------------------------------------------------------
+    !> This function computes the factorial of n
+    !-----------------------------------------------------------------------------
+    function factorial (n) result (res)
 
-    implicit none
-    integer, intent (in) :: n
-    integer :: res
-    integer :: i
+        implicit none
+        integer, intent (in) :: n
+        integer :: res
+        integer :: i
 
-    res = product ((/(i, i = 1, n)/))
+        res = product ((/(i, i = 1, n)/))
 
-  end function factorial
+    end function factorial
 
-  !-----------------------------------------------------------------------------
-  !> This function computes the binomial coefficients
-  !-----------------------------------------------------------------------------
-  function choose (n, k) result (res)
+    !-----------------------------------------------------------------------------
+    !> This function computes the binomial coefficients
+    !-----------------------------------------------------------------------------
+    function choose (n, k) result (res)
 
-    implicit none
-    integer, intent (in) :: n
-    integer, intent (in) :: k
-    integer :: res
+        implicit none
+        integer, intent (in) :: n
+        integer, intent (in) :: k
+        integer :: res
 
-    res = factorial (n) / (factorial (k) * factorial (n - k))
+        res = factorial (n) / (factorial (k) * factorial (n - k))
 
-  end function choose
+    end function choose
 
-  !-----------------------------------------------------------------------------
-  !> This function returns 0 if name is not contained in list, otherwise the index for which
-  !> a substring
-  !-----------------------------------------------------------------------------
-  function list_contains_name (list, name) result (index)
+    !-----------------------------------------------------------------------------
+    !> This function returns 0 if name is not contained in list, otherwise the index for which
+    !> a substring
+    !-----------------------------------------------------------------------------
+    function list_contains_name (list, name) result (index)
 
-    implicit none
-    character(len=*), intent (in) :: list(:)
-    character(len=*), intent (in) :: name
-    integer :: index
+        implicit none
+        character(len=*), intent (in) :: list(:)
+        character(len=*), intent (in) :: name
+        integer :: index
 
-    do index = 1, size(list)
-      if (trim(list(index))==trim(name))  return
-    end do
-    index=0
-  end function list_contains_name
-
-
-
+        do index = 1, size(list)
+            if (trim(list(index))==trim(name))  return
+        end do
+        index=0
+    end function list_contains_name
 
     !-----------------------------------------------------------------------------
     ! This function returns, to a given filename, the corresponding dataset name
@@ -272,33 +269,33 @@ contains
     end function startup_conditioner
 
     !==========================================================================
-      !> \brief This subroutine returns the value f of a smooth step function \n
-      !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
-      !> h is the semi-size of the smoothing area, so \n
-      !> f is 1 if delta<=0-h \n
-      !> f is 0 if delta>0+h \n
-      !> f is variable (smooth) in between
-      !> \details
-      !> \image html maskfunction.bmp "plot of chi(delta)"
-      !> \image latex maskfunction.eps "plot of chi(delta)"
-        function smoothstep1(delta,h)
-          use module_precision
-          implicit none
-          real(kind=rk), intent(in)  :: delta,h
-          real(kind=rk)              :: smoothstep1,f
-          !-------------------------------------------------
-          ! cos shaped smoothing (compact in phys.space)
-          !-------------------------------------------------
-          if (delta<=-h) then
+    !> \brief This subroutine returns the value f of a smooth step function \n
+    !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
+    !> h is the semi-size of the smoothing area, so \n
+    !> f is 1 if delta<=0-h \n
+    !> f is 0 if delta>0+h \n
+    !> f is variable (smooth) in between
+    !> \details
+    !> \image html maskfunction.bmp "plot of chi(delta)"
+    !> \image latex maskfunction.eps "plot of chi(delta)"
+    function smoothstep1(delta,h)
+        use module_precision
+        implicit none
+        real(kind=rk), intent(in)  :: delta,h
+        real(kind=rk)              :: smoothstep1,f
+        !-------------------------------------------------
+        ! cos shaped smoothing (compact in phys.space)
+        !-------------------------------------------------
+        if (delta<=-h) then
             f = 1.0_rk
-          elseif ( -h<delta .and. delta<+h  ) then
+        elseif ( -h<delta .and. delta<+h  ) then
             f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
-          else
+        else
             f = 0.0_rk
-          endif
+        endif
 
-          smoothstep1=f
-        end function smoothstep1
+        smoothstep1=f
+    end function smoothstep1
     !==========================================================================
 
 
@@ -397,44 +394,290 @@ contains
     ! thing, such as abort, reload_params or save data.
     !-------------------------------------------------------------------------------
     subroutine Initialize_runtime_control_file()
-      ! overwrites the file again with the standard runtime_control file
-      implicit none
+        ! overwrites the file again with the standard runtime_control file
+        implicit none
 
-      open  (14,file='runtime_control',status='replace')
-      write (14,'(A)') "# This is wabbit's runtime control file"
-      write (14,'(A)') "# Stop the run but makes a backup first"
-      write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
-      write (14,'(A)') "#       runtime_control=save_stop;"
-      write (14,'(A)') ""
-      write (14,'(A)') "[runtime_control]"
-      write (14,'(A)') "runtime_control=nothing;"
-      close (14)
+        open  (14,file='runtime_control',status='replace')
+        write (14,'(A)') "# This is wabbit's runtime control file"
+        write (14,'(A)') "# Stop the run but makes a backup first"
+        write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
+        write (14,'(A)') "#       runtime_control=save_stop;"
+        write (14,'(A)') ""
+        write (14,'(A)') "[runtime_control]"
+        write (14,'(A)') "runtime_control=nothing;"
+        close (14)
 
     end subroutine Initialize_runtime_control_file
 
 
     logical function runtime_control_stop(  )
-      ! reads runtime control command
-      use module_ini_files_parser_mpi
-      implicit none
-      character(len=80) :: command
-      character(len=80) :: file
-      type(inifile) :: CTRL_FILE
+        ! reads runtime control command
+        use module_ini_files_parser_mpi
+        implicit none
+        character(len=80) :: command
+        character(len=80) :: file
+        type(inifile) :: CTRL_FILE
 
-      file ="runtime_control"
+        file ="runtime_control"
 
-      ! root reads in the control file
-      ! and fetched the command
-      call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
-      call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
-      call clean_ini_file_mpi( CTRL_FILE )
+        ! root reads in the control file
+        ! and fetched the command
+        call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
+        call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
+        call clean_ini_file_mpi( CTRL_FILE )
 
-      if (command == "save_stop") then
-          runtime_control_stop = .true.
-      else
-          runtime_control_stop = .false.
-      endif
-  end function runtime_control_stop
+        if (command == "save_stop") then
+            runtime_control_stop = .true.
+        else
+            runtime_control_stop = .false.
+        endif
+    end function runtime_control_stop
 
+
+    ! source: http://fortranwiki.org/fortran/show/String_Functions
+    FUNCTION str_replace_text (s,text,rep)  RESULT(outs)
+        CHARACTER(*)        :: s,text,rep
+        CHARACTER(LEN(s)+100) :: outs     ! provide outs with extra 100 char len
+        INTEGER             :: i, nt, nr
+
+        outs = s ; nt = LEN_TRIM(text) ; nr = LEN_TRIM(rep)
+        DO
+            i = INDEX(outs,text(:nt)) ; IF (i == 0) EXIT
+            outs = outs(:i-1) // rep(:nr) // outs(i+nt:)
+        END DO
+    END FUNCTION str_replace_text
+
+
+    !-------------------------------------------------------------------------!
+    !> @brief remove (multiple) blancs as separators in a string
+    subroutine merge_blanks(string_merge)
+        ! this routine removes blanks at the beginning and end of an string
+        ! and multiple blanks which are right next to each other
+
+        implicit none
+        character(len=*), intent(inout) :: string_merge
+        integer(kind=ik) :: i, j, len_str, count
+
+        len_str = len(string_merge)
+        count = 0
+
+        string_merge = string_merge
+        do i=1,len_str-1
+            if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
+                count = count + 1
+                string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+            end if
+        end do
+
+        string_merge = adjustl(string_merge)
+
+    end subroutine merge_blanks
+
+
+
+    !-------------------------------------------------------------------------!
+    !> @brief count number of vector elements in a string
+    subroutine count_entries(string_cnt, n_entries)
+        ! only to be used after merged blaks
+        ! this routine counts the separators and gives back this value +1
+
+        implicit none
+        character(len=1) :: separator
+        character(len=*), intent(in) :: string_cnt
+        integer(kind=ik), intent(out) :: n_entries
+        integer(kind=ik) :: count_separator, i, l_string
+        character(len=len_trim(adjustl(string_cnt))):: string_trim
+
+        string_trim = trim(adjustl( string_cnt ))
+        call merge_blanks(string_trim)
+        string_trim = trim(adjustl( string_trim ))
+
+        l_string = len_trim(string_trim)
+
+        ! we now have reduced the number of b blanks to at most one at the time: "hdj    aa" => "hdj aa"
+        ! NOW: we figure out if the values are separated by spaces " " or commas "," or ";"
+        separator = " "
+        if (index(string_trim, ",") /= 0) separator=","
+        if (index(string_trim, ";") /= 0) separator=";"
+
+        count_separator = 0
+        do i = 1, l_string
+            if (string_trim(i:i) == separator) then
+                count_separator = count_separator + 1
+            end if
+        end do
+
+        n_entries = count_separator + 1
+
+    end subroutine count_entries
+
+
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_str( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        character(len=*), intent(in) :: default
+        character(len=80), intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+
+        value = default
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            if (index(args, trim(adjustl(name))) /= 0) then
+                value = str_replace_text( args, trim(adjustl(name))//"=", "")
+                value = str_replace_text( value, '"', '')
+
+                if (rank == 0) then
+                    write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
+                    return
+                endif
+            endif
+
+        enddo
+
+        if (rank == 0) then
+            write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))//" THIS IS THE DEFAULT!"
+        endif
+
+    end subroutine
+
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_str_vct( name, value )
+        implicit none
+        character(len=*), intent(in) :: name
+        character(len=80), intent(out), ALLOCATABLE :: value(:)
+
+        integer :: i, rank, ierr, n, k
+        character(len=120) :: args
+
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        do i = 1, command_argument_count()
+            call get_command_argument(i, args)
+
+            if (index(args, trim(adjustl(name))) /= 0) then
+                ! remove the string "--name="
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                ! remove str delimiter "
+                args = str_replace_text( args, '"', '')
+                ! count number of vector entries
+                call count_entries(args, n)
+
+                allocate( value(1:n) )
+
+                read(args, *) value
+
+                if (rank == 0) then
+                    write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))
+                    write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
+                    return
+                endif
+            endif
+
+        enddo
+
+    end subroutine
+
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_int( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        integer(kind=ik), intent(in) :: default
+        integer(kind=ik), intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+        integer :: iostat
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            if (index(args, trim(adjustl(name))) /= 0) then
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                args = str_replace_text( args, '"', '')
+
+                read(args, *, iostat=iostat) value
+
+                if (iostat /= 0) then
+                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    call abort(20030201, "Failed to convert to INTEGER.")
+                endif
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
+                    return
+                endif
+            endif
+
+        enddo
+
+        value = default
+        if (rank == 0) then
+            write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",i8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
+
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_dbl( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        real(kind=rk), intent(in) :: default
+        real(kind=rk), intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+        integer :: iostat
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            if (index(args, trim(adjustl(name))) /= 0) then
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                args = str_replace_text( args, '"', '')
+
+                read(args, *, iostat=iostat) value
+
+                if (iostat /= 0) then
+                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    call abort(20030201, "Failed to convert to DOUBLE.")
+                endif
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
+                    return
+                endif
+            endif
+
+        enddo
+
+        value = default
+        if (rank == 0) then
+            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
 
 end module module_helpers

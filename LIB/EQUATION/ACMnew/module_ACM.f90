@@ -28,7 +28,6 @@ module module_acm
   use module_operators, only : compute_vorticity, divergence
   use module_params, only : read_bs
   use module_helpers, only : startup_conditioner, smoothstep, random_data
-  use module_params, only : merge_blancs, count_entries
   use module_timing
 
   !---------------------------------------------------------------------------------------------

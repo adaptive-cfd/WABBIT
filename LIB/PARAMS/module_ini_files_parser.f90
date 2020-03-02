@@ -54,7 +54,7 @@ module module_ini_files_parser
 
 
 !!!!!!!!
-contains !count_entries, merge_blancs
+contains
 !!!!!!!!
 
 

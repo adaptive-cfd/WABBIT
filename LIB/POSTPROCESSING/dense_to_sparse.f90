@@ -13,6 +13,7 @@ subroutine dense_to_sparse(params)
     use module_IO
     use module_mpi
     use module_initialization
+    use module_helpers
 
     implicit none
 
@@ -20,7 +21,7 @@ subroutine dense_to_sparse(params)
     type (type_params), intent(inout)  :: params
     character(len=80)      :: indicator="threshold-state-vector", file_in, args
     character(len=80)      :: tail_string
-    real(kind=rk)          :: time, eps=-1.0_rk,maxmem=-1.0_rk
+    real(kind=rk)          :: time, eps=-1.0_rk
     integer(kind=ik)       :: iteration
     character(len=80), allocatable :: file_out(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
@@ -33,11 +34,10 @@ subroutine dense_to_sparse(params)
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in
-    character(len=5)                        :: order
+    character(len=80)                       :: order
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik)                        :: treecode_size, number_dense_blocks, &
-    n_opt_args, i, l, dim
+    integer(kind=ik)                        :: treecode_size, number_dense_blocks, i, l, dim
     !-----------------------------------------------------------------------------------------------------
 
     call get_command_argument(2, file_in)
@@ -67,72 +67,40 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! read predefined params
     !----------------------------------
-    n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
+    call get_cmd_arg_dbl( "--eps", params%eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--indicator", indicator, default="threshold-state-vector" )
+    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str_vct( "--files", params%input_files )
 
-    do i = 1, command_argument_count()
-        call get_command_argument(i,args)
-        !-------------------------------
-        ! order of predictor
-        if ( index(args,"--order=")==1 ) then
-            read(args(9:len_trim(args)),* ) order
-            n_opt_args = n_opt_args + 1
-        end if
-        !-------------------------------
-        ! Threshold indicator [threshold-state-vector (default)] (just one choice now)
-        if ( index(args,"--indicator=")==1 ) then
-            read(args(13:len_trim(args)),* ) indicator
-            n_opt_args = n_opt_args + 1
-        end if
-        !-------------------------------
-        ! Threshold for keeping wavelet coefficients
-        if ( index(args,"--eps=")==1 ) then
-            read(args(7:len_trim(args)),* ) eps
-            n_opt_args = n_opt_args + 1
-        end if
-        !-------------------------------
-        ! MEMORY AVAILABLE
-        if ( index(args,"--memory=")==1 ) then
-            read(args(10:len_trim(args)-2),* ) maxmem
-            n_opt_args = n_opt_args + 1
-        endif
-        !-------------------------------
-        ! WAVELET normalization
-        if ( index(args,"--eps-norm=")==1 ) then
-            read(args(12:len_trim(args)),* ) params%eps_norm
-            n_opt_args = n_opt_args + 1
-        endif
-
-    end do
 
     ! Check parameters for correct inputs:
     if (order == "CDF20") then
         params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
-    elseif (order=="CDF40") then
+    elseif (order == "CDF40") then
         params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
-    else
+    elseif (order == "CDF44") then
         params%harten_multiresolution = .false.
         params%wavelet_transform_type = 'biorthogonal'
         params%order_predictor = "multiresolution_4th"
         params%wavelet='CDF4,4'
         params%n_ghosts = 6_ik
+    else
+        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
     end if
 
-    if (eps > 0) then
-        params%eps=eps
-    else
+    if (params%eps < 0) then
         call abort(2303191,"You must specify the threshold value --eps")
     endif
-    params%coarsening_indicator=indicator
+
+    params%coarsening_indicator = indicator
     params%forest_size = 1
 
-    params%n_eqn = command_argument_count() - n_opt_args
-    if (params%n_eqn <= 0 ) call abort(2603191,"No files are specified for sparsing!!!")
-
-    allocate(params%input_files(params%n_eqn))
+    params%n_eqn = size(params%input_files)
     allocate(params%field_names(params%n_eqn))
     allocate(file_out(params%n_eqn))
     allocate(params%threshold_state_vector_component(params%n_eqn))
@@ -143,12 +111,11 @@ subroutine dense_to_sparse(params)
     !-------------------------------------------
     ! check and find common params in all h5-files
     !-------------------------------------------
-    call get_command_argument(n_opt_args+1, params%input_files(1))
     call read_attributes(params%input_files(1), lgt_n_tmp, time, iteration, params%domain_size, &
     params%Bs,params%max_treelevel, params%dim)
 
     do i = 1, params%n_eqn
-        call get_command_argument(n_opt_args+i, file_in)
+        file_in = params%input_files(i)
         call check_file_exists(trim(file_in))
         call read_attributes(file_in, lgt_n_tmp, time, iteration, domain, Bs, level, dim)
 

@@ -27,6 +27,7 @@ module module_params
     use module_ini_files_parser_mpi
     ! MPI general bridge module
     use module_bridge
+    use module_helpers
 
     use module_t_files
 !---------------------------------------------------------------------------------------------

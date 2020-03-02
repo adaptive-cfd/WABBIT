@@ -187,7 +187,7 @@ $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_t_files.o \
-	ini_file_to_params.f90
+	ini_file_to_params.f90 $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_boundary_conditions.o: module_boundary_conditions.f90 \
@@ -199,7 +199,7 @@ $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/modul
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
-	inicond_NStokes.f90 filter_block.f90
+	inicond_NStokes.f90 filter_block.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o\

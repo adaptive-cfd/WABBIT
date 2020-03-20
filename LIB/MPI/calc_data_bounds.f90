@@ -87,8 +87,9 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
             cycle
         endif
 
-        call get_block_spacing_origin( params, send_treecode(1:J), x0_send, dx_send )
-        call get_block_spacing_origin( params, recv_treecode(1:J-leveldiff), x0_recv, dx_recv )
+        call get_block_spacing_origin2( send_treecode(1:J), (/1.0_rk, 1.0_rk, 1.0_rk/), Bs, params%dim, x0_send, dx_send )
+        call get_block_spacing_origin2( recv_treecode(1:J-leveldiff),(/1.0_rk, 1.0_rk, 1.0_rk/), Bs, params%dim, x0_recv, dx_recv )
+
 
         ! if the ghost nodes patch on the recver is on the domain boundary, then our algorithm
         ! cannot work: the sender will be at the opposite site. So be sure not to choose such a
@@ -250,47 +251,8 @@ logical function patch_crosses_periodic_BC(x0, dx, ijk, dim)
 
 end function
 
-! we cannot use the one in module_mesh because it has a circular dependency (makefile)
-subroutine get_block_spacing_origin( params, treecode, x0, dx )
-
-    implicit none
-
-    !> user defined parameter structure
-    type (type_params), intent(in)             :: params
-    integer(kind=ik), intent(in)               :: treecode(1:)
-    !> output
-    real(kind=rk), dimension(1:3), intent(out) :: x0, dx
-    ! loop variables and shortcuts
-    integer(kind=ik)                           :: ix,iy,iz,level
-    integer(kind=ik), dimension(3)             :: Bs
-
-    bs = params%Bs
-
-    ! fetch this blocks level:
-    level = size(treecode)
-
-    ! compute its coordinates in ijk space
-    call decoding( treecode, ix, iy, iz, level)
-
-    ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
-    ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
-    dx = (/1.0_rk, 1.0_rk, 1.0_rk/)
-    dx(1:params%dim) = dx(1:params%dim) * 2.0_rk**(-level) / real(Bs(1:params%dim)-1, kind=rk)
-    ! note zero based indexing:
-    x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1) ,kind=rk) * dx
-
-end subroutine get_block_spacing_origin
-
-
 
 subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, sender_or_receiver)
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure

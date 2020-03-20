@@ -2,12 +2,16 @@
 !> Note you must not have any dependencies for this module (other than precision)
 !> in order not to create makefile conflicts.
 module module_helpers
-use module_globals
-use mpi
-implicit none
+    use module_globals
+    use mpi
+    implicit none
 
-interface smoothstep
-    module procedure smoothstep1, smoothstep2
+    interface smoothstep
+        module procedure smoothstep1, smoothstep2
+    end interface
+
+    interface get_cmd_arg
+        module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
     end interface
 
     ! routines of the interface should be private to hide them from outside this module
@@ -542,11 +546,17 @@ contains
         value = default
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
+        ! loop over all command line arguments (therefore, the orderng does not matter)
+        ! this may be not the most efficient way, but command line parsing is done only
+        ! once on startup, hence performance does not matter.
         do i = 1, command_argument_count()
             call get_command_argument(i,args)
 
+            ! is the string '--name=' in the argument?
             if (index(args, trim(adjustl(name))//"=") /= 0) then
+                ! remove the string '--name='
                 value = str_replace_text( args, trim(adjustl(name))//"=", "")
+                ! remove quotation marks, if any
                 value = str_replace_text( value, '"', '')
 
                 if (rank == 0) then
@@ -591,6 +601,9 @@ contains
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
+        ! loop over all command line arguments (therefore, the orderng does not matter)
+        ! this may be not the most efficient way, but command line parsing is done only
+        ! once on startup, hence performance does not matter.
         do i = 1, command_argument_count()
             call get_command_argument(i, args)
 
@@ -735,6 +748,94 @@ contains
         value = default
         if (rank == 0) then
             write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
+
+
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
+    ! The case logical is special:
+    ! --name=1
+    ! --name=[yes, 1, true, TRUE, .true.]
+    ! --name
+    ! are identical and return true.
+    !---------------------------------------------------------------------------
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    !---------------------------------------------------------------------------
+    subroutine get_cmd_arg_bool( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        logical, intent(in) :: default
+        logical, intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+        integer :: iostat
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        ! loop over all command line arguments (therefore, the orderng does not matter)
+        ! this may be not the most efficient way, but command line parsing is done only
+        ! once on startup, hence performance does not matter.
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            ! is the string '--name=' in the argument?
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
+                ! remove the string '--name='
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                ! remove quoatiion marks, if any
+                args = str_replace_text( args, '"', '')
+                ! now args is just the substring left of the '=' sign.
+                write(*,*) "args=", args
+
+                if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.") then
+                    value = .true.
+                elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.") then
+                    value = .false.
+                else
+                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    call abort(200302017, "Failed to convert to LOGICAL.")
+                endif
+
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                endif
+
+                return
+
+
+            elseif ( args == name ) then
+                ! in the case of logical, we can also call '--name', which also returns TRUE.
+                value = .true.
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                endif
+
+                return
+            endif
+
+        enddo
+
+        value = default
+        if (rank == 0) then
+            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
         endif
 
     end subroutine

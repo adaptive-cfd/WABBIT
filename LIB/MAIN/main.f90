@@ -171,8 +171,7 @@ program main
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
-    ! have the pysics module read their own parameters. They also decide how many grid-qtys
-    ! they want
+    ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &

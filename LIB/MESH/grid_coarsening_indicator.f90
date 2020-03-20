@@ -146,10 +146,10 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     if ( params%eps_normalized ) then
         if ( params%coarsening_indicator == "threshold-state-vector" ) then
             ! Apply thresholding directly to the statevector, not to derived quantities
-            call component_wise_tree_norm(params, hvy_block, hvy_active, hvy_n, params%eps_norm, norm)
+            call component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, params%eps_norm, norm)
         else
             ! use derived qtys instead
-            call component_wise_tree_norm(params, hvy_tmp, hvy_active, hvy_n, params%eps_norm, norm)
+            call component_wise_tree_norm(params, lgt_block, hvy_tmp, hvy_active, hvy_n, params%eps_norm, norm)
         endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
@@ -163,7 +163,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
     ! HACK
     if (params%physics_type == "ACM-new") norm(1:params%dim) = maxval(norm(1:params%dim))
-
+    ! write(*,*) "norm", norm
     !---------------------------------------------------------------------------
     !> evaluate coarsening criterion on all blocks
     !---------------------------------------------------------------------------

@@ -49,16 +49,15 @@ subroutine dense_to_sparse(params)
             write(*,*) "postprocessing subroutine sparse a mesh with a given detail treshold"
             write(*,*) " "
             write(*,*) "Command:"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --dense-to-sparse source.h5 target.h5 --eps=0.1"
-            write(*,*) "[--indicator=threshold-state-vector --memory==2GB"
-            write(*,*) "--order=[CDF20|CDF40|CDF44] --eps-norm=[Linfty (default), L2, H1]"
+            write(*,*) "./wabbit-post --dense-to-sparse "
             write(*,*) "-------------------------------------------------------------"
-            write(*,*) "Optional Inputs: "
-            write(*,*) "  1. indicator = which quantity is thresholded"
-            write(*,*) "  (default is the max treelevel of the source file) "
-            write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
-            write(*,*) "  (default is preditor order 2) "
-            write(*,*) "  3. memory = maximal memory allocated"
+            write(*,*) " Parameters: "
+            write(*,*) "  --eps-normalized="
+            write(*,*) "  --eps-norm="
+            write(*,*) "  --eps="
+            write(*,*) "  --indicator="
+            write(*,*) "  --order="
+            write(*,*) "  --files="
             write(*,*) "-------------------------------------------------------------"
             write(*,*)
         end if
@@ -68,6 +67,7 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! read parameters
     !----------------------------------
+    call get_cmd_arg_bool( "--eps-normalized", params%eps_normalized, default=.true. )
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--eps", params%eps, default=-1.0_rk )
     call get_cmd_arg_str( "--indicator", indicator, default="threshold-state-vector" )
@@ -105,7 +105,6 @@ subroutine dense_to_sparse(params)
     allocate(params%field_names(params%n_eqn))
     allocate(file_out(params%n_eqn))
     allocate(params%threshold_state_vector_component(params%n_eqn))
-    params%eps_normalized = .true.
     params%threshold_state_vector_component = .true.
 
     !-------------------------------------------

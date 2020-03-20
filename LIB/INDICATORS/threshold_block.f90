@@ -156,10 +156,45 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         end do
     end if
 
+
+
+
+! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
+! ich schicke dir die notizen gleich (photos).
+!
+! also wir brauchen einen scale(level)- dependent threshold, d.h. \epsilon_j
+! zudem ist dieser abhaengig von der raum dimension d.
+!
+! Fuer die L^2 normalisierung (mit wavelets welche in der L^\infty norm normalisiert sind) haben wir
+!
+! \epsilon_j = 2^{-jd/2} \epsilon
+!
+! d.h. der threshold wird kleiner auf kleinen skalen.
+!
+! Fuer die vorticity (anstatt der velocity) kommt nochmal ein faktor 2^{-j} dazu, d.h.
+!
+! \epsilon_j = 2^{-j(d+2)/2} \epsilon
+!
+! Zum testen waere es gut in 1d oder 2d zu pruefen, ob die L^2 norm von u - u_\epsilon
+! linear mit epsilon abnimmt, das gleiche koennte man auch fuer H^1 (philipp koennte dies doch mal ausprobieren?).
+!
+! fuer CVS brauchen wir dann noch \epsilon was von Z (der enstrophy) und der feinsten
+! aufloesung abhaengt. fuer L^2 normalisierte wavelets ist
+! der threshold:
+!
+! \epsilon = \sqrt{2/3 \sigma^2 \ln N}
+!
+! wobei \sigma^2 die varianz (= 2 Z) der incoh. vorticity ist.
+! typischerweise erhaelt man diese mit 1-3 iterationen.
+! als ersten schritt koennen wir einfach Z der totalen stroemung nehmen.
+! N ist die maximale aufloesung, typicherweise 2^{d J}.
+!
+
     ! default threshlding level is the one in the parameter struct
     eps2 = params%eps
     ! but if we pass another one, use that.
     if (present(eps)) eps2 = eps
+
 
     select case(params%eps_norm)
     case ("Linfty")
@@ -170,8 +205,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        eps2 = eps2 * ( 2**(-level*params%dim*0.5_rk) )
-        
+        eps2 = eps2 * ( 2.0_rk**(-dble(level*params%dim)/2.0_rk) )
+
     case ("H1")
         ! H1 norm mimicks filtering of vorticity
         eps2 = eps2 * ( 2**(-level*(params%dim+2.0_rk)*0.5_rk) )

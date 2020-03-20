@@ -3,7 +3,7 @@
 !> \brief
 !! Module of global parameters and functions
 !> \details
-!!    * index positions of lgt_data (idx_tree_number,IDX_MESH_LVL,IDX_REFINE_STS etc)
+!!    * index positions of lgt_data (IDX_TREE_ID, IDX_MESH_LVL, IDX_REFINE_STS etc)
 !!    * functions abort
 !!    * global prints (todo)
 !!    * global MPI communicator

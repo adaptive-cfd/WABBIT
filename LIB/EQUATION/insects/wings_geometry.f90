@@ -1810,11 +1810,12 @@ end subroutine Setup_Wing_Fourier_coefficients
 !-------------------------------------------------------------------------------
 subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
   implicit none
-  type(diptera),intent(inout) :: Insect
+  type(diptera), intent(inout) :: Insect
   character(len=*), intent(in) :: fname
 
   type(inifile) :: ifile
   real(kind=rk), allocatable :: tmparray(:,:)
+  character(len=strlen) :: type_str
   integer :: a,b
   integer(kind=2), intent(in) :: wingID ! wing id number
   real(kind=rk) :: init_thickness

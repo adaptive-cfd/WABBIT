@@ -312,7 +312,8 @@ $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_pa
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90
+	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
+	$(OBJDIR)/module_treelib.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \

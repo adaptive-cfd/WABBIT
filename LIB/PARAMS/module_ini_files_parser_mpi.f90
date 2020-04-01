@@ -165,10 +165,20 @@ contains
         logical, intent(in) :: verbose
         logical, optional, intent(in) ::  remove_comments
         integer :: mpirank, mpicode
+        logical :: exists
 
         ! check if communicator is set
         if (WABBIT_COMM==-1) then
             call abort(3567632,"Error[module_ini_files_parser_mpi.f90]: Communicator not set")
+        endif
+
+        ! check if the specified file exists
+        ! even though read_ini_file does this as well, but the serial read_ini_file
+        ! can not call abort() and does a STOP, but that is bad on supercomputers.
+        inquire ( file=file, exist=exists )
+        if ( exists .eqv. .false.) then
+          write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
+          call abort(30302020,"INI file not found")
         endif
 
         ! fetch my process id

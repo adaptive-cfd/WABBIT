@@ -252,7 +252,7 @@ end subroutine read_intarray_from_ascii_file
     inquire ( file=file, exist=exists )
     if ( exists .eqv. .false.) then
       write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
-      stop
+      call abort(300320201, "INIFILES: File not found!")
     endif
 
     ! we set the module-global variable verbosity. if set to false, all routines
@@ -353,8 +353,7 @@ end subroutine read_intarray_from_ascii_file
         params_real = params_real*dx
         write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
         if ( lattice_spacing_set .eqv. .false.) then
-          write(*,*) "INI FILES PARSER ERROR: you try to read relative values without setting dx first."
-          stop
+          call abort(300320201, "INIFILES: ERROR: you try to read relative values without setting dx first.")
         endif
       endif
     else
@@ -405,8 +404,7 @@ end subroutine read_intarray_from_ascii_file
         write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
 
         if ( lattice_spacing_set .eqv. .false.) then
-          write(*,*) "INI FILES PARSER ERROR: you try to read relative values without setting dx first."
-          stop
+          call abort(03030303, "INIFILES:  ERROR: you try to read relative values without setting dx first.")
         endif
 
       endif
@@ -507,7 +505,7 @@ end subroutine read_intarray_from_ascii_file
       if (iostat /= 0) then
           write(*,*) "ERROR! The vector we try to read from "//trim(adjustl(section))//"::"//trim(adjustl(keyword))
           write(*,*) "does NOT have the right length (expected::",n,")"
-          stop
+          call abort(3003209, "INIFILES: vector has incompatible length!")
       endif
       write (value, formatstring) params_vector
     else
@@ -768,8 +766,7 @@ end subroutine read_intarray_from_ascii_file
     value = ''
 
     if (allocated(matrix)) then
-      write(*,*) "INIFILES: ERROR: matrix already allocated"
-      stop
+      call abort(030320207, "INIFILES: ERROR: matrix already allocated")
     end if
 
     !-- loop over the lines of PARAMS.ini file
@@ -824,8 +821,7 @@ end subroutine read_intarray_from_ascii_file
               exit
             elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
               ! a = would mean we skipped past the matrix definition to the next variable..
-              write(*,*) "INIFILES: ERROR: invalid ini matrix (code 767626201)"
-              stop
+              call abort(303020205, "INIFILES ERROR: you try to read relative values without setting dx first.")
             end if
           end do
 
@@ -1041,8 +1037,7 @@ end subroutine getvalue
               exit
             elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
               ! a = would mean we skipped past the matrix definition to the next variable..
-              write(*,*) "INIFILES: ERROR: invalid ini matrix (code 767626201)"
-              stop
+              call abort(767626201, "INIFILES: ERROR: invalid ini matrix" )
             end if
           end do
 

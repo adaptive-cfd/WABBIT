@@ -38,13 +38,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
-
-
-    ! DO NOT FORGET TO REMOVE THIS
-   ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
-
-
-
     if (size(hvy_block,4)>N_max_components) then
         call abort(160720191,"You try to ghost-sync a vector with too many components.")
     endif
@@ -55,12 +48,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     myrank  = params%rank
     mpisize = params%number_procs
 
-
-
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
     do istage = 1, 2
-
         !***************************************************************************
         ! (i) stage initialization
         !***************************************************************************
@@ -111,7 +101,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! define level difference: sender - receiver, so +1 means sender on higher level
                     level_diff = lgt_block( sender_lgtID, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%max_treelevel + IDX_MESH_LVL )
 
-
                     ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
                     ! leveldiff =  0 : sender is same level as recver
                     ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
@@ -124,15 +113,13 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                         if ( level_diff == +1 ) cycle
                     endif
 
-                    !----------------------------  pack describing data and node values to send ---------------------------
                     if ( myrank == recver_rank ) then
                         !-----------------------------------------------------------
                         ! internal relation (no communication)
                         !-----------------------------------------------------------
                         ! NOTE: 06/11/2018, Thomas. I checked that treating all neighbors external (ie passing by the buffers) is 10-15% slower
                         ! than treating internal separately (on irene@TGCC, using Allinea MAP profiler, 3D testcase, 144 CPUs, infiniband)
-                        call send_prepare_internal_neighbor( recver_rank+1, sender_hvyID, recver_hvyID, neighborhood, &
-                        level_diff )
+                        call send_prepare_internal_neighbor( recver_rank+1, sender_hvyID, recver_hvyID, neighborhood, level_diff )
 
                     else
                         !-----------------------------------------------------------
@@ -151,18 +138,15 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         !***************************************************************************
         call isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_recv_buffer, new_recv_buffer, isend, irecv )
 
-        ! process-internal ghost points (direct copy)
-        call unpack_ghostlayers_internal_neighbor( params, myrank+1, hvy_block )
-
-        call wait_for_xfer(params, isend, irecv)
-
 
         !***************************************************************************
         ! (iv) Unpack received data in the ghost node layers
         !***************************************************************************
-        ! leveldiff = -1 : sender is finer than recver, restriction is applied on sender side
-        ! leveldiff =  0 : sender is same level as recver
-        ! leveldiff = +1 : sender coarser than recver, interpolation on sender side
+        ! process-internal ghost points (direct copy)
+        call unpack_ghostlayers_internal_neighbor( params, myrank+1, hvy_block )
+        ! before unpacking the data we received from other ranks, we wait for the transfer
+        ! to be completed
+        call wait_for_xfer(params, isend, irecv)
 
         do k = 1, mpisize ! one-based
             if (k /= myrank+1) then
@@ -170,9 +154,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 call unpack_ghostlayers_external_neighbor( params, k, hvy_block )
             end if
         end do
-
-
     end do ! loop over stages 1,2
+
 end subroutine synchronize_ghosts_generic_sequence
 
 
@@ -569,7 +552,7 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
 
     do mpirank_partner = 0, params%number_procs-1 ! zero based
 
-        if ( int_recv_counter(mpirank_partner) > 0 .and. mpirank_partner/=rank ) then
+        if ( int_recv_counter(mpirank_partner) > 1 .and. mpirank_partner/=rank ) then
             ! length of integer buffer
             length_intBuffer = int_recv_counter(mpirank_partner)
             i0 = sum(int_recv_counter(0:mpirank_partner-1)) + 1 ! note exclude k of course do not run 0:mpirank_partner
@@ -583,7 +566,7 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
             mpirank_partner, tag, WABBIT_COMM, recv_request(irecv), ierr)
         endif
 
-        if ( int_send_counter(mpirank_partner) > 0 .and. mpirank_partner/=rank  ) then
+        if ( int_send_counter(mpirank_partner) > 1 .and. mpirank_partner/=rank  ) then
             ! length of integer buffer
             length_intBuffer = int_send_counter(mpirank_partner)
             i0 = sum(int_send_counter(0:mpirank_partner-1)) + 1 ! note exclude k of course do not run 0:mpirank_partner
@@ -604,7 +587,6 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
     do mpirank_partner = 0, params%number_procs-1 ! zero based
 
         if (send_counter(mpirank_partner) > 0) then
-
             ! increase communication counter
             isend = isend + 1
 
@@ -637,7 +619,6 @@ subroutine isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_rec
             mpirank_partner, MPI_ANY_TAG, WABBIT_COMM, recv_request(irecv), ierr)
         end if
     end do
-
 end subroutine isend_irecv_data_2
 
 

@@ -865,4 +865,24 @@ contains
 
     end subroutine
 
+    !-------------------------------------------------------------------------------
+    ! Truncate = round a real number to one significant digit, i.e. from 1.246262e-2
+    ! to 1.2e-2. This slightly modifies the CFL condition (if the time step is
+    ! dictated by CFL and not by penalization), but allows to keep the time step
+    ! constant over more time steps, which is more efficient.
+    !-------------------------------------------------------------------------------
+    real(kind=rk) function round_one_digit(a)
+      implicit none
+
+      real(kind=rk),intent(in)::a
+      character(len=9) :: str
+      integer :: iostat
+
+      write (str,'(es9.1)') a
+      read (str,*, iostat=iostat) round_one_digit
+
+      if (iostat /= 0) write(*,*) a, str
+    end
+
+
 end module module_helpers

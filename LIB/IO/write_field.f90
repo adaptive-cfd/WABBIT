@@ -115,7 +115,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
+    ! allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n ), stat=status)
     allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+
     if (status /= 0) then
         call abort(2510191, "IO: sorry, but buffer allocation failed! At least the weather is clearing up. Go outside.")
     endif
@@ -170,6 +172,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! (note zero-based offset):
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n/) - 1
+        ! ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n/) - 1
 
     endif
 
@@ -207,6 +210,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             else
                 ! 2D
                 myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                ! myblockbuffer(:,:,1,l) = hvy_block( :, :, 1, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(2)

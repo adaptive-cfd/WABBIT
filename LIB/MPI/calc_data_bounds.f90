@@ -6,133 +6,444 @@
 ! Now you can be clever: synchronizing ghosts means copying points with THE SAME COORDINATES. Makes sense, doesnt't it?
 ! So all you would have to do is compute the sender bounds (from the given, manually set recver bounds)
 
-subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff, TYPE)
+subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff)
     implicit none
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in) :: ijkrecv(2,3)
     integer(kind=ik), intent(out) :: ijkbuffer(2,3)
     integer(kind=ik), intent(out) :: ijksend(2,3)
     ! leveldiff = 1 ! -1: interpolation, +1: coarsening
-    integer(kind=ik), intent(in) :: dir, leveldiff, TYPE
+    integer(kind=ik), intent(in) :: dir, leveldiff
 
     integer(kind=ik), parameter :: Jmax = 6
     integer(kind=ik) :: send_treecode(1:Jmax)
     integer(kind=ik) :: recv_treecode(1:Jmax)
-    integer(kind=ik) :: J=4, i, ishift
-    integer(kind=ik) :: i1, i2, g, nDirs, min_size,Nsender
+    integer(kind=ik) :: J=4, ineighbor, ishift, ileveldiff
+    integer(kind=ik) :: i1, i2, g, nDirs, min_size, Nsender, i
     integer(kind=ik), dimension(3) :: Bs
-    integer(kind=ik) :: shifts(1:17, 1:3)
     real(kind=rk) :: x0_send(1:3), dx_send(1:3), x0_recv(1:3), dx_recv(1:3), x0_buffer(1:3), dx_buffer(1:3)
-    real(kind=rk) :: r1, r2
-    logical :: invalid, coarser_neighbor_possible
+    real(kind=rk) :: r1, r2, q1, q2
+    ! List of sender and recver pairs, treecodes. They depend on the direction (1:16 in 2D and 1:74 in 3D)
+    ! and the level difference, space dimension (2d/3d). They are helper qtys: not related to the treecodes
+    ! of the actual computational grid.
+    ! These treecodes are easily computed when the sender is on the same level or finer than the recver, by
+    ! using the adjacent block compuation. If the neighbor (sender) is coarser, then this is not trivial, as
+    ! our grid definition does not allow all blocks to have coarser neighbors. In some cases, the neighbor has to be
+    ! on the same level. We computed this list simply by choosind another recver block until we found a valid combination.
+    ! For ease of coding, it is now (>03/2020) a hard coded list, see git history for the code.
+    integer(kind=ik), dimension(1:74, -1:1, 2:3, 1:Jmax) :: senders, recvers
 
-    shifts(1,:) = (/0,0,0/)
-    shifts(2,:) = (/1,0,0/)
-    shifts(3,:) = (/0,1,0/)
-    shifts(4,:) = (/0,0,1/)
-    shifts(5,:) = (/0,1,1/)
-    shifts(6,:) = (/1,1,0/)
-    shifts(7,:) = (/1,0,1/)
-    shifts(8,:) = (/1,1,1/)
-    shifts(9,:) = (/-1,0,1/)
-    shifts(10,:) = (/1,-1,-1/)
-    shifts(11,:) = (/-1,1,-1/)
-    shifts(12,:) = (/-1,-1,-1/)
-    shifts(13,:) = (/-1,-1,1/)
-    shifts(14,:) = (/0,-1,-1/)
-    shifts(15,:) = (/-1,0,0/)
-    shifts(16,:) = (/0,-1,0/)
-    shifts(17,:) = (/0,0,-1/)
+! write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+"
+! write(*,*) "computing sender bounds for dir=", dir, "leveldiff=", leveldiff
+! write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+"
 
-    ijksend = 1
-    ijkbuffer = 1
-    ishift = 1
-    invalid = .true.
+    senders = -1
+    recvers = -1
 
-    g = params%n_ghosts
-    Bs = params%Bs
-    nDirs = 74
-    if (params%dim == 2) nDirs = 16
+    ! the if clause is for code folding only.
+    if (.true.) then
+        senders( 1, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 1, 0, 2, :) = (/ 0, 3, 3, 1,-1,-1/)
+        senders( 2, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 2, 0, 2, :) = (/ 1, 2, 2, 2,-1,-1/)
+        senders( 3, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 3, 0, 2, :) = (/ 2, 1, 1, 1,-1,-1/)
+        senders( 4, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 4, 0, 2, :) = (/ 0, 3, 3, 2,-1,-1/)
+        senders( 5,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 5,-1, 2, :) = (/ 1, 2, 2, 0, 2,-1/)
+        senders( 5, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 5, 0, 2, :) = (/ 1, 2, 2, 0,-1,-1/)
+        senders( 5, 1, 2, :) = (/ 2, 1, 1, 1,-1,-1/)
+        recvers( 5, 1, 2, :) = (/ 1, 2, 2,-1,-1,-1/)
+        senders( 6,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 6,-1, 2, :) = (/ 0, 3, 3, 0, 3,-1/)
+        senders( 6, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 6, 0, 2, :) = (/ 0, 3, 3, 0,-1,-1/)
+        senders( 6, 1, 2, :) = (/ 3, 0, 0, 0,-1,-1/)
+        recvers( 6, 1, 2, :) = (/ 0, 3, 3,-1,-1,-1/)
+        senders( 7,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 7,-1, 2, :) = (/ 3, 0, 0, 0, 0,-1/)
+        senders( 7, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 7, 0, 2, :) = (/ 3, 0, 0, 0,-1,-1/)
+        senders( 7, 1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 7, 1, 2, :) = (/ 3, 0, 0,-1,-1,-1/)
+        senders( 8,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 8,-1, 2, :) = (/ 2, 1, 1, 0, 1,-1/)
+        senders( 8, 0, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 8, 0, 2, :) = (/ 2, 1, 1, 0,-1,-1/)
+        senders( 8, 1, 2, :) = (/ 1, 2, 2, 2,-1,-1/)
+        recvers( 8, 1, 2, :) = (/ 2, 1, 1,-1,-1,-1/)
+        senders( 9,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers( 9,-1, 2, :) = (/ 0, 3, 3, 1, 3,-1/)
+        senders( 9, 1, 2, :) = (/ 2, 1, 1, 1,-1,-1/)
+        recvers( 9, 1, 2, :) = (/ 0, 3, 3,-1,-1,-1/)
+        senders(10,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(10,-1, 2, :) = (/ 0, 3, 3, 1, 2,-1/)
+        senders(10, 1, 2, :) = (/ 3, 0, 0, 0,-1,-1/)
+        recvers(10, 1, 2, :) = (/ 1, 2, 2,-1,-1,-1/)
+        senders(11,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(11,-1, 2, :) = (/ 2, 1, 1, 1, 1,-1/)
+        senders(11, 1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(11, 1, 2, :) = (/ 2, 1, 1,-1,-1,-1/)
+        senders(12,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(12,-1, 2, :) = (/ 2, 1, 1, 1, 0,-1/)
+        senders(12, 1, 2, :) = (/ 1, 2, 2, 2,-1,-1/)
+        recvers(12, 1, 2, :) = (/ 3, 0, 0,-1,-1,-1/)
+        senders(13,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(13,-1, 2, :) = (/ 1, 2, 2, 2, 0,-1/)
+        senders(13, 1, 2, :) = (/ 2, 1, 1, 1,-1,-1/)
+        recvers(13, 1, 2, :) = (/ 3, 0, 0,-1,-1,-1/)
+        senders(14,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(14,-1, 2, :) = (/ 1, 2, 2, 2, 2,-1/)
+        senders(14, 1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(14, 1, 2, :) = (/ 1, 2, 2,-1,-1,-1/)
+        senders(15,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(15,-1, 2, :) = (/ 0, 3, 3, 2, 1,-1/)
+        senders(15, 1, 2, :) = (/ 3, 0, 0, 0,-1,-1/)
+        recvers(15, 1, 2, :) = (/ 2, 1, 1,-1,-1,-1/)
+        senders(16,-1, 2, :) = (/ 0, 3, 3, 3,-1,-1/)
+        recvers(16,-1, 2, :) = (/ 0, 3, 3, 2, 3,-1/)
+        senders(16, 1, 2, :) = (/ 1, 2, 2, 2,-1,-1/)
+        recvers(16, 1, 2, :) = (/ 0, 3, 3,-1,-1,-1/)
 
-    ! check if all dimensions are 1 for this patch, if so, skip it
+        senders( 1, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 1, 0, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        senders( 2, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 2, 0, 3, :) = (/ 0, 7, 7, 6,-1,-1/)
+        senders( 3, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 3, 0, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        senders( 4, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 4, 0, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        senders( 5, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 5, 0, 3, :) = (/ 0, 7, 7, 5,-1,-1/)
+        senders( 6, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 6, 0, 3, :) = (/ 0, 7, 7, 3,-1,-1/)
+        senders( 7, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 7, 0, 3, :) = (/ 4, 3, 3, 2,-1,-1/)
+        senders( 8, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 8, 0, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        senders( 9, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers( 9, 0, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        senders(10, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(10, 0, 3, :) = (/ 4, 3, 3, 1,-1,-1/)
+        senders(11, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(11, 0, 3, :) = (/ 0, 7, 7, 2,-1,-1/)
+        senders(12, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(12, 0, 3, :) = (/ 2, 5, 5, 1,-1,-1/)
+        senders(13, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(13, 0, 3, :) = (/ 1, 6, 6, 2,-1,-1/)
+        senders(14, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(14, 0, 3, :) = (/ 0, 7, 7, 1,-1,-1/)
+        senders(15, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(15, 0, 3, :) = (/ 2, 5, 5, 4,-1,-1/)
+        senders(16, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(16, 0, 3, :) = (/ 0, 7, 7, 4,-1,-1/)
+        senders(17, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(17, 0, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        senders(18, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(18, 0, 3, :) = (/ 1, 6, 6, 4,-1,-1/)
+        senders(19,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(19,-1, 3, :) = (/ 6, 1, 1, 0, 1,-1/)
+        senders(19, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(19, 0, 3, :) = (/ 6, 1, 1, 0,-1,-1/)
+        senders(19, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(19, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(20,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(20,-1, 3, :) = (/ 7, 0, 0, 0, 0,-1/)
+        senders(20, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(20, 0, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        senders(20, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(20, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(21,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(21,-1, 3, :) = (/ 5, 2, 2, 0, 2,-1/)
+        senders(21, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(21, 0, 3, :) = (/ 5, 2, 2, 0,-1,-1/)
+        senders(21, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(21, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+        senders(22,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(22,-1, 3, :) = (/ 4, 3, 3, 0, 3,-1/)
+        senders(22, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(22, 0, 3, :) = (/ 4, 3, 3, 0,-1,-1/)
+        senders(22, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(22, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(23,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(23,-1, 3, :) = (/ 2, 5, 5, 0, 5,-1/)
+        senders(23, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(23, 0, 3, :) = (/ 2, 5, 5, 0,-1,-1/)
+        senders(23, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(23, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(24,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(24,-1, 3, :) = (/ 3, 4, 4, 0, 4,-1/)
+        senders(24, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(24, 0, 3, :) = (/ 3, 4, 4, 0,-1,-1/)
+        senders(24, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(24, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(25,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(25,-1, 3, :) = (/ 1, 6, 6, 0, 6,-1/)
+        senders(25, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(25, 0, 3, :) = (/ 1, 6, 6, 0,-1,-1/)
+        senders(25, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(25, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(26,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(26,-1, 3, :) = (/ 0, 7, 7, 0, 7,-1/)
+        senders(26, 0, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(26, 0, 3, :) = (/ 0, 7, 7, 0,-1,-1/)
+        senders(26, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(26, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(27,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(27,-1, 3, :) = (/ 4, 3, 3, 3, 2,-1/)
+        senders(27, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(27, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+        senders(28,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(28,-1, 3, :) = (/ 4, 3, 3, 3, 3,-1/)
+        senders(28, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(28, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(29,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(29,-1, 3, :) = (/ 4, 3, 3, 3, 1,-1/)
+        senders(29, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(29, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(30,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(30,-1, 3, :) = (/ 4, 3, 3, 3, 0,-1/)
+        senders(30, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(30, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(31,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(31,-1, 3, :) = (/ 0, 7, 7, 6, 7,-1/)
+        senders(31, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(31, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(32,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(32,-1, 3, :) = (/ 0, 7, 7, 6, 3,-1/)
+        senders(32, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(32, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(33,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(33,-1, 3, :) = (/ 0, 7, 7, 6, 5,-1/)
+        senders(33, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(33, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(34,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(34,-1, 3, :) = (/ 0, 7, 7, 6, 1,-1/)
+        senders(34, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(34, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(35,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(35,-1, 3, :) = (/ 2, 5, 5, 5, 4,-1/)
+        senders(35, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(35, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(36,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(36,-1, 3, :) = (/ 2, 5, 5, 5, 0,-1/)
+        senders(36, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(36, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(37,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(37,-1, 3, :) = (/ 2, 5, 5, 5, 5,-1/)
+        senders(37, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(37, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(38,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(38,-1, 3, :) = (/ 2, 5, 5, 5, 1,-1/)
+        senders(38, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(38, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(39,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(39,-1, 3, :) = (/ 1, 6, 6, 6, 6,-1/)
+        senders(39, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(39, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(40,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(40,-1, 3, :) = (/ 1, 6, 6, 6, 2,-1/)
+        senders(40, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(40, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+        senders(41,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(41,-1, 3, :) = (/ 1, 6, 6, 6, 4,-1/)
+        senders(41, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(41, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(42,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(42,-1, 3, :) = (/ 1, 6, 6, 6, 0,-1/)
+        senders(42, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(42, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(43,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(43,-1, 3, :) = (/ 0, 7, 7, 5, 7,-1/)
+        senders(43, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(43, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(44,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(44,-1, 3, :) = (/ 0, 7, 7, 5, 3,-1/)
+        senders(44, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(44, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(45,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(45,-1, 3, :) = (/ 0, 7, 7, 5, 6,-1/)
+        senders(45, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(45, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(46,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(46,-1, 3, :) = (/ 0, 7, 7, 5, 2,-1/)
+        senders(46, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(46, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+        senders(47,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(47,-1, 3, :) = (/ 0, 7, 7, 3, 6,-1/)
+        senders(47, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(47, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(48,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(48,-1, 3, :) = (/ 0, 7, 7, 3, 7,-1/)
+        senders(48, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(48, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(49,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(49,-1, 3, :) = (/ 0, 7, 7, 3, 5,-1/)
+        senders(49, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(49, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(50,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(50,-1, 3, :) = (/ 0, 7, 7, 3, 4,-1/)
+        senders(50, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(50, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(51,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(51,-1, 3, :) = (/ 4, 3, 3, 2, 3,-1/)
+        senders(51, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(51, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(52,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(52,-1, 3, :) = (/ 4, 3, 3, 2, 1,-1/)
+        senders(52, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(52, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(53,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(53,-1, 3, :) = (/ 6, 1, 1, 1, 0,-1/)
+        senders(53, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(53, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(54,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(54,-1, 3, :) = (/ 6, 1, 1, 1, 1,-1/)
+        senders(54, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(54, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(55,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(55,-1, 3, :) = (/ 5, 2, 2, 2, 2,-1/)
+        senders(55, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(55, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+        senders(56,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(56,-1, 3, :) = (/ 5, 2, 2, 2, 0,-1/)
+        senders(56, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(56, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(57,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(57,-1, 3, :) = (/ 4, 3, 3, 1, 3,-1/)
+        senders(57, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(57, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(58,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(58,-1, 3, :) = (/ 4, 3, 3, 1, 2,-1/)
+        senders(58, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(58, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+        senders(59,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(59,-1, 3, :) = (/ 0, 7, 7, 2, 7,-1/)
+        senders(59, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(59, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(60,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(60,-1, 3, :) = (/ 0, 7, 7, 2, 5,-1/)
+        senders(60, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(60, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(61,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(61,-1, 3, :) = (/ 2, 5, 5, 1, 4,-1/)
+        senders(61, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(61, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(62,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(62,-1, 3, :) = (/ 2, 5, 5, 1, 5,-1/)
+        senders(62, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(62, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(63,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(63,-1, 3, :) = (/ 1, 6, 6, 2, 6,-1/)
+        senders(63, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(63, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(64,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(64,-1, 3, :) = (/ 1, 6, 6, 2, 4,-1/)
+        senders(64, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(64, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(65,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(65,-1, 3, :) = (/ 0, 7, 7, 1, 7,-1/)
+        senders(65, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(65, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(66,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(66,-1, 3, :) = (/ 0, 7, 7, 1, 6,-1/)
+        senders(66, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(66, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(67,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(67,-1, 3, :) = (/ 2, 5, 5, 4, 5,-1/)
+        senders(67, 1, 3, :) = (/ 1, 6, 6, 6,-1,-1/)
+        recvers(67, 1, 3, :) = (/ 2, 5, 5,-1,-1,-1/)
+        senders(68,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(68,-1, 3, :) = (/ 2, 5, 5, 4, 1,-1/)
+        senders(68, 1, 3, :) = (/ 5, 2, 2, 2,-1,-1/)
+        recvers(68, 1, 3, :) = (/ 6, 1, 1,-1,-1,-1/)
+        senders(69,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(69,-1, 3, :) = (/ 0, 7, 7, 4, 7,-1/)
+        senders(69, 1, 3, :) = (/ 3, 4, 4, 4,-1,-1/)
+        recvers(69, 1, 3, :) = (/ 0, 7, 7,-1,-1,-1/)
+        senders(70,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(70,-1, 3, :) = (/ 0, 7, 7, 4, 3,-1/)
+        senders(70, 1, 3, :) = (/ 7, 0, 0, 0,-1,-1/)
+        recvers(70, 1, 3, :) = (/ 4, 3, 3,-1,-1,-1/)
+        senders(71,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(71,-1, 3, :) = (/ 3, 4, 4, 4, 4,-1/)
+        senders(71, 1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(71, 1, 3, :) = (/ 3, 4, 4,-1,-1,-1/)
+        senders(72,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(72,-1, 3, :) = (/ 3, 4, 4, 4, 0,-1/)
+        senders(72, 1, 3, :) = (/ 4, 3, 3, 3,-1,-1/)
+        recvers(72, 1, 3, :) = (/ 7, 0, 0,-1,-1,-1/)
+        senders(73,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(73,-1, 3, :) = (/ 1, 6, 6, 4, 6,-1/)
+        senders(73, 1, 3, :) = (/ 2, 5, 5, 5,-1,-1/)
+        recvers(73, 1, 3, :) = (/ 1, 6, 6,-1,-1,-1/)
+        senders(74,-1, 3, :) = (/ 0, 7, 7, 7,-1,-1/)
+        recvers(74,-1, 3, :) = (/ 1, 6, 6, 4, 2,-1/)
+        senders(74, 1, 3, :) = (/ 6, 1, 1, 1,-1,-1/)
+        recvers(74, 1, 3, :) = (/ 5, 2, 2,-1,-1,-1/)
+    endif
+
+    send_treecode = -1
+    recv_treecode = -1
+    ijksend       = 1
+    ijkbuffer     = 1
+    g             = params%n_ghosts
+    Bs            = params%Bs
+
+    ! check if all dimensions are 1 for this recver patch, if so, skip it
     if ( ijkrecv(2,1)-ijkrecv(1,1)==0 .and. ijkrecv(2,2)-ijkrecv(1,2)==0 .and. ijkrecv(2,3)-ijkrecv(1,3)==0) then
         ! this neighborhood relation is invalid for the leveldiff, we can skip it.
         return
     endif
 
+    if ((dir == 1) .and. (params%rank == 0)) then
+        open(16, file='neighbor_blocks2D.dat', status='replace')
+        do ineighbor = 1, 16
+            do ileveldiff = -1, 1
+                send_treecode = senders(ineighbor, ileveldiff, 2, :)
+                recv_treecode = recvers(ineighbor, ileveldiff, 2, :)
+
+                call get_block_spacing_origin2( send_treecode(1:J), real(Bs*2**J, kind=rk), Bs, params%dim, x0_send, dx_send )
+                call get_block_spacing_origin2( recv_treecode(1:J-ileveldiff), real(Bs*2**J, kind=rk), Bs, params%dim, x0_recv, dx_recv )
+
+                write(16,*) ineighbor, ileveldiff, x0_send, dx_send, x0_recv, dx_recv
+            enddo
+        enddo
+        close(16)
+    endif
+
     !***************************************************************************
     ! Compute sender bounds from recver bounds
     !***************************************************************************
-    do while ( invalid )
-        ! just choose any point far away from the boundary, to avoid periodicity
-        ! when crossing the periodic boundary, x0 jumps. It may well happen that the block cannot have
-        ! a coarser neighbor in the direction. In this case, we use the SHIFT variable to choose another
-        ! one.
-        call encoding(send_treecode, (/shifts(ishift,1)+(2**J)/2, shifts(ishift,2)+(2**J)/2, &
-            shifts(ishift,3)+(2**J)/2/),params%dim, (2**J)**params%dim, J)
+    send_treecode = senders(dir, leveldiff, params%dim, :)
+    recv_treecode = recvers(dir, leveldiff, params%dim, :)
 
-        ! fetch the neighbors treecode.
-        call get_neighbor_treecode( send_treecode, recv_treecode, dir, &
-        leveldiff, J, params%dim, Jmax, coarser_neighbor_possible)
+    call get_block_spacing_origin2( send_treecode(1:J), real(Bs*2**j, kind=rk), Bs, params%dim, x0_send, dx_send )
+    call get_block_spacing_origin2( recv_treecode(1:J-leveldiff), real(Bs*2**j, kind=rk), Bs, params%dim, x0_recv, dx_recv )
 
-        ! in the coarser neighbor case, finding a valid treecode can be tricky. not all treecodes
-        ! have a VALID coarser neighbor in the specified direction. If that happens, we have to choose
-        ! another sender coordinate
-        if (leveldiff == +1 .and. .not. coarser_neighbor_possible) then
-            ! write(*,*) "impossible"
-            ! the treecodes have the same coarser ID: this was invalid. they share the same mother block,
-            ! which means it cannot be the right coarser neighbor
-            ishift = ishift + 1
-            if (ishift>size(shifts,1)) call abort(551, "no more shifts")
-            cycle
-        endif
+    do i = 1, params%dim
+        ! shift to zero at the origin (which is g+1, actually)
+        r1 = real(ijkrecv(1,i) - (g+1), kind=rk)
+        r2 = real(ijkrecv(2,i) - (g+1), kind=rk)
 
-        call get_block_spacing_origin2( send_treecode(1:J), (/1.0_rk, 1.0_rk, 1.0_rk/), Bs, params%dim, x0_send, dx_send )
-        call get_block_spacing_origin2( recv_treecode(1:J-leveldiff),(/1.0_rk, 1.0_rk, 1.0_rk/), Bs, params%dim, x0_recv, dx_recv )
+        ! there's a very simple relation between sender and recver boundarys.
+        ! we only need to define the recver bounds
+        q1 = round_one_digit( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
+        q2 = round_one_digit( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
 
+        i1 = floor(q1) + (g+1)
+        i2 = ceiling(q2) + (g+1)
+        ijksend(1:2, i) = (/i1, i2/)
 
-        ! if the ghost nodes patch on the recver is on the domain boundary, then our algorithm
-        ! cannot work: the sender will be at the opposite site. So be sure not to choose such a
-        ! patch
-        if (patch_crosses_periodic_BC(x0_recv, dx_recv, ijkrecv, params%dim)) then
-            call abort(5551, "Yoda, the force is not with us. Bounds pass periodic BC: impossible to auto-generate bounds.")
-        endif
-
-        do i = 1, params%dim
-            ! shift to zero at the origin (which is g+1, actually)
-            r1 = real(ijkrecv(1,i) - (g+1), kind=rk)
-            r2 = real(ijkrecv(2,i) - (g+1), kind=rk)
-
-            ! there's a very simple relation between sender and recver boundarys.
-            ! we only need to define the recver bounds
-            i1 = nint( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
-            i2 = nint( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) ) + (g+1)
-            ijksend(1:2, i) = (/i1, i2/)
-
-            ! NOTE at the moment, we really just computed the upper/lower bounds of the patch
-            ! (selected on the receiver) on the sender. In the next step, we will extend the sender
-            ! patch to *contain* what the receiver wants, but also a little more, if required, for interpolation.
-
-            ! check if the bounds we computed are valid, i.e. referring strictly to
-            ! the interior of blocks. If not, try again.
-            if (i1>=g+1 .and. i1<=Bs(i)+g .and. i2>=g+1 .and. i2<=Bs(i)+g) then
-                invalid = .false.
-            else
-                invalid = .true.
-            endif
-            ! if one direcion yields unreasonable bounds, we can skip the others of course
-            ! thus we exit the i loop
-            if (invalid) exit
-        enddo
-
-        ishift = ishift + 1
-
-        if (ishift>size(shifts,1)) then
-            write(*,*) "Dir=", dir, "leveldiff=", leveldiff
-            call abort(386739635, "Master yoda. The bounds computation failed, because we were unable &
-            & to find a valid pair of blocks for the given neighbor-code. May the force be with us. Tip: &
-            & try changing number_ghost_nodes.")
-        endif
+        ! write(*,*) "x0_send", x0_send, "dx_send", dx_send
+        ! write(*,*) "x0_recv", x0_recv, "dx_recv", dx_recv
+        ! ! NOTE at the moment, we really just computed the upper/lower bounds of the patch
+        ! ! (selected on the receiver) on the sender. In the next step, we will extend the sender
+        ! ! patch to *contain* what the receiver wants, but also a little more, if required, for interpolation.
+        ! write(*,*) "dim=", i, "bounds=", i1, i2, "Dir=", dir, g+1, Bs(i)+g, "~", q1, q2,&
+        !  (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i), (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i)
     enddo
 
 
@@ -252,7 +563,7 @@ logical function patch_crosses_periodic_BC(x0, dx, ijk, dim)
 end function
 
 
-subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, sender_or_receiver)
+subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
     implicit none
 
     !> user defined parameter structure
@@ -264,11 +575,6 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
     !> difference between block levels
     integer(kind=ik), intent(in)                    :: level_diff
 
-    ! data_bounds_type
-    integer(kind=ik), intent(in)                   :: data_bounds_type
-    ! sender or reciver
-    character(len=*), intent(in)                   :: sender_or_receiver
-
     integer(kind=ik) :: g
     integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: sh_start, sh_end
@@ -279,15 +585,8 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
     Bs    = params%Bs
     g     = params%n_ghosts
 
-    sh_start = 0
+    sh_start = 1
     sh_end   = 0
-
-    if ( data_bounds_type == exclude_redundant ) then
-        sh_start = 1
-    end if
-    if ( data_bounds_type == only_redundant ) then
-        sh_end = -g
-    end if
 
     ! set 1 and not -1 (or anything else), because 2D bounds ignore 3rd dimension
     ! and thus cycle from 1:1
@@ -1399,7 +1698,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
             elseif ( level_diff == 1 ) then
                 data_bounds(1,1) = Bs(1)+g+sh_start
                 data_bounds(2,1) = Bs(1)+g+g+sh_end
-                data_bounds(1,2) = g+(Bs(2)+1)/2
+                data_bounds(1,2) = g+(Bs(2)+1)/2 +1
                 data_bounds(2,2) = Bs(2)+g
 
             end if
@@ -1431,7 +1730,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
             elseif ( level_diff == 1 ) then
                 data_bounds(1,1) = 1-sh_end
                 data_bounds(2,1) = g+1-sh_start
-                data_bounds(1,2) = g+(Bs(2)+1)/2
+                data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 !tommy +1
                 data_bounds(2,2) = Bs(2)+g
 
             end if
@@ -1477,7 +1776,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
                 data_bounds(2,2) = g+1-sh_start
 
             elseif ( level_diff == 1 ) then
-                data_bounds(1,1) = g+(Bs(1)+1)/2
+                data_bounds(1,1) = g+(Bs(1)+1)/2  + 1 !tommy +1
                 data_bounds(2,1) = Bs(1)+g
                 data_bounds(1,2) = 1-sh_end
                 data_bounds(2,2) = g+1-sh_start
@@ -1509,7 +1808,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
                 data_bounds(2,2) = Bs(2)+g+g+sh_end
 
             elseif ( level_diff == 1 ) then
-                data_bounds(1,1) = g+(Bs(1)+1)/2
+                data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 !tommy +1
                 data_bounds(2,1) = Bs(1)+g
                 data_bounds(1,2) = Bs(2)+g+sh_start
                 data_bounds(2,2) = Bs(2)+g+g+sh_end

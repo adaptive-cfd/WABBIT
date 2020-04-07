@@ -29,12 +29,6 @@
 
 subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -65,12 +59,6 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     integer(kind=ik)                    :: level, tree_id
 
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     N = params%number_blocks
     ! set MPI parameter
     rank = params%rank
@@ -84,13 +72,10 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     if (.not.allocated(data_predict_fine)) allocate( data_predict_fine(2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 2*(Bs(3)+2*g)-1) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-    if (.not.allocated(new_data)) allocate( new_data(2*Bs(1)-1, 2*Bs(2)-1, 2*Bs(3)-1, N_MAX_COMPONENTS) )
+    if (.not.allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), 2*Bs(3), N_MAX_COMPONENTS) )
 
 
-!---------------------------------------------------------------------------------------------
-! main body
-
-    ! every proc loop over his active heavy data array
+    ! every proc loop over its active heavy data array
     do k = 1, hvy_n
 
         ! light data id
@@ -112,12 +97,13 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
                 ! interpolate data
                 call prediction_3D(hvy_block(:, :, :, dF, hvy_active(k)), data_predict_fine, params%order_predictor)
                 ! save new data, but cut ghost nodes.
-                new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*g+1+2*Bs(1)-2, 2*g+1:2*g+1+2*Bs(2)-2, 2*g+1:2*g+1+2*Bs(3)-2)
+                ! new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*g+1+2*Bs(1)-2, 2*g+1:2*g+1+2*Bs(2)-2, 2*g+1:2*g+1+2*Bs(3)-2)
+                new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g, 2*g+1:2*Bs(3)+2*g )
             end do
 
             ! ------------------------------------------------------------------------------------------------------
             ! second: split new data and write into new blocks
-            !--------------------------
+            ! ------------------------------------------------------------------------------------------------------
             ! first new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
@@ -160,7 +146,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2):2*Bs(2)-1, 1:Bs(3), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2)+1:2*Bs(2), 1:Bs(3), dF)
             end do
 
             !--------------------------
@@ -183,7 +169,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, 1:Bs(2), 1:Bs(3), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), 1:Bs(2), 1:Bs(3), dF)
             end do
 
             !--------------------------
@@ -206,7 +192,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, Bs(2):2*Bs(2)-1, 1:Bs(3), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), Bs(2)+1:2*Bs(2), 1:Bs(3), dF)
             end do
 
             !--------------------------
@@ -229,7 +215,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), 1:Bs(2), Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), 1:Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
             !--------------------------
@@ -252,7 +238,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2):2*Bs(2)-1, Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2)+1:2*Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
             !--------------------------
@@ -275,7 +261,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, 1:Bs(2), Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), 1:Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
             !--------------------------
@@ -299,7 +285,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, Bs(2):2*Bs(2)-1, Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), Bs(2)+1:2*Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
         end if

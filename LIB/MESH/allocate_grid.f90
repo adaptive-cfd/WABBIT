@@ -35,7 +35,6 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
 
     real(kind=rk)      :: maxmem, mem_per_block
-    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=80)  :: memstring
     integer(kind=ik)   :: i
 
@@ -109,8 +108,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                 if (params%dim==3) then
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
@@ -130,8 +129,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                 else
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) .and. params%N_mask_components>0  ) then
@@ -324,7 +323,6 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
 
     real(kind=rk)      :: maxmem, mem_per_block
-    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=80)  :: memstring
     integer(kind=ik)   :: i
 
@@ -395,8 +393,8 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                 if (params%dim==3) then
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) ) then
@@ -416,8 +414,8 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                 else
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) ) then

@@ -269,24 +269,6 @@ program main
         t2 = MPI_wtime()
 
         !***********************************************************************
-        ! check redundant nodes
-        !***********************************************************************
-        t4 = MPI_wtime()
-        if (params%check_redundant_nodes) then
-            ! run the internal test for the ghost nodes.
-            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), &
-            hvy_n(tree_ID_flow), test_failed)
-
-            if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-                lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
-                call abort(111111,"Same origin of ghost nodes check failed - stopping.")
-            endif
-        endif
-        call toc( "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
-
-
-        !***********************************************************************
         ! MPI bridge (used e.g. for particle-fluid coupling)
         !***********************************************************************
         if (params%bridge_exists) then

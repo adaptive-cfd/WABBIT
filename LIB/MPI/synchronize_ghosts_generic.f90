@@ -41,7 +41,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
 
     ! DO NOT FORGET TO REMOVE THIS
-    ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
+   ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
 
 
 

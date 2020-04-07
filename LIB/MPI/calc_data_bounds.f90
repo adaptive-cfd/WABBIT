@@ -870,21 +870,21 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = g+1-sh_start
                 select case(neighborhood)
                 case(27) ! '__1/123'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = g+(Bs(2)+1)/2
 
                 case(28) ! '__1/134'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(29) ! '__1/145'
                     data_bounds(1,1) = g+1
                     data_bounds(2,1) = g+(Bs(1)+1)/2
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(30) ! '__1/152'
@@ -934,13 +934,13 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 ! first, third dimension
                 select case(neighborhood)
                 case(31) ! '__2/123'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(32) ! '__2/623'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
                     data_bounds(1,3) = g+1
                     data_bounds(2,3) = g+(Bs(3)+1)/2
@@ -948,7 +948,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 case(33) ! '__2/152'
                     data_bounds(1,1) = g+1
                     data_bounds(2,1) = g+(Bs(1)+1)/2
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(34) ! '__2/652'
@@ -1001,17 +1001,17 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 case(35) ! '__3/123'
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = g+(Bs(2)+1)/2
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(37) ! '__3/134'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(38) ! '__3/634'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
                     data_bounds(1,3) = g+1
                     data_bounds(2,3) = g+(Bs(3)+1)/2
@@ -1064,21 +1064,21 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 ! first, third dimension
                 select case(neighborhood)
                 case(40) ! '__4/634'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
                     data_bounds(1,3) = g+1
                     data_bounds(2,3) = g+(Bs(3)+1)/2
 
                 case(39) ! '__4/134'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(41) ! '__4/145'
                     data_bounds(1,1) = g+1
                     data_bounds(2,1) = g+(Bs(1)+1)/2
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(42) ! '__4/645'
@@ -1131,17 +1131,17 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 case(45) ! '__5/152'
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = g+(Bs(2)+1)/2
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(43) ! '__5/145'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(44) ! '__5/645'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
                     data_bounds(1,3) = g+1
                     data_bounds(2,3) = g+(Bs(3)+1)/2
@@ -1192,21 +1192,21 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = Bs(3)+g+g+sh_end
                 select case(neighborhood)
                 case(47) ! '__6/623'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = g+(Bs(2)+1)/2
 
                 case(48) ! '__6/634'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(49) ! '__6/645'
                     data_bounds(1,1) = g+1
                     data_bounds(2,1) = g+(Bs(1)+1)/2
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(50) ! '__6/652'
@@ -1242,7 +1242,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = g+1-sh_start
                 select case(neighborhood)
                 case(51) ! '_12/123'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
 
                 case(52) ! '_12/152'
@@ -1275,7 +1275,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = g+1-sh_start
                 select case(neighborhood)
                 case(54) ! '_13/134'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(53) ! '_13/123'
@@ -1309,7 +1309,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = g+1-sh_start
                 select case(neighborhood)
                 case(55) ! '_14/134'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
 
                 case(56) ! '_14/145'
@@ -1344,7 +1344,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = g+1-sh_start
                 select case(neighborhood)
                 case(57) ! '_15/145'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(58) ! '_15/152''
@@ -1378,7 +1378,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = Bs(3)+g+g+sh_end
                 select case(neighborhood)
                 case(59) ! '_62/623'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
 
                 case(60) ! '_62/652'
@@ -1411,7 +1411,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = Bs(3)+g+g+sh_end
                 select case(neighborhood)
                 case(62) ! '_63/634'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(61) ! '_63/623'
@@ -1445,7 +1445,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = Bs(3)+g+g+sh_end
                 select case(neighborhood)
                 case(63) ! '_64/634'
-                    data_bounds(1,1) = g+(Bs(1)+1)/2
+                    data_bounds(1,1) = g+(Bs(1)+1)/2 + 1 ! NEW
                     data_bounds(2,1) = Bs(1)+g
 
                 case(64) ! '_64/645'
@@ -1480,7 +1480,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,3) = Bs(3)+g+g+sh_end
                 select case(neighborhood)
                 case(65) ! '_65/645'
-                    data_bounds(1,2) = g+(Bs(2)+1)/2
+                    data_bounds(1,2) = g+(Bs(2)+1)/2 + 1 ! NEW
                     data_bounds(2,2) = Bs(2)+g
 
                 case(66) ! '_65/652'
@@ -1514,7 +1514,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,2) = Bs(2)+g+g+sh_end
                 select case(neighborhood)
                 case(67) ! '_23/123'
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(68) ! '_23/236''
@@ -1547,7 +1547,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,2) = Bs(2)+g+g+sh_end
                 select case(neighborhood)
                 case(69) ! '_25/152'
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(70) ! '_25/652''
@@ -1580,7 +1580,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,2) = g+1-sh_start
                 select case(neighborhood)
                 case(71) ! '_43/134'
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(72) ! '_43/634''
@@ -1613,7 +1613,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
                 data_bounds(2,2) = g+1-sh_start
                 select case(neighborhood)
                 case(73) ! '_45/145'
-                    data_bounds(1,3) = g+(Bs(3)+1)/2
+                    data_bounds(1,3) = g+(Bs(3)+1)/2 + 1 ! NEW
                     data_bounds(2,3) = Bs(3)+g
 
                 case(74) ! '_45/645'

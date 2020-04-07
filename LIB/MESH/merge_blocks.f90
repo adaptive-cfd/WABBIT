@@ -135,11 +135,6 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
             if (params%harten_multiresolution) then
                 ! hartens multiresolution: coarsening is just taking every 2nd grid point.
 
-! LL
-! 1:Bs:2 bzw. g+1:Bs+g:2
-! UL
-! 2:Bs-1:2 bzw g+2:Bs+g:2
-
                 ! sister 0
                 hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(1) )
                 ! sister 1
@@ -162,40 +157,40 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_2D(hvy_block( :, :, 1, i, heavy_ids(2) ), tmpblock( :, :, 1, i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, :, :)
+                hvy_block(bound1(1):boundm(1), boundm(2)+1:bound2(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, :, :)
 
                 ! sister 2
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_2D(hvy_block( :, :, 1, i, heavy_ids(3) ), tmpblock( :, :, 1, i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = tmpblock( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, :, :)
+                hvy_block(boundm(1)+1:bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = tmpblock( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, :, :)
 
                 ! sister 3
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_2D(hvy_block( :, :, 1, i, heavy_ids(4) ), tmpblock( :, :, 1, i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), :, :, hvy_merge_id) = tmpblock( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, :, :)
+                hvy_block(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), :, :, hvy_merge_id) = tmpblock( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, :, :)
             endif
 
         elseif (N_merge == 8) then
             ! ************ 3D case ***********************
             if (params%harten_multiresolution) then
                 ! sister 0
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
+                hvy_block(bound1(1):boundm(1)  , bound1(2):boundm(2)  , bound1(3):boundm(3),  :, hvy_merge_id )  = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
                 ! sister 1
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
+                hvy_block(bound1(1):boundm(1)  , boundm(2)+1:bound2(2), bound1(3):boundm(3),  :, hvy_merge_id )  = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
                 ! sister 2
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
+                hvy_block(boundm(1)+1:bound2(1), bound1(2):boundm(2)  , bound1(3):boundm(3),  :, hvy_merge_id )  = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
                 ! sister 3
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
+                hvy_block(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), bound1(3):boundm(3),  :, hvy_merge_id )  = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
                 ! sister 4
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(5) )
+                hvy_block(bound1(1):boundm(1)  , bound1(2):boundm(2)  , boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(5) )
                 ! sister 5
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(6) )
+                hvy_block(bound1(1):boundm(1)  , boundm(2)+1:bound2(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(6) )
                 ! sister 6
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(7) )
+                hvy_block(boundm(1)+1:bound2(1), bound1(2):boundm(2)  , boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(7) )
                 ! sister 7
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(8) )
+                hvy_block(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(8) )
             else
                 ! sister 0
                 do i = 1, size(hvy_block,4)
@@ -207,43 +202,43 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(2)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
+                hvy_block(bound1(1):boundm(1), boundm(2)+1:bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
 
                 ! sister 2
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(3)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
+                hvy_block(boundm(1)+1:bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
 
                 ! sister 3
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(4)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
+                hvy_block(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
 
                 ! sister 4
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(5)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(5) )
+                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(5) )
 
                 ! sister 5
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(6)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(6) )
+                hvy_block(bound1(1):boundm(1), boundm(2)+1:bound2(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(6) )
 
                 ! sister 6
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(7)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(7) )
+                hvy_block(boundm(1)+1:bound2(1), bound1(2):boundm(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(7) )
 
                 ! sister 7
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(8)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(8) )
+                hvy_block(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_block( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(8) )
             endif
         endif
 
@@ -255,29 +250,29 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
                 ! sister 0
                 hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(1) )
                 ! sister 1
-                hvy_mask(bound1(1):boundm(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, :,:, heavy_ids(2) )
+                hvy_mask(bound1(1):boundm(1), boundm(2)+1:bound2(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, :,:, heavy_ids(2) )
                 ! sister 2
-                hvy_mask(boundm(1):bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_mask( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(3) )
+                hvy_mask(boundm(1)+1:bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_mask( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(3) )
                 ! sister 3
-                hvy_mask(boundm(1):bound2(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_mask( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, :,:, heavy_ids(4) )
+                hvy_mask(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), :, :, hvy_merge_id) = hvy_mask( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, :,:, heavy_ids(4) )
             elseif (N_merge == 8) then
                 ! ************ 3D case ***********************
                 ! sister 0
                 hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
                 ! sister 1
-                hvy_mask(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
+                hvy_mask(bound1(1):boundm(1), boundm(2)+1:bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
                 ! sister 2
-                hvy_mask(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
+                hvy_mask(boundm(1)+1:bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
                 ! sister 3
-                hvy_mask(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
+                hvy_mask(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
                 ! sister 4
-                hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(5) )
+                hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(5) )
                 ! sister 5
-                hvy_mask(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(6) )
+                hvy_mask(bound1(1):boundm(1), boundm(2)+1:bound2(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(6) )
                 ! sister 6
-                hvy_mask(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(7) )
+                hvy_mask(boundm(1)+1:bound2(1), bound1(2):boundm(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+1:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(7) )
                 ! sister 7
-                hvy_mask(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(8) )
+                hvy_mask(boundm(1)+1:bound2(1), boundm(2)+1:bound2(2), boundm(3)+1:bound2(3), :, hvy_merge_id ) = hvy_mask( g+2:Bs(1)+g:2, g+2:Bs(2)+g:2, g+2:Bs(3)+g:2, :, heavy_ids(8) )
             endif
         endif
 

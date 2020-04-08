@@ -93,7 +93,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,*) "of wabbit (prior to 08 April 2020). In this the file, the grid"
         write(*,*) "definition includes a redundant point, i.e., a block is defined"
         write(*,*) "with spacing dx = L*2^-J / (Bs-1). In new versions, the redundant"
-        write(*,*) "point is removed, leaving us with the spacing dx = L*2^J / Bs"
+        write(*,*) "point is removed, leaving us with the spacing dx = L*2^-J / Bs"
         write(*,*) "The file can be read; but it slightly increases the resolution"
         write(*,*) "(dx reduced), so do not expect the result to be perfectly identical"
         write(*,*) "to what would be obtained with the old code version."
@@ -102,7 +102,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,*) "--------------------------------------------------------------------"
     endif
 
-    if (version(1) >= 20200408) then
+    if (version(1) == 20200408) then
         ! Newer files also contain the block size in addition:
         call read_attribute( file_id, "blocks", "block-size", Bs_file)
     else
@@ -129,7 +129,6 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,'("Bs_file          = ",3(i3,1x))') Bs_file
         write(*,'("Bs_memory        = ",3(i3,1x))') params%Bs
     end if
-
 
 
     ! If the file has the wrong dimensions, we cannot read it

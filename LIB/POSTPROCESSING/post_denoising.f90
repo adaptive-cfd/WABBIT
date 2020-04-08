@@ -144,7 +144,7 @@ subroutine post_denoising(params)
             hvy_id = hvy_active(k, 2)
             call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-            Z = Z + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_id)**2 )*dx(1)*dx(2)
+            Z = Z + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id)**2 )*dx(1)*dx(2)
         enddo
         call MPI_ALLREDUCE(MPI_IN_PLACE, Z, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         Z = Z / (2.0_rk*product( params%domain_size(1:params%dim) ))

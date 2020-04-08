@@ -81,8 +81,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
-                    ! norm(p) = norm(p) + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, p, hvy_id )**2 )
-                    norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, p, hvy_id )**2 )
+                    norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, p, hvy_id )**2 )
                 enddo
             enddo
         else
@@ -94,8 +93,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
-                    ! norm(p) = norm(p) + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, p, hvy_id )**2 )
-                    norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, p, hvy_id )**2 )
+                    norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, hvy_id )**2 )
                 enddo
             enddo
         endif
@@ -120,7 +118,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
     case default
         write(*,*) which_norm
         call abort(20030201, "The tree norm you desire is not implemented. How dare you.")
-        
+
     end select
 
 end subroutine

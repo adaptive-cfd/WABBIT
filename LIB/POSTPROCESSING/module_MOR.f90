@@ -136,7 +136,7 @@ contains
       write(rowfmt,'(A,I4,A)') '(',N_snapshots,'(es15.8,1x))'
       open(14,file=filename, status='replace')
       do i = 1,N_snapshots
-        write(14,FMT=rowfmt) C(i,:) 
+        write(14,FMT=rowfmt) C(i,:)
       enddo
       close(14)
     end if
@@ -597,7 +597,7 @@ contains
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
-    
+
     !----------------------------------
     ! COMPUTE POD Modes
     !----------------------------------
@@ -645,9 +645,9 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80) :: fname_acoefs, filename, args 
+    character(len=80) :: fname_acoefs, filename, args
     character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
-    character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in 
+    character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
@@ -688,7 +688,7 @@ contains
             write(*,*) " --save_all           reconstruct all snapshots (default is false)"
             write(*,*) " --iteration          reconstruct single snapshot (default is no snapshots)"
             write(*,*) " --order              order of the predictor"
-            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot" 
+            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
             write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
@@ -835,7 +835,7 @@ contains
     !----------------------------------
     ! READ a_coefficient from file
     !----------------------------------
-    call read_array_from_ascii_file_mpi(fname_acoefs, a_coefs, n_header=0_ik) 
+    call read_array_from_ascii_file_mpi(fname_acoefs, a_coefs, n_header=0_ik)
     call count_lines_in_ascii_file_mpi(fsnapshot_list(1), N_snapshots, n_header=0_ik)
 
     !-------------------------------------------
@@ -907,7 +907,7 @@ contains
         call read_attributes(mode_in(i,j), lgt_n_tmp, unused_var, unused_int, domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
         if (any(params%Bs .ne. Bs)) then
-          write(*,*) "Bs: ",Bs, " vs ",params%Bs; 
+          write(*,*) "Bs: ",Bs, " vs ",params%Bs;
           call abort( 203199, " Block size is not consistent ")
         end if
         if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
@@ -1001,7 +1001,7 @@ contains
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
-    
+
     !---------------------------------------------------------------
     !---------------------------------------------------------------
     !          HERE WE DO THE ACTUAL error COMPUTATION
@@ -1011,11 +1011,11 @@ contains
     !
     ! 1. compute the reconstructed snapshots \tilde{u}(x,t)
     !   for different numbers of modes r = 1,...,Nmodes
-    ! 2. substract original snapshot by the reconstructed one 
+    ! 2. substract original snapshot by the reconstructed one
     !                  \delta u = u_i(x)-\tilde{u}_i(x)
     ! 3. compute the error for each time: err_i = \norm{delta u(x,t_i)}
     ! 4. add all errors sum_i(err_i)
-    ! 5. normalize it for the relative error 
+    ! 5. normalize it for the relative error
     !---------------------------------------------------------------
     !---------------------------------------------------------------
     if (tree_n < fsize) then
@@ -1037,10 +1037,10 @@ contains
           ! loop over every component
           do dF = 1, n_components
             ! filename is constructed from: reconst<dF>-<r>_<time>.h5
-            !                   - componentnumber dF 
+            !                   - componentnumber dF
             !                   - number of modes used for reconstruction r
             !                   - time of reconstructed snapshot
-            write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk) 
+            write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk)
             call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
             lgt_n, hvy_n, hvy_active, dF, reconst_tree_id ,time(j), iter_list(j) )
           end do
@@ -1049,7 +1049,7 @@ contains
 
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_id, j)
-        ! compute L2 norm  
+        ! compute L2 norm
         do dF = 1, params%n_eqn
           norm = compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt=dF, &
                               tree_id_opt=reconst_tree_id, verbosity=verbose)
@@ -1058,9 +1058,9 @@ contains
       end do
       L2error(r) = L2norm/L2norm_snapshots**2
     end do
-    
+
     !--------------------------
-    ! save L2error 
+    ! save L2error
     !--------------------------
     if (params%rank==0 ) then
       write(*,*)
@@ -1073,7 +1073,7 @@ contains
       close(14)
     end if
 
-    
+
   end subroutine
   !###############################################################
 
@@ -1081,7 +1081,7 @@ contains
 
 
 
-  
+
   !##############################################################
   !> Compute the L2 norm of the snapshotmatrix
   function compute_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n,  &
@@ -1207,9 +1207,9 @@ contains
           ! It is needed to perform the L2 inner product
           call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
           if ( params%dim == 3 ) then
-              C_val = C_val + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, :, hvy_id))
+              C_val = C_val + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, :, hvy_id))
           else
-              C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
+              C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
           endif
         end do
         t_inc(2) = MPI_wtime()-t_inc(2)
@@ -1287,7 +1287,7 @@ contains
             write(*,*) " RECONSTRUCTION OF SNAPSHOTS WITH wPOD MODES "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " CALL: ./wabbit-post --POD-reconstruct a_coef.txt --components=3 "
-            write(*,*) "                     --list POD_mode1.txt [POD_mode2.txt] [POD_mode3.txt]" 
+            write(*,*) "                     --list POD_mode1.txt [POD_mode2.txt] [POD_mode3.txt]"
             write(*,*) "                     [--save_all --iteration=10 --order=[2|4] --nmodes=3 --adapt=0.1] "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " a_coef.txt           list of temporal coefficients for all modes"
@@ -1296,7 +1296,7 @@ contains
             write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) " --nmodes             number of modes used for reconstruction"
             write(*,*) " --order              order of the predictor"
-            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot" 
+            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
         return
@@ -1645,7 +1645,7 @@ contains
     if (present(opt_offset_mode_tree_id)) then
       offset=opt_offset_mode_tree_id
     endif
-    
+
     if (rank == 0) then
       write(*, *)
       write(*,'(80("-"))')
@@ -1727,9 +1727,9 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80) ::  filename, args 
+    character(len=80) ::  filename, args
     character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
-    character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in 
+    character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
@@ -1773,7 +1773,7 @@ contains
             write(*,*) " --save_all           reconstruct all snapshots (default is false)"
             write(*,*) " --iteration          reconstruct single snapshot (default is no snapshots)"
             write(*,*) " --order              order of the predictor"
-            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot" 
+            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
             write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
@@ -1990,7 +1990,7 @@ contains
         call read_attributes(mode_in(i,j), lgt_n_tmp, unused_var, unused_int, domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
         if (any(params%Bs .ne. Bs)) then
-          write(*,*) "Bs: ",Bs, " vs ",params%Bs; 
+          write(*,*) "Bs: ",Bs, " vs ",params%Bs;
           call abort( 203199, " Block size is not consistent ")
         end if
         if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
@@ -2128,7 +2128,7 @@ contains
     end if
 
 
-    
+
   end subroutine
   !###############################################################
 

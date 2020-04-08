@@ -598,10 +598,10 @@ contains
             ! integrate squared quantity
             ! ----------------------------
             if (params%dim == 3) then
-                norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, &
-                g+1:Bs(3)+g-1,dF , hvy_id)**2)*dx(1)*dx(2)*dx(3)
+                norm = norm + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, &
+                g+1:Bs(3)+g, dF, hvy_id)**2)*dx(1)*dx(2)*dx(3)
             else
-                norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, &
+                norm = norm + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, &
                 dF, hvy_id)**2)*dx(1)*dx(2)
             endif
         end do
@@ -1670,9 +1670,9 @@ function scalar_product_two_trees( params, tree_n, &
       ! It is needed to perform the L2 inner product
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
       if ( params%dim == 3 ) then
-        sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, :, hvy_id))
+        sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, :, hvy_id))
       else
-        sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
+        sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
       endif
     end do
     t_inc(2) = MPI_wtime()-t_inc(2)

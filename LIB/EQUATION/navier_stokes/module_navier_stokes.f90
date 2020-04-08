@@ -704,10 +704,10 @@ contains
       if (params_ns%dim==2) then
         ! compute density and pressure only in physical domain
         tmp(1:5) =0.0_rk
-        ! we do not want to sum over redudant points so exclude Bs+g!!!
-        do iy=g+1, Bs(2)+g-1
+        
+        do iy=g+1, Bs(2)+g
           y = dble(iy-(g+1)) * dx(2) + x0(2)
-          do ix=g+1, Bs(1)+g-1
+          do ix=g+1, Bs(1)+g
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             if (mask(ix,iy,1)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
